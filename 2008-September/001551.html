@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4494 - in dependencies/OgreNewt_ngt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4494%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200809012042.m81KgZDw019891%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001550.html">
+   <LINK REL="Next"  HREF="001552.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4494 - in dependencies/OgreNewt_ngt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4494%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200809012042.m81KgZDw019891%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4494 - in dependencies/OgreNewt_ngt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Sep  1 22:42:35 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001550.html">[Dsa-hl-svn] r4493 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="001552.html">[Dsa-hl-svn] r4495 - in modules: common/dsa regressiontest/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1551">[ date ]</a>
+              <a href="thread.html#1551">[ thread ]</a>
+              <a href="subject.html#1551">[ subject ]</a>
+              <a href="author.html#1551">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-09-01 22:42:34 +0200 (Mon, 01 Sep 2008)
+New Revision: 4494
+
+Modified:
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Body.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_ContactCallback.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp
+Log:
+added triggervolumes and changed function-names in the contact-callback. but the trigger-volumes still need some changes in the contact-callback to work
+
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Body.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Body.h	2008-09-01 20:41:21 UTC (rev 4493)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Body.h	2008-09-01 20:42:34 UTC (rev 4494)
+@@ -198,7 +198,22 @@
+ 		returns the current center of mass, as an offset from the original origin when the body was created.
+ 	*/
+ 	Ogre::Vector3 getCenterOfMass() const;
++        //! freeze the rigid body.
++        /*!
++            this command &quot;freezes&quot; the Rigid Body, removing it from the active simulation list.  it will &quot;unfreeze&quot; if another body comes in contact with it, or you &quot;unfreeze&quot; it.
++            \sa unFreeze()
++        */
++       void freeze() { NewtonBodySetFreezeState( m_body, 1 ); }
+ 
++        //! unfreeze the rigid body.
++        /*!
++            \sa freeze()
++        */
++        void unFreeze() { NewtonBodySetFreezeState( m_body, 0 ); }
++
++        //! is the body freezed?
++        bool isFreezed() { return NewtonBodyGetFreezeState( m_body ) != 0; }
++            
+ 	//! set the material for the body
+ 	/*!
+ 		Materials are an extremely powerful way to control body behavior. first create a new MaterialID object, and then pass a pointer
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2008-09-01 20:41:21 UTC (rev 4493)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2008-09-01 20:42:34 UTC (rev 4494)
+@@ -90,6 +90,15 @@
+ 	//! calculate the moment of inertia for this collision primitive, along with the theoretical center-of-mass for this shape.
+ 	void calculateInertialMatrix( Ogre::Vector3&amp; inertia, Ogre::Vector3&amp; offset ) const { NewtonConvexCollisionCalculateInertialMatrix( m_col, &amp;inertia.x, &amp;offset.x ); }
+ 
++        //! returns true, if the collision is a trigger-volume
++        bool isTriggerVolume() const { return NewtonCollisionIsTriggerVolume(m_col) != 0; }
++
++        //! set collision as trigger-volume
++        /*!
++                if a collision is marked as a trigger-volume, there's no calculation of contacts, so
++                this acts like an accurate aabb test
++        */
++        void setAsTriggerVolume(bool trigger) { NewtonCollisionSetAsTriggerVolume(m_col, (int)trigger); }
+ };
+ 
+ //typedef Ogre::SharedPtr&lt;Collision&gt; CollisionPtr;
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_ContactCallback.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_ContactCallback.h	2008-09-01 20:41:21 UTC (rev 4493)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_ContactCallback.h	2008-09-01 20:42:34 UTC (rev 4494)
+@@ -107,7 +107,7 @@
+ 		user process function.  is called for each contact between the 2 bodies.  all member functions are valid from
+ 		within this function, and will affect the current contact.  return 0 to ignore the collision, 1 to allow it.
+ 	 */
+-	virtual int userProcess( Ogre::Real timeStep, int threadIndex ) { return 1; }
++	virtual int contactProcess( Ogre::Real timeStep, int threadIndex ) { return 1; }
+ 
+ 	//! user-defined End function
+ 	/*!
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp	2008-09-01 20:41:21 UTC (rev 4493)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp	2008-09-01 20:42:34 UTC (rev 4494)
+@@ -43,8 +43,10 @@
+ 	        me-&gt;m_body1 = (OgreNewt::Body*)NewtonBodyGetUserData( NewtonJointGetBody1(contactJoint) );
+ 
+ 	        // call the user-defined callback function!
+-	        if( !me-&gt;userProcess( (Ogre::Real)timeStep, threadIndex ) )
++	        if( !me-&gt;contactProcess( (Ogre::Real)timeStep, threadIndex ) )
++                {
+                     NewtonContactJointRemoveContact(contactJoint, contact);
++                }
+         }
+ }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001550.html">[Dsa-hl-svn] r4493 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="001552.html">[Dsa-hl-svn] r4495 - in modules: common/dsa regressiontest/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1551">[ date ]</a>
+              <a href="thread.html#1551">[ thread ]</a>
+              <a href="subject.html#1551">[ subject ]</a>
+              <a href="author.html#1551">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

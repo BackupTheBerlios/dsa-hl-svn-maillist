@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3812 - in rl/trunk/engine: rules/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3812%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/swig&In-Reply-To=%3C200709051224.l85COFk3001216%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000882.html">
+   <LINK REL="Next"  HREF="000884.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3812 - in rl/trunk/engine: rules/src script/swig</H1>
+    <B>no22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3812%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/swig&In-Reply-To=%3C200709051224.l85COFk3001216%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3812 - in rl/trunk/engine: rules/src script/swig">no22 at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep  5 14:24:15 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000882.html">[Dsa-hl-svn] r3811 - modules/regressiontest/maps
+</A></li>
+        <LI>Next message: <A HREF="000884.html">[Dsa-hl-svn] r3813 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#883">[ date ]</a>
+              <a href="thread.html#883">[ thread ]</a>
+              <a href="subject.html#883">[ subject ]</a>
+              <a href="author.html#883">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: no22
+Date: 2007-09-05 14:24:10 +0200 (Wed, 05 Sep 2007)
+New Revision: 3812
+
+Modified:
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/DsaManager.cpp
+   rl/trunk/engine/rules/src/Person.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Creature:
+* exportet addSf to ruby (Sonderfertigkeiten don't work yet, though)
+CreatureController:
+* renamed taw to tap which seems to be more appropriate
+* used the IMMOBILE metastatus, which is more robust to changes
+DsaManager:
+* more information in error message
+
+
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-09-05 11:01:42 UTC (rev 3811)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-09-05 12:24:10 UTC (rev 3812)
+@@ -389,6 +389,7 @@
+ 
+     int Creature::getTalent(const CeGuiString talentName)
+     {
++        LOG_DEBUG(Logger::RULES, &quot;Using talent &quot; + talentName);
+         TalentMap::const_iterator it = mTalente.find(talentName);
+         if (it == mTalente.end())
+         {
+@@ -567,7 +568,8 @@
+ 			Throw(IllegalArgumentException, &quot;Sonderfertigkeit schon in mSonderfertigkeiten enthalten.&quot;);
+ 		}
+ 		//ueberpruefe ob es die Sonderfertigkeit ueberhaupt gib
+-		DsaManager::getSingleton().getTalent(sfName);
++        /// @todo
++		//DsaManager::getSingleton().getSf(sfName);
+ 		mSonderfertigkeiten[sfName] = new SonderfertigkeitenStateSet();
+ 		mSonderfertigkeiten[sfName]-&gt;setOriginalValue( value );
+ 		fireObjectStateChangeEvent();
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-09-05 11:01:42 UTC (rev 3811)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-09-05 12:24:10 UTC (rev 3812)
+@@ -61,7 +61,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_DEAD | Effect::STATUS_UNCONSCIOUS | Effect::STATUS_SLEEPING));
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -730,20 +730,20 @@
+ 
+             if( mMovingCreature-&gt;getCreature()-&gt;hasTalent(&quot;Athletik&quot;) )
+             {
+-                int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
+-                if( taw &gt; 0 )
++                int tap = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
++                if( tap &gt; 0 )
+                 {
+-                    if( taw == RESULT_SPEKT_AUTOERFOLG )
++                    if( tap == RESULT_SPEKT_AUTOERFOLG )
+                     {
+                         mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 12.5;
+                     }
+-                    else if( taw == RESULT_AUTOERFOLG )
++                    else if( tap == RESULT_AUTOERFOLG )
+                     {
+                         mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 25.0;
+                     }
+                     else
+                     {
+-                        mHeight += taw / 25.0;
++                        mHeight += tap / 25.0;
+                     }
+                 }
+             }
+
+Modified: rl/trunk/engine/rules/src/DsaManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/DsaManager.cpp	2007-09-05 11:01:42 UTC (rev 3811)
++++ rl/trunk/engine/rules/src/DsaManager.cpp	2007-09-05 12:24:10 UTC (rev 3812)
+@@ -212,7 +212,8 @@
+         }
+         else
+         {
+-            Throw(IllegalArgumentException, &quot;Talent nicht gefunden.&quot;);
++            CeGuiString errorMessage = &quot;Talent &quot; + talentName + &quot; nicht gefunden.&quot;;
++            Throw(IllegalArgumentException, errorMessage.c_str());
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/rules/src/Person.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Person.cpp	2007-09-05 11:01:42 UTC (rev 3811)
++++ rl/trunk/engine/rules/src/Person.cpp	2007-09-05 12:24:10 UTC (rev 3812)
+@@ -26,6 +26,7 @@
+     {
+         mQueryFlags |= QUERYFLAG_PERSON;
+ 		setWert(WERT_SOZIALSTATUS, 0);
++        setWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE, 5);
+     }
+ 
+ }
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-09-05 11:01:42 UTC (rev 3811)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-09-05 12:24:10 UTC (rev 3812)
+@@ -644,6 +644,13 @@
+             ALIGNMENT_NEUTRAL, ///&lt; Creature doesn't fight for either side.
+             ALIGNMENT_ENEMY    ///&lt; Creature fights against the player.
+         };
++
++            enum SfStatus
++            {
++                SFSTATUS_IN_TRAINING = 1,
++                SFSTATUS_OK,
++                SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Wird das ueberhaupt gebraucht?
++        };
+         
+ 
+         // some targets
+@@ -691,6 +698,7 @@
+         void addNachteil(const rl::CeGuiString nachteilName, int value = 0);        
+         
+         void addKampftechnik(const rl::CeGuiString kampftechnikName, std::pair&lt;int,int&gt; value = make_pair(0,0));
++        virtual void addSf(const rl::CeGuiString sfName, SfStatus value = SFSTATUS_IN_TRAINING);
+         
+         virtual int doTalentprobe(const rl::CeGuiString talentName, int modifier);
+         virtual int doEigenschaftsprobe(const rl::CeGuiString eigenschaftName, int modifier);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000882.html">[Dsa-hl-svn] r3811 - modules/regressiontest/maps
+</A></li>
+	<LI>Next message: <A HREF="000884.html">[Dsa-hl-svn] r3813 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#883">[ date ]</a>
+              <a href="thread.html#883">[ thread ]</a>
+              <a href="subject.html#883">[ subject ]</a>
+              <a href="author.html#883">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

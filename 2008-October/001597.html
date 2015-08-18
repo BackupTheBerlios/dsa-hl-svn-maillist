@@ -1,0 +1,792 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4540 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4540%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200810020613.m926DZq2029864%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001594.html">
+   <LINK REL="Next"  HREF="001598.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4540 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4540%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200810020613.m926DZq2029864%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4540 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Oct  2 08:13:35 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001594.html">[Dsa-hl-svn] r4539 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj engine/core/include engine/rules	engine/rules/include engine/rules/src engine/script/swig engine/ui
+</A></li>
+        <LI>Next message: <A HREF="001598.html">[Dsa-hl-svn] r4541 - in modules: common/scripts regressiontest/dsa	regressiontest/scripts regressiontest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1597">[ date ]</a>
+              <a href="thread.html#1597">[ thread ]</a>
+              <a href="subject.html#1597">[ subject ]</a>
+              <a href="author.html#1597">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-10-02 08:13:34 +0200 (Thu, 02 Oct 2008)
+New Revision: 4540
+
+Modified:
+   rl/trunk/engine/core/include/MessagePump.h
+   rl/trunk/engine/core/src/MessagePump.cpp
+Log:
+Moved non-template methods to cpp file
+
+Modified: rl/trunk/engine/core/include/MessagePump.h
+===================================================================
+--- rl/trunk/engine/core/include/MessagePump.h	2008-10-01 16:51:11 UTC (rev 4539)
++++ rl/trunk/engine/core/include/MessagePump.h	2008-10-02 06:13:34 UTC (rev 4540)
+@@ -1,292 +1,234 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-
+-#ifndef __Rl_MessagePump_H__
+-#define __Rl_MessagePump_H__
+-
+-#include &quot;CorePrerequisites.h&quot;
+-
+-#include &quot;MessageType.h&quot;
+-#include &quot;GameTask.h&quot;
+-
+-
+-#include &lt;map&gt;
+-#include &lt;queue&gt;
+-
+-#include &lt;boost/noncopyable.hpp&gt;
+-
+-namespace rl
+-{
+-
+-    class MessageHandlerWrapperBase
+-    {
+-    public:
+-        virtual ~MessageHandlerWrapperBase() {}
+-        virtual bool Invoke(MessageObjectBase* obj) = 0;
+-    };
+-
+-    template&lt;class _MessageType&gt;
+-    class MessageHandlerWrapper : public MessageHandlerWrapperBase
+-    {
+-    public:
+-        typedef typename _MessageType::MessageObjectType MessageObjectType;
+-        typedef typename _MessageType::HandlerType HandlerType;
+-
+-        MessageHandlerWrapper(const HandlerType&amp; handler)
+-            : mHandler(handler)
+-        {
+-        }
+-
+-        virtual bool Invoke(MessageObjectBase* obj)
+-        {
+-            MessageObjectType* obj2 = static_cast&lt;MessageObjectType*&gt;(obj);
+-            return obj2-&gt;Invoke(mHandler);
+-        }
+-
+-    private:
+-        HandlerType mHandler;
+-    };
+-
+-    class _RlCoreExport MessagePump : public GameTask, public Ogre::Singleton&lt;MessagePump&gt;
+-    {
+-    public:
+-        class Connection
+-        {
+-            friend class MessagePump;
+-        public:
+-            Connection()
+-                : connectionId(-1), pump(NULL)
+-            {}
+-            void disconnect()
+-            {
+-                if(pump &amp;&amp; connectionId != -1)
+-                    pump-&gt;disconnectHandler(connectionId);
+-            }
+-        private:
+-            MessagePump* pump;
+-            int connectionId;
+-        };
+-
+-        class ScopedConnection : boost::noncopyable
+-        {
+-        public:
+-            ScopedConnection()
+-            {}
+-            ScopedConnection(const Connection&amp; conn)
+-                : mConnection(conn)
+-            {}
+-            ScopedConnection&amp; operator =(const Connection&amp; conn)
+-            {
+-                mConnection.disconnect();
+-                mConnection = conn;
+-                return *this;
+-            }
+-            ~ScopedConnection()
+-            {
+-                mConnection.disconnect();
+-            }
+-        private:
+-            Connection mConnection;
+-        };
+-
+-    private:
+-        struct MessageHandlerMapEntry
+-        {
+-            int connectionId;
+-            MessageHandlerWrapperBase* handlerWrapper;
+-        };
+-
+-        typedef std::vector&lt;MessageHandlerMapEntry&gt; MessageHandlerMapEntries;
+-        typedef std::map&lt;int, MessageHandlerMapEntries*&gt; MessageHandlerMap;
+-        typedef std::queue&lt;MessageObjectBase*&gt; MessageQueue;
+-
+-    public:
+-        MessagePump() : mNextConnectionId(0) {}
+-        ~MessagePump();
+-
+-        template&lt;typename _MessageType&gt;
+-        Connection addMessageHandler( const typename _MessageType::HandlerType&amp; handler )
+-        {
+-            MessageHandlerWrapper&lt;_MessageType&gt;* wrapper =
+-                new MessageHandlerWrapper&lt;_MessageType&gt;(handler);
+-
+-            MessageHandlerMapEntries* entries = getOrCreateMapEntries(_MessageType::MessageTypeId);
+-            MessageHandlerMapEntry entry = {mNextConnectionId++, wrapper};
+-            entries-&gt;push_back(entry);
+-
+-            LOG_MESSAGE(&quot;MessagePump&quot;, 
+-                &quot;Added message handler for message type &quot; 
+-                + Ogre::StringConverter::toString(_MessageType::MessageTypeId));
+-
+-            Connection con;
+-            con.pump = this;
+-            con.connectionId = entry.connectionId;
+-            return con;
+-        }
+-
+-        /*
+-        * sendMessage and postMessage is implemented for all possible parameter counts
+-        * Thanks to the idea of SFINAE, the compiler will choose 
+-        * the correct implementation for all MessageTypes at compile time
+-        *
+-        * sendMessage processes the message immediatly, while postMessage delays the 
+-        * processing to a later frame
+-        */
+-        template&lt;typename _MessageType&gt;
+-        bool sendMessage()
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
+-            return doSend(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1);
+-            return doSend(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p2)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2);
+-            return doSend(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p2,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p3)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2, p3);
+-            return doSend(obj);
+-        }
+-
+-        ////////////////////////////////
+-
+-        template&lt;typename _MessageType&gt;
+-        void postMessage()
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
+-            doPost(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1);
+-            doPost(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p2)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1,p2);
+-            doPost(obj);
+-        }
+-
+-        template&lt;typename _MessageType&gt;
+-        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p2,
+-            const typename _MessageType::MessageObjectType::Param2&amp; p3)
+-        {
+-            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2, p3);
+-            doPost(obj);
+-        }
+-
+-        void sendPending()
+-        {
+-            while(!mMessageQueue.empty())
+-            {
+-                doSend(mMessageQueue.front());
+-                mMessageQueue.pop();
+-            }
+-        }
+-
+-        // overloads from GameTask
+-
+-        virtual void run(Ogre::Real elapsedTime);
+-
+-        virtual const Ogre::String&amp; getName() const;
+-
+-    private:
+-        MessageHandlerMapEntries* getOrCreateMapEntries(int id) 
+-        {
+-            LOG_MESSAGE(&quot;MessagePump&quot;, &quot;Create or get id &quot; + Ogre::StringConverter::toString(id));
+-            MessageHandlerMap::iterator it = mMessageHandlerMap.find(id);
+-            if(it == mMessageHandlerMap.end())
+-            {
+-                MessageHandlerMapEntries* entries = new MessageHandlerMapEntries();
+-                mMessageHandlerMap[id] = entries;
+-                return entries;
+-            }
+-            return it-&gt;second;
+-        }
+-
+-        bool doSend(MessageObjectBase* msg)
+-        {
+-            bool msgHandled = false;
+-            MessageHandlerMapEntries* entries = getOrCreateMapEntries(msg-&gt;getMessageTypeId());
+-            for(MessageHandlerMapEntries::iterator it = entries-&gt;begin(); it != entries-&gt;end(); ++it)
+-            {
+-                if((*it).handlerWrapper-&gt;Invoke(msg))
+-                {
+-                    msgHandled = true;
+-                }
+-            }
+-            delete msg;
+-            return msgHandled;;
+-        }
+-
+-        void doPost(MessageObjectBase* msg)
+-        {
+-            mMessageQueue.push(msg);
+-        }
+-
+-        friend class Connection;
+-        void disconnectHandler(int connectionId)
+-        {
+-            //not very performant...definitely needs improvement
+-            for (MessageHandlerMap::iterator it = mMessageHandlerMap.begin();
+-                it != mMessageHandlerMap.end(); ++it)
+-            {
+-                MessageHandlerMapEntries* en = it-&gt;second;
+-                for (MessageHandlerMapEntries::iterator jt = en-&gt;begin(); jt != en-&gt;end(); ++jt)
+-                {
+-                    if (jt-&gt;connectionId == connectionId)
+-                    {
+-                        delete jt-&gt;handlerWrapper;
+-                        en-&gt;erase(jt);
+-                        if (en-&gt;empty())
+-                        {
+-                            delete en;
+-                            mMessageHandlerMap.erase(it);
+-                        }
+-                        return;
+-                    }
+-                }
+-            }
+-        }
+-
+-    private:
+-        int mNextConnectionId;
+-        MessageHandlerMap mMessageHandlerMap;
+-        MessageQueue mMessageQueue;
+-    };
+-}
+-#endif
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_MessagePump_H__
++#define __Rl_MessagePump_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++#include &quot;MessageType.h&quot;
++#include &quot;GameTask.h&quot;
++
++
++#include &lt;map&gt;
++#include &lt;queue&gt;
++
++#include &lt;boost/noncopyable.hpp&gt;
++
++namespace rl
++{
++
++    class MessageHandlerWrapperBase
++    {
++    public:
++        virtual ~MessageHandlerWrapperBase() {}
++        virtual bool Invoke(MessageObjectBase* obj) = 0;
++    };
++
++    template&lt;class _MessageType&gt;
++    class MessageHandlerWrapper : public MessageHandlerWrapperBase
++    {
++    public:
++        typedef typename _MessageType::MessageObjectType MessageObjectType;
++        typedef typename _MessageType::HandlerType HandlerType;
++
++        MessageHandlerWrapper(const HandlerType&amp; handler)
++            : mHandler(handler)
++        {
++        }
++
++        virtual bool Invoke(MessageObjectBase* obj)
++        {
++            MessageObjectType* obj2 = static_cast&lt;MessageObjectType*&gt;(obj);
++            return obj2-&gt;Invoke(mHandler);
++        }
++
++    private:
++        HandlerType mHandler;
++    };
++
++    class _RlCoreExport MessagePump : public GameTask, public Ogre::Singleton&lt;MessagePump&gt;
++    {
++    public:
++        class Connection
++        {
++            friend class MessagePump;
++        public:
++            Connection()
++                : connectionId(-1), pump(NULL)
++            {}
++            void disconnect()
++            {
++                if(pump &amp;&amp; connectionId != -1)
++                    pump-&gt;disconnectHandler(connectionId);
++            }
++        private:
++            MessagePump* pump;
++            int connectionId;
++        };
++
++        class ScopedConnection : boost::noncopyable
++        {
++        public:
++            ScopedConnection()
++            {}
++            ScopedConnection(const Connection&amp; conn)
++                : mConnection(conn)
++            {}
++            ScopedConnection&amp; operator =(const Connection&amp; conn)
++            {
++                mConnection.disconnect();
++                mConnection = conn;
++                return *this;
++            }
++            ~ScopedConnection()
++            {
++                mConnection.disconnect();
++            }
++        private:
++            Connection mConnection;
++        };
++
++    private:
++        struct MessageHandlerMapEntry
++        {
++            int connectionId;
++            MessageHandlerWrapperBase* handlerWrapper;
++        };
++
++        typedef std::vector&lt;MessageHandlerMapEntry&gt; MessageHandlerMapEntries;
++        typedef std::map&lt;int, MessageHandlerMapEntries*&gt; MessageHandlerMap;
++        typedef std::queue&lt;MessageObjectBase*&gt; MessageQueue;
++
++    public:
++        MessagePump() : mNextConnectionId(0) {}
++        ~MessagePump();
++
++        template&lt;typename _MessageType&gt;
++        Connection addMessageHandler( const typename _MessageType::HandlerType&amp; handler )
++        {
++            MessageHandlerWrapper&lt;_MessageType&gt;* wrapper =
++                new MessageHandlerWrapper&lt;_MessageType&gt;(handler);
++
++            MessageHandlerMapEntries* entries = getOrCreateMapEntries(_MessageType::MessageTypeId);
++            MessageHandlerMapEntry entry = {mNextConnectionId++, wrapper};
++            entries-&gt;push_back(entry);
++
++            LOG_MESSAGE(&quot;MessagePump&quot;, 
++                &quot;Added message handler for message type &quot; 
++                + Ogre::StringConverter::toString(_MessageType::MessageTypeId));
++
++            Connection con;
++            con.pump = this;
++            con.connectionId = entry.connectionId;
++            return con;
++        }
++
++        /*
++        * sendMessage and postMessage is implemented for all possible parameter counts
++        * Thanks to the idea of SFINAE, the compiler will choose 
++        * the correct implementation for all MessageTypes at compile time
++        *
++        * sendMessage processes the message immediatly, while postMessage delays the 
++        * processing to a later frame
++        */
++        template&lt;typename _MessageType&gt;
++        bool sendMessage()
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            return doSend(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1);
++            return doSend(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2);
++            return doSend(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2,
++            const typename _MessageType::MessageObjectType::Param2&amp; p3)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2, p3);
++            return doSend(obj);
++        }
++
++        ////////////////////////////////
++
++        template&lt;typename _MessageType&gt;
++        void postMessage()
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            doPost(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1);
++            doPost(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1,p2);
++            doPost(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2,
++            const typename _MessageType::MessageObjectType::Param2&amp; p3)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2, p3);
++            doPost(obj);
++        }
++
++        void sendPending();
++
++        // overloads from GameTask
++
++        virtual void run(Ogre::Real elapsedTime);
++
++        virtual const Ogre::String&amp; getName() const;
++
++    private:
++        MessageHandlerMapEntries* getOrCreateMapEntries(int id); 
++        bool doSend(MessageObjectBase* msg);
++        void doPost(MessageObjectBase* msg);
++
++        friend class Connection;
++        void disconnectHandler(int connectionId);
++
++    private:
++        int mNextConnectionId;
++        MessageHandlerMap mMessageHandlerMap;
++        MessageQueue mMessageQueue;
++    };
++}
++#endif
+
+Modified: rl/trunk/engine/core/src/MessagePump.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MessagePump.cpp	2008-10-01 16:51:11 UTC (rev 4539)
++++ rl/trunk/engine/core/src/MessagePump.cpp	2008-10-02 06:13:34 UTC (rev 4540)
+@@ -1,57 +1,126 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot;
+-
+-#include &quot;MessagePump.h&quot;
+-
+-template&lt;&gt; rl::MessagePump* Ogre::Singleton&lt;rl::MessagePump&gt;::ms_Singleton = 0;
+-
+-namespace rl
+-{
+-    MessagePump::~MessagePump()
+-    {
+-
+-        while(!mMessageQueue.empty())
+-        {
+-        
+-            delete mMessageQueue.front();
+-            mMessageQueue.pop();    
+-        }
+-
+-        MessageHandlerMap::iterator it = mMessageHandlerMap.begin();
+-        for( ; it != mMessageHandlerMap.end(); it++ )
+-            if( it-&gt;second != NULL )
+-                delete it-&gt;second;
+-    }
+-
+-    void MessagePump::run(Ogre::Real elapsedTime)
+-    {
+-        static bool sending = false;
+-        if(!sending)
+-        {
+-            sending = true;
+-            sendPending();
+-            sending = false;  
+-        }
+-    }
+-
+-    const Ogre::String&amp; MessagePump::getName() const
+-    {
+-        static Ogre::String name = &quot;MessagePump&quot;;
+-        return name;
+-    }
+-
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot;
++
++#include &quot;MessagePump.h&quot;
++
++template&lt;&gt; rl::MessagePump* Ogre::Singleton&lt;rl::MessagePump&gt;::ms_Singleton = 0;
++
++namespace rl
++{
++    MessagePump::~MessagePump()
++    {
++
++        while(!mMessageQueue.empty())
++        {
++        
++            delete mMessageQueue.front();
++            mMessageQueue.pop();    
++        }
++
++        MessageHandlerMap::iterator it = mMessageHandlerMap.begin();
++        for( ; it != mMessageHandlerMap.end(); it++ )
++            if( it-&gt;second != NULL )
++                delete it-&gt;second;
++    }
++
++    void MessagePump::run(Ogre::Real elapsedTime)
++    {
++        static bool sending = false;
++        if(!sending)
++        {
++            sending = true;
++            sendPending();
++            sending = false;  
++        }
++    }
++
++    const Ogre::String&amp; MessagePump::getName() const
++    {
++        static Ogre::String name = &quot;MessagePump&quot;;
++        return name;
++    }
++    
++    void MessagePump::sendPending()
++    {
++        while(!mMessageQueue.empty())
++        {
++            doSend(mMessageQueue.front());
++            mMessageQueue.pop();
++        }
++    }
++    
++    
++    MessagePump::MessageHandlerMapEntries* MessagePump::getOrCreateMapEntries(int id)
++    {
++        // if (id != 0x1000204){
++        //     LOG_MESSAGE(&quot;MessagePump&quot;, &quot;Create or get id &quot; + Ogre::StringConverter::toString(id));                
++        // }
++        MessageHandlerMap::iterator it = mMessageHandlerMap.find(id);
++        if(it == mMessageHandlerMap.end())
++        {
++            MessageHandlerMapEntries* entries = new MessageHandlerMapEntries();
++            mMessageHandlerMap[id] = entries;
++            return entries;
++        }
++        return it-&gt;second;
++    }
++    
++    bool MessagePump::doSend(MessageObjectBase* msg)
++    {
++        bool msgHandled = false;
++        MessageHandlerMapEntries* entries = getOrCreateMapEntries(msg-&gt;getMessageTypeId());
++        for(MessageHandlerMapEntries::iterator it = entries-&gt;begin(); it != entries-&gt;end(); ++it)
++        {
++            if((*it).handlerWrapper-&gt;Invoke(msg))
++            {
++                msgHandled = true;
++            }
++        }
++        delete msg;
++        return msgHandled;;
++    }
++    
++    void MessagePump::doPost(MessageObjectBase* msg)
++    {
++        mMessageQueue.push(msg);
++    }
++    
++    void MessagePump::disconnectHandler(int connectionId)
++    {
++        //not very performant...definitely needs improvement
++        for (MessageHandlerMap::iterator it = mMessageHandlerMap.begin();
++             it != mMessageHandlerMap.end(); ++it)
++        {
++            MessageHandlerMapEntries* en = it-&gt;second;
++            for (MessageHandlerMapEntries::iterator jt = en-&gt;begin(); jt != en-&gt;end(); ++jt)
++            {
++                if (jt-&gt;connectionId == connectionId)
++                {
++                    delete jt-&gt;handlerWrapper;
++                    en-&gt;erase(jt);
++                    if (en-&gt;empty())
++                    {
++                        delete en;
++                        mMessageHandlerMap.erase(it);
++                    }
++                    return;
++                }
++            }
++        }
++    }
++    
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001594.html">[Dsa-hl-svn] r4539 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj engine/core/include engine/rules	engine/rules/include engine/rules/src engine/script/swig engine/ui
+</A></li>
+	<LI>Next message: <A HREF="001598.html">[Dsa-hl-svn] r4541 - in modules: common/scripts regressiontest/dsa	regressiontest/scripts regressiontest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1597">[ date ]</a>
+              <a href="thread.html#1597">[ thread ]</a>
+              <a href="subject.html#1597">[ subject ]</a>
+              <a href="author.html#1597">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

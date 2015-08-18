@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4380 - rl/trunk/tools
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4380%20-%20rl/trunk/tools&In-Reply-To=%3C200805221654.m4MGs4rj002906%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001450.html">
+   <LINK REL="Next"  HREF="001452.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4380 - rl/trunk/tools</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4380%20-%20rl/trunk/tools&In-Reply-To=%3C200805221654.m4MGs4rj002906%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4380 - rl/trunk/tools">tanis at mail.berlios.de
+       </A><BR>
+    <I>Thu May 22 18:54:04 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001450.html">[Dsa-hl-svn] r4379 - modules/common/scripts/jobs
+</A></li>
+        <LI>Next message: <A HREF="001452.html">[Dsa-hl-svn] r4381 - in rl/branches: .	ogre16/rl/trunk/engine/core/include ogre16/rl/trunk/engine/core/src	ogre16/rl/trunk/engine/rules/src ogre16/rl/trunk/engine/script/swig	ogre16/rl/trunk/engine/ui/src ogre16/rl/trunk/tools
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1451">[ date ]</a>
+              <a href="thread.html#1451">[ thread ]</a>
+              <a href="subject.html#1451">[ subject ]</a>
+              <a href="author.html#1451">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-05-22 18:54:01 +0200 (Thu, 22 May 2008)
+New Revision: 4380
+
+Added:
+   rl/trunk/tools/material_updater.rb
+Log:
+Material update script for transition from Ogre 1.4 to Ogre 1.6
+N O C H   N I C H T  B E N U T Z E N !!!
+
+Added: rl/trunk/tools/material_updater.rb
+===================================================================
+--- rl/trunk/tools/material_updater.rb	2008-05-22 15:28:13 UTC (rev 4379)
++++ rl/trunk/tools/material_updater.rb	2008-05-22 16:54:01 UTC (rev 4380)
+@@ -0,0 +1,108 @@
++=begin
++Copyright (c) 2008 Daniel Wickert
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the &quot;Software&quot;), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++THE SOFTWARE.  
++
++ This script adds necessary import statements for switch Ogre 1.4 -&gt; Ogre 1.6
++ Only run it once on any given set of materials.
++ If a base material's source file can't be determined,
++ it is imported from __unkown_material_file__,
++ so it is easy to spot missing files.
++
++ This script expects a single base directory as argument,
++ if none given process current directory
++ call:
++ &gt; ruby material_upgrader.rb [base_directory]
++
++=end
++
++require 'find'
++
++base = ARGV.empty? ? '.' : ARGV[0]
++
++# key: derived material name, value: base material name.
++derived_materials = Hash.new
++# key: file name, value: Array of material names.
++materials_per_file = Hash.new
++# key: material name, value: file base name.
++file_per_material = Hash.new(&quot;__unkown_material_file__&quot;)
++
++# Find all materials, their base materials and store which material is defined where.
++Find.find(base) do |path|
++  if test(?d, path) :
++    # Do not enter hidden directories like .svn
++    if File.basename(path)[0] == ?. :
++      Find.prune
++    end
++    puts &quot;Entering &quot; + path + &quot;...&quot;
++  else
++    # Actual file. Is it a material or program?
++    if path =~ /\.(material|program)$/ :
++      puts &quot;   Parsing #{File.basename(path)}...&quot;
++      materials = Array.new
++      File.open(path, &quot;r+&quot;).each do |line|
++        # For each material in the file store it in an array.
++        if line =~ /^\s*material\s+([^:\s]*)/ :
++          puts &quot;      found material #$1.&quot;
++          materials &lt;&lt; $1
++          file_per_material[$1] = File.basename(path)
++        end
++        # For each dervied material store material and its base material in a hash.
++        if line =~ /^\s*material\s+([^:\s]*)?\s*:\s*([^:\s]*)?\s+$/ :
++          puts &quot;         it is derived from #$2.&quot;
++          derived_materials[$1] = $2
++        end
++      end
++      materials_per_file[path] = materials
++    end
++  end
++end
++
++materials_per_file.each do |file, materials|
++  # does the file contain derived materials?
++  imports = Array.new
++  materials.each do |mat|
++    if derived_materials.has_key? mat :
++      # Prepare an import statement.
++      basemat = derived_materials[mat]
++      importfile = file_per_material[basemat]
++      if importfile != File.basename(file) :
++        imports &lt;&lt; &quot;import #{basemat} from #{importfile}\n&quot;        
++      end
++    end
++  end
++  if not imports.empty? :
++    imports.sort!
++    imports.uniq!
++    # Open file and add imports at the beginning.
++    puts &quot;in file #{file}:&quot;
++    imports.each {|line| puts &quot;   #{line}&quot;}
++    File.open(file, File::RDWR) do |f|
++      content = f.readlines
++      f.pos = 0
++      f.print imports
++      f.print &quot;\n&quot;
++      f.print content
++      f.truncate f.pos
++    end
++  end
++end
++
++
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001450.html">[Dsa-hl-svn] r4379 - modules/common/scripts/jobs
+</A></li>
+	<LI>Next message: <A HREF="001452.html">[Dsa-hl-svn] r4381 - in rl/branches: .	ogre16/rl/trunk/engine/core/include ogre16/rl/trunk/engine/core/src	ogre16/rl/trunk/engine/rules/src ogre16/rl/trunk/engine/script/swig	ogre16/rl/trunk/engine/ui/src ogre16/rl/trunk/tools
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1451">[ date ]</a>
+              <a href="thread.html#1451">[ thread ]</a>
+              <a href="subject.html#1451">[ subject ]</a>
+              <a href="author.html#1451">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

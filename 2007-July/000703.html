@@ -1,0 +1,207 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3632 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3632%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200707281929.l6SJTZdV010902%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000702.html">
+   <LINK REL="Next"  HREF="000704.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3632 - in rl/trunk/engine/core: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3632%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200707281929.l6SJTZdV010902%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3632 - in rl/trunk/engine/core: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Jul 28 21:29:35 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000702.html">[Dsa-hl-svn] r3631 - modules/techdemo2/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000704.html">[Dsa-hl-svn] r3633 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#703">[ date ]</a>
+              <a href="thread.html#703">[ thread ]</a>
+              <a href="subject.html#703">[ subject ]</a>
+              <a href="author.html#703">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-07-28 21:29:27 +0200 (Sat, 28 Jul 2007)
+New Revision: 3632
+
+Modified:
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/GameLoop.cpp
+Log:
+Now a fixed number of frames can be smoothed (and not all frames in a period of time). You can also disable smoothing.
+This prevents accelerations and slowdowns of the movement (the whole game) when the framerate changes.
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-07-28 12:42:05 UTC (rev 3631)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-07-28 19:29:27 UTC (rev 3632)
+@@ -114,12 +114,12 @@
+     unsigned long mGameTime;
+ 
+     std::deque&lt;unsigned long&gt; mLastTimes;
+-    /// In milliseconds, because Ogre's timer works this way.
+-    unsigned long mSmoothPeriod;
++    /// In milliseconds, because Ogre's timer works this way. Number of smoothed Frames, should not be 0!
++    unsigned long mSmoothedFrames;
+     /// Time cap for frame time, to prevent interpolation problems during spikes.
+     Ogre::Real mMaxFrameTime;
+-	bool mQuitRequested;
+-	bool mPaused;
++    bool mQuitRequested;
++    bool mPaused;
+ 
+     /// Averages frame rate over mSmoothPeriod milliseconds.
+     /// Steadies Controls and Physics a bit.
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-07-28 12:42:05 UTC (rev 3631)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-07-28 19:29:27 UTC (rev 3632)
+@@ -41,10 +41,10 @@
+           mTimer(NULL),
+           mGameTime(0),
+           mLastTimes(),
+-          mSmoothPeriod(500),
+-          mMaxFrameTime(0.250f),
++          mSmoothedFrames(3),
++          mMaxFrameTime(0.1f),
+           mQuitRequested(false),
+-		  mPaused(false)
++          mPaused(false)
+     {
+         // create five task lists, one for each taskgroup
+         mTaskLists.push_back(new GameTaskList());
+@@ -109,25 +109,35 @@
+         }
+     }
+ 
+-	bool GameLoop::isPaused() const
+-	{
+-		return mPaused;
+-	}
++    bool GameLoop::isPaused() const
++    {
++        return mPaused;
++    }
+ 
+-	void GameLoop::setPaused(bool paused)
+-	{
+-		mPaused = paused;
+-	}
++    void GameLoop::setPaused(bool paused)
++    {
++        mPaused = paused;
++    }
+ 
+     void GameLoop::_executeOneRenderLoop()
+     {
+         // Calculate frame time. This time is smoothed and capped.
+         unsigned long elapsedTime = mTimer-&gt;getMilliseconds();
+-        Real frameTime = 0.001f * (Real) smoothFrameTime(elapsedTime - mGameTime);
++
++        unsigned long unsmoothedFrameTime = elapsedTime - mGameTime;
++
++        if( elapsedTime &lt; mGameTime )
++            unsmoothedFrameTime = 1;
++
++        if( unsmoothedFrameTime &gt; mMaxFrameTime*1000 )
++        {
++            LOG_MESSAGE(Logger::CORE, &quot;Die aktuelle Frame wurde auf den festgelegten Maximalwert gek&#252;rzt&quot;);
++            unsmoothedFrameTime = mMaxFrameTime*1000;
++        }
++        Real frameTime = 0.001f * (Real) smoothFrameTime(unsmoothedFrameTime);
+         mGameTime = elapsedTime;
+-        if (frameTime &gt; mMaxFrameTime) frameTime = mMaxFrameTime;
+ 
+-		// Let Ogre handle Windows/XServer events.
++        // Let Ogre handle Windows/XServer events.
+         WindowEventUtilities::messagePump();
+ 
+         // Render the next frame
+@@ -141,7 +151,7 @@
+             {
+                 if (it-&gt;valid &amp;&amp; !(it-&gt;task-&gt;isPaused()) &amp;&amp; !isPaused())
+                 {
+-					it-&gt;task-&gt;run(frameTime);
++                    it-&gt;task-&gt;run(frameTime);
+                 }
+             }
+         }
+@@ -177,27 +187,22 @@
+     }
+ 
+     // Idea taken from Ogre, but implementation by us.
+-    // smooths time step over the period mSmoothPeriod.
++    // fixed number of smoothed frames
+     unsigned long GameLoop::smoothFrameTime(unsigned long time)
+     {
++        // remove the last frame, if enough frame-times are saved
++        if( mLastTimes.size() &gt;= std::max(mSmoothedFrames,(unsigned long)1) )
++            mLastTimes.pop_front();
+         // First add time for this frame
+         mLastTimes.push_back(time);
+ 
+-        // Starting from the end of the queue, determine the element, that
+-        // is just over the threshold mSmoothPeriod.
+-        unsigned long limit = 0;
+-        std::deque&lt;unsigned long&gt;::reverse_iterator i = mLastTimes.rbegin();
+-        while (i != mLastTimes.rend() &amp;&amp; limit &lt; mSmoothPeriod)
+-        {
+-            limit += *i;
+-            ++i;
+-        }
+-        // Erase all times, that are over.
+-        mLastTimes.erase(mLastTimes.begin(), mLastTimes.begin() + (mLastTimes.rend() - i));
+-
+         // Return the mean of the remaining times.
+-        return std::accumulate(mLastTimes.begin(), mLastTimes.end(), 0)
+-            / std::max(mLastTimes.size(), (size_t)1);
++        // Do not return zero
++        if( mLastTimes.size() == 0 )
++            return time;
++        else
++            return std::accumulate(mLastTimes.begin(), mLastTimes.end(), 0)
++                / std::max(mLastTimes.size(), (size_t)1);
+     }
+ 
+     unsigned long GameLoop::getClock() const
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000702.html">[Dsa-hl-svn] r3631 - modules/techdemo2/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000704.html">[Dsa-hl-svn] r3633 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#703">[ date ]</a>
+              <a href="thread.html#703">[ thread ]</a>
+              <a href="subject.html#703">[ subject ]</a>
+              <a href="author.html#703">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

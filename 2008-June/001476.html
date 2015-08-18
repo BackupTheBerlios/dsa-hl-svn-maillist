@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4405 - in rl/trunk/engine: core/include core/src	script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4405%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/src&In-Reply-To=%3C200806152103.m5FL3S2N002426%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001475.html">
+   <LINK REL="Next"  HREF="001477.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4405 - in rl/trunk/engine: core/include core/src	script/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4405%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/src&In-Reply-To=%3C200806152103.m5FL3S2N002426%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4405 - in rl/trunk/engine: core/include core/src	script/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Jun 15 23:03:28 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001475.html">[Dsa-hl-svn] r4404 - modules/persistenztest/scripts
+</A></li>
+        <LI>Next message: <A HREF="001477.html">[Dsa-hl-svn] r4406 - in rl/trunk/engine: ai/src rules/include	rules/src script/swig ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1476">[ date ]</a>
+              <a href="thread.html#1476">[ thread ]</a>
+              <a href="subject.html#1476">[ subject ]</a>
+              <a href="author.html#1476">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-06-15 23:03:20 +0200 (Sun, 15 Jun 2008)
+New Revision: 4405
+
+Modified:
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/GameLoop.cpp
+   rl/trunk/engine/script/src/MapLoader.cpp
+Log:
+don't execute game tasks while loading map
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2008-06-15 21:02:27 UTC (rev 4404)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2008-06-15 21:03:20 UTC (rev 4405)
+@@ -66,7 +66,7 @@
+     void startCore();
+ 
+     /** Renders one frame (for internal use) */
+-    void renderOneFrame();
++    void renderOneFrame(bool executeTasks = true);
+ 
+     World* getWorld();
+     void loadMap(const Ogre::String type, const Ogre::String filename,
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2008-06-15 21:02:27 UTC (rev 4404)
++++ rl/trunk/engine/core/include/GameLoop.h	2008-06-15 21:03:20 UTC (rev 4405)
+@@ -71,7 +71,7 @@
+ 
+     /// Execute the render loop for one frame (for internal use only)
+     /// @see CoreSubsystem
+-    void _executeOneRenderLoop();
++    void _executeOneRenderLoop(bool executeTasks = true);
+ 
+     void setTimeFactor(Ogre::Real timeFactor);
+       
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-06-15 21:02:27 UTC (rev 4404)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-06-15 21:03:20 UTC (rev 4405)
+@@ -134,9 +134,9 @@
+         //mRubyInterpreter-&gt;finalizeInterpreter();
+     }
+ 
+-    void CoreSubsystem::renderOneFrame()
++    void CoreSubsystem::renderOneFrame(bool executeTasks)
+     {
+-        mGameLoop-&gt;_executeOneRenderLoop();
++        mGameLoop-&gt;_executeOneRenderLoop(executeTasks);
+     }
+ 
+     void CoreSubsystem::setDeveloperMode(bool developerMode)
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2008-06-15 21:02:27 UTC (rev 4404)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2008-06-15 21:03:20 UTC (rev 4405)
+@@ -128,7 +128,7 @@
+         }
+     }
+ 
+-    void GameLoop::_executeOneRenderLoop()
++    void GameLoop::_executeOneRenderLoop(bool executeTasks)
+     {
+         // Calculate frame time. This time is smoothed and capped.
+         unsigned long elapsedTime = mTimer-&gt;getMilliseconds();
+@@ -153,7 +153,7 @@
+         Root::getSingleton().renderOneFrame();
+ 
+         // Execute all tasks in order.
+-        for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
++        for (size_t i = 0; i &lt; mTaskLists.size() &amp;&amp; executeTasks; ++i)
+         {
+             GameTaskList* tasks = mTaskLists[i];
+             for (GameTaskList::iterator it = tasks-&gt;begin(); it != tasks-&gt;end(); ++it)
+
+Modified: rl/trunk/engine/script/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/script/src/MapLoader.cpp	2008-06-15 21:02:27 UTC (rev 4404)
++++ rl/trunk/engine/script/src/MapLoader.cpp	2008-06-15 21:03:20 UTC (rev 4405)
+@@ -321,7 +321,7 @@
+             mPercentageWindow-&gt;setText(text);
+         }
+ 
+-        CoreSubsystem::getSingleton().renderOneFrame();
++        CoreSubsystem::getSingleton().renderOneFrame(false);
+ 
+         if (percentage == 1)
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001475.html">[Dsa-hl-svn] r4404 - modules/persistenztest/scripts
+</A></li>
+	<LI>Next message: <A HREF="001477.html">[Dsa-hl-svn] r4406 - in rl/trunk/engine: ai/src rules/include	rules/src script/swig ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1476">[ date ]</a>
+              <a href="thread.html#1476">[ thread ]</a>
+              <a href="subject.html#1476">[ subject ]</a>
+              <a href="author.html#1476">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

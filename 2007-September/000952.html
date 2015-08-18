@@ -1,0 +1,1419 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3881 - in rl/trunk/engine: core/include core/src ui	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3881%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%20ui%0A%09ui/include%20ui/src&In-Reply-To=%3C200709261613.l8QGDbWf016578%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000951.html">
+   <LINK REL="Next"  HREF="000953.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3881 - in rl/trunk/engine: core/include core/src ui	ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3881%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%20ui%0A%09ui/include%20ui/src&In-Reply-To=%3C200709261613.l8QGDbWf016578%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3881 - in rl/trunk/engine: core/include core/src ui	ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep 26 18:13:37 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000951.html">[Dsa-hl-svn] r3880 - in modules/ruchin: maps models
+</A></li>
+        <LI>Next message: <A HREF="000953.html">[Dsa-hl-svn] r3882 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#952">[ date ]</a>
+              <a href="thread.html#952">[ thread ]</a>
+              <a href="subject.html#952">[ subject ]</a>
+              <a href="author.html#952">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-26 18:13:18 +0200 (Wed, 26 Sep 2007)
+New Revision: 3881
+
+Modified:
+   rl/trunk/engine/core/include/GameEventManager.h
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/ui/RlUI2005.vcproj
+   rl/trunk/engine/ui/include/AbstractWindow.h
+   rl/trunk/engine/ui/include/Console.h
+   rl/trunk/engine/ui/include/ControlState.h
+   rl/trunk/engine/ui/include/DialogControlState.h
+   rl/trunk/engine/ui/include/FreeflightControlState.h
+   rl/trunk/engine/ui/include/InputManager.h
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/include/WindowManager.h
+   rl/trunk/engine/ui/src/Console.cpp
+   rl/trunk/engine/ui/src/ControlState.cpp
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+   rl/trunk/engine/ui/src/GameSettings.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+   rl/trunk/engine/ui/src/WindowFactory.cpp
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+-Added possibility to save the history of the console
+-Now using the InputManager as Listener for Keyboard- and Mouse-Events, so the input-handling is easier (the contol-states don't need to care about input to cegui)
+ ControlStates now get all input (even if already handled by cegui)
+-The InputManager implements a Job for KeyRepeating, AbstractWindows can specify keys, that should be repeated (at the moment the console uses this feature)
+-If a Window does not use mouseinput, the controlstates can use it (you could look around while putting text in the console)
+-opening a window while turning around doesn't create strange camera-positions any more
+
+Modified: rl/trunk/engine/core/include/GameEventManager.h
+===================================================================
+--- rl/trunk/engine/core/include/GameEventManager.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/core/include/GameEventManager.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -57,7 +57,7 @@
+      */
+     virtual void run( Ogre::Real elapsedTime );
+ 
+-    /** F&#252;gt eine Sphere Area hinzu, und h&#228;ngt einen Listener an
++    /** DEPRECATED! F&#252;gt eine Sphere Area hinzu, und h&#228;ngt einen Listener an
+     *
+     * @param actor Der Actor um den herum die Kugel aufgespannt werden soll
+     * @param queryMask Die Maske um die SzenenAnfrage zu beschleunigen
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -60,6 +60,7 @@
+         // Setup general default values
+         addSetting(&quot;General&quot;, &quot;Log Level&quot;, &quot;2&quot;);
+         addSetting(&quot;General&quot;, &quot;Subtitle Speed&quot;, &quot;0.0&quot;);
++        addSetting(&quot;General&quot;, &quot;Save Console History&quot;, &quot;50&quot;);
+ 
+         // Setup sound default values
+         addSetting(&quot;Sound&quot;, &quot;DefaultMusicVolume&quot;, &quot;0.4&quot;);
+
+Modified: rl/trunk/engine/ui/RlUI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ui/RlUI2005.vcproj	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/RlUI2005.vcproj	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -373,10 +373,6 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
+-				RelativePath=&quot;.\include\GameSettings.h&quot;
+-				&gt;
+-			&lt;/File&gt;
+-			&lt;File
+ 				RelativePath=&quot;.\include\InputManager.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -468,6 +464,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\include\GameSettings.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\include\InfoPopup.h&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+@@ -582,10 +582,6 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
+-				RelativePath=&quot;.\src\GameSettings.cpp&quot;
+-				&gt;
+-			&lt;/File&gt;
+-			&lt;File
+ 				RelativePath=&quot;.\src\InputManager.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -697,6 +693,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\src\GameSettings.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\src\InfoPopup.cpp&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Modified: rl/trunk/engine/ui/include/AbstractWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/AbstractWindow.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/AbstractWindow.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -95,6 +95,9 @@
+ 
+ 		virtual void windowHid();
+ 
++        // return true, if the specified key should be repeated if pressed down
++        virtual bool wantsKeyToRepeat(const int &amp;key) {return false;}
++
+ 	protected:
+ 		AbstractWindow(
+ 			const CeGuiString&amp; xmlfile, 
+
+Modified: rl/trunk/engine/ui/include/Console.h
+===================================================================
+--- rl/trunk/engine/ui/include/Console.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/Console.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -36,12 +36,15 @@
+ 	{
+ 		public:
+ 			Console();
++            ~Console();
+ 			
+ 			void setRubyInterpreter(RubyInterpreter* interpreter);
+ 			void write(const CeGuiString&amp; output);
+ 				
+ 			void setVisible(bool visible, bool destroyAfterHide = false);
+ 
++            bool wantsKeyToRepeat(const int &amp;key);
++
+ 		private:
+ 			CEGUI::Editbox* mCommandLine;
+ 			CEGUI::Listbox* mDisplay;
+@@ -50,6 +53,7 @@
+ 			bool mPrompt;
+ 
+ 			bool handleKeyDown(const CEGUI::EventArgs&amp; e);
++            bool handleKeyUp(const CEGUI::EventArgs&amp; e);
+ 			void appendTextRow(const CeGuiString&amp; text, const CEGUI::colour color);
+ 
+ 			std::vector&lt;CeGuiString&gt; mHistory;
+
+Modified: rl/trunk/engine/ui/include/ControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/ControlState.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/ControlState.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -35,7 +35,7 @@
+     /**
+      * This class handles character control via user input.
+      */
+-    class _RlUiExport ControlState : public OIS::KeyListener, public OIS::MouseListener
++    class _RlUiExport ControlState// : public OIS::KeyListener, public OIS::MouseListener
+     {
+ 	public:
+ 
+@@ -52,11 +52,11 @@
+ 
+         virtual void run(Ogre::Real elapsedTime) = 0;
+ 
+-        virtual bool mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
+-        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
+-        virtual bool mouseMoved(const OIS::MouseEvent&amp; evt);
+-        virtual bool keyPressed(const OIS::KeyEvent&amp; evt);
+-        virtual bool keyReleased(const OIS::KeyEvent&amp; evt);
++        virtual bool mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled); // if handled is true, we should not handle the event!
++        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled);
++        virtual bool mouseMoved(const OIS::MouseEvent&amp; evt, bool handled);
++        virtual bool keyPressed(const OIS::KeyEvent&amp; evt, bool handled);
++        virtual bool keyReleased(const OIS::KeyEvent&amp; evt, bool handled);
+ 
+         const CommandMapper* getCommandMapper() const {return mCommandMapper;}
+         ControlStateType getType() const { return mType;}
+@@ -64,14 +64,9 @@
+         static bool startAction(const CeGuiString&amp; actionName, Creature* character = NULL);
+ 
+ 	protected:
+-        /// Returns true, if there is at least one window open,
+-        /// that requires keyboard and/or mouse input. 
+-        bool isCeguiActive() const;
+ 
+-        /// Returns true, if the key event should be injected into CEGUI
+-        /// This is the case, if an open window requests key input and it is
+-        /// an input or navigation key.
+-        //bool sendKeyToCeGui(const OIS::KeyEvent&amp; evt) const;
++        /// returns wether cegui currently uses the mouse
++        bool isMouseUsedByCegui() const;
+ 
+         Person* mCharacter;
+ 
+
+Modified: rl/trunk/engine/ui/include/DialogControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/DialogControlState.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/DialogControlState.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -66,7 +66,7 @@
+ 		/// Antwort eines der Dialogf&#252;hrenden
+ 		void response(Actor* actor, const CeGuiString&amp; text, const Ogre::String&amp; soundFile = &quot;&quot;);
+ 
+-        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
++        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled);
+ 
+ 		bool handleDialogSelectOption();	
+ 		bool handleDialogClose();
+
+Modified: rl/trunk/engine/ui/include/FreeflightControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/FreeflightControlState.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/FreeflightControlState.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -46,8 +46,8 @@
+ 
+ 		virtual void run(Ogre::Real elapsedTime);
+ 
+-        virtual bool keyPressed(const OIS::KeyEvent&amp; evt);
+-        virtual bool keyReleased(const OIS::KeyEvent&amp; evt);
++        virtual bool keyPressed(const OIS::KeyEvent&amp; evt, bool handled);
++        virtual bool keyReleased(const OIS::KeyEvent&amp; evt, bool handled);
+ 
+ 	    void toggleCameraCollision();
+ 	    void resetCamera();
+
+Modified: rl/trunk/engine/ui/include/InputManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/InputManager.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/InputManager.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -41,7 +41,8 @@
+     class _RlUiExport InputManager
+         :    public Ogre::Singleton&lt;InputManager&gt;,
+             public GameTask,
+-            private XmlProcessor
++            private XmlProcessor,
++            public OIS::KeyListener, public OIS::MouseListener
+     {
+     public:
+ 
+@@ -49,6 +50,7 @@
+         ~InputManager();
+ 
+         bool isMouseButtonDown( OIS::MouseButtonID buttonID );
++        bool isKeyDown( OIS::KeyCode key );
+ 
+         Ogre::Real getMouseRelativeX(void) const;
+         Ogre::Real getMouseRelativeY(void) const;
+@@ -85,6 +87,12 @@
+         int getModifierCode() const;
+         const CEGUI::utf8&amp; getKeyChar(int keycode, int modifiers) const;
+ 
++        virtual bool mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
++        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
++        virtual bool mouseMoved(const OIS::MouseEvent&amp; evt);
++        virtual bool keyPressed(const OIS::KeyEvent&amp; evt);
++        virtual bool keyReleased(const OIS::KeyEvent&amp; evt);
++
+     private:
+         enum { NUM_MOUSE_BUTTON=4, NUM_KEYS=256 };
+         enum Modifiers {ALT_MASK = 1, CTRL_MASK = 2, SHIFT_MASK = 4, SUPER_MASK = 8};
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -75,9 +75,9 @@
+         */
+         void resetCamera();
+ 
+-        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
+-        virtual bool keyPressed(const OIS::KeyEvent&amp; evt);
+-        virtual bool keyReleased(const OIS::KeyEvent&amp; evt);
++        virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled);
++        virtual bool keyPressed(const OIS::KeyEvent&amp; evt, bool handled);
++        virtual bool keyReleased(const OIS::KeyEvent&amp; evt, bool handled);
+ 
+         // Overrides from DebugVisualisable
+         virtual DebugVisualisableFlag getFlag() const;
+
+Modified: rl/trunk/engine/ui/include/WindowManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowManager.h	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/include/WindowManager.h	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -52,6 +52,8 @@
+         /// Callback for Windows, called when there visibility is changed.
+         void _visiblityChanged(AbstractWindow* window, bool isVisible);
+ 
++        AbstractWindow* getActiveWindow();
++
+ 	private:
+ 		std::list&lt;AbstractWindow*&gt; mWindowList;
+ 
+
+Modified: rl/trunk/engine/ui/src/Console.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/Console.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/Console.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -16,6 +16,7 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;Console.h&quot;
++#include &quot;ConfigurationManager.h&quot;
+ 
+ #include &lt;boost/bind.hpp&gt;
+ #include &lt;elements/CEGUIFrameWindow.h&gt;
+@@ -24,6 +25,8 @@
+ #include &quot;ListboxWrappedTextItem.h&quot;
+ #include &quot;InputManager.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
++#include &quot;JobScheduler.h&quot;
++#include &quot;Job.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -39,6 +42,7 @@
+ 		using namespace CEGUI;
+ 
+ 		mDisplay = getListbox(&quot;Console/Display&quot;);
++        mDisplay-&gt;setShowVertScrollbar(true);
+ 		mCommandLine = getEditbox(&quot;Console/Inputbox&quot;);
+ 
+ 		mWindow-&gt;subscribeEvent(
+@@ -47,15 +51,82 @@
+ 		mCommandLine-&gt;subscribeEvent(
+ 			Editbox::EventKeyDown,
+ 			boost::bind(&amp;Console::handleKeyDown, this, _1));
+-		mDisplay-&gt;moveToFront();
+-
++		mWindow-&gt;subscribeEvent(
++			FrameWindow::EventKeyUp,
++			boost::bind(&amp;Console::handleKeyUp, this, _1));
++		mCommandLine-&gt;subscribeEvent(
++			Editbox::EventKeyUp,
++			boost::bind(&amp;Console::handleKeyUp, this, _1));
+ 		mWindow-&gt;subscribeEvent(FrameWindow::EventCloseClicked,
+             boost::bind(&amp;Console::hideWindow, this));
+ 
+-		mHistory.clear();
++		// load history from file
++        if( ConfigurationManager::getSingleton().getIntSetting(&quot;General&quot;, &quot;Save Console History&quot;) &gt; 0 )
++        {
++            // load file
++            std::ifstream historyFile;
++            std::string filename;
++            // compare with ConfigurationManager
++#if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++            filename = Ogre::String(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/console_history&quot;;
++#else
++            filename = &quot;./modules/config/console_history&quot;;
++#endif
++            historyFile.open(filename.c_str());
++            if( !historyFile.good() )
++            {
++                LOG_MESSAGE(Logger::UI, &quot;could not open history file&quot;);
++            }
++            else
++            {
++                // parse history file
++                while( !historyFile.eof() )
++                {
++                    std::string str;
++                    std::getline(historyFile, str);
++                    if( str != &quot;&quot; )
++                        mHistory.push_back(str);
++                }
++            }
++        }
+         setVisible(false);
+ 	}
+ 
++
++    Console::~Console()
++    {
++		// save history to file
++        int lines = ConfigurationManager::getSingleton().getIntSetting(&quot;General&quot;, &quot;Save Console History&quot;);
++        if( lines &gt; 0 )
++        {
++            // file
++            std::ofstream historyFile;
++            std::string filename;
++            // compare with ConfigurationManager
++#if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++            filename = Ogre::String(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/console_history&quot;;
++#else
++            filename = &quot;./modules/config/console_history&quot;;
++#endif
++            historyFile.open(filename.c_str());
++            if( !historyFile.good() )
++            {
++                LOG_MESSAGE(Logger::UI, &quot;could not open history file for writing&quot;);
++            }
++            else
++            {
++                std::vector&lt;CeGuiString&gt;::reverse_iterator it = mHistory.rbegin();
++                while( lines &gt; 0 &amp;&amp; it != mHistory.rend() )
++                {
++                    lines--;
++                    if( (*it) != &quot;&quot; )
++                        historyFile &lt;&lt; (*it) &lt;&lt; std::endl;
++                    it++;
++                }
++            }
++        }
++    }
++
+ 	void Console::setVisible(bool visible, bool destroy)
+ 	{
+ 		if (visible)
+@@ -67,7 +138,9 @@
+ 	}
+ 
+ 	bool Console::handleKeyDown(const CEGUI::EventArgs&amp; e)
+-	{
++    {
++        InputManager* im = InputManager::getSingletonPtr();
++        static const CEGUI::utf8 NO_CHAR = 0;
+ 		KeyEventArgs ke = static_cast&lt;const KeyEventArgs&amp;&gt;(e);
+         if (ke.scancode == Key::ArrowDown)
+ 		{
+@@ -92,14 +165,52 @@
+ 			mCommandLine-&gt;setText((utf8*)&quot;&quot;);
+ 			return true;
+ 		}
++        else
++        {
++            if( im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()) != NO_CHAR )
++            {
++                InputManager* im = InputManager::getSingletonPtr();
++                CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
++                cegui.injectChar(im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()));
++                return true;
++            }
++        }
++
++		return false;
++	}
++
++    bool Console::wantsKeyToRepeat(const int &amp;key)
++    {
+         InputManager* im = InputManager::getSingletonPtr();
+         static const CEGUI::utf8 NO_CHAR = 0;
+-        if( im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()) != NO_CHAR )
++        if( im-&gt;getKeyChar(key, im-&gt;getModifierCode()) != NO_CHAR || // keys that should be repeated
++            key == CEGUI::Key::ArrowDown ||
++            key == CEGUI::Key::ArrowUp ||
++            key == CEGUI::Key::Return ||
++            key == CEGUI::Key::ArrowLeft ||
++            key == CEGUI::Key::ArrowRight ||
++            key == CEGUI::Key::Backspace ||
++            key == CEGUI::Key::Delete )
+             return true;
+ 
+-		return false;
+-	}
++        return false;
++    }
+ 
++    bool Console::handleKeyUp(const CEGUI::EventArgs&amp; e)
++    {
++        // return true for keys handled in keyup
++        InputManager* im = InputManager::getSingletonPtr();
++        static const CEGUI::utf8 NO_CHAR = 0;
++        KeyEventArgs ke = static_cast&lt;const KeyEventArgs&amp;&gt;(e);
++        if( im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()) != NO_CHAR ||
++            ke.scancode == CEGUI::Key::ArrowDown ||
++            ke.scancode == CEGUI::Key::ArrowUp ||
++            ke.scancode == CEGUI::Key::Return )
++            return true;
++        else
++            return false;
++    }
++
+ 	void Console::write(const CeGuiString&amp; output)
+ 	{
+ 		CeGuiString temp;
+
+Modified: rl/trunk/engine/ui/src/ControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ControlState.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/ControlState.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -130,77 +130,25 @@
+ 		return true;
+ 	}
+ 
+-    bool ControlState::mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
++    bool ControlState::mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled)
+     {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            bool retval = CEGUI::System::getSingleton().injectMouseButtonDown(
+-                static_cast&lt;CEGUI::MouseButton&gt;(id));
+-            return retval;
+-        }
+-        
+         return false;
+     }
+ 
+-    bool ControlState::mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
++    bool ControlState::mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id, bool handled)
+     {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            bool retval = CEGUI::System::getSingleton().injectMouseButtonUp(static_cast&lt;CEGUI::MouseButton&gt;(id));
+-            return retval;
+-        }
+-
+         return false;
+     }
+ 
+-    bool ControlState::mouseMoved(const OIS::MouseEvent&amp; evt)
++    bool ControlState::mouseMoved(const OIS::MouseEvent&amp; evt, bool handled)
+     {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            bool retval;
+-            //CEGUI::Renderer* renderer = CEGUI::System::getSingleton().getRenderer();
+-            retval = CEGUI::System::getSingleton().injectMouseMove(evt.state.X.rel, evt.state.Y.rel);
+-            return true;
+-        }
+-
+         return false;
+     }
+ 
+-    bool ControlState::keyPressed(const OIS::KeyEvent&amp; evt)
++    bool ControlState::keyPressed(const OIS::KeyEvent&amp; evt, bool handled)
+     {
+-        InputManager* im = InputManager::getSingletonPtr();
++        int code = CommandMapper::encodeKey(evt.key, InputManager::getSingleton().getModifierCode());
+ 
+-        if ( WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
+-        {
+-            bool retval;
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            retval = cegui.injectKeyDown(evt.key);
+-            return retval;
+-        }
+-
+-        return false;
+-    }
+-
+-    bool ControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+-    {
+-        InputManager* im = InputManager::getSingletonPtr();
+-
+-        if ( WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
+-        {
+-            bool retval;
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            retval = cegui.injectKeyUp(evt.key);
+-            if( !retval )
+-                retval = cegui.injectChar(im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()));
+-            
+-            if( retval )
+-                return true;
+-        }
+-
+-        int code = CommandMapper::encodeKey(evt.key, im-&gt;getModifierCode());
+-
+         // First see, if a control state action is defined
+ 	    CeGuiString action = mCommandMapper-&gt;getControlStateAction(code, mType);
+         if (action == &quot;&quot;)
+@@ -208,48 +156,23 @@
+             // No. So try global actions.
+             action = mCommandMapper-&gt;getGlobalAction(code);
+         }
+-        return startAction(action, mCharacter);
++        if( !handled )
++            return startAction(action, mCharacter);
+ 
++        // hack to enable tab to hide the console-window if opened
++        if( action == &quot;toggleconsole&quot; ) // we start toggleconsole always, even if handled, because cegui handles tab
++            return startAction(action, mCharacter);
++
++        return false;
+     }
+ 
+-    bool ControlState::isCeguiActive() const
++    bool ControlState::keyReleased(const OIS::KeyEvent&amp; evt, bool handled)
+     {
+-        return WindowManager::getSingleton().getWindowInputMask() != 0;
++        return false;
+     }
+-/*
+-    bool ControlState::sendKeyToCeGui(const OIS::KeyEvent&amp; evt) const
+-    {
+-        InputManager* im = InputManager::getSingletonPtr();
+ 
+-        // Wenn kein Fenster mit Tastatureingabe aktiv ist, kriegt CEGUI keine KeyEvents
+-        if ((WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT) )
+-        {
+-            return true;
+-        }
+-
+-        return false;
+-
+-        // ---- Tastatureingabe gefordert ----
+-
+-        // Tasten, die Zeichen liefern sollen an CEGUI gesendet werden
+-        if (im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()) != 0)
+-        {
+-            return true;
+-        }
+-
+-        if (evt.key == OIS::KC_RETURN
+-            || evt.key == OIS::KC_HOME || evt.key == OIS::KC_END
+-            || evt.key == OIS::KC_LEFT || evt.key == OIS::KC_RIGHT
+-            || evt.key == OIS::KC_BACK || evt.key == OIS::KC_DELETE
+-            || evt.key == OIS::KC_UP   || evt.key == OIS::KC_DOWN
+-            || evt.key == OIS::KC_RMENU
+-            || evt.key == OIS::KC_LCONTROL)
+-        {
+-            return true;
+-        }
+-
+-        return false;
++    bool ControlState::isMouseUsedByCegui() const
++    {
++        return WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT;
+     }
+-*/
+ }
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -317,21 +317,22 @@
+     }
+ 
+     bool DialogControlState::mouseReleased(const OIS::MouseEvent&amp; evt,
+-        OIS::MouseButtonID id)
++        OIS::MouseButtonID id, bool handled)
+     {
+-        if( ControlState::mouseReleased(evt, id) )
+-            return true;
++        bool retval = false;
++        if( ControlState::mouseReleased(evt, id, handled) )
++            retval = true;
+ 
+-        if (mTextShown &amp;&amp; (mCurrFadeTextTime + 0.25) &lt; mTotalFadeTextTime)
++        if( !handled &amp;&amp; !retval )
+         {
+-            mCurrFadeTextTime = -1;
++            if (mTextShown &amp;&amp; (mCurrFadeTextTime + 0.25) &lt; mTotalFadeTextTime)
++            {
++                mCurrFadeTextTime = -1;
++                retval = true;
++            }
++        }
+ 
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
++        return retval;
+     }
+ 
+ 	void DialogControlState::start()
+
+Modified: rl/trunk/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -103,10 +103,8 @@
+ 
+ 	void FreeflightControlState::run(Real elapsedTime)
+ 	{
+-        if (isCeguiActive()) return;
++        InputManager* im = InputManager::getSingletonPtr();
+ 
+-		InputManager* im = InputManager::getSingletonPtr();
+-
+ 		// Fetch current movement state
+ 		mDesiredVelocity = Vector3::ZERO;
+ 
+@@ -150,7 +148,10 @@
+             }
+         }
+ 
+-		mMovementSpeed += im-&gt;getMouseRelativeZ() * mSpeedIncrement;
++        bool useMouseInput = !isMouseUsedByCegui();
++
++        if( useMouseInput )
++		    mMovementSpeed += im-&gt;getMouseRelativeZ() * mSpeedIncrement;
+ 		if (mMovementSpeed &lt; mSpeedRange.first)
+ 		{
+ 			mMovementSpeed = mSpeedRange.first;
+@@ -169,16 +170,20 @@
+         // mouse
+         if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
+         {
+-            mYaw -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
++            if( useMouseInput )
++                mYaw -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
+         }
+         while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+         while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+ 
+ 
+-        if (mInvertedMouse)
+-            mPitch += mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+-        else
+-            mPitch -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++        if (useMouseInput )
++        {
++            if (mInvertedMouse)
++                mPitch += mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++            else
++                mPitch -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++        }
+ 
+         while (mPitch.valueDegrees() &gt; 360.0f) mPitch -= Degree(360.0f);
+         while (mPitch.valueDegrees() &lt; -360.0f) mPitch += Degree(360.0f);
+@@ -220,72 +225,36 @@
+         mPitch = Degree(0);
+ 	}
+ 
+-    bool FreeflightControlState::keyPressed(const OIS::KeyEvent&amp; evt)
++    bool FreeflightControlState::keyPressed(const OIS::KeyEvent&amp; evt, bool handled)
+ 	{
+-        if( ControlState::keyPressed(evt) )
+-            return true;
+-
+-        int movement = mCommandMapper-&gt;getMovement(evt.key);
+-
+-		if (movement != MOVE_NONE)
+-		{
+-			mCurrentMovementState |= movement;
+-			return true;
+-		}
+-
+-		return false;
+-	}
+-
+-    bool FreeflightControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+-	{
+-        // this should be the same as in ControlState::keyReleased!
+-        InputManager* im = InputManager::getSingletonPtr();
+-        if ( WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
++        bool retval = false;
++        if( !handled )
+         {
+-            bool retval;
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            retval = cegui.injectKeyUp(evt.key);
+-            if( !retval )
+-                retval = cegui.injectChar(im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()));
+-            
+-            if( retval )
+-                return true;
+-        }
++            int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 
+-
+-        int code = CommandMapper::encodeKey(evt.key, im-&gt;getModifierCode());
+-        // First see, if a control state action is defined
+-	    CeGuiString command = mCommandMapper-&gt;getControlStateAction(code, mType);
+-        if (command == &quot;&quot;)
+-        {
+-            // No. So try global actions.
+-            command = mCommandMapper-&gt;getGlobalAction(code);
++		    if (movement != MOVE_NONE)
++		    {
++			    mCurrentMovementState |= movement;
++			    retval = true;
++		    }
+         }
+-        if (command == &quot;back_to_character_movement&quot;)
+-        {
+-            InputManager::getSingleton().popControlState();
+-            return true;
+-        }
+-        if (command == &quot;toggle_camera_collision&quot;)
+-        {
+-            toggleCameraCollision();
+-            return true;
+-        }
+-        if( startAction(command, mCharacter) )
+-            return true;
+ 
++        retval = retval || ControlState::keyPressed(evt, retval || handled);
++        return retval;
++	}
+ 
+-
+-
++    bool FreeflightControlState::keyReleased(const OIS::KeyEvent&amp; evt, bool handled)
++	{
++        bool retval = false;
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 		if (movement != MOVE_NONE)
+ 		{
+ 			mCurrentMovementState &amp;= ~movement;
+-			return true;
++			retval = true;
+ 		}
+ 
+-        return false;
++        retval = retval || ControlState::keyReleased(evt, handled || retval);
++        return retval;
+ 	}
+ 
+     int FreeflightControlState::userProcess()
+
+Modified: rl/trunk/engine/ui/src/GameSettings.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameSettings.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/GameSettings.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -47,6 +47,7 @@
+                                     boost::bind(&amp;GameSettings::onCancel, this));
+ 
+         centerWindow();
++        setVisible(false);
+     }
+ 
+     GameSettings::~GameSettings()
+@@ -112,11 +113,13 @@
+ 
+     bool GameSettings::onApply()
+     {
++        hideWindow();
+         return true;
+     }
+ 
+     bool GameSettings::onCancel()
+     {
++        hideWindow();
+         return true;
+     }
+ 
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -43,10 +43,13 @@
+ #include &quot;FreeflightControlState.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;GameObject.h&quot;
++#include &quot;Job.h&quot;
++#include &quot;JobScheduler.h&quot;
+ #include &quot;MovementControlState.h&quot;
+ #include &quot;RubyInterpreter.h&quot;
+ #include &quot;UiSubsystem.h&quot;
+ #include &quot;WindowFactory.h&quot;
++#include &quot;WindowManager.h&quot;
+ 
+ using namespace Ogre;
+ using namespace OIS;
+@@ -116,8 +119,10 @@
+         LOG_DEBUG(Logger::UI, &quot;Initializing input manager: Create Keyboard input.&quot;);
+         mKeyboard = static_cast&lt;OIS::Keyboard*&gt;(mInputManager-&gt;createInputObject(OIS::OISKeyboard, true));
+         mKeyboard-&gt;setTextTranslation(OIS::Keyboard::Unicode);
++        mKeyboard-&gt;setEventCallback(this);
+         LOG_DEBUG(Logger::UI, &quot;Initializing input manager: Create Mouse Input.&quot;);
+         mMouse = static_cast&lt;OIS::Mouse*&gt;(mInputManager-&gt;createInputObject(OIS::OISMouse, true));
++        mMouse-&gt;setEventCallback(this);
+ 
+         LOG_DEBUG(Logger::UI, &quot;Initializing input manager: Set mouse paremeters.&quot;);
+         unsigned int width, height, depth;
+@@ -159,6 +164,11 @@
+         return ms.buttonDown( buttonID );
+     }
+ 
++    bool InputManager::isKeyDown( OIS::KeyCode key )
++    {
++        return mKeyboard-&gt;isKeyDown(key);
++    }
++
+     Ogre::Real InputManager::getMouseRelativeX() const
+     {
+         return (float)mMouse-&gt;getMouseState().X.rel;
+@@ -399,8 +409,8 @@
+             mControlStates.top()-&gt;pause();
+         }
+ 
+-        mKeyboard-&gt;setEventCallback(controller);
+-        mMouse-&gt;setEventCallback(controller);
++        //mKeyboard-&gt;setEventCallback(controller);
++        //mMouse-&gt;setEventCallback(controller);
+ 
+         mControlStates.push(controller);
+         mControlStates.top()-&gt;resume();
+@@ -416,14 +426,14 @@
+         if (!mControlStates.empty())
+         {
+             ControlState* newController = mControlStates.top();
+-            mKeyboard-&gt;setEventCallback(newController);
+-            mMouse-&gt;setEventCallback(newController);
++            //mKeyboard-&gt;setEventCallback(newController);
++            //mMouse-&gt;setEventCallback(newController);
+             newController-&gt;resume();
+         }
+         else
+         {
+-            mKeyboard-&gt;setEventCallback(NULL);
+-            mMouse-&gt;setEventCallback(NULL);
++            //mKeyboard-&gt;setEventCallback(NULL);
++            //mMouse-&gt;setEventCallback(NULL);
+         }
+     }
+ 
+@@ -452,4 +462,132 @@
+         pushControlState(CST_DIALOG);
+         return true;
+     }
++
++    bool InputManager::mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
++    {
++        bool retval = false;
++        if( WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT )
++        {
++            if( CEGUI::System::getSingleton().injectMouseButtonDown(
++                static_cast&lt;CEGUI::MouseButton&gt;(id)) )
++                retval = true;
++        }
++
++        if( !mControlStates.empty() )
++            retval = retval || mControlStates.top()-&gt;mousePressed(evt, id, retval);
++        return retval;
++    }
++
++    bool InputManager::mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
++    {
++        bool retval = false;
++        if( WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT )
++        {
++            if( CEGUI::System::getSingleton().injectMouseButtonUp(
++                static_cast&lt;CEGUI::MouseButton&gt;(id)) )
++                retval = true;
++        }
++
++        if( !mControlStates.empty() )
++            if( mControlStates.top()-&gt;mouseReleased(evt, id, retval) )
++                retval = true;
++        return retval;
++    }
++
++    bool InputManager::mouseMoved(const OIS::MouseEvent&amp; evt)
++    {
++        bool retval = false;
++        if( WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT )
++        {
++            if( CEGUI::System::getSingleton().injectMouseMove(
++                evt.state.X.rel, evt.state.Y.rel ) )
++                retval = true;
++        }
++
++        if( !mControlStates.empty() )
++            if( mControlStates.top()-&gt;mouseMoved(evt, retval) )
++                retval = true;
++        return retval;
++    }
++
++    // job definition for key repeating
++    // this job is created when a key was pressed and the processing window wants the key to be repeated
++    class KeyRepeatJob : public Job
++    {
++    public:
++        KeyRepeatJob(AbstractWindow* window, OIS::KeyCode key) : 
++          Job(false, true),
++          mWindow(window),
++          mKey(key),
++          mLastTime(0)
++        {
++        }
++        bool execute(Ogre::Real t)
++        {
++            rl::Time time = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_CONTINUOUS)-&gt;getClock();
++            if ( WindowManager::getSingleton().getActiveWindow() == mWindow &amp;&amp; // perhaps window was deleted!!
++                InputManager::getSingleton().isKeyDown(OIS::KeyCode(mKey)) )
++            {
++                if ( time - mLastTime &gt; 50 )
++                {
++                    bool handled = false;
++                    handled = handled || CEGUI::System::getSingleton().injectKeyDown(mKey);
++                    handled = handled || CEGUI::System::getSingleton().injectKeyUp(mKey);
++                    
++                    mLastTime = time;
++
++                    if( !handled )  // we don't need a job for keys, that are not handled!
++                        return true;
++                }
++                return false;
++            }
++            else
++                return true; // delete this job
++        }
++    private:
++        rl::Time mLastTime;
++        AbstractWindow* mWindow;
++        OIS::KeyCode mKey;
++    };
++
++    bool InputManager::keyPressed(const OIS::KeyEvent&amp; evt)
++    {
++        bool retval = false;
++        if( WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
++        {
++            AbstractWindow *activeWin = WindowManager::getSingleton().getActiveWindow();
++            if( activeWin != NULL )
++            {
++                if( activeWin-&gt;wantsKeyToRepeat(evt.key) )
++                {
++                    KeyRepeatJob *job = new KeyRepeatJob(activeWin, evt.key);
++                    JobScheduler::getSingleton().addJob(job, JobScheduler::JP_NORMAL, 0.5);
++                }
++            }
++
++            if( CEGUI::System::getSingleton().injectKeyDown( evt.key ) )
++                retval = true;
++        }
++
++        if( !mControlStates.empty() )
++            if( mControlStates.top()-&gt;keyPressed(evt, retval) )
++                retval = true;
++        return retval;
++    }
++
++    bool InputManager::keyReleased(const OIS::KeyEvent&amp; evt)
++    {
++        bool retval = false;
++        if( WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
++        {
++            if( CEGUI::System::getSingleton().injectKeyUp( evt.key ) )
++                retval = true;
++        }
++
++        if( !mControlStates.empty() )
++            if( mControlStates.top()-&gt;keyReleased(evt, retval) )
++                retval = true;
++        return false;
++    }
++
+ }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -231,8 +231,6 @@
+     //------------------------------------------------------------------------
+     void MovementControlState::run(Real elapsedTime)
+     {
+-        if (isCeguiActive()) return;
+-
+         InputManager* im = InputManager::getSingletonPtr();
+ 
+         updateCharacter(elapsedTime);
+@@ -242,12 +240,15 @@
+ 
+ 
+         // camera pitch
+-        if (mInvertedMouse)
+-            mPitch -= 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
+-        else
+-            mPitch += 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
+-        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+-        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
++        if (!isMouseUsedByCegui() )
++        {
++            if (mInvertedMouse)
++                mPitch -= 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
++            else
++                mPitch += 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
++            if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
++            if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
++        }
+ 
+ 
+ 
+@@ -319,11 +320,14 @@
+                     }
+ 
+                     // mouse
+-                    if( !isCeguiActive() &amp;&amp; mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
++                    if( !isMouseUsedByCegui() )
+                     {
+-                        if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
++                        if (mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
+                         {
+-                            rotation = -mMouseSensitivity/3.0f * Degree(im-&gt;getMouseRelativeX())/200.0 * baseVel;
++                            if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
++                            {
++                                rotation = -mMouseSensitivity/3.0f * Degree(im-&gt;getMouseRelativeX())/200.0 * baseVel;
++                            }
+                         }
+                     }
+                 }
+@@ -532,22 +536,25 @@
+         InputManager* im = InputManager::getSingletonPtr();
+ 
+         // camera position (distance)
+-        mDesiredDistance -= im-&gt;getMouseRelativeZ() * 0.002;
+-        if (mDesiredDistance &lt; mDistanceRange.first)
++        if ( !isMouseUsedByCegui() )
+         {
+-            mDesiredDistance = mDistanceRange.first;
+-        }
+-        if (mDesiredDistance &gt; mDistanceRange.second)
+-        {
+-            mDesiredDistance = mDistanceRange.second;
+-        }
++            mDesiredDistance -= im-&gt;getMouseRelativeZ() * 0.002;
++            if (mDesiredDistance &lt; mDistanceRange.first)
++            {
++                mDesiredDistance = mDistanceRange.first;
++            }
++            if (mDesiredDistance &gt; mDistanceRange.second)
++            {
++                mDesiredDistance = mDistanceRange.second;
++            }
+ 
+-        if( !isCeguiActive() &amp;&amp; mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE )
+-        {
+-            mCamYaw -= 2 * mMouseSensitivity / 4.0 * mRotationSpeed * Degree(im-&gt;getMouseRelativeX() / 15);
++            if( mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE )
++            {
++                mCamYaw -= 2 * mMouseSensitivity / 4.0 * mRotationSpeed * Degree(im-&gt;getMouseRelativeX() / 15);
+ 
+-            while (mCamYaw.valueDegrees() &gt; 360.0f) mCamYaw -= Degree(360.0f);
+-            while (mCamYaw.valueDegrees() &lt; -360.0f) mCamYaw += Degree(360.0f);
++                while (mCamYaw.valueDegrees() &gt; 360.0f) mCamYaw -= Degree(360.0f);
++                while (mCamYaw.valueDegrees() &lt; -360.0f) mCamYaw += Degree(360.0f);
++            }
+         }
+ 
+         SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
+@@ -1089,7 +1096,8 @@
+     //------------------------------------------------------------------------
+     void MovementControlState::updateSelection()
+     {
+-        if (isCeguiActive()) return;
++        if ( isMouseUsedByCegui() )
++            return;
+ 
+         InputManager* im = InputManager::getSingletonPtr();
+ 
+@@ -1266,97 +1274,93 @@
+     }
+ 
+     //------------------------------------------------------------------------
+-    bool MovementControlState::keyPressed(const OIS::KeyEvent&amp; evt)
++    bool MovementControlState::keyPressed(const OIS::KeyEvent&amp; evt, bool handled)
+     {
+-        if( ControlState::keyPressed(evt) )
+-            return true;
+-
+-        int movement = mCommandMapper-&gt;getMovement(evt.key);
+-
+         bool retval = false;
+-        if (movement &amp; MOVE_RUN_LOCK) // dieses einrasten lassen
++        if( !handled )
+         {
+-            mCharacterState.mCurrentMovementState ^= MOVE_RUN_LOCK;
+-            movement &amp;= ~MOVE_RUN_LOCK;
+-            retval = true;
+-        }
++            int code = CommandMapper::encodeKey(evt.key, InputManager::getSingleton().getModifierCode());
++            // First see, if a control state action is defined
++	        CeGuiString command = mCommandMapper-&gt;getControlStateAction(code, mType);
++            if (command == &quot;&quot;)
++            {
++                // No. So try global actions.
++                command = mCommandMapper-&gt;getGlobalAction(code);
++            }
++            else if (command == &quot;freeflight_mode&quot;)
++            {
++                InputManager::getSingleton().pushControlState(CST_FREEFLIGHT);
++                retval = true;
++            }
++            else if (command == &quot;reset_camera&quot;)
++            {
++                resetCamera();
++                retval = true;
++            }
++            else if (command == &quot;toggle_view_mode&quot;)
++            {
++                toggleViewMode();
++                retval = true;
++            }
++            else if( startAction(command, mCharacter) )
++                retval = true;
+ 
+-        if (movement != MOVE_NONE)
+-        {
+-            mCharacterState.mCurrentMovementState |= movement;
+-            retval = true;
+-        }
+-        return retval;
+-    }
+ 
+-    //------------------------------------------------------------------------
+-    bool MovementControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+-    {
+-        // this should be the same as in ControlState::keyReleased!
+-        InputManager* im = InputManager::getSingletonPtr();
+-        if ( WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT )
+-        {
+-            bool retval;
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            retval = cegui.injectKeyUp(evt.key);
++
+             if( !retval )
+-                retval = cegui.injectChar(im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()));
+-            
+-            if( retval )
+-                return true;
+-        }
++            {
++                int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 
++                if (movement &amp; MOVE_RUN_LOCK) // dieses einrasten lassen
++                {
++                    mCharacterState.mCurrentMovementState ^= MOVE_RUN_LOCK;
++                    movement &amp;= ~MOVE_RUN_LOCK;
++                    retval = true;
++                }
+ 
+-        int code = CommandMapper::encodeKey(evt.key, im-&gt;getModifierCode());
+-        // First see, if a control state action is defined
+-	    CeGuiString command = mCommandMapper-&gt;getControlStateAction(code, mType);
+-        if (command == &quot;&quot;)
+-        {
+-            // No. So try global actions.
+-            command = mCommandMapper-&gt;getGlobalAction(code);
++                if (movement != MOVE_NONE)
++                {
++                    mCharacterState.mCurrentMovementState |= movement;
++                    retval = true;
++                }
++            }
+         }
+-        if (command == &quot;freeflight_mode&quot;)
+-        {
+-            InputManager::getSingleton().pushControlState(CST_FREEFLIGHT);
+-            return true;
+-        }
+-        if (command == &quot;reset_camera&quot;)
+-        {
+-            resetCamera();
+-            return true;
+-        }
+-        if (command == &quot;toggle_view_mode&quot;)
+-        {
+-            toggleViewMode();
+-            return true;
+-        }
+-        if( startAction(command, mCharacter) )
+-            return true;
+ 
+ 
++        retval = retval || ControlState::keyPressed(evt, handled || retval );
++        return retval;
++    }
++
++    //------------------------------------------------------------------------
++    bool MovementControlState::keyReleased(const OIS::KeyEvent&amp; evt, bool handled)
++    {
++        bool retval = false;
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+         if (movement != MOVE_NONE)
+         {
+             mCharacterState.mCurrentMovementState &amp;= (~movement | MOVE_RUN_LOCK);
+-            return true;
++            retval = true;
+         }
+ 
+-        return false;
++        retval = retval || ControlState::keyReleased(evt, retval);
++        return retval;
+     }
+ 
+     //------------------------------------------------------------------------
+     bool MovementControlState::mouseReleased(const OIS::MouseEvent&amp; evt,
+-        OIS::MouseButtonID id)
++        OIS::MouseButtonID id, bool handled)
+     {
+-        if( ControlState::mouseReleased(evt, id) )
+-            return true;
++        handled = handled || ControlState::mouseReleased(evt, id, handled);
+ 
+ 
+-        InputManager* im = InputManager::getSingletonPtr();
+-        int mouseButtonMask = CommandMapper::encodeKey(id, im-&gt;getModifierCode());
+-        return startAction(mCommandMapper-&gt;getControlStateAction(mouseButtonMask,
+-            CST_MOVEMENT), mCharacter);
++        if( !handled )
++        {
++            InputManager* im = InputManager::getSingletonPtr();
++            int mouseButtonMask = CommandMapper::encodeKey(id, im-&gt;getModifierCode());
++            return startAction(mCommandMapper-&gt;getControlStateAction(mouseButtonMask,
++                CST_MOVEMENT), mCharacter);
++        }
++        return false;
+     }
+ 
+     //------------------------------------------------------------------------
+
+Modified: rl/trunk/engine/ui/src/WindowFactory.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFactory.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/WindowFactory.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -103,6 +103,7 @@
+         mJournalWindow = new JournalWindow();
+         mInfoPopup = new InfoPopup();
+         mObjectDescriptionWindow = new ObjectDescriptionWindow();
++        mGameSettings = new GameSettings();
+ 
+         RulesSubsystem::getSingleton().getQuestBook()-&gt;addQuestListener(mJournalWindow);
+         RulesSubsystem::getSingleton().getQuestBook()-&gt;addQuestListener(mInfoPopup);
+@@ -383,7 +384,6 @@
+     void WindowFactory::showGameSettings()
+     {
+         // Create the game settings window and show it
+-        mGameSettings = new GameSettings();
+         mGameSettings-&gt;setVisible(true);
+     }
+ 
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2007-09-26 13:59:06 UTC (rev 3880)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2007-09-26 16:13:18 UTC (rev 3881)
+@@ -119,4 +119,19 @@
+         mask |= mNumActiveWindowsKeyboardInput &gt; 0 ? AbstractWindow::WIT_KEYBOARD_INPUT : 0;
+         return mask;
+     }
++
++    AbstractWindow* WindowManager::getActiveWindow()
++    {
++        // iterate through windows
++        std::list&lt;AbstractWindow*&gt;::iterator it;
++        for( it = mWindowList.begin(); it != mWindowList.end(); it++ )
++        {
++            if( (*it)-&gt;getWindow()-&gt;isActive() )
++            {
++                return *it;
++            }
++        }
++
++        return NULL;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000951.html">[Dsa-hl-svn] r3880 - in modules/ruchin: maps models
+</A></li>
+	<LI>Next message: <A HREF="000953.html">[Dsa-hl-svn] r3882 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#952">[ date ]</a>
+              <a href="thread.html#952">[ thread ]</a>
+              <a href="subject.html#952">[ subject ]</a>
+              <a href="author.html#952">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,248 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3230 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3230%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200704041746.l34Hk90s014009%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000300.html">
+   <LINK REL="Next"  HREF="000302.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3230 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3230%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200704041746.l34Hk90s014009%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3230 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr  4 19:46:09 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000300.html">[Dsa-hl-svn] r3229 - in rl/trunk/engine/common: include src
+</A></li>
+        <LI>Next message: <A HREF="000302.html">[Dsa-hl-svn] r3231 - in rl/trunk/engine: core/include core/src	rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#301">[ date ]</a>
+              <a href="thread.html#301">[ thread ]</a>
+              <a href="subject.html#301">[ subject ]</a>
+              <a href="author.html#301">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-04 19:46:04 +0200 (Wed, 04 Apr 2007)
+New Revision: 3230
+
+Modified:
+   rl/trunk/engine/rules/include/Inventory.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+Preparations for using meshcombiner in RL: add submesh slot class
+
+Modified: rl/trunk/engine/rules/include/Inventory.h
+===================================================================
+--- rl/trunk/engine/rules/include/Inventory.h	2007-04-04 17:44:46 UTC (rev 3229)
++++ rl/trunk/engine/rules/include/Inventory.h	2007-04-04 17:46:04 UTC (rev 3230)
+@@ -92,7 +92,7 @@
+ 
+ private:
+ 	bool mValuesUpToDate;
+-	int mCurrentWeight;
++	Ogre::Real mCurrentWeight;
+ 	int mCurrentBeByWeight;
+ 	int mCurrentBe;
+ 	int mCurrentRs;
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2007-04-04 17:44:46 UTC (rev 3229)
++++ rl/trunk/engine/rules/include/Slot.h	2007-04-04 17:46:04 UTC (rev 3230)
+@@ -26,21 +26,42 @@
+ class _RlRulesExport Slot
+ {
+ public:
+-    Slot(Creature* owner, const CeGuiString&amp; name, const Ogre::String&amp; bone, int itemMask);
+-    ~Slot();
+-
+-    void setItem(Item* item);
++    virtual void setItem(Item* item) = 0;
+     Item* getItem() const;
+     bool isAllowed(Item* item) const;
+ 
++protected:
++    Slot(Creature* owner, const CeGuiString&amp; name, int itemMask);
++    virtual ~Slot();
++
++    Creature* mOwner;
++    Item* mItem;
++
+ private:
+-    Creature* mOwner;
+     CeGuiString mName;
+-    Ogre::String mBone;
+     int mItemMask;
+-    Item* mItem;
+ };
+ 
++class BoneSlot : public Slot
++{
++public:
++    BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; bone);
++    virtual void setItem(Item* item);
++
++private:
++    Ogre::String mBone;
++};
++
++class SubmeshSlot : public Slot
++{
++public:
++    SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh);
++    virtual void setItem(Item* item);
++
++private:
++    Ogre::String mSubmesh;
++};
++
+ } // namespace rl
+ 
+ #endif //__SLOT_H__
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2007-04-04 17:44:46 UTC (rev 3229)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2007-04-04 17:46:04 UTC (rev 3230)
+@@ -129,7 +129,7 @@
+ 	{
+ 		ItemList::iterator it = items.begin();
+ 
+-		unsigned int totalWeight = 0;
++		Ogre::Real totalWeight = 0.0;
+ 
+ 		while (it != items.end())
+ 		{
+@@ -155,7 +155,7 @@
+ 		//ItemList::iterator it = wornItems.begin();
+ 		//while (it != wornItems.end())
+ 		//{
+-		//	// Beachte nur R&#252;stungen
++		//	// Beachte nur Rstungen
+ 		//	if (dynamic_cast&lt;Armor*&gt;(*it) != 0)
+ 		//	{
+ 		//		mCurrentRs += (dynamic_cast&lt;Armor*&gt;(*it))-&gt;getGRS();
+@@ -218,7 +218,7 @@
+         {
+             Throw(rl::IllegalArgumentException, Ogre::String(&quot;Slot '&quot;)+name.c_str()+&quot;' already exists.&quot;);
+         }
+-        mSlots[name] = new Slot(mOwner, name, bone, itemMask);
++        mSlots[name] = new BoneSlot(mOwner, name, itemMask, bone);
+     }
+ 
+     const Inventory::SlotMap&amp; Inventory::getAllSlots() const
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-04-04 17:44:46 UTC (rev 3229)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-04-04 17:46:04 UTC (rev 3230)
+@@ -22,18 +22,35 @@
+ 
+ namespace rl {
+ 
+-    Slot::Slot(Creature* owner, const CeGuiString&amp; name, const Ogre::String&amp; bone, int itemMask)
+-        : mOwner(owner), mName(name), mBone(bone), mItemMask(itemMask), mItem(NULL)
++    Slot::Slot(Creature* owner, const CeGuiString&amp; name, int itemMask)
++        : mOwner(owner), mName(name), mItemMask(itemMask), mItem(NULL)
+     {
+     }
+ 
+     Slot::~Slot()
+     {
+-        ///@todo an den richtigen Bone anf&#252;gen
+     }
+ 
+-    void Slot::setItem(Item* item)
++    Item* Slot::getItem() const
+     {
++        return mItem;
++    }
++
++    bool Slot::isAllowed(Item *item) const
++    {
++        int type = item-&gt;getItemType();
++        return (type &amp; mItemMask) == type;
++    }
++
++
++    BoneSlot::BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; bone)
++        : Slot(owner, name, itemMask), mBone(bone)
++    {
++    }
++
++
++    void BoneSlot::setItem(Item* item)
++    {
+ 		if (item == NULL)
+ 		{
+ 			mItem-&gt;setState(GOS_LOADED);
+@@ -51,21 +68,21 @@
+             mItem = item;
+             if (mOwner-&gt;getState() == GOS_IN_SCENE)
+             {
+-                mItem-&gt;hold();
++				mItem-&gt;setState(GOS_HELD);
+                 mOwner-&gt;getActor()-&gt;attachToSlot(mItem-&gt;getActor(), mBone);
+             }
+         }
+     }
+ 
+-    Item* Slot::getItem() const
++
++    SubmeshSlot::SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh)
++        : Slot(owner, name, itemMask), mSubmesh(submesh)
+     {
+-        return mItem;
+     }
+ 
+-    bool Slot::isAllowed(Item *item) const
++
++    void SubmeshSlot::setItem(Item* item)
+     {
+-        int type = item-&gt;getItemType();
+-        return (type &amp; mItemMask) == type;
++        ///@todo: use meshcombiner API
+     }
+-
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000300.html">[Dsa-hl-svn] r3229 - in rl/trunk/engine/common: include src
+</A></li>
+	<LI>Next message: <A HREF="000302.html">[Dsa-hl-svn] r3231 - in rl/trunk/engine: core/include core/src	rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#301">[ date ]</a>
+              <a href="thread.html#301">[ thread ]</a>
+              <a href="subject.html#301">[ subject ]</a>
+              <a href="author.html#301">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

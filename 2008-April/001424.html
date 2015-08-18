@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4353 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4353%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200804201606.m3KG6VQK024735%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001423.html">
+   <LINK REL="Next"  HREF="001425.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4353 - rl/trunk/engine/rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4353%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200804201606.m3KG6VQK024735%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4353 - rl/trunk/engine/rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Apr 20 18:06:31 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001423.html">[Dsa-hl-svn] r4352 - modules/kanalisation
+</A></li>
+        <LI>Next message: <A HREF="001425.html">[Dsa-hl-svn] r4354 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1424">[ date ]</a>
+              <a href="thread.html#1424">[ thread ]</a>
+              <a href="subject.html#1424">[ subject ]</a>
+              <a href="author.html#1424">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-04-20 18:06:29 +0200 (Sun, 20 Apr 2008)
+New Revision: 4353
+
+Modified:
+   rl/trunk/engine/rules/src/CreatureController.cpp
+Log:
+- No falling animation if creature is immobile
+- do not repeat last movement if there is no valid movement
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-04-20 13:14:57 UTC (rev 4352)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-04-20 16:06:29 UTC (rev 4353)
+@@ -124,7 +124,8 @@
+         virtual bool isPossible() const
+         {
+             return
+-                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE;
++                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE
++                &amp;&amp; !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; Effect::LS_IMMOBILE);
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -193,7 +194,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; Effect::LS_IMMOBILE);
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -1605,12 +1606,12 @@
+ 
+         mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
+                 boost::bind(&amp;CreatureController::refetchCreature, this));
+-
+-        mLifeStateChangedHandler = MessagePump::getSingleton()
+-            .addMessageHandler&lt;MessageType_GameObjectLifeStateChanged&gt;(
+-                boost::bind(&amp;CreatureController::onCreatureLifeStateChanged, this, _1, _2, _3));
+-        
+-        LOG_DEBUG(&quot;CreatureController&quot;, &quot;Added CreatureController for &quot; + creature-&gt;getName());
++
++        mLifeStateChangedHandler = MessagePump::getSingleton()
++            .addMessageHandler&lt;MessageType_GameObjectLifeStateChanged&gt;(
++                boost::bind(&amp;CreatureController::onCreatureLifeStateChanged, this, _1, _2, _3));
++        
++        LOG_DEBUG(&quot;CreatureController&quot;, &quot;Added CreatureController for &quot; + creature-&gt;getName());
+     }
+ 
+     CreatureController::~CreatureController()
+@@ -1731,6 +1732,8 @@
+             }
+         }
+ 
++        LOG_DEBUG(&quot;CreatureController&quot;, &quot;Set animation &quot; + name + &quot; at &quot; + mCreature-&gt;getName());
++
+         return meshAnim;
+     }
+ 
+@@ -1976,6 +1979,11 @@
+             movement = getMovementFromId(movement-&gt;getFallBackMovement());
+         }
+ 
++        if (!movement)
++        {
++            mMovement = NULL;
++        }
++
+         return false;
+     }
+ 
+@@ -2009,23 +2017,24 @@
+ 
+         return false;
+     }
+-    
+-    bool CreatureController::onCreatureLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
+-                                                        Effect::LifeState newstate) 
+-    {
+-        if (gameobject == mCreature) 
+-        {
+-            if ((newstate &amp; Effect::LS_UNCONSCIOUS || newstate &amp; Effect::LS_DEAD) 
+-                &amp;&amp; !(oldstate &amp; Effect::LS_UNCONSCIOUS || oldstate &amp; Effect::LS_DEAD))
+-            {
+-                // die, die, die!
+-                Creature::AnimationSpeedPair anim = mCreature-&gt;getAnimation(&quot;sterben&quot;);
+-                setAnimation(anim.first, anim.second, 0, anim.first, 1.0f );
+-            }
+-            return true;
+-        }
+-        
+-        return false;
+-    }
++    
++    bool CreatureController::onCreatureLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
++                                                        Effect::LifeState newstate) 
++    {
++        if (gameobject == mCreature) 
++        {
++            if ((newstate &amp; Effect::LS_UNCONSCIOUS || newstate &amp; Effect::LS_DEAD) 
++                &amp;&amp; !(oldstate &amp; Effect::LS_UNCONSCIOUS || oldstate &amp; Effect::LS_DEAD))
++            {
++                // die, die, die!
++                setMovement(CreatureController::MT_NONE, Vector3::ZERO, Vector3::ZERO);
++                Creature::AnimationSpeedPair anim = mCreature-&gt;getAnimation(&quot;sterben&quot;);
++                setAnimation(anim.first, anim.second, 1, anim.first, 1.0f );
++            }
++            return true;
++        }
++        
++        return false;
++    }
+ 
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001423.html">[Dsa-hl-svn] r4352 - modules/kanalisation
+</A></li>
+	<LI>Next message: <A HREF="001425.html">[Dsa-hl-svn] r4354 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1424">[ date ]</a>
+              <a href="thread.html#1424">[ thread ]</a>
+              <a href="subject.html#1424">[ subject ]</a>
+              <a href="author.html#1424">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

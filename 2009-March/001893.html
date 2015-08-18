@@ -1,0 +1,231 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4836 - modules/common/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4836%20-%20modules/common/scripts&In-Reply-To=%3C200903152254.n2FMsrSP007994%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001892.html">
+   <LINK REL="Next"  HREF="001894.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4836 - modules/common/scripts</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4836%20-%20modules/common/scripts&In-Reply-To=%3C200903152254.n2FMsrSP007994%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4836 - modules/common/scripts">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 15 23:54:53 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001892.html">[Dsa-hl-svn] r4835 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001894.html">[Dsa-hl-svn] r4837 - in rl/trunk/editors/Lockenwickler/src: .	media/icons
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1893">[ date ]</a>
+              <a href="thread.html#1893">[ thread ]</a>
+              <a href="subject.html#1893">[ subject ]</a>
+              <a href="author.html#1893">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2009-03-15 23:54:52 +0100 (Sun, 15 Mar 2009)
+New Revision: 4836
+
+Modified:
+   modules/common/scripts/npc.rb
+Log:
+ 
+
+Modified: modules/common/scripts/npc.rb
+===================================================================
+--- modules/common/scripts/npc.rb	2009-03-15 22:54:37 UTC (rev 4835)
++++ modules/common/scripts/npc.rb	2009-03-15 22:54:52 UTC (rev 4836)
+@@ -1,76 +1,79 @@
+-require 'steering.rb'
+-
+-class TalkAction &lt; Action
+-  def initialize()
+-    super(&quot;talk&quot;, &quot;Reden&quot;)
+-  end
+-
+-  def doAction(object, actor, target)
+-    npcs = Array.new();
+-    npcs.push(object);
+-    npcs += object.getCreaturesNearby(1, false);
+-    dialog = DialogManager::getSingleton().createDialog(object.getDialog(), npcs);  
+-	  agent = AgentManager::getSingleton().createAgent(object);
+-	  agent.pushState(RlScript::AST_DIALOG);
+-    agent.getCurrentState().setDialog(dialog);
+-  end
+-end
+-
+-module TalkTarget
+-  @mDialog;
+-
+-  def initialize(id)
+-    super(id)
+-    addAction(TalkAction.new())
+-  end
+-
+-  def setProperty(key, value)
+-    if (key == &quot;dialog&quot;)
+-      @mDialog = value;
+-    else
+-      super(key, value)
+-    end
+-  end
+-
+-  def getDialog()
+-    return @mDialog;
+-  end
+-end
+-
+-module BehaviourBot
+-  def setProperty(key, value)
+-    if (key == &quot;behaviours&quot;)
+-      print &quot;behaviours:&quot;;
+-      p value;
+-    else
+-      super(key, value)
+-    end
+-    
+-    #TODO: Create behaviours like that:
+-    #
+-    #bot = $DS.loadBot(&quot;Sonja&quot;, &quot;sonja.xml&quot;);
+-    #bot.setNonPlayerCharacter(sonja);
+-    #
+-    #agent = $AGM.createAgent(bot);
+-    #agent.addSteeringBehaviour(DefaultIdleBehaviour.new);
+-    #agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+-    #agent.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+-    
+-  end
+-end
+-
+-class NPC &lt; Creature
+-  include TalkTarget
+-  include BehaviourBot
+-  
+-  def getCreaturesNearby(range, includePlayers)
+-    gos = $GOM.getAllGameObjects();
+-    gos.each { |go|
+-      if ((go.getPosition() - self.getPosition()).getLength() &lt;= range) and
+-          (includePlayers || !PartyManager.getSingleton().isInParty(go))
+-        gos -= go;
+-      end
+-    }
+-    return gos;
+-  end
++require 'steering.rb'
++
++class TalkAction &lt; Action
++  def initialize()
++    super(&quot;talk&quot;, &quot;Reden&quot;)
++  end
++
++  def doAction(object, actor, target)
++    npcs = Array.new();
++    npcs.push(object);
++    npcs += object.getCreaturesNearby(1, false);
++    dialog = DialogManager::getSingleton().createDialog(object.getDialog(), npcs);  
++    agent = AgentManager::getSingleton().createAgent(object);
++    agent.pushState(RlScript::AST_DIALOG);
++    dialogState = agent.getCurrentState()
++    dialogState.setDialog(dialog);
++    npcs.each do |cur|
++      dialogState.addDialogPartner(AgentManager::getSingleton().createAgent(cur));
++    end
++  end
++end
++
++module TalkTarget
++  @mDialog;
++
++  def initialize(id)
++    super(id)
++    addAction(TalkAction.new())
++  end
++
++  def setProperty(key, value)
++    if (key == &quot;dialog&quot;)
++      @mDialog = value;
++    else
++      super(key, value)
++    end
++  end
++
++  def getDialog()
++    return @mDialog;
++  end
++end
++
++module BehaviourBot
++  def setProperty(key, value)
++    if (key == &quot;behaviours&quot;)
++      print &quot;behaviours:&quot;;
++      p value;
++    else
++      super(key, value)
++    end
++    
++    #TODO: Create behaviours like that:
++    #
++    #bot = $DS.loadBot(&quot;Sonja&quot;, &quot;sonja.xml&quot;);
++    #bot.setNonPlayerCharacter(sonja);
++    #
++    #agent = $AGM.createAgent(bot);
++    #agent.addSteeringBehaviour(DefaultIdleBehaviour.new);
++    #agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
++    #agent.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
++    
++  end
++end
++
++class NPC &lt; Creature
++  include TalkTarget
++  include BehaviourBot
++  
++  def getCreaturesNearby(range, includePlayers)
++    print &quot;Getting all nearby&quot;;
++    selector = SphereSelector.new(QUERYFLAG_CREATURE);
++    selector.setPosition(getPosition());
++    selector.setRadius(range);
++    selector.updateSelection();
++    
++    return selector.getAllSelectedObjects();
++  end
+ end
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001892.html">[Dsa-hl-svn] r4835 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001894.html">[Dsa-hl-svn] r4837 - in rl/trunk/editors/Lockenwickler/src: .	media/icons
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1893">[ date ]</a>
+              <a href="thread.html#1893">[ thread ]</a>
+              <a href="subject.html#1893">[ subject ]</a>
+              <a href="author.html#1893">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

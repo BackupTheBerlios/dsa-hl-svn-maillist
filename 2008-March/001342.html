@@ -1,0 +1,362 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4271 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4271%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803081654.m28GsPP6017354%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001341.html">
+   <LINK REL="Next"  HREF="001343.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4271 - in rl/trunk/engine/rules: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4271%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803081654.m28GsPP6017354%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4271 - in rl/trunk/engine/rules: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 17:54:25 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001341.html">[Dsa-hl-svn] r4270 - in modules/regressiontest/scripts: . maps
+</A></li>
+        <LI>Next message: <A HREF="001343.html">[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1342">[ date ]</a>
+              <a href="thread.html#1342">[ thread ]</a>
+              <a href="subject.html#1342">[ subject ]</a>
+              <a href="author.html#1342">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-08 17:54:21 +0100 (Sat, 08 Mar 2008)
+New Revision: 4271
+
+Modified:
+   rl/trunk/engine/rules/include/Combatant.h
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/RulesConstants.h
+   rl/trunk/engine/rules/include/RulesMessages.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/rules/src/Combatant.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/ObjectStateChangeEventSource.cpp
+Log:
+Manage life condition of creatures. They can now die, but death is yet without effect.
+
+Modified: rl/trunk/engine/rules/include/Combatant.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combatant.h	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/include/Combatant.h	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -79,6 +79,9 @@
+         **/
+ 		int rollParade(bool gluecklich);
+ 
++		int rollTrefferpunkte() const;
++		int applyTrefferpunkte(int tp);
++
+ 		void doAttacke(JobSet* jobSet, Combatant* target, int attackeResult, bool parade,
+ 			int paradeResult = 0);
+ 		void doParade(JobSet* jobSet, Combatant* target, int paradeResult);
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/include/Creature.h	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -632,6 +632,8 @@
+              **/
+             int doInitiativeWurf(bool getMaxInitiative = false);
+ 
++			int doTrefferpunkteWurf(Weapon* weapon) const;
++
+             /**
+              *  Fuegt der Kreatur \a tp @ref abbdet &quot;Trefferpunkte&quot; zu.
+              *  @param tp die Trefferpunkte
+@@ -823,6 +825,9 @@
+             /// Zuletzt zugewiesene Bewegungsart
+             int mMovementType;
+ 
++			/// Life state, alive or dead or in between
++			LifeState mLifeState;
++
+             /// Zeigt auf die gerade aktive Waffe.
+             EigenschaftMap mEigenschaften;
+             TalentMap mTalente;
+
+Modified: rl/trunk/engine/rules/include/RulesConstants.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesConstants.h	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/include/RulesConstants.h	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -59,6 +59,16 @@
+ 		GET_DIALOG,  ///!&lt; Dialog events (&quot;Charisma roll succeded.&quot;)
+ 		GET_QUEST    ///!&lt; Quest related events (&quot;Quest succeded: Kill Wolf.&quot;)
+ 	};
++
++    /// General life condition state of creatures.
++    enum LifeState
++    {
++        LIFESTATE_ALIVE         = 1, ///&lt; Creature is alive and kicking.
++		LIFESTATE_INCAPACITATED = 2, ///&lt; Creature is alive and not quite kicking.
++        LIFESTATE_UNCONCIOUS    = 3, ///&lt; Creature is alive but not kicking.
++        LIFESTATE_DEAD          = 4, ///&lt; Creature is neither alive nor kicking.
++		LIFESTATE_UNDEAD        = 5  ///&lt; Creature is not alive but kicking. (DO NOT USE BTW)
++    };
+ }
+ 
+ #endif // __RULESCONSTANTS_H__
+
+Modified: rl/trunk/engine/rules/include/RulesMessages.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesMessages.h	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/include/RulesMessages.h	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -25,6 +25,7 @@
+ namespace rl
+ {
+ 	class Combatant;
++	class Creature;
+ 
+ 	/// 0x03xxxxxx as mask for rules messages
+     enum RulesMessageTypeIds
+@@ -40,7 +41,13 @@
+ 		RLMSG_COMBAT_EVENTS = 0x03000200,
+ 		// Events
+ 		RLMSG_COMBAT_OPPONENT_ENTERED = 0x03000201,
+-		RLMSG_COMBAT_OPPONENT_LEFT = 0x03000202
++		RLMSG_COMBAT_OPPONENT_LEFT = 0x03000202,
++
++		// Game object related events
++        // Mask
++        RLMSG_GAMEOBJECT_EVENTS = 0x03000300,
++        // Events
++        RLMSG_CREATURE_LIFESTATE_CHANGED = 0x03000301
+     };
+ 
+     /// Message sent right after a new game log event has been added.
+@@ -52,5 +59,8 @@
+ 
+ 	typedef MessageType&lt;RLMSG_COMBAT_OPPONENT_LEFT, Combatant*&gt;
+ 		MessageType_CombatOpponentLeft;
++
++	typedef MessageType&lt;RLMSG_CREATURE_LIFESTATE_CHANGED, Creature*, LifeState&gt;
++		MessageType_CreatureLifeStateChanged;
+ }
+ #endif
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -292,6 +292,7 @@
+ 	{
+ 		GameEventLog::getSingleton().logEvent(
+ 			actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
++		bool rollDamage = false;
+ 		// Make an attack roll.
+ 		int aresult = actor-&gt;rollAttacke();
+ 		if (aresult &gt;= RESULT_ERFOLG)
+@@ -313,6 +314,7 @@
+ 					{
+ 						GameEventLog::getSingleton().logEvent(&quot;Erfolg, nicht pariert, Treffer!&quot;,
+ 							GET_COMBAT);
++						rollDamage = true;
+ 					}
+ 					target-&gt;doParade(jobSet, actor, presult);
+ 					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
+@@ -326,6 +328,7 @@
+ 			{
+ 				GameEventLog::getSingleton().logEvent(&quot;Treffer!&quot;, GET_COMBAT);
+ 				actor-&gt;doAttacke(jobSet, target, aresult, false);
++				rollDamage = true;
+ 			}
+ 		}
+ 		else
+@@ -334,6 +337,17 @@
+ 			actor-&gt;doAttacke(jobSet, target, aresult, false);
+ 			target-&gt;doGetroffen(jobSet);
+ 		}
++		
++		if (rollDamage)
++		{
++			int tp = actor-&gt;rollTrefferpunkte();
++			int sp = target-&gt;applyTrefferpunkte(tp);
++			CeGuiString msg = actor-&gt;getName() + &quot; trifft f&#252;r &quot;
++				+ CeGuiString(StringConverter::toString(tp))
++				+ &quot; Trefferpunkte, &quot; + target-&gt;getName() + &quot; erleidet &quot;
++				+ CeGuiString(StringConverter::toString(sp)) + &quot; Schadenspunkte.&quot;;
++			GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
++		}
+ 	}
+ 
+     void Combat::jobFinished(unsigned long ticket)
+
+Modified: rl/trunk/engine/rules/src/Combatant.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combatant.cpp	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/src/Combatant.cpp	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -85,6 +85,19 @@
+ 		return getCreature()-&gt;doParade(weapon-&gt;getKampftechnik(), 0, gluecklich);
+ 	}
+ 
++	int Combatant::rollTrefferpunkte() const
++	{
++		return getCreature()-&gt;doTrefferpunkteWurf(getActiveWeapon());
++	}
++
++	int Combatant::applyTrefferpunkte(int tp)
++	{
++		int oldLe = getCreature()-&gt;getLe();
++		getCreature()-&gt;damageLe(tp);
++		int newLe = getCreature()-&gt;getLe();
++		return oldLe - newLe;
++	}
++
+ 	void Combatant::doAttacke(JobSet* jobSet, Combatant* target, int attackeResult, bool parade,
+ 		int paradeResult)
+ 	{
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/src/Creature.cpp	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -27,6 +27,8 @@
+ #include &quot;Inventory.h&quot;
+ #include &quot;Kampftechnik.h&quot;
+ #include &quot;MeshObject.h&quot;
++#include &quot;MessagePump.h&quot;
++#include &quot;RulesMessages.h&quot;
+ #include &quot;StateSet.h&quot;
+ #include &quot;Slot.h&quot;
+ #include &quot;Talent.h&quot;
+@@ -247,29 +249,38 @@
+    void Creature::modifyLe(int mod, bool ignoreMax)
+     {
+         int oldLe = mCurrentLe;
++		LifeState oldLifeState = mLifeState;
+         mCurrentLe += mod;
+ 		if (!ignoreMax)
++		{
+ 			mCurrentLe = min(mCurrentLe, getLeMax());
+-		if (mCurrentLe &lt;= getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE) &amp;&amp;
+-            oldLe &gt; getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE))
+-		{
+-            ///@todo set incapacitated.
+-			MeshObject* mo = static_cast&lt;MeshObject*&gt;(getActor()-&gt;getControlledObject());
+-			mo-&gt;stopAllAnimations();
+-            ///@todo Sturzanimation aufrufen, sobald sie verfuegbar ist.
+-			//mo-&gt;startAnimation(&quot;Niederschlag/Sturz&quot;, 1.0f, 1);
+ 		}
+-        if (mCurrentLe &lt;= 0 &amp;&amp;
+-            oldLe &gt; 0)
++
++        if (mCurrentLe &lt;= -getEigenschaft(&quot;KO&quot;) &amp;&amp; oldLe &gt; -getEigenschaft(&quot;KO&quot;))
+         {
+-            ///@todo set unconscious
++            mLifeState = LIFESTATE_DEAD;
+         }
+-        if (mCurrentLe &lt;= -getEigenschaft(&quot;KO&quot;) &amp;&amp;
+-            oldLe &gt; -getEigenschaft(&quot;KO&quot;))
++        else if (mCurrentLe &lt;= 0 &amp;&amp; oldLe &gt; 0)
+         {
+-            ///@todo set dead
++			mLifeState = LIFESTATE_UNCONCIOUS;
+         }
++		else if (mCurrentLe &lt;= getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE) &amp;&amp;
++            oldLe &gt; getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE))
++		{
++			mLifeState = LIFESTATE_INCAPACITATED;
++		}
++		else
++		{
++			mLifeState = LIFESTATE_ALIVE;
++		}
++
+ 		fireObjectStateChangeEvent();
++
++		if (mLifeState != oldLifeState)
++		{
++			MessagePump::getSingleton().sendMessage&lt;MessageType_CreatureLifeStateChanged&gt;(this,
++				mLifeState);
++		}
+     }
+ 
+     int Creature::getLe() const
+@@ -850,6 +861,24 @@
+ 		return rval;
+ 	}
+ 
++	int Creature::doTrefferpunkteWurf(Weapon* weapon) const
++	{
++		// Roll dice
++		const Tripel&lt;int&gt;&amp; weaponTp = weapon-&gt;getTp();
++		int rval = DsaManager::getSingleton().roll(weaponTp.first, weaponTp.second);
++		rval += weaponTp.third;
++
++		// Apply TP/KK
++
++		int kk = getEigenschaft(E_KOERPERKRAFT);
++		std::pair&lt;int, int&gt; tpkk = weapon-&gt;getTpKk();
++		
++		int bonus = (kk - tpkk.first) / tpkk.second;
++		rval += bonus;
++
++		return rval;
++	}
++
+ 	/// @todo Implement correctly
+ 	void Creature::damageLe(int tp, int damageType)
+ 	{
+@@ -871,7 +900,8 @@
+             damageAu(tp, AUDAMAGE_NORMAL);
+             tp = (int)floor(tp/2.);
+         }
+-		modifyLe(-tp);
++		int rs = getWert(WERT_RS);
++		modifyLe(-tp + rs);
+ 	}
+ 
+     void Creature::damageAe(int asp)
+
+Modified: rl/trunk/engine/rules/src/ObjectStateChangeEventSource.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/ObjectStateChangeEventSource.cpp	2008-03-08 16:40:40 UTC (rev 4270)
++++ rl/trunk/engine/rules/src/ObjectStateChangeEventSource.cpp	2008-03-08 16:54:21 UTC (rev 4271)
+@@ -40,7 +40,6 @@
+         removeObjectStateChangeListener();
+     }
+ 
+-
+ 	void ObjectStateChangeEventSource::fireObjectStateChangeEvent()
+ 	{
+ 		ObjectStateChangeEvent* evt = new ObjectStateChangeEvent(this);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001341.html">[Dsa-hl-svn] r4270 - in modules/regressiontest/scripts: . maps
+</A></li>
+	<LI>Next message: <A HREF="001343.html">[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1342">[ date ]</a>
+              <a href="thread.html#1342">[ thread ]</a>
+              <a href="subject.html#1342">[ subject ]</a>
+              <a href="author.html#1342">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

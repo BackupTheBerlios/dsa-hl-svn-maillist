@@ -1,0 +1,700 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3035 - in rl/trunk/engine: common/include common/src	core/include core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3035%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/include%20core/src&In-Reply-To=%3C200702101636.l1AGaK6m021736%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000105.html">
+   <LINK REL="Next"  HREF="000107.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3035 - in rl/trunk/engine: common/include common/src	core/include core/src</H1>
+    <B>chrber at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3035%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/include%20core/src&In-Reply-To=%3C200702101636.l1AGaK6m021736%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3035 - in rl/trunk/engine: common/include common/src	core/include core/src">chrber at mail.berlios.de
+       </A><BR>
+    <I>Sat Feb 10 17:36:20 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000105.html">[Dsa-hl-svn] r3034 - in rl/trunk: . engine/core/src	engine/ui/include engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000107.html">[Dsa-hl-svn] r3036 - modules/config
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#106">[ date ]</a>
+              <a href="thread.html#106">[ thread ]</a>
+              <a href="subject.html#106">[ subject ]</a>
+              <a href="author.html#106">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: chrber
+Date: 2007-02-10 17:36:19 +0100 (Sat, 10 Feb 2007)
+New Revision: 3035
+
+Modified:
+   rl/trunk/engine/common/include/ConfigFile.h
+   rl/trunk/engine/common/src/ConfigFile.cpp
+   rl/trunk/engine/core/include/ConfigurationManager.h
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+Log:
+Removed obsolete functions from ConfigFile class
+Avoid one #ifdef clutch in CoreSubsystem by letting the ConfigurationManager specifiy the list of plugins
+Removes also one now obsolete method of ConfigurationManager
+
+
+Modified: rl/trunk/engine/common/include/ConfigFile.h
+===================================================================
+--- rl/trunk/engine/common/include/ConfigFile.h	2007-02-10 14:31:59 UTC (rev 3034)
++++ rl/trunk/engine/common/include/ConfigFile.h	2007-02-10 16:36:19 UTC (rev 3035)
+@@ -19,175 +19,72 @@
+ 
+ #include &quot;CommonPrerequisites.h&quot;
+ #include &lt;OgreConfigFile.h&gt;
+-#include &lt;OgreDataStream.h&gt;
+-#include &lt;OgreStringConverter.h&gt;
+ 
+-namespace Ogre
+-{
+-    template&lt;class T&gt; class SharedPtr;
+-    class DataStream;
+-    typedef class SharedPtr&lt;DataStream&gt; DataStreamPtr;
+-
+-}
+-
+ namespace rl
+ {
+-
+-class _RlCommonExport ConfigFile : public Ogre::ConfigFile
+-{
+-public:
+-    ConfigFile();
+-    /// save to a filename (not using resource group locations)
+-    void save(const Ogre::String&amp; filename, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+-    /// save to a filename (using resource group locations)
+-    void save(const Ogre::String&amp; filename, const Ogre::String&amp; resourceGroup, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+-    /// save to a data stream
+-    void save(std::ofstream&amp; stream, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+-    /// save to a filename (not using resource group locations)
+-    void saveDirect(const Ogre::String&amp; filename, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+-    /// save to a filename (using resource group locations)
+-    void saveToResourceSystem(const Ogre::String&amp; filename, const Ogre::String&amp; resourceGroup, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+-
+-
+-    /**
+-     * Setzt die Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param value Der Wert der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @author JoSch
+-     * @date 05-10-2006
+-    */
+-    template &lt;class T&gt;
+-    void setValue(const T &amp;value, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK)
++    class _RlCommonExport ConfigFile : public Ogre::ConfigFile
+     {
+-        if (mSettings[section] == 0)
+-        {
+-            // Neue Sektion anlegen
+-            mSettings[section] = new SettingsMultiMap();
+-        }
+-        Ogre::String _value = Ogre::StringConverter::toString(value);
+-        mSettings[section]-&gt;insert( std::multimap&lt;Ogre::String, Ogre::String&gt;::value_type(name, _value));
+-    }
++    public:
++        /**
++         * Default constructor
++         *
++         * Calls parent constructor
++         */
++        ConfigFile();
+ 
+-    /**
+-     * Setzt die Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param value Der Wert der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @author JoSch
+-     * @date 05-10-2006
+-    */
+-    void setValues(const Ogre::StringVector values, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK)
+-    {
+-        if (mSettings[section] == 0)
+-        {
+-            // Neue Sektion anlegen
+-            mSettings[section] = new SettingsMultiMap();
+-        }
+-        for (Ogre::StringVector::const_iterator it = values.begin();
+-            it != values.end(); it++)
+-        {
+-            mSettings[section]-&gt;insert( std::multimap&lt;Ogre::String, Ogre::String&gt;::value_type(name, *it));
+-        }
+-    }
++        /**
++         * Wrapper function for saveDirect
++         *
++         * @param filename Filename of the configuration file
++         * @param separators Inserted between key and value
++         * @param trimWhitespace Should leading and trailing whitespace be removed?
++         */
++        void save(const Ogre::String&amp; filename, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+ 
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param _default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    int getValue(const int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
++        /**
++         * Wrapper function for saveToResourceSystem
++         *
++         * @param filename Filename of the configuration file
++         * @param separators Inserted between key and value
++         * @param trimWhitespace Should leading and trailing whitespace be removed?
++         */
++        void save(const Ogre::String&amp; filename, const Ogre::String&amp; resourceGroup, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+ 
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    Ogre::String getValue(const Ogre::String &amp;_default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
++        /**
++         * Save to a stream
++         *
++         * The function, which actually save the contents of the ConfigFile
++         * object.
++         *
++         * @param stream Data stream
++         * @param separators Inserted between key and value
++         * @param trimWhitespace Should leading and trailing whitespace be removed?
++         */
++        void save(std::ofstream&amp; stream, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+ 
+-    /**
+-     * Holt alle Einstellungen mit selbem Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    Ogre::StringVector getValues(const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
++        /**
++         * Save to a filename (not using resource group locations)
++         *
++         * Opens a filehandle to filename and calls the stream save function.
++         *
++         * @param filename Filename of the configuration file
++         * @param separators Inserted between key and value
++         * @param trimWhitespace Should leading and trailing whitespace be removed?
++         */
++        void saveDirect(const Ogre::String&amp; filename, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+ 
++        /**
++         * Save to a filename (using resource group locations)
++         *
++         * Creates the resource group if needed, opens a filehandle to filename
++         * and calls the stream save function.
++         *
++         * @param filename Filename of the configuration file
++         * @param separators Inserted between key and value
++         * @param trimWhitespace Should leading and trailing whitespace be removed?
++         */
++        void saveToResourceSystem(const Ogre::String&amp; filename, const Ogre::String&amp; resourceGroup, const Ogre::String&amp; separators = &quot;\t:=&quot;, bool trimWhitespace = true);
+ 
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    Ogre::Real getValue(const Ogre::Real &amp;_default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
+-
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    bool getValue(const bool _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
+-
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    long int getValue(const long int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
+-
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    unsigned int getValue(const unsigned int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
+-
+-    /**
+-     * Holt eine Einstellung mit Namen und Abschnitt
+-     * @param name Der Name der Einstellung
+-     * @param section Der Name des Abschnitts
+-     * @param __default Ein Standardwert, falls die Einstellung nicht
+-     * gespeichert wurde
+-     * @author JoSch
+-     * @date 05-10-2006
+-     */
+-    unsigned long int getValue(const unsigned long int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section = Ogre::StringUtil::BLANK);
+-
+         /**
+          * Adds a section to the config file and adds a list of key-value pairs
+          *
+@@ -195,20 +92,7 @@
+          * @param settings The list of key-value pairs
+          */
+         void addSection(const Ogre::String&amp; section, const Ogre::NameValuePairList&amp; settings);
+-};
+-
+-template&lt;&gt; inline
+-void ConfigFile::setValue&lt;Ogre::String&gt;(const Ogre::String &amp;value, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-        if (mSettings[section] == 0)
+-    {
+-        // Neue Sektion anlegen
+-        mSettings[section] = new SettingsMultiMap();
+-    }
+-    mSettings[section]-&gt;insert( std::multimap&lt;Ogre::String, Ogre::String&gt;::value_type(name, value));
++    };
+ }
+ 
+-}
+-
+ #endif /*CONFIGFILE_H_*/
+
+Modified: rl/trunk/engine/common/src/ConfigFile.cpp
+===================================================================
+--- rl/trunk/engine/common/src/ConfigFile.cpp	2007-02-10 14:31:59 UTC (rev 3034)
++++ rl/trunk/engine/common/src/ConfigFile.cpp	2007-02-10 16:36:19 UTC (rev 3035)
+@@ -17,174 +17,81 @@
+ #include &quot;ConfigFile.h&quot;
+ #include &quot;Exception.h&quot;
+ 
+-#include &lt;OgreString.h&gt;
+-#include &lt;OgreDataStream.h&gt;
+-
+ using namespace Ogre;
+ using namespace std;
+ 
+ namespace rl
+ {
+ 
+-ConfigFile::ConfigFile()
+-    : Ogre::ConfigFile()
+-{
+-}
++    ConfigFile::ConfigFile()
++        : Ogre::ConfigFile()
++    {
++    }
+ 
+-//-----------------------------------------------------------------------
+-void ConfigFile::save(const String&amp; filename, const String&amp; separators, bool trimWhitespace)
+-{
+-    saveDirect(filename, separators, trimWhitespace);
+-}
+-//-----------------------------------------------------------------------
+-void ConfigFile::save(const String&amp; filename, const String&amp; resourceGroup,
+-    const String&amp; separators, bool trimWhitespace)
+-{
+-    saveToResourceSystem(filename, resourceGroup, separators, trimWhitespace);
+-}
+-//-----------------------------------------------------------------------
+-void ConfigFile::saveDirect(const String&amp; filename, const String&amp; separators,
+-    bool trimWhitespace)
+-{
+-    /* Open the configuration file */
+-    ofstream fp;
+-    fp.open(filename.c_str());
+-    if(!fp)
++    void ConfigFile::save(const String&amp; filename, const String&amp; separators, bool trimWhitespace)
+     {
+-        Throw(FileNotFoundException, &quot;'&quot; + filename + &quot;' file not found!&quot;);
++        saveDirect(filename, separators, trimWhitespace);
+     }
+ 
+-    save(fp, separators, trimWhitespace);
+-
+-}
+-//-----------------------------------------------------------------------
+-void ConfigFile::saveToResourceSystem(const String&amp; filename,
+-    const String&amp; resourceGroup, const String&amp; separators, bool trimWhitespace)
+-{
+-    ///@todo ResourceGroup zum Dateiname erstellen.
+-    ofstream fp;
+-    fp.open(filename.c_str());
+-    if(!fp)
++    void ConfigFile::save(const String&amp; filename, const String&amp; resourceGroup, const String&amp; separators, bool trimWhitespace)
+     {
+-        Throw(FileNotFoundException, &quot;'&quot; + filename + &quot;' file not found!&quot;);
++        saveToResourceSystem(filename, resourceGroup, separators, trimWhitespace);
+     }
+ 
+-    save(fp, separators, trimWhitespace);
+-}
+-//-----------------------------------------------------------------------
+-void ConfigFile::save(ofstream&amp; stream, const String&amp; separators,
+-    bool trimWhitespace)
+-{
+-    SettingsBySection::const_iterator section;
+-    for(section = mSettings.begin(); section != mSettings.end(); section++)
++    void ConfigFile::saveDirect(const String&amp; filename, const String&amp; separators, bool trimWhitespace)
+     {
+-        if (section-&gt;first != StringUtil::BLANK)
++        /* Open the configuration file */
++        ofstream fp;
++        fp.open(filename.c_str());
++        if(!fp)
+         {
+-            stream &lt;&lt; &quot;[&quot; &lt;&lt; section-&gt;first &lt;&lt; &quot;]&quot; &lt;&lt; endl;
+-        } else {
+-            /// Keine Sektion
++            Throw(FileNotFoundException, &quot;'&quot; + filename + &quot;' file not found!&quot;);
+         }
+-        SettingsMultiMap::const_iterator setting;
+-        SettingsMultiMap *settings = section-&gt;second;
+-        for(setting = settings-&gt;begin(); setting != settings-&gt;end(); setting++)
+-        {
+-            stream &lt;&lt; setting-&gt;first &lt;&lt; &quot;=&quot; &lt;&lt; setting-&gt;second &lt;&lt; endl;
+-        }
+ 
+-        // Insert a linebreak
+-        stream &lt;&lt; endl;
++        save(fp, separators, trimWhitespace);
+     }
+-}
+ 
+-int ConfigFile::getValue(const int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
++    void ConfigFile::saveToResourceSystem(const String&amp; filename, const String&amp; resourceGroup, const String&amp; separators, bool trimWhitespace)
+     {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseInt(v);
+-    }
+-}
++        ///@todo ResourceGroup zum Dateiname erstellen.
++        ofstream fp;
++        fp.open(filename.c_str());
++        if(!fp)
++        {
++            Throw(FileNotFoundException, &quot;'&quot; + filename + &quot;' file not found!&quot;);
++        }
+ 
+-String ConfigFile::getValue(const String &amp;_default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    return getSetting(name, section);
+-}
+-
+-StringVector ConfigFile::getValues(const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    return getMultiSetting(name, section);
+-}
+-
+-Real ConfigFile::getValue(const Real &amp;_default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
+-    {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseReal(v);
++        save(fp, separators, trimWhitespace);
+     }
+-}
+ 
+-bool ConfigFile::getValue(const bool _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
++    void ConfigFile::save(ofstream&amp; stream, const String&amp; separators, bool trimWhitespace)
+     {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseBool(v);
+-    }
+-}
++        SettingsBySection::const_iterator section;
++        for(section = mSettings.begin(); section != mSettings.end(); section++)
++        {
++            if (section-&gt;first != StringUtil::BLANK)
++            {
++                stream &lt;&lt; &quot;[&quot; &lt;&lt; section-&gt;first &lt;&lt; &quot;]&quot; &lt;&lt; endl;
++            } else {
++                /// Keine Sektion
++            }
++            SettingsMultiMap::const_iterator setting;
++            SettingsMultiMap *settings = section-&gt;second;
++            for(setting = settings-&gt;begin(); setting != settings-&gt;end(); setting++)
++            {
++                stream &lt;&lt; setting-&gt;first &lt;&lt; &quot;=&quot; &lt;&lt; setting-&gt;second &lt;&lt; endl;
++            }
+ 
+-long int ConfigFile::getValue(const long int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
+-    {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseLong(v);
++            // Insert a linebreak
++            stream &lt;&lt; endl;
++        }
+     }
+-}
+ 
+-unsigned int ConfigFile::getValue(const unsigned int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
+-    {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseUnsignedInt(v);
+-    }
+-}
+-
+-unsigned long int ConfigFile::getValue(const unsigned long int _default, const Ogre::String &amp;name,
+-        const Ogre::String &amp;section)
+-{
+-    Ogre::String v = getSetting(name, section);
+-    if (v == Ogre::StringUtil::BLANK)
+-    {
+-        return _default;
+-    } else {
+-        return Ogre::StringConverter::parseUnsignedLong(v);
+-    }
+-}
+-
+     void ConfigFile::addSection(const Ogre::String&amp; section, const Ogre::NameValuePairList&amp; settings)
+     {
+         // Create new section
+         mSettings[section] = new SettingsMultiMap();
+-        // Insert values from the settings map
++        // Insert values from the settings list
+         mSettings[section]-&gt;insert(settings.begin(), settings.end());
+     }
+ }
+
+Modified: rl/trunk/engine/core/include/ConfigurationManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ConfigurationManager.h	2007-02-10 14:31:59 UTC (rev 3034)
++++ rl/trunk/engine/core/include/ConfigurationManager.h	2007-02-10 16:36:19 UTC (rev 3035)
+@@ -98,14 +98,6 @@
+             Ogre::String getModulesCfgFile() const;
+ 
+             /**
+-             * Returns the filename of the configuration file for the OS
+-             * specific plugins
+-             *
+-             * @return filename of the plugin's configuration file
+-             */
+-            Ogre::String getPluginCfgFile() const;
+-
+-            /**
+              * Returns a list of paths, were Rastullah configuration files
+              * reside
+              *
+@@ -132,13 +124,6 @@
+             Ogre::String getRastullahLogDirectory() const;
+ 
+             /**
+-             * Returns the directory where OGRE stores its plugins
+-             *
+-             * @return directory where OGRE plugins are stored
+-             */
+-            Ogre::String getOgrePluginDirectory() const;
+-
+-            /**
+              * Adds a key-value pair to the list specified by section
+              *
+              * If the key already exists in the list, its value will be updated
+@@ -200,6 +185,13 @@
+             Ogre::NameValuePairList getSoundSettings() const;
+ 
+             /**
++             * Returns a list of Ogre plugins specific to the OS
++             *
++             * @return vector of plugin names
++             */
++            Ogre::StringVector getPluginList() const;
++
++            /**
+              * Returns the filename of the current keymap file used by
+              * Rastullah
+              *
+@@ -302,6 +294,7 @@
+             Ogre::NameValuePairList mGraphicSettings; //!&lt; Graphic settings for the OGRE Renderer
+             Ogre::NameValuePairList mSoundSettings;   //!&lt; Sound settings for the Rastullah soundsystem
+             Ogre::NameValuePairList mInputSettings;   //!&lt; Input settings for the Rastullah inputsystem
++            Ogre::StringVector mPluginList;           //!&lt; List of OGRE Plugins, which will be loaded by CoreSubsystem
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-02-10 14:31:59 UTC (rev 3034)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-02-10 16:36:19 UTC (rev 3035)
+@@ -113,11 +113,6 @@
+         return mRastullahLogDirectory;
+     }
+ 
+-    Ogre::String ConfigurationManager::getOgrePluginDirectory() const
+-    {
+-        return mOgrePluginDirectory;
+-    }
+-
+     Ogre::NameValuePairList ConfigurationManager::getGraphicSettings() const
+     {
+         return mGraphicSettings;
+@@ -133,6 +128,11 @@
+         return mInputSettings;
+     }
+ 
++    Ogre::StringVector ConfigurationManager::getPluginList() const
++    {
++        return mPluginList;
++    }
++
+     void ConfigurationManager::loadConfig()
+     {
+         // On Linux, we create the .rastullah directory
+@@ -284,6 +284,24 @@
+             mOgrePluginDirectory = &quot;.&quot;;
+ #           endif
+         }
++
++        // Plugin list for OGRE specific to operating system
++#       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
++        Ogre::String dirSeparator = &quot;\\&quot;;
++        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;RenderSystem_Direct3D9&quot;);
++#       else
++        Ogre::String dirSeparator = &quot;/&quot;;
++#       endif
++        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;RenderSystem_GL&quot;);
++        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;Plugin_ParticleFX&quot;);
++        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;Plugin_OctreeSceneManager&quot;);
++
++        Ogre::StringVector test = getPluginList();
++
++        for (Ogre::StringVector::const_iterator it = test.begin(); it &lt; test.end(); it++)
++        {
++            std::cout &lt;&lt; std::endl &lt;&lt; *it &lt;&lt; std::endl;
++        }
+     }
+ 
+     void ConfigurationManager::saveConfig()
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-02-10 14:31:59 UTC (rev 3034)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-02-10 16:36:19 UTC (rev 3035)
+@@ -156,18 +156,13 @@
+         mOgreRoot = new Root(&quot;&quot;, &quot;&quot;, ConfigurationManager::getSingleton().getOgreLogFile());
+ 
+         // Load Ogre plugins
+-        String PluginDir = ConfigurationManager::getSingleton().getOgrePluginDirectory();
+-#       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;\\RenderSystem_Direct3D9&quot;);
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;\\RenderSystem_GL&quot;);
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;\\Plugin_ParticleFX&quot;);
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;\\Plugin_OctreeSceneManager&quot;);
+-#       else
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;/RenderSystem_GL&quot;);
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;/Plugin_ParticleFX&quot;);
+-        mOgreRoot-&gt;loadPlugin(PluginDir + &quot;/Plugin_OctreeSceneManager&quot;);
+-#       endif
++        Ogre::StringVector pluginList = ConfigurationManager::getSingleton().getPluginList();
+ 
++        for (Ogre::StringVector::const_iterator it = pluginList.begin(); it &lt; pluginList.end(); it++)
++        {
++            mOgreRoot-&gt;loadPlugin(*it);
++        }
++
+         // Find out, what Renderer plugins are available
+         RenderSystemList* rsl = mOgreRoot-&gt;getAvailableRenderers();
+         RenderSystemList::iterator it;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000105.html">[Dsa-hl-svn] r3034 - in rl/trunk: . engine/core/src	engine/ui/include engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000107.html">[Dsa-hl-svn] r3036 - modules/config
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#106">[ date ]</a>
+              <a href="thread.html#106">[ thread ]</a>
+              <a href="subject.html#106">[ subject ]</a>
+              <a href="author.html#106">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

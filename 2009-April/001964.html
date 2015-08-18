@@ -1,0 +1,297 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4907 - in rl/trunk/editors/Lockenwickler: . src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4907%20-%20in%20rl/trunk/editors/Lockenwickler%3A%20.%20src&In-Reply-To=%3C200904211749.n3LHn3Cs029102%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001963.html">
+   <LINK REL="Next"  HREF="001965.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4907 - in rl/trunk/editors/Lockenwickler: . src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4907%20-%20in%20rl/trunk/editors/Lockenwickler%3A%20.%20src&In-Reply-To=%3C200904211749.n3LHn3Cs029102%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4907 - in rl/trunk/editors/Lockenwickler: . src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Tue Apr 21 19:49:03 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001963.html">[Dsa-hl-svn] r4906 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001965.html">[Dsa-hl-svn] r4908 - in rl/trunk/engine: core/include core/src	script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1964">[ date ]</a>
+              <a href="thread.html#1964">[ thread ]</a>
+              <a href="subject.html#1964">[ subject ]</a>
+              <a href="author.html#1964">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-04-21 19:49:01 +0200 (Tue, 21 Apr 2009)
+New Revision: 4907
+
+Modified:
+   rl/trunk/editors/Lockenwickler/Lockenwickler.e4p
+   rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/TriggerManager.py
+   rl/trunk/editors/Lockenwickler/src/Ui_AddTriggerDialog.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- more work on trigger support
+
+Modified: rl/trunk/editors/Lockenwickler/Lockenwickler.e4p
+===================================================================
+--- rl/trunk/editors/Lockenwickler/Lockenwickler.e4p	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/Lockenwickler.e4p	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ &lt;!DOCTYPE Project SYSTEM &quot;Project-4.6.dtd&quot;&gt;
+ &lt;!-- eric4 project file for project Lockenwickler --&gt;
+-&lt;!-- Saved: 2009-04-19, 16:52:11 --&gt;
++&lt;!-- Saved: 2009-04-19, 16:59:45 --&gt;
+ &lt;!-- Copyright (C) 2009 Stefan Stammberger, <A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">sstammberger at web.de</A> --&gt;
+ &lt;Project version=&quot;4.6&quot;&gt;
+   &lt;Language&gt;en&lt;/Language&gt;
+@@ -47,7 +47,6 @@
+     &lt;Source&gt;ui files/Ui_GOPropertyEditorDialogINT.py&lt;/Source&gt;
+     &lt;Source&gt;ui files/Ui_GOPropertyEditorDialogSTRING.py&lt;/Source&gt;
+     &lt;Source&gt;ui files/Ui_NewModuleWizard.py&lt;/Source&gt;
+-    &lt;Source&gt;ui files/Ui_AddTriggerDialog.py&lt;/Source&gt;
+     &lt;Source&gt;src/AddTriggerDialog.py&lt;/Source&gt;
+     &lt;Source&gt;src/Ui_AddTriggerDialog.py&lt;/Source&gt;
+   &lt;/Sources&gt;
+
+Modified: rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -7,26 +7,43 @@
+ from PyQt4.QtGui import QDialog
+ from PyQt4.QtCore import pyqtSignature
+ 
++
+ from Ui_AddTriggerDialog import Ui_Dialog
+ 
+ class AddTriggerDialog(QDialog, Ui_Dialog):
+-    def __init__(self, parent = None):
+-
++    def __init__(self, trigger, triggerClassNames, triggerManager, parent = None):
+         QDialog.__init__(self, parent)
+         self.setupUi(self)
+-    
++        self.triggerManager = triggerManager
++        self.trigger = trigger
++
++        self.buttonBox.setEnabled(False)
++        
++        for trigger in triggerClassNames:
++            self.comboBox.addItem(trigger)
++        
+     @pyqtSignature(&quot;QString&quot;)
+     def on_lineEdit_textChanged(self, p0):
+-        &quot;&quot;&quot;
+-        Slot documentation goes here.
+-        &quot;&quot;&quot;
+-        # TODO: not implemented yet
+-        raise NotImplementedError
+-    
++        for trigger in self.triggerManager.triggerInstances:
++            if trigger.name is p0:
++                self.buttonBox.setEnabled(False)
++            else:
++                self.buttonBox.setEnabled(True)
++                
++        if len(self.triggerManager.triggerInstances) == 0:
++            self.buttonBox.setEnabled(True)
++            
+     @pyqtSignature(&quot;&quot;)
+     def on_pushButton_clicked(self):
+-        &quot;&quot;&quot;
+-        Slot documentation goes here.
+-        &quot;&quot;&quot;
+-        # TODO: not implemented yet
+-        raise NotImplementedError
++        if self.trigger.addProperty():
++            self.updateProperties()
++        
++    def accept(self):
++        self.trigger.name = str(self.lineEdit.text())
++        self.trigger.className = str(self.comboBox.currentText())
++        self.close()
++        
++    def updateProperties(self):
++        self.listView.clear()
++        for prop in self.trigger.properties:
++            self.listView.addItem(prop.name + &quot;  &quot; + prop.type + &quot;  &quot; + prop.data)
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -22,7 +22,6 @@
+ from PyQt4.QtGui import *
+ import ogre.renderer.OGRE as og
+ 
+-from ZoneManager import ZoneManager
+ 
+ # get the light out of a light node
+ def extractLight(node):
+@@ -380,7 +379,7 @@
+     
+     def onAddTriggerToZone(self):
+         zoneName = str(self.sceneTreeView.currentItem().text(0)).replace(&quot;Zone: &quot;, &quot;&quot;)
+-        ZoneManager.instance.getZone(zoneName).addTrigger()
++        self.moduleManager.zoneManager.getZone(zoneName).addTrigger()
+         
+     def onOptions(self):
+         dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self.showZoneLights, self)
+
+Modified: rl/trunk/editors/Lockenwickler/src/TriggerManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/TriggerManager.py	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/src/TriggerManager.py	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -18,7 +18,13 @@
+ #################################################
+ 
+ from os.path import isfile,  join
++
++from PyQt4.QtCore import *
++from PyQt4.QtGui import *
++
+ from GlobDirectoryWalker import GlobDirectoryWalker
++from AddTriggerDialog import AddTriggerDialog
++from GOGenericEditor import *
+ 
+ class TriggerProperty():
+     def __init__(self, name, type, data):
+@@ -27,14 +33,21 @@
+         self.data = data
+ 
+ class Trigger():
+-    def __init__(self, className, name):
+-        self.className = className
+-        self.name = name
++    def __init__(self):
++        self.className = &quot;&quot;
++        self.name = &quot;&quot;
+         self.properties = []
+         
+-    def addProperty(self, name, type, data):
+-        prop = TriggerProperty(name,  type, data)
+-        self.properties.append(prop)
++    def addProperty(self):
++        editor = GOGenericEditor(&quot;&quot;, &quot;STRING&quot;, &quot;&quot;, QApplication.focusWidget())
++        if editor.exec_():
++            name = str(editor.nameEditBox.text())
++            type = str(editor.typeDropBox.currentText())
++            data = str(editor.dataEditBox.text())
++            prop = TriggerProperty(name,  type, data)
++            self.properties.append(prop)
++            return True
++        return False
+         
+     def removeProperty(self, name):
+         for prop in self.properties:
+@@ -47,7 +60,7 @@
+     availableTriggers = []
+     
+     def __init__(self):
+-        self.triggerInstances = ()
++        self.triggerInstances = []
+         self.directories = []
+         
+         if TriggerManager.instance == None:
+@@ -58,10 +71,15 @@
+         
+         self.update()
+     
+-    def createTrigger(self, className, name):
+-        trigger = Trigger(className, name)
+-        self.triggerInstances.append(trigger)
+-        return trigger
++    def createTrigger(self):
++        trigger = Trigger()
++        
++        dlg = AddTriggerDialog(trigger, TriggerManager.availableTriggers, self, QApplication.focusWidget())
++        if dlg.exec_():
++            self.triggerInstances.append(trigger)
++            return trigger
++        
++        return False
+     
+     def update(self):
+         TriggerManager.availableTriggers = []
+
+Modified: rl/trunk/editors/Lockenwickler/src/Ui_AddTriggerDialog.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Ui_AddTriggerDialog.py	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/src/Ui_AddTriggerDialog.py	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -30,7 +30,7 @@
+         self.pushButton.setLayoutDirection(QtCore.Qt.LeftToRight)
+         self.pushButton.setObjectName(&quot;pushButton&quot;)
+         self.gridLayout.addWidget(self.pushButton, 5, 0, 1, 1)
+-        self.listView = QtGui.QListView(Dialog)
++        self.listView = QtGui.QListWidget(Dialog)
+         self.listView.setObjectName(&quot;listView&quot;)
+         self.gridLayout.addWidget(self.listView, 6, 0, 1, 1)
+         self.buttonBox = QtGui.QDialogButtonBox(Dialog)
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-20 22:44:43 UTC (rev 4906)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-21 17:49:01 UTC (rev 4907)
+@@ -27,8 +27,8 @@
+  
+ from ModuleExplorer import NameInputDlg
+ from TriggerManager import TriggerManager
+-from AddTriggerDialog import AddTriggerDialog
+ 
++
+ #                &lt;zone name=&quot;Testzone&quot;&gt;
+ #                        &lt;area type=&quot;sphere&quot;&gt;
+ #                                &lt;position x=&quot;-10&quot; y=&quot;0&quot; z=&quot;-5&quot;/&gt;
+@@ -142,8 +142,7 @@
+                 del a
+     
+     def addTrigger(self):
+-        dlg = AddTriggerDialog()
+-        dlg.exec_(QCursor.pos())
++        trigger = TriggerManager.instance.createTrigger()
+     
+     def hide(self):
+         self.sceneManager.getRootSceneNode().removeChild(self.zoneNode)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001963.html">[Dsa-hl-svn] r4906 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001965.html">[Dsa-hl-svn] r4908 - in rl/trunk/engine: core/include core/src	script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1964">[ date ]</a>
+              <a href="thread.html#1964">[ thread ]</a>
+              <a href="subject.html#1964">[ subject ]</a>
+              <a href="author.html#1964">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

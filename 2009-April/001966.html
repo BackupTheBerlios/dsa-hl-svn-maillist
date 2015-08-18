@@ -1,0 +1,319 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4909 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4909%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200904231442.n3NEg4Nv029749%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001965.html">
+   <LINK REL="Next"  HREF="001967.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4909 - in rl/trunk/engine/core: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4909%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200904231442.n3NEg4Nv029749%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4909 - in rl/trunk/engine/core: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 23 16:42:04 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001965.html">[Dsa-hl-svn] r4908 - in rl/trunk/engine: core/include core/src	script/src
+</A></li>
+        <LI>Next message: <A HREF="001967.html">[Dsa-hl-svn] r4910 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1966">[ date ]</a>
+              <a href="thread.html#1966">[ thread ]</a>
+              <a href="subject.html#1966">[ subject ]</a>
+              <a href="author.html#1966">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-04-23 16:42:02 +0200 (Thu, 23 Apr 2009)
+New Revision: 4909
+
+Modified:
+   rl/trunk/engine/core/include/PhysicsCollisionFactory.h
+   rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+Log:
+-using cache files for treecollisions
+
+
+Modified: rl/trunk/engine/core/include/PhysicsCollisionFactory.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsCollisionFactory.h	2009-04-22 18:06:13 UTC (rev 4908)
++++ rl/trunk/engine/core/include/PhysicsCollisionFactory.h	2009-04-23 14:42:02 UTC (rev 4909)
+@@ -40,6 +40,10 @@
+     class PhysicsCollisionFactory
+     {
+     public:
++        //! constructor
++        PhysicsCollisionFactory();
++
++
+         //! destructor, releases the collisions from the collision cache
+         ~PhysicsCollisionFactory();
+ 
+@@ -57,7 +61,7 @@
+          * if that is not the case, we'll have to fix OgreNewt ...
+ 		 * @param entity gives the mesh entity that needs a collision primitive
+ 		 * @param geomType specifies the type of collision primitiv to create.
+-		 * @param animName gives the name of the currently set animation (this is used in the collisionscache
++		 * @param animName gives the name of the currently set animation (this is used in the collisionscache)
+ 		 * @param offset gives the offset of the coordinate system of the coll. primitiv,
+          *        it is relative to the standard offset (center of the aabb of an entity for simple collision types)
+ 		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
+@@ -196,7 +200,16 @@
+             const Ogre::Vector3 &amp;offset,
+             const Ogre::Quaternion &amp;orientation);
+ 
++        /** creates a mesh collision primitive from aabb
++         * It's actually a convenience function used by createCollisionFromEntity
++         * @param entity the entity for which a convexhull should be created, if it is attached to
++         *               a node the scale of the node is used (see OgreNewt)
++		 * @param animName gives the name of the currently set animation (this is used in the collisionscache)
++         * @param nocache if true, the function doesn't try to load the collision from a cache file
++         */
++        OgreNewt::CollisionPtr createMesh( Ogre::Entity* entity, const Ogre::String &amp; animName, bool nocache );
+ 
++
+         //! class for caching convex collisions (box...convexhull), saves additionally the scale, so it can be rescaled if necessary
+         class ConvexCollisionCacheObject
+         {
+@@ -261,6 +274,23 @@
+ 
+         //! cache for mesh collisions
+         MeshCollisionCacheMap mMeshCollisionsCache;
++
++
++        //! OgreNewt collision serializer
++        OgreNewt::CollisionSerializer mCollisionSerializer;
++
++        /** load a collision from a file
++         * It's actually a convenience function used internally
++        */
++        OgreNewt::CollisionPtr loadFromFile(const Ogre::String&amp; filename);
++
++        /** save a collision to a file
++         * It's actually a convenience function used internally
++        */
++        void saveToFile(OgreNewt::CollisionPtr col, const Ogre::String&amp; filename);
++
++        //! the path for cached collision files
++        Ogre::String mCachePathName;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp	2009-04-22 18:06:13 UTC (rev 4908)
++++ rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp	2009-04-23 14:42:02 UTC (rev 4909)
+@@ -19,6 +19,11 @@
+ #include &quot;PhysicsCollisionFactory.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+ 
++#include &lt;boost/filesystem/operations.hpp&gt;
++#include &lt;boost/filesystem/exception.hpp&gt;
++
++namespace fs = boost::filesystem;
++
+ #ifdef __APPLE__
+ #   include &lt;Ogre/OgreMesh.h&gt;
+ #else
+@@ -34,6 +39,24 @@
+ 
+ namespace rl
+ {
++
++    PhysicsCollisionFactory::PhysicsCollisionFactory() :
++        mCollisionSerializer()
++    {
++
++#       if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++        mCachePathName = Ogre::String( Ogre::String(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/cache/&quot;);
++        fs::path cachePath( mCachePathName, fs::portable_posix_name);
++#       else
++        mCachePathName = Ogre::String( ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/cache/&quot; );
++        fs::path cachePath( mCachePathName );
++#       endif
++
++        if( !fs::exists(cachePath) )
++            fs::create_directory(cachePath);
++    }
++
++
+     PhysicsCollisionFactory::~PhysicsCollisionFactory()
+     {
+         clearCollisionCache();
+@@ -298,6 +321,11 @@
+                 LOG_WARNING(Logger::CORE, &quot; Cannot set collision offset or orientation when using mesh-collision (entity: '&quot; +
+                         entity-&gt;getName()+&quot;')!&quot;);
+             }
++            if( inertia || centerOfMass )
++            {
++                LOG_WARNING(Logger::CORE, &quot; Cannot calculate inertia or center of mass when using mesh-collision (entity: '&quot; +
++                        entity-&gt;getName()+&quot;')!&quot;);
++            }
+         }
+ 
+ 
+@@ -434,9 +462,7 @@
+         }
+         else if (geomType == GT_MESH)
+         {
+-            rval = CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+-                PhysicsManager::getSingleton()._getNewtonWorld(),
+-                entity, true ));
++            rval = createMesh( entity, animName, nocache );
+ 
+             if( meshCacheIt != mMeshCollisionsCache.end() )
+                 meshCacheIt-&gt;second.col = rval;
+@@ -618,7 +644,92 @@
+     }
+ 
+ 
++    OgreNewt::CollisionPtr PhysicsCollisionFactory::loadFromFile(const Ogre::String&amp; filename)
++    {
++        OgreNewt::CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
++        Ogre::String fullfilename = mCachePathName+filename;
++        FILE* pFile = fopen(fullfilename.c_str(), &quot;r&quot; );
++        if( pFile )
++        {
++            Ogre::DataStreamPtr streamPtr( new Ogre::FileHandleDataStream( pFile ) );
++            rval = mCollisionSerializer.importCollision( streamPtr, PhysicsManager::getSingleton()._getNewtonWorld() );
+ 
++            if( rval )
++            {
++                LOG_DEBUG(Logger::CORE, &quot;Loaded collision from file '&quot; + filename + &quot;'.&quot;);
++            }
++        }
++
++        return rval;
++    }
++
++
++
++    void PhysicsCollisionFactory::saveToFile(OgreNewt::CollisionPtr col, const Ogre::String&amp; filename)
++    {
++        mCollisionSerializer.exportCollision(col, mCachePathName + filename);
++    }
++
++
++
++    OgreNewt::CollisionPtr PhysicsCollisionFactory::createMesh( Ogre::Entity* entity, const Ogre::String&amp; animName, bool nocache )
++    {
++        OgreNewt::CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
++        Ogre::String filename;
++
++        if( !nocache )
++        {
++            Ogre::Vector3 scale(Ogre::Vector3::UNIT_SCALE);
++            if( entity-&gt;getParentNode() )
++                scale = entity-&gt;getParentNode()-&gt;getScale();
++
++            filename = entity-&gt;getMesh()-&gt;getName() + animName + Ogre::StringConverter::toString(scale) + &quot;.collision&quot;;
++
++            // check date of cache file and mesh
++            time_t meshFileModified = 
++                Ogre::ResourceGroupManager::getSingleton().resourceModifiedTime(
++                        entity-&gt;getMesh()-&gt;getGroup(),
++                        entity-&gt;getMesh()-&gt;getName());
++
++#if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++            fs::path cacheFilePath( mCachePathName+filename, fs::portable_posix_name);
++#else
++            fs::path cacheFilePath( mCachePathName+filename );
++#endif
++
++            time_t cacheFileModified = 0;
++            if( fs::exists(cacheFilePath) )
++                cacheFileModified = fs::last_write_time(cacheFilePath);
++
++
++            if( cacheFileModified &gt; meshFileModified )        
++                rval = loadFromFile( filename );
++        }
++
++
++        if( !rval )
++        {
++            rval = OgreNewt::CollisionPtr( new OgreNewt::CollisionPrimitives::TreeCollision(
++                        PhysicsManager::getSingleton()._getNewtonWorld(),
++                        entity, true ));
++
++            if( !nocache )
++            {
++                saveToFile(rval, filename );
++            }
++        }
++
++        return rval;
++    }
++
++
++
+     PhysicsCollisionFactory::StringVector::StringVector(const Ogre::String&amp; str, const Ogre::Vector3&amp; vec)
+     {
+         setString(str);
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-22 18:06:13 UTC (rev 4908)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-23 14:42:02 UTC (rev 4909)
+@@ -114,6 +114,16 @@
+ 
+     PhysicsManager::~PhysicsManager()
+     {
++        // remove all bodies
++        clearLevelGeometry();
++
++        // remove all physical things
++        for( vector&lt;PhysicalThing*&gt;::iterator it = mPhysicalThings.begin(); it != mPhysicalThings.end(); it++ )
++        {
++            delete (*it);
++        }
++
++
+         // remove all material-pairs
+         for (MaterialPairMap::iterator it = mMaterialPairs.begin(); it != mMaterialPairs.end(); it++)
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001965.html">[Dsa-hl-svn] r4908 - in rl/trunk/engine: core/include core/src	script/src
+</A></li>
+	<LI>Next message: <A HREF="001967.html">[Dsa-hl-svn] r4910 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1966">[ date ]</a>
+              <a href="thread.html#1966">[ thread ]</a>
+              <a href="subject.html#1966">[ subject ]</a>
+              <a href="author.html#1966">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

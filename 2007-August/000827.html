@@ -1,0 +1,383 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3756 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3756%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200708261526.l7QFQLcn017304%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000826.html">
+   <LINK REL="Next"  HREF="000828.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3756 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3756%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200708261526.l7QFQLcn017304%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3756 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Aug 26 17:26:21 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000826.html">[Dsa-hl-svn] r3755 - modules/common/gui/windows
+</A></li>
+        <LI>Next message: <A HREF="000828.html">[Dsa-hl-svn] r3757 - in rl/trunk/engine/common: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#827">[ date ]</a>
+              <a href="thread.html#827">[ thread ]</a>
+              <a href="subject.html#827">[ subject ]</a>
+              <a href="author.html#827">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-26 17:26:08 +0200 (Sun, 26 Aug 2007)
+New Revision: 3756
+
+Modified:
+   rl/trunk/engine/rules/include/Container.h
+   rl/trunk/engine/rules/include/Inventory.h
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/ui/include/ContainerContentWindow.h
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+Log:
+the possible target slots are shown, if dragging an item
+
+Modified: rl/trunk/engine/rules/include/Container.h
+===================================================================
+--- rl/trunk/engine/rules/include/Container.h	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/rules/include/Container.h	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -89,6 +89,8 @@
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertySet* getAllProperties() const;
+ 
++        bool canHold(Item* item);
++
+     private:
+ 		static const IntPair NO_SPACE_FOR_ITEM;
+ 
+
+Modified: rl/trunk/engine/rules/include/Inventory.h
+===================================================================
+--- rl/trunk/engine/rules/include/Inventory.h	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/rules/include/Inventory.h	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -78,8 +78,8 @@
+     // Das Inventar der Kreatur wird durch das Inventarobjekt verwaltet.
+     //void addToInventory(Item* item, const CeGuiString&amp; containerName);
+     void hold(Item* item, const CeGuiString&amp; slotName);
+-    bool canHold(Item* item, const CeGuiString&amp; slotName) const;
+-    bool canReady(Item* item, const CeGuiString&amp; slotName) const;
++    bool canHold(const Item* item, const CeGuiString&amp; slotName) const;
++    bool canReady(const Item* item, const CeGuiString&amp; slotName) const;
+ 	void dropItem(const CeGuiString&amp; slotName);
+     void ready(Item* item);
+     //void removeFromInventory(Item* item);
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/rules/src/Container.cpp	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -363,4 +363,8 @@
+         return ps;
+     }
+ 
++    bool Container::canHold(Item* item)
++    {
++        return findPositionWithEnoughSpace(item-&gt;getSize()) != NO_SPACE_FOR_ITEM;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -193,7 +193,7 @@
+         //item-&gt;setOwner(getOwner());
+     }
+ 
+-	bool Inventory::canHold(Item* item, const CeGuiString&amp; slotName) const
++	bool Inventory::canHold(const Item* item, const CeGuiString&amp; slotName) const
+     {
+         std::map&lt;CeGuiString, Slot*&gt;::const_iterator slotIter = mSlots.find(slotName);
+         if (slotIter == mSlots.end())
+@@ -204,7 +204,7 @@
+ 		return slotIter-&gt;second-&gt;isAllowed(item);
+     }
+ 
+-	bool Inventory::canReady(Item* item, const CeGuiString&amp; slotName) const
++	bool Inventory::canReady(const Item* item, const CeGuiString&amp; slotName) const
+     {
+         std::map&lt;CeGuiString, Slot*&gt;::const_iterator slotIter = mSlots.find(slotName);
+         if (slotIter == mSlots.end())
+
+Modified: rl/trunk/engine/ui/include/ContainerContentWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -43,6 +43,8 @@
+ 		static int sItemCount;
+ 
+ 		bool handleItemDroppedOnContainer(const CEGUI::EventArgs&amp; evt);
++        bool handleItemEntersContainer(const CEGUI::EventArgs&amp; evt);
++        bool handleItemLeavesContainer(const CEGUI::EventArgs&amp; evt);
+         bool handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item);
+         bool handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item);
+ 		void initializeContent();
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -46,11 +46,14 @@
+ 
+         void setVisible(bool visible, bool destroyAfterHide = false);
+ 
++        bool showPossibleSlots(const Item* item);
++
+     private:
+ 		typedef std::map&lt;CeGuiString, ItemDragContainer*&gt; DndContainerMap;
++        typedef std::map&lt;CeGuiString, CEGUI::Window*&gt; SlotWindowMap;
+ 
+ 		Inventory* mInventory;
+-        std::map&lt;CeGuiString, CEGUI::Window*&gt; mSlotWindows;
++        SlotWindowMap mSlotWindows;
+ 		CEGUI::Window* mWorldBackground;
+ 		DndContainerMap mWorldDragContainers;
+ 		DndContainerMap mSlotDragContainers;
+
+Modified: rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -45,6 +45,12 @@
+ 		mContentWindow-&gt;subscribeEvent(
+ 			Window::EventDragDropItemDropped,
+ 			boost::bind(&amp;ContainerContentWindow::handleItemDroppedOnContainer, this, _1));
++		mContentWindow-&gt;subscribeEvent(
++            Window::EventDragDropItemEnters,
++			boost::bind(&amp;ContainerContentWindow::handleItemEntersContainer, this, _1));
++		mContentWindow-&gt;subscribeEvent(
++            Window::EventDragDropItemLeaves,
++			boost::bind(&amp;ContainerContentWindow::handleItemLeavesContainer, this, _1));
+ 
+         UVector2 size = UVector2(
+ 			cegui_absdim(container-&gt;getVolume().first*30),
+@@ -60,6 +66,45 @@
+ 		bindDestroyWindowToXButton();
+ 	}
+ 
++    bool ContainerContentWindow::handleItemEntersContainer(const CEGUI::EventArgs&amp; evt)
++    {
++		const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
++
++		if (evtArgs.dragDropItem-&gt;testClassName(&quot;ItemDragContainer&quot;))
++		{
++			ItemDragContainer* dragcont = static_cast&lt;ItemDragContainer*&gt;(
++				evtArgs.dragDropItem);
++			Item* item = dragcont-&gt;getItem();
++
++            if( item-&gt;getParentContainer() == mContainer )
++                return true;
++
++            if( !mContainer-&gt;canHold(item) )
++            {
++                mContentWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                    mContentWindow-&gt;getProperty(&quot;ContainerColour_DropImpossible&quot;));
++            }
++
++
++            return true;
++        }
++        return false;
++    }
++
++    bool ContainerContentWindow::handleItemLeavesContainer(const CEGUI::EventArgs&amp; evt)
++    {
++        const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
++
++		if (evtArgs.dragDropItem-&gt;testClassName(&quot;ItemDragContainer&quot;))
++		{
++            mContentWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                mContentWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++
++            return true;
++        }
++        return false;
++    }
++
+     void ContainerContentWindow::setVisible(bool visible, bool destroyAfterHide)
+     {
+         if( !visible &amp;&amp; destroyAfterHide )
+@@ -121,9 +166,11 @@
+ 					    cegui_absdim(pos.second*30)));
+ 			    dragcont-&gt;setItemParent(mContainer);
+ 
++                handleItemLeavesContainer(evt);
+ 			    return true;
+             }
+ 		}
++        handleItemLeavesContainer(evt);
+ 		return false;
+ 	}
+ 
+@@ -153,6 +200,13 @@
+ 			dragContainerName);
+ 		itemhandler-&gt;setItemParent(mContainer);
+ 		itemhandler-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
++        if( mInventoryWindow )
++        {
++            itemhandler-&gt;subscribeEvent(DragContainer::EventDragStarted,
++                boost::bind(&amp;rl::InventoryWindow::showPossibleSlots, mInventoryWindow, item));
++            itemhandler-&gt;subscribeEvent(DragContainer::EventDragEnded,
++                boost::bind(&amp;InventoryWindow::showPossibleSlots, mInventoryWindow, (Item*)NULL));
++        }
+ 
+ 		return itemhandler;
+ 	}
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-26 15:18:23 UTC (rev 3755)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-26 15:26:08 UTC (rev 3756)
+@@ -223,6 +223,10 @@
+ 
+ 			itemhandler-&gt;setRiseOnClickEnabled(true);
+ 			itemhandler-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
++            itemhandler-&gt;subscribeEvent(DragContainer::EventDragStarted,
++                boost::bind(&amp;rl::InventoryWindow::showPossibleSlots, this, item));
++            itemhandler-&gt;subscribeEvent(DragContainer::EventDragEnded,
++                boost::bind(&amp;InventoryWindow::showPossibleSlots, this, (Item*)NULL));
+ 		}
+ 
+ 		return itemhandler;
+@@ -271,12 +275,12 @@
+ 				newCont-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+ 				newCont-&gt;setItemParent(mInventory, targetSlot);
+ 
+-                handleItemLeavesSlot(evt);
++                showPossibleSlots(NULL);
+ 				return true;
+ 			}
+ 			else
+ 			{
+-                handleItemLeavesSlot(evt);
++                showPossibleSlots(NULL);
+ 				return false;
+ 			}
+ 		}
+@@ -300,13 +304,13 @@
+ 
+             if( mInventory-&gt;canReady(item, targetSlot) )
+             {
+-                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
+-                    slotWindow-&gt;getProperty(&quot;ContainerColour_DropReady&quot;));
++                //slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                //    slotWindow-&gt;getProperty(&quot;ContainerColour_DropReady&quot;));
+             }
+             else if( mInventory-&gt;canHold(item, targetSlot) )
+             {
+-                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
+-                    slotWindow-&gt;getProperty(&quot;ContainerColour_DropPossible&quot;));
++                //slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                //    slotWindow-&gt;getProperty(&quot;ContainerColour_DropPossible&quot;));
+             }
+             else
+             {
+@@ -326,13 +330,30 @@
+ 
+ 		if (evtArgs.dragDropItem-&gt;testClassName(&quot;ItemDragContainer&quot;))
+ 		{
++			ItemDragContainer* dragcont = static_cast&lt;ItemDragContainer*&gt;(
++				evtArgs.dragDropItem);
++			Item* item = dragcont-&gt;getItem();
+ 			CeGuiString targetSlot = evtArgs.window-&gt;getUserString(SLOTNAME);
+             CEGUI::Window* slotWindow = mSlotWindows[targetSlot];
+ 
+ 
+-            slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
+-                slotWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++            if( mInventory-&gt;canReady(item, targetSlot) )
++            {
++                //slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                //    slotWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++            }
++            else if( mInventory-&gt;canHold(item, targetSlot) )
++            {
++                //slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                //    slotWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++            }
++            else
++            {
++                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                    slotWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++            }
+ 
++
+             return true;
+         }
+         return false;
+@@ -555,4 +576,31 @@
+             mOpenContainerMap.erase(iter);
+         }
+     }
++
++    bool InventoryWindow::showPossibleSlots(const Item* item)
++    {
++        SlotWindowMap::iterator iter = mSlotWindows.begin();
++
++        for( ; iter != mSlotWindows.end(); iter++ )
++        {
++            if( item )
++            {
++                if( mInventory-&gt;canReady(item, iter-&gt;first) )
++                {
++                    iter-&gt;second-&gt;setProperty(&quot;ContainerColour&quot;, 
++                        iter-&gt;second-&gt;getProperty(&quot;ContainerColour_DropReady&quot;));
++                    continue;
++                }
++                else if( mInventory-&gt;canHold(item, iter-&gt;first) )
++                {
++                    iter-&gt;second-&gt;setProperty(&quot;ContainerColour&quot;, 
++                        iter-&gt;second-&gt;getProperty(&quot;ContainerColour_DropPossible&quot;));
++                    continue;
++                }
++            }
++            iter-&gt;second-&gt;setProperty(&quot;ContainerColour&quot;, 
++                iter-&gt;second-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++        }
++        return true;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000826.html">[Dsa-hl-svn] r3755 - modules/common/gui/windows
+</A></li>
+	<LI>Next message: <A HREF="000828.html">[Dsa-hl-svn] r3757 - in rl/trunk/engine/common: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#827">[ date ]</a>
+              <a href="thread.html#827">[ thread ]</a>
+              <a href="subject.html#827">[ subject ]</a>
+              <a href="author.html#827">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,250 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3702 - in rl/trunk/engine: ai/include ai/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3702%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200708210846.l7L8kTYE016865%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000772.html">
+   <LINK REL="Next"  HREF="000774.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3702 - in rl/trunk/engine: ai/include ai/src	script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3702%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200708210846.l7L8kTYE016865%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3702 - in rl/trunk/engine: ai/include ai/src	script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Aug 21 10:46:29 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000772.html">[Dsa-hl-svn] r3701 - rl/trunk/engine/ai/src
+</A></li>
+        <LI>Next message: <A HREF="000774.html">[Dsa-hl-svn] r3703 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#773">[ date ]</a>
+              <a href="thread.html#773">[ thread ]</a>
+              <a href="subject.html#773">[ subject ]</a>
+              <a href="author.html#773">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-21 10:46:20 +0200 (Tue, 21 Aug 2007)
+New Revision: 3702
+
+Modified:
+   rl/trunk/engine/ai/include/AgentDialogState.h
+   rl/trunk/engine/ai/src/AgentDialogState.cpp
+   rl/trunk/engine/script/swig/RlAi.head.swig
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+Export AgentDialogState to Ruby
+
+Modified: rl/trunk/engine/ai/include/AgentDialogState.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentDialogState.h	2007-08-21 08:43:46 UTC (rev 3701)
++++ rl/trunk/engine/ai/include/AgentDialogState.h	2007-08-21 08:46:20 UTC (rev 3702)
+@@ -22,7 +22,7 @@
+ namespace rl
+ {
+ 
+-    class AgentDialogState :
++    class _RlAiExport AgentDialogState :
+         public AgentState
+     {
+     public:
+@@ -30,10 +30,10 @@
+         ~AgentDialogState();
+ 
+         virtual void update(const Ogre::Real elapsedTime);
+-        void setPlayer(Agent* player);
++        void setDialogPartner(Agent* partner);
+ 
+     private:
+-        Agent* mPlayer;
++        Agent* mPartner;
+         bool mTalking;
+     };
+ 
+
+Modified: rl/trunk/engine/ai/src/AgentDialogState.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentDialogState.cpp	2007-08-21 08:43:46 UTC (rev 3701)
++++ rl/trunk/engine/ai/src/AgentDialogState.cpp	2007-08-21 08:46:20 UTC (rev 3702)
+@@ -29,7 +29,7 @@
+ 
+     AgentDialogState::AgentDialogState(Agent* agent)
+         : AgentState(agent),
+-        mPlayer(NULL),
++        mPartner(NULL),
+         mTalking(false)
+     {
+     }
+@@ -38,9 +38,9 @@
+     {
+     }
+ 
+-    void AgentDialogState::setPlayer(Agent* player)
++    void AgentDialogState::setDialogPartner(Agent* partner)
+     {
+-        mPlayer = player;
++        mPartner = partner;
+     }
+ 
+     void AgentDialogState::update(const Ogre::Real elapsedTime)
+@@ -49,21 +49,30 @@
+                 CreatureControllerManager::getSingleton().getCreatureController(
+                     mAgent-&gt;getControlledCreature());
+ 
+-        if (!mAgent-&gt;isAhead(mPlayer, 0.95)) //getController().calcDistance(@mPlayer.getVehicle().getPosition(), getController().getPosition()) &gt; 2.5)
++        if (!mAgent-&gt;getPosition().squaredDistance(mPartner-&gt;getPosition()) &gt; 1.5)
+         {		
+-            ctrl-&gt;setMovement(
+-                CreatureController::MT_DREHEN, 
+-                Vector3::ZERO, 
+-                mPlayer-&gt;getControlledCreature()-&gt;getPosition());
++            mAgent-&gt;addForce(mAgent-&gt;calcPursuit(mPartner));
++            mAgent-&gt;updateVehicle(0, elapsedTime);
+         }
++        //else if (!mAgent-&gt;isAhead(mPartner, 0.95)) 
++        //{		
++        //    mAgent-&gt;addForce(mAgent-&gt;calcPursuit(mPartner));
++        //    mAgent-&gt;updateVehicle(0, elapsedTime);
++        //}
++        ///@todo: Turn if near
+ 		else
+         {
+ 			if (!mTalking)
+             {
++                mAgent-&gt;reset();
+                 ctrl-&gt;setMovement(CreatureController::MT_NONE, Vector3::ZERO, Vector3::ZERO);
+-				ctrl-&gt;setAnimation(&quot;reden&quot;);
++		        //$IM.pushControlState(CST_DIALOG);
++
++                ctrl-&gt;setAnimation(&quot;reden&quot;);
+ 				mTalking = true;
+             }			
+         }
++
++
+     }
+ } // namespace rl
+
+Modified: rl/trunk/engine/script/swig/RlAi.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.head.swig	2007-08-21 08:43:46 UTC (rev 3701)
++++ rl/trunk/engine/script/swig/RlAi.head.swig	2007-08-21 08:46:20 UTC (rev 3702)
+@@ -23,6 +23,7 @@
+ #include &quot;AiSubsystem.h&quot;
+ #include &quot;AgentManager.h&quot;
+ #include &quot;Agent.h&quot;
++#include &quot;AgentDialogState.h&quot;
+ #include &quot;AStar.h&quot;
+ #include &quot;AStarHeuristic.h&quot;
+ #include &quot;AStarCosts.h&quot;
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-08-21 08:43:46 UTC (rev 3701)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-08-21 08:46:20 UTC (rev 3702)
+@@ -22,9 +22,10 @@
+ 
+ namespace rl 
+ {
+-	// Before first use of GameObject or subclasses!
++	// Before first use
+ 	%apply SWIGTYPE *DYNAMIC { rl::AStarHeuristic * };
+ 	%apply SWIGTYPE *DYNAMIC { rl::AStarCosts * };
++    %apply SWIGTYPE *DYNAMIC { rl::AgentState* };
+ 
+ 	class SteeringVehicle
+ 	{
+@@ -64,6 +65,23 @@
+ 		rl::SteeringBehaviour* getParent();
+ 		rl::SteeringVehicle* getController();
+ 	};
++
++	%feature(&quot;director&quot;) AgentState;
++    class AgentState
++    {
++    private:
++        AgentState(rl::Agent* agent);
++    };
++
++    class AgentDialogState : public rl::AgentState
++    {
++    public:
++        void setDialogPartner(rl::Agent* partner);
++    private:
++        AgentDialogState(rl::Agent* agent);
++    };
++
++    typedef enum {AST_STEERING, AST_COMBAT, AST_DIALOG} AgentStateType;
+ 	
+ 	class Agent
+ 	{
+@@ -71,7 +89,10 @@
+ 		Agent(rl::Creature* character);
+ 		virtual ~Agent();
+         rl::Creature* getControlledCreature() const;
++        rl::AgentState* getCurrentState() const;
++        void pushState(rl::AgentStateType type);
+ 	};
++
+ 	class AiSubsystem 
+ 	{
+ 	public:
+@@ -301,3 +322,21 @@
+ DYNAMIC_CAST(SWIGTYPE_p_rl__AStarCosts, AStarCosts_dynamic_cast);
+ 
+ 
++%{
++static swig_type_info *AgentState_dynamic_cast(void **ptr)
++{
++    rl::AgentState *pAgentState = static_cast&lt;rl::AgentState*&gt;(*ptr);
++
++    rl::AgentDialogState *pAgentDialogState=dynamic_cast&lt;rl::AgentDialogState*&gt;(pAgentState);
++    if (pAgentDialogState)
++    {
++        *ptr=pAgentDialogState;
++        return SWIGTYPE_p_rl__AgentDialogState;
++    }
++   
++    return 0;
++}
++%}
++DYNAMIC_CAST(SWIGTYPE_p_rl__AgentState, AgentState_dynamic_cast);
++
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000772.html">[Dsa-hl-svn] r3701 - rl/trunk/engine/ai/src
+</A></li>
+	<LI>Next message: <A HREF="000774.html">[Dsa-hl-svn] r3703 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#773">[ date ]</a>
+              <a href="thread.html#773">[ thread ]</a>
+              <a href="subject.html#773">[ subject ]</a>
+              <a href="author.html#773">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

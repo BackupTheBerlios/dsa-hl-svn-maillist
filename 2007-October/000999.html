@@ -1,0 +1,294 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3928 - in rl/trunk/engine: ai/include ai/src core/src	rules/include rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3928%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200710171708.l9HH83Ni027629%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000998.html">
+   <LINK REL="Next"  HREF="001000.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3928 - in rl/trunk/engine: ai/include ai/src core/src	rules/include rules/src ui/include ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3928%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200710171708.l9HH83Ni027629%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3928 - in rl/trunk/engine: ai/include ai/src core/src	rules/include rules/src ui/include ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Wed Oct 17 19:08:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000998.html">[Dsa-hl-svn] r3927 - modules/kanalisation/maps
+</A></li>
+        <LI>Next message: <A HREF="001000.html">[Dsa-hl-svn] r3929 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#999">[ date ]</a>
+              <a href="thread.html#999">[ thread ]</a>
+              <a href="subject.html#999">[ subject ]</a>
+              <a href="author.html#999">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-17 19:07:35 +0200 (Wed, 17 Oct 2007)
+New Revision: 3928
+
+Modified:
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/ui/include/ControlState.h
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+- rl doesn't crash after loading a save game anymore, but there a some unexpected effects
+- rl might crash at exit after, if a save game has been loaded
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -22,6 +22,7 @@
+ #include &quot;LineSetPrimitive.h&quot;
+ #include &quot;OgreVector3.h&quot;
+ #include &quot;OpenSteer/SteerLibrary.h&quot;
++#include &quot;MessagePump.h&quot;
+ 
+ 
+ namespace rl
+@@ -292,7 +293,10 @@
+ 
+         //! Creature object steered by this vehicle(and controlled by Agent).
+         Creature* mCreature;
++        int mCreatureId;
+ 
++        bool refetchCreature();
++
+         CreatureController* mController;
+ 
+         // derived from debugvisualisable
+@@ -301,6 +305,8 @@
+         Ogre::Vector3 mDebugSteer;
+         Ogre::Vector3 mDebugWander;
+         Ogre::Vector3 mDebugAvoidObstacles;
++    private:
++        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -27,6 +27,7 @@
+ #include &quot;MeshObject.h&quot;
+ #include &quot;CreatureController.h&quot;
+ #include &quot;PhysicalThing.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ using namespace Ogre;
+ using namespace OpenSteer;
+@@ -41,6 +42,7 @@
+ 	  mCurrentVelocity(Vector3::ZERO),
+ 	  mForwardVector(Vector3::NEGATIVE_UNIT_Z),
+ 	  mCreature(creature),
++      mCreatureId(mCreature-&gt;getId()),
+       mController(NULL),
+       mDebugSteer(Vector3::ZERO),
+       mDebugWander(Vector3::ZERO),
+@@ -49,6 +51,8 @@
+ 	initialize();
+     mController = CreatureControllerManager::getSingleton().getCreatureController(
+         mCreature);
++    mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
++                boost::bind(&amp;SteeringVehicle::refetchCreature, this));
+ }
+ 
+ SteeringVehicle::~SteeringVehicle()
+@@ -401,4 +405,10 @@
+     mPrimitive = new LineSetPrimitive();
+ }
+ 
++bool SteeringVehicle::refetchCreature()
++{
++    mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(mCreatureId));
++    return false;
++}
++
+ } // namespace rl
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -96,6 +96,8 @@
+ 
+         Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGames&quot;);
+         Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(&quot;SaveGames&quot;); //close all resource files -&gt; make them writable
++
++        MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameSaved&gt;();
+     }
+ 
+     void SaveGameManager::loadSaveGameFile(const CeGuiString &amp;name)
+@@ -107,6 +109,8 @@
+             reader.parseSaveGameFile(&amp;file, mSaveGameDataOrderMap);
+             ///@todo: SaveGameReader
+         }
++
++        MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoaded&gt;();
+     }
+ 
+     void SaveGameManager::deleteSaveGameFile(const CeGuiString &amp;name)
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/rules/include/CreatureController.h	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -168,8 +168,6 @@
+ 
+         // in order to copy the contactcallback members correctly;
+         friend class CreatureControllerManager;
+-
+-        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     private:
+         // only used in setAnimation
+         Ogre::String mLastAnimationName;
+@@ -182,6 +180,8 @@
+ 
+         // used to reset the material
+         const OgreNewt::MaterialID *mOldMaterialId;
++
++        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     };
+ 
+     /// this is the base class of all movements
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -96,6 +96,11 @@
+ 
+     GameObject::~GameObject(void)
+     {
++        if (mActor != NULL)
++        {
++            mActor-&gt;setGameObject(NULL);
++            mActor-&gt;setQueryFlags(0);
++        }
+     	delete mEffectManager;
+     }
+ 
+
+Modified: rl/trunk/engine/ui/include/ControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/ControlState.h	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/ui/include/ControlState.h	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -85,6 +85,7 @@
+ 
+         ControlStateType mType;
+ 
++    private:
+         MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     };
+ }
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -83,6 +83,8 @@
+         virtual DebugVisualisableFlag getFlag() const;
+         virtual void updatePrimitive();
+ 
++        bool updateAfterGameObjectLoading();
++
+     protected:
+         virtual void doCreatePrimitive();
+         CreatureController* mController;
+@@ -174,6 +176,8 @@
+         * @param timestep in order to reset the camera (no valid last position) the timestep can be 0.
+         */
+         Ogre::Vector3 calculateOptimalCameraPosition(bool SlowlyMoveBackward, const Ogre::Real &amp;timestep);
++
++        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-10-17 16:15:17 UTC (rev 3927)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-10-17 17:07:35 UTC (rev 3928)
+@@ -38,6 +38,7 @@
+ #include &quot;CreatureControllerManager.h&quot;
+ #include &quot;DebugWindow.h&quot;
+ #include &quot;Exception.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ #include &quot;InputManager.h&quot;
+ #include &quot;Logger.h&quot;
+ #include &quot;MeshObject.h&quot;
+@@ -136,6 +137,9 @@
+         mCombatSelector.setFilter(filter);
+ 
+         mSelector.setFilter(new InSceneSelectionFilter());
++
++        mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
++                boost::bind(&amp;MovementControlState::updateAfterGameObjectLoading, this));
+     }
+ 
+     //------------------------------------------------------------------------
+@@ -1389,4 +1393,19 @@
+     {
+         mPrimitive = new LineSetPrimitive();
+     }
++
++    bool MovementControlState::updateAfterGameObjectLoading()
++    {
++        // We want to check for visibility from char's POV.
++        mSelector.setCheckVisibility(true, GameObjectManager::getSingleton().getGameObject(mCharacterId));
++        mSelector.track(mCharacter);
++        mSelector.setRadius(3.0);
++
++        // Same for combat selector
++        mCombatSelector.setCheckVisibility(true, GameObjectManager::getSingleton().getGameObject(mCharacterId));
++        mCombatSelector.track(mCharacter);
++        mCombatSelector.setRadius(10.0);
++
++        return false;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000998.html">[Dsa-hl-svn] r3927 - modules/kanalisation/maps
+</A></li>
+	<LI>Next message: <A HREF="001000.html">[Dsa-hl-svn] r3929 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#999">[ date ]</a>
+              <a href="thread.html#999">[ thread ]</a>
+              <a href="subject.html#999">[ subject ]</a>
+              <a href="author.html#999">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

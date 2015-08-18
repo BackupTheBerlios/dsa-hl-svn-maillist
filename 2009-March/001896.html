@@ -1,0 +1,350 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4839 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4839%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903172025.n2HKP0ln001076%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001895.html">
+   <LINK REL="Next"  HREF="001897.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4839 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4839%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903172025.n2HKP0ln001076%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4839 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar 17 21:25:00 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001895.html">[Dsa-hl-svn] r4838 - in dependencies/OgreNewt: inc src
+</A></li>
+        <LI>Next message: <A HREF="001897.html">[Dsa-hl-svn] r4840 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1896">[ date ]</a>
+              <a href="thread.html#1896">[ thread ]</a>
+              <a href="subject.html#1896">[ subject ]</a>
+              <a href="author.html#1896">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-17 21:24:57 +0100 (Tue, 17 Mar 2009)
+New Revision: 4839
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+Log:
+- All light properties are now exposed to the Property Window and can be edited
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-17 13:36:05 UTC (rev 4838)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-17 20:24:57 UTC (rev 4839)
+@@ -453,7 +453,7 @@
+                     lightName = light.getName()
+                     lightType = light.getType()
+                     isVisible = &quot;true&quot;
+-                    if not light.isVisible():
++                    if not light.getVisible():
+                         isVisible = &quot;false&quot;
+                     
+                     castShadows = &quot;false&quot;
+
+Modified: rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-17 13:36:05 UTC (rev 4838)
++++ rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-17 20:24:57 UTC (rev 4839)
+@@ -22,7 +22,10 @@
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+ 
++import ogre.renderer.OGRE as og
++
+ from Property import *
++import ModuleManager
+ 
+ class BoolEditor(QDialog):
+     def __init__(self, currentSelectedText, parent=None):
+@@ -49,7 +52,11 @@
+         self.connect(self.combo, SIGNAL(&quot;currentIndexChanged ( const QString &amp;)&quot;), self.accept)
+     
+     def getValue(self):
+-        return str(self.combo.currentText())
++        ret = True
++        if str(self.combo.currentText()) == &quot;False&quot;:
++            ret = False
++        
++        return ret
+     
+ class GameObjectStateEditor(QDialog):
+     def __init__(self, currentSelectedText, parent=None):
+@@ -152,13 +159,35 @@
+                 bedit = BoolEditor(item.text(column), self)
+                 bedit.exec_()
+                 item.setText(column, bedit.getValue())
+-                self.node.getAttachedObject(0).getUserObject().receivesShadow = bedit.getValue()
++                self.node.getAttachedObject(0).getUserObject().receivesShadow = str(bedit.getValue())
+             elif item.text(0) == &quot;Physics Proxy Type&quot;:
+                 bedit = EntityPhysicsProxyEditor(item.text(column), self)
+                 bedit.exec_()
+                 item.setText(column, bedit.getValue())
+                 self.node.getAttachedObject(0).getUserObject().physicsproxytype = bedit.getValue()
+-                
++            elif item.text(0) == &quot;Visibility&quot;:
++                bedit = BoolEditor(item.text(column), self)
++                bedit.exec_()
++                item.setText(column, str(bedit.getValue()))
++                ModuleManager.extractLight(self.node).setVisible(bedit.getValue())
++            elif item.text(0) == &quot;CastShadows&quot;:
++                bedit = BoolEditor(item.text(column), self)
++                bedit.exec_()
++                item.setText(column, str(bedit.getValue()))
++                ModuleManager.extractLight(self.node).setCastShadows(bedit.getValue())
++            elif item.text(0) == &quot;Diffuse Color&quot;:
++                min = 1.0 / 255.0
++                col = ModuleManager.extractLight(self.node).getDiffuseColour()
++                newColor = QColorDialog.getColor(QColor(col.r * 255, col.g * 255, col.g * 255), self)
++                ModuleManager.extractLight(self.node).setDiffuseColour(og.ColourValue(min * newColor.red(), min * newColor.green(), min * newColor.blue()))
++                self.showProperties(self.so)
++            elif item.text(0) == &quot;Specular Color&quot;:
++                min = 1.0 / 255.0
++                col = ModuleManager.extractLight(self.node).getSpecularColour()
++                newColor = QColorDialog.getColor(QColor(col.r * 255, col.g * 255, col.g * 255), self)
++                ModuleManager.extractLight(self.node).setSpecularColour(og.ColourValue(min * newColor.red(), min * newColor.green(), min * newColor.blue()))
++                self.showProperties(self.so)
++
+             else:
+                 self.treeWidget.editItem(item, column)
+ 
+@@ -167,19 +196,43 @@
+             parent = item.parent()
+             if parent is None: # handle properties that don't expand here (pos, rot, scale etc)
+                 if item.text(0) == &quot;Name&quot;:
+-                    if not self.sceneManager.hasEntity(str(item.text(column))):
+-                        newEnt = self.node.getAttachedObject(0).clone(str(item.text(column)))
+-                        oldEnt = self.node.getAttachedObject(0)
+-                        self.node.detachObject(oldEnt)
+-                        self.sceneManager.destroyEntity(oldEnt)
+-                        self.node.attachObject(newEnt)
+-                        
+-                        # update the selection object since it still has references to the deleted entity
+-                        self.so.entity = newEnt
+-                        self.so.entityName = newEnt.getName()
+-                    else:
+-                        item.setText(column, self.valueBeforeEdit)
+-                        print &quot;Error: Name already exists!&quot;
++                    if self.node.getName().startswith(&quot;entity_&quot;):
++                        if not self.sceneManager.hasEntity(str(item.text(column))):
++                            newEnt = self.node.getAttachedObject(0).clone(str(item.text(column)))
++                            oldEnt = self.node.getAttachedObject(0)
++                            self.node.detachObject(oldEnt)
++                            self.sceneManager.destroyEntity(oldEnt)
++                            self.node.attachObject(newEnt)
++                            
++                            # update the selection object since it still has references to the deleted entity
++                            self.so.entity = newEnt
++                            self.so.entityName = newEnt.getName()
++                        else:
++                            item.setText(column, self.valueBeforeEdit)
++                            print &quot;Error: Name already exists!&quot;
++                            
++                    elif self.node.getName().startswith(&quot;light_&quot;):
++                        if not self.sceneManager.hasLight(str(item.text(column))):
++                            newLight = self.sceneManager.createLight(str(item.text(column)))
++                            oldLight = ModuleManager.extractLight(self.node)
++                            self.node.detachObject(oldLight)
++                            self.node.attachObject(newLight)
++                            newLight.setType(oldLight.getType())
++                            newLight.setVisibilityFlags(newLight.getVisibilityFlags())
++                            newLight.setCastShadows(oldLight.getCastShadows())
++                            newLight.setDiffuseColour(oldLight.getDiffuseColour())
++                            newLight.setSpecularColour(oldLight.getSpecularColour())
++                            newLight.setAttenuation(oldLight.getAttenuationRange(), oldLight.getAttenuationConstant(), oldLight.getAttenuationLinear(), oldLight.getAttenuationQuadric())
++                            if newLight.getType() == og.Light.LT_SPOTLIGHT:
++                                newLight.setSpotlightRange(oldLight.getSpotlightInnerAngle(), oldLight.getSpotlightOuterAngle(), oldLight.getSpotlightFalloff())
++                            if newLight.getType() == og.Light.LT_SPOTLIGHT or newLight.getType() == og.Light.LT_DIRECTIONAL:
++                                newLight.setDirection(oldLight.getDirection())
++                                
++                            self.sceneManager.destroyLight(oldLight)
++                        else:
++                            item.setText(column, self.valueBeforeEdit)
++                            print &quot;Error: Name already exists!&quot;
++                            
+                 elif item.text(0) == &quot;GameObject Id&quot;:
+                     if not self.gocManager.inWorldIdExists(str(item.text(column))):
+                         val = None
+@@ -210,7 +263,7 @@
+                         item.setText(column, self.valueBeforeEdit)
+                         print &quot;ValueError: &quot; + str(e)
+                         return
+-                        
++                    
+                     self.node.getAttachedObject(0).getUserObject().renderingdistance = val
+             else:
+                 val = None
+@@ -244,8 +297,25 @@
+                         self.node.setScale(self.node.getScale().x, val, self.node.getScale().z)
+                     elif item.text(0) == &quot;Z&quot;:
+                         self.node.setScale(self.node.getScale().x, self.node.getScale().y, val)
+-
+-                    
++                elif parent.text(0) == &quot;Attenuation&quot;:
++                    light = ModuleManager.extractLight(self.node)
++                    if item.text(0) == &quot;range&quot;:
++                        light.setAttenuation(val, light.getAttenuationConstant(), light.getAttenuationLinear(), light.getAttenuationQuadric())
++                    elif item.text(0) == &quot;constant&quot;:
++                        light.setAttenuation(light.getAttenuationRange(), val, light.getAttenuationLinear(), light.getAttenuationQuadric())
++                    elif item.text(0) == &quot;linear&quot;:
++                        light.setAttenuation(light.getAttenuationRange(), light.getAttenuationConstant(), val, light.getAttenuationQuadric())
++                    elif item.text(0) == &quot;quadratic&quot;:
++                        light.setAttenuation(light.getAttenuationRange(), light.getAttenuationConstant(), light.getAttenuationLinear(), val)
++                elif parent.text(0) == &quot;Spotlightrange&quot;:
++                    light = ModuleManager.extractLight(self.node)
++                    if item.text(0) == &quot;inner&quot;:
++                        light.setSpotlightInnerAngle(og.Degree(val))
++                    elif item.text(0) == &quot;outer&quot;:
++                        light.setSpotlightOuterAngle(og.Degree(val))
++                    elif item.text(0) == &quot;falloff&quot;:                      
++                      light.setSpotlightFalloff(val)
++                        
+     def showProperties(self, so):
+         # onItemChanged should only be called when the user changes values not when they change by code
+         self.disconnect(self.treeWidget, SIGNAL(&quot;itemChanged (QTreeWidgetItem *,int)&quot;),
+@@ -303,10 +373,102 @@
+             self.parseOrientation(self.node)
+             self.parseScale(self.node)
+             
++        elif name.startswith(&quot;light_&quot;):
++            item = QTreeWidgetItem(self.treeWidget)
++            light = ModuleManager.extractLight(self.node)
++            n = light.getName()
++            item.setText(0, &quot;Name&quot;)
++            item.setText(1, n)
++            item.setFlags(item.flags() | Qt.ItemIsEditable)
++            
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Type&quot;)
++            if light.getType() == og.Light.LT_POINT:
++                item.setText(1, &quot;point&quot;)
++            elif light.getType() == og.Light.LT_SPOTLIGHT:
++                item.setText(1, &quot;spot&quot;)
++            elif light.getType() == og.Light.LT_DIRECTIONAL:
++                item.setText(1, &quot;directional&quot;)
++
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Visibility&quot;)
++            item.setText(1, str(light.getVisible()))
++            
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;CastShadows&quot;)
++            item.setText(1, str(light.getCastShadows()))
++            
++            if light.getType() == og.Light.LT_POINT or light.getType() == og.Light.LT_SPOTLIGHT:
++                self.parsePosition(self.node)
++            if light.getType() == og.Light.LT_SPOTLIGHT:
++                self.parseSpotLightProperties(self.node)
++                
++            self.parseDiffuseColor(self.node)
++            self.parseSpecularColor(self.node)
++            self.parseLightAttenuation(self.node)
++
++       
+         self.connect(self.treeWidget, SIGNAL(&quot;itemChanged (QTreeWidgetItem *,int)&quot;),
+                        self.onItemChanged)
+                        
+-                       
++    
++    def parseDiffuseColor(self, node):
++        item = QTreeWidgetItem(self.treeWidget)
++        item.setText(0, &quot;Diffuse Color&quot;)
++        color = ModuleManager.extractLight(self.node).getDiffuseColour()
++        item.setText(1, str(int(255 * color.r)) + &quot;; &quot; + str(int(255 * color.g)) + &quot;; &quot; + str(int(255 * color.b)))
++        
++    def parseSpecularColor(self, node):
++        item = QTreeWidgetItem(self.treeWidget)
++        item.setText(0, &quot;Specular Color&quot;)
++        color = ModuleManager.extractLight(self.node).getSpecularColour()
++        item.setText(1, str(int(255 * color.r)) + &quot;; &quot; + str(int(255 * color.g)) + &quot;; &quot; + str(int(255 * color.b)))
++        
++    def parseLightAttenuation(self, node):
++        item = QTreeWidgetItem(self.treeWidget)
++        item.setText(0, &quot;Attenuation&quot;)
++        light = ModuleManager.extractLight(self.node)
++        
++        range = QTreeWidgetItem(item)
++        range.setText(0, &quot;range&quot;)
++        range.setText(1, str(light.getAttenuationRange()))
++        range.setFlags(range.flags() | Qt.ItemIsEditable)
++        
++        constant = QTreeWidgetItem(item)
++        constant.setText(0, &quot;constant&quot;)
++        constant.setText(1,  str(light.getAttenuationConstant()))
++        constant.setFlags(constant.flags() | Qt.ItemIsEditable)
++        
++        linear = QTreeWidgetItem(item)
++        linear.setText(0, &quot;linear&quot;)
++        linear.setText(1, str(light.getAttenuationLinear()))
++        linear.setFlags(linear.flags() | Qt.ItemIsEditable)
++        
++        quadratic = QTreeWidgetItem(item)
++        quadratic.setText(0, &quot;quadratic&quot;)
++        quadratic.setText(1, str(light.getAttenuationQuadric()))
++        quadratic.setFlags(quadratic.flags() | Qt.ItemIsEditable)
++    
++    def parseSpotLightProperties(self,  node):
++        light = ModuleManager.extractLight(self.node)
++        item = QTreeWidgetItem(self.treeWidget)
++        item.setText(0, &quot;Spotlightrange&quot;)
++
++        inner = QTreeWidgetItem(item)
++        inner.setText(0, &quot;inner&quot;)
++        inner.setText(1, str(light.getSpotlightInnerAngle().valueDegrees()))
++        inner.setFlags(inner.flags() | Qt.ItemIsEditable)
++        
++        outer = QTreeWidgetItem(item)
++        outer.setText(0, &quot;outer&quot;)
++        outer.setText(1, str(light.getSpotlightOuterAngle().valueDegrees()))
++        outer.setFlags(outer.flags() | Qt.ItemIsEditable)
++        
++        falloff = QTreeWidgetItem(item)
++        falloff.setText(0, &quot;falloff&quot;)
++        falloff.setText(1, str(light.getSpotlightFalloff()))
++        falloff.setFlags(falloff.flags() | Qt.ItemIsEditable)
++
+     def parsePosition(self, node):
+         item = QTreeWidgetItem(self.treeWidget)
+         item.setText(0, &quot;Position&quot;)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001895.html">[Dsa-hl-svn] r4838 - in dependencies/OgreNewt: inc src
+</A></li>
+	<LI>Next message: <A HREF="001897.html">[Dsa-hl-svn] r4840 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1896">[ date ]</a>
+              <a href="thread.html#1896">[ thread ]</a>
+              <a href="subject.html#1896">[ subject ]</a>
+              <a href="author.html#1896">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

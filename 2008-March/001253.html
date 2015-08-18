@@ -1,0 +1,462 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4182 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4182%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803061246.m26CkBVf025506%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001252.html">
+   <LINK REL="Next"  HREF="001254.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4182 - in rl/trunk/engine/rules: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4182%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803061246.m26CkBVf025506%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4182 - in rl/trunk/engine/rules: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  6 13:46:11 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001252.html">[Dsa-hl-svn] r4181 - in rl/trunk/engine: common/include common/src	rules/src
+</A></li>
+        <LI>Next message: <A HREF="001254.html">[Dsa-hl-svn] r4183 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1253">[ date ]</a>
+              <a href="thread.html#1253">[ thread ]</a>
+              <a href="subject.html#1253">[ subject ]</a>
+              <a href="author.html#1253">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-06 13:46:09 +0100 (Thu, 06 Mar 2008)
+New Revision: 4182
+
+Modified:
+   rl/trunk/engine/rules/include/CombatManager.h
+   rl/trunk/engine/rules/include/Kampfaktion.h
+   rl/trunk/engine/rules/include/Weapon.h
+   rl/trunk/engine/rules/src/CombatManager.cpp
+   rl/trunk/engine/rules/src/Kampfaktion.cpp
+   rl/trunk/engine/rules/src/Weapon.cpp
+Log:
+WIP on combat. Not yet usable.
+
+Modified: rl/trunk/engine/rules/include/CombatManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CombatManager.h	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/include/CombatManager.h	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -28,6 +28,7 @@
+     class Combatant;
+     class CombatantFactory;
+     class Creature;
++	class Kampfaktion;
+ 	
+     class _RlRulesExport CombatManager : public Ogre::Singleton&lt;CombatManager&gt;
+     {
+@@ -55,10 +56,14 @@
+         void registerCombatantFactory(const Ogre::String&amp; name, CombatantFactory* factory);
+         void unregisterCombatantFactory(CombatantFactory* factory);
+ 
++		Kampfaktion* getKampfaktion(const CeGuiString&amp; name);
++
+     private:
+         typedef std::map&lt;Ogre::String, CombatantFactory*&gt; CombatantFactoryMap;
+         CombatantFactoryMap mCombatantFactories;
+         Combat* mCurrentCombat;
++
++		std::map&lt;CeGuiString, Kampfaktion*&gt; mKampfaktionen;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/include/Kampfaktion.h
+===================================================================
+--- rl/trunk/engine/rules/include/Kampfaktion.h	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/include/Kampfaktion.h	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -31,23 +31,22 @@
+     class _RlRulesExport Kampfaktion
+     {
+     public:
++		typedef enum {AKTION, REAKTION, FREIE_AKTION, LAENGERFRISTIGE_HANDLUNG} Type;
+ 
+-        /**
+-        * @param name Name, mit der die Aktion dem Benutzer
+-        *             gegen&#252;ber dargestellt wird.
+-        *             Die gleiche, die intern verwendet wird.
+-        * @param descritpion Eine naehere Beschreibung.
+-        */
+-        Kampfaktion(const CeGuiString&amp; name, const CeGuiString&amp; description);
++        Kampfaktion(Type type, const CeGuiString&amp; name, const CeGuiString&amp; description);
+         virtual ~Kampfaktion();
+ 
+         CeGuiString getName() const;
+         CeGuiString getDescription() const;
+ 
++		virtual bool hasTarget() const = 0;
++		virtual Ogre::Real getMaximumTargetDistance() const = 0;
++
+         virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const = 0;
+         virtual void doKampfaktion(Combatant* actor, Combatant* target) = 0;
+ 
+ 	protected:
++		Type mType;
+ 		CeGuiString mName;
+ 		CeGuiString mDescription;
+     };
+@@ -58,9 +57,25 @@
+ 		Attacke();
+ 		virtual ~Attacke();
+ 
+-        virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
++		virtual bool hasTarget() const;
++		virtual Ogre::Real getMaximumTargetDistance() const;
++
++		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
+         virtual void doKampfaktion(Combatant* actor, Combatant* target);
+ 	};
++
++	class _RlRulesExport Parade : public Kampfaktion
++	{
++	public:
++		Parade();
++		virtual ~Parade();
++
++		virtual bool hasTarget() const;
++		virtual Ogre::Real getMaximumTargetDistance() const;
++
++		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
++        virtual void doKampfaktion(Combatant* actor, Combatant* target);
++	};
+ }
+ 
+ #endif
+
+Modified: rl/trunk/engine/rules/include/Weapon.h
+===================================================================
+--- rl/trunk/engine/rules/include/Weapon.h	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/include/Weapon.h	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -28,12 +28,17 @@
+ 	public:
+ 		enum Distanzklasse 
+ 		{
+-			DK_H = 0,
+-			DK_N = 1,
+-			DK_S = 2,
+-			DK_P = 4
++			DK_H = 1,
++			DK_N = 2,
++			DK_S = 4,
++			DK_P = 8
+ 		};
+ 
++		static const Ogre::Real DK_NAHKAMPF_MIN_DISTANCE;
++		static const Ogre::Real DK_STABWAFFEN_MIN_DISTANCE;
++		static const Ogre::Real DK_PIKE_MIN_DISTANCE;
++		static const Ogre::Real DK_PIKE_MAX_DISTANCE;
++
+         static const Ogre::String CLASS_NAME;
+ 
+         static const Ogre::String PROPERTY_TP;
+@@ -63,6 +68,11 @@
+ 		void setKampftechnik(const CeGuiString newKampftechnik);
+ 		const CeGuiString getKampftechnik() const;
+ 
++		/// Return minimum distance in meters where weapon can be used without penalty.
++		Ogre::Real getMinimumDistance() const;
++		/// Return maximum distance in meters where weapon can be used without penalty.
++		Ogre::Real getMaximumDistance() const;
++
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertyRecord* getAllProperties() const;
+
+Modified: rl/trunk/engine/rules/src/CombatManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CombatManager.cpp	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/src/CombatManager.cpp	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -20,6 +20,7 @@
+ #include &quot;Combat.h&quot;
+ #include &quot;Combatant.h&quot;
+ #include &quot;Exception.h&quot;
++#include &quot;Kampfaktion.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -30,10 +31,18 @@
+ 
+     CombatManager::CombatManager() : mCurrentCombat(NULL)
+     {
++		Kampfaktion* ka = new Attacke();
++		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
+     }
+ 
+     CombatManager::~CombatManager()
+     {
++		for (std::map&lt;CeGuiString, Kampfaktion*&gt;::iterator it = mKampfaktionen.begin();
++			it != mKampfaktionen.end(); ++it)
++		{
++			delete it-&gt;second;
++		}
++		mKampfaktionen.clear();
+     }
+ 
+     Combat* CombatManager::startCombat()
+@@ -98,4 +107,17 @@
+             }
+         }
+     }
++
++	Kampfaktion* CombatManager::getKampfaktion(const CeGuiString&amp; name)
++	{
++		std::map&lt;CeGuiString, Kampfaktion*&gt;::const_iterator it = mKampfaktionen.find(name);
++		if (it != mKampfaktionen.end())
++		{
++			return it-&gt;second;
++		}
++		else
++		{
++			return NULL;
++		}
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/Kampfaktion.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Kampfaktion.cpp	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/src/Kampfaktion.cpp	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -22,8 +22,8 @@
+ 
+ namespace rl
+ {
+-	Kampfaktion::Kampfaktion(const CeGuiString&amp; name, const CeGuiString&amp; description)
+-		: mName(name), mDescription(description)
++	Kampfaktion::Kampfaktion(Type type, const CeGuiString&amp; name, const CeGuiString&amp; description)
++		: mType(type), mName(name), mDescription(description)
+ 	{
+ 	}
+ 
+@@ -41,7 +41,7 @@
+ 		return mDescription;
+ 	}
+ 
+-	Attacke::Attacke() : Kampfaktion(&quot;Attacke&quot;, &quot;Greife Gegner an.&quot;)
++	Attacke::Attacke() : Kampfaktion(AKTION, &quot;Attacke&quot;, &quot;Greife Gegner an.&quot;)
+ 	{
+ 	}
+ 
+@@ -49,12 +49,54 @@
+ 	{
+ 	}
+ 
++	bool Attacke::hasTarget() const
++	{
++		return true;
++	}
++
++	Real Attacke::getMaximumTargetDistance() const
++	{
++		return 1.0f;
++	}
++
+ 	bool Attacke::canDoKampfaktion(Combatant* actor, Combatant* target) const
+ 	{
++		// Check whether actor has skill for weapon in hand.
++
++		// Check whether target &#237;s in range of our actor and his/her weapon.
+ 		return true;
+ 	}
+ 
+     void Attacke::doKampfaktion(Combatant* actor, Combatant* target)
+ 	{
++
+ 	}
++
++	Parade::Parade() : Kampfaktion(REAKTION, &quot;Parade&quot;, &quot;Pariere Attacken des Gegners&quot;)
++	{
++	}
++
++	Parade::~Parade()
++	{
++	}
++
++	bool Parade::hasTarget() const
++	{
++		return true;
++	}
++
++	Real Parade::getMaximumTargetDistance() const
++	{
++		return 1.0f;
++	}
++
++    bool Parade::canDoKampfaktion(Combatant* actor, Combatant* target) const
++	{
++		// Check, whether actor's weapon can be parried with our weapon/side weapon/shield.
++		return true;
++	}
++
++    void Parade::doKampfaktion(Combatant* actor, Combatant* target)
++	{
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/Weapon.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Weapon.cpp	2008-03-06 12:17:29 UTC (rev 4181)
++++ rl/trunk/engine/rules/src/Weapon.cpp	2008-03-06 12:46:09 UTC (rev 4182)
+@@ -22,6 +22,11 @@
+ 
+ namespace rl
+ {
++	const Ogre::Real Weapon::DK_NAHKAMPF_MIN_DISTANCE = 0.5f;
++	const Ogre::Real Weapon::DK_STABWAFFEN_MIN_DISTANCE = 1.5f;
++	const Ogre::Real Weapon::DK_PIKE_MIN_DISTANCE = 3.0f;
++	const Ogre::Real Weapon::DK_PIKE_MAX_DISTANCE = 4.0f;
++
+     const Ogre::String Weapon::CLASS_NAME = &quot;Weapon&quot;;
+     const Ogre::String Weapon::PROPERTY_TP = &quot;TP&quot;;
+     const Ogre::String Weapon::PROPERTY_TP_KK = &quot;TPKK&quot;;
+@@ -29,7 +34,7 @@
+     const Ogre::String Weapon::PROPERTY_TP_INI = &quot;INI&quot;;
+     const Ogre::String Weapon::PROPERTY_TP_WM = &quot;WM&quot;;
+     const Ogre::String Weapon::PROPERTY_TP_DK = &quot;DK&quot;;
+-    const Ogre::String Weapon::PROPERTY_TP_KAMPFTECHNIK = &quot;KT&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_KAMPFTECHNIK = &quot;kampftechnik&quot;;
+ 
+ 	Weapon::Weapon(unsigned int id)
+ 		: Item(id),
+@@ -117,6 +122,46 @@
+         return (mDk &amp; newDk) == newDk;
+     }
+ 
++	Ogre::Real Weapon::getMinimumDistance() const
++	{
++		if (mDk &amp; DK_H)
++		{
++			return 0.0f;
++		}
++		else if (mDk &amp; DK_N)
++		{
++			return DK_NAHKAMPF_MIN_DISTANCE;
++		}
++		else if (mDk &amp; DK_S)
++		{
++			return DK_STABWAFFEN_MIN_DISTANCE;
++		}
++		else
++		{
++			return DK_PIKE_MIN_DISTANCE;
++		}
++	}
++
++	Ogre::Real Weapon::getMaximumDistance() const
++	{
++		if (mDk &amp; DK_P)
++		{
++			return DK_PIKE_MAX_DISTANCE;
++		}
++		else if (mDk &amp; DK_S)
++		{
++			return DK_PIKE_MIN_DISTANCE;
++		}
++		else if (mDk &amp; DK_N)
++		{
++			return DK_STABWAFFEN_MIN_DISTANCE;
++		}
++		else
++		{
++			return DK_NAHKAMPF_MIN_DISTANCE;
++		}
++	}
++
+ 	void Weapon::setKampftechnik(const CeGuiString newKampftechnik)
+ 	{
+ 		mKampftechnik = newKampftechnik;
+@@ -151,7 +196,27 @@
+         }
+         else if (key == Weapon::PROPERTY_TP_DK)
+         {
+-            mDk = value.toInt();
++			Ogre::String tmp = value.toString().c_str();
++			mDk = 0;
++			for (size_t i = 0; i &lt; tmp.size(); ++i)
++			{
++				if (tmp[i] == 'H' || tmp[i] == 'h')
++				{
++					mDk |= DK_H;
++				}
++				else if (tmp[i] == 'N' || tmp[i] == 'n')
++				{
++					mDk |= DK_N;
++				}
++				else if (tmp[i] == 'S' || tmp[i] == 's')
++				{
++					mDk |= DK_S;
++				}
++				else if (tmp[i] == 'P' || tmp[i] == 'p')
++				{
++					mDk |= DK_P;
++				}
++			}
+         }
+         else if (key == Weapon::PROPERTY_TP_KAMPFTECHNIK)
+         {
+@@ -187,7 +252,24 @@
+         }
+         else if (key == Weapon::PROPERTY_TP_DK)
+         {
+-            return Property(mDk);
++			CeGuiString dk;
++			if (mDk &amp; DK_H)
++			{
++				dk += &quot;H&quot;;
++			}
++			else if (mDk &amp; DK_N)
++			{
++				dk += &quot;N&quot;;
++			}
++			else if (mDk &amp; DK_S)
++			{
++				dk += &quot;S&quot;;
++			}
++			else if (mDk &amp; DK_P)
++			{
++				dk += &quot;P&quot;;
++			}
++            return Property(dk);
+         }
+         else if (key == Weapon::PROPERTY_TP_KAMPFTECHNIK)
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001252.html">[Dsa-hl-svn] r4181 - in rl/trunk/engine: common/include common/src	rules/src
+</A></li>
+	<LI>Next message: <A HREF="001254.html">[Dsa-hl-svn] r4183 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1253">[ date ]</a>
+              <a href="thread.html#1253">[ thread ]</a>
+              <a href="subject.html#1253">[ subject ]</a>
+              <a href="author.html#1253">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

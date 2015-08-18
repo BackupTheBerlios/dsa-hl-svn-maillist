@@ -1,0 +1,344 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4387 - in rl/trunk/engine: core/include core/src	rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4387%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200805310912.m4V9CM34005081%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001457.html">
+   <LINK REL="Next"  HREF="001459.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4387 - in rl/trunk/engine: core/include core/src	rules/include rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4387%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200805310912.m4V9CM34005081%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4387 - in rl/trunk/engine: core/include core/src	rules/include rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat May 31 11:12:22 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001457.html">[Dsa-hl-svn] r4386 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001459.html">[Dsa-hl-svn] r4388 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1458">[ date ]</a>
+              <a href="thread.html#1458">[ thread ]</a>
+              <a href="subject.html#1458">[ subject ]</a>
+              <a href="author.html#1458">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-05-31 11:12:17 +0200 (Sat, 31 May 2008)
+New Revision: 4387
+
+Modified:
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/rules/include/CreatureControllerManager.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+Save current scene in gameobjects when they are in the scene or attached to gameobjects in the scene
+
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -111,6 +111,9 @@
+ 
+     void setTimeFactor(const Ogre::Real&amp; factor = 1.0F);
+ 
++    void _setCurrentScene(const CeGuiString&amp; scene);
++    const CeGuiString&amp; getCurrentScene() const;
++
+ private:
+     World* mWorld;
+     RubyInterpreter* mRubyInterpreter;
+@@ -118,6 +121,7 @@
+     ContentModule* mActiveAdventureModule;
+     Ogre::String mDefaultActiveModule;
+     Ogre::RenderWindow* mRenderWindow;            //!&lt; Render window for OGRE
++    CeGuiString mCurrentScene;
+ 
+     RL_LONGLONG mClockStartTime;
+ 
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -73,7 +73,8 @@
+         mDebugVisualsManager(NULL),
+         mJobScheduler(NULL),
+         mRenderWindow(NULL),
+-        mZoneManager(NULL)
++        mZoneManager(NULL),
++        mCurrentScene(&quot;&quot;)
+     {
+         initializeCoreSubsystem();
+     }
+@@ -578,4 +579,14 @@
+         mSoundManager-&gt;unloadAllDrivers();
+         LOG_MESSAGE(Logger::CORE, &quot;Soundtreiber entladen&quot;);
+     }
++
++    void CoreSubsystem::_setCurrentScene(const CeGuiString&amp; scene)
++    {
++        mCurrentScene = scene;
++    }
++
++    const CeGuiString&amp; CoreSubsystem::getCurrentScene() const
++    {
++        return mCurrentScene;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/include/CreatureControllerManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureControllerManager.h	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/include/CreatureControllerManager.h	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -29,6 +29,7 @@
+ 
+ namespace rl
+ {
++    class Creature;
+     class CreatureController;
+ 
+     /// This class manages CreatureControllers, which provide an API for moving the creature
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -52,6 +52,7 @@
+         static const Ogre::String PROPERTY_OBJECT_ID;
+         static const Ogre::String PROPERTY_INHERITS;
+         static const Ogre::String PROPERTY_BASE_CLASS;
++        static const Ogre::String PROPERTY_SCENE; 
+         static const Ogre::String PROPERTY_POSITION; 
+         static const Ogre::String PROPERTY_ORIENTATION; 
+         static const Ogre::String PROPERTY_NAME;
+@@ -98,6 +99,9 @@
+         void addAction(Action* action, int option = Action::ACT_NORMAL);
+         void addActionInGroup(Action* action, ActionGroup* group, int option = Action::ACT_NORMAL);
+         void removeAction(Action* action);
++
++        void setScene(const CeGuiString&amp; scene);
++        const CeGuiString&amp; getScene() const;
+     
+         /*
+          * sets the actor of this gameobject
+@@ -214,8 +218,8 @@
+ 
+         virtual void doPlaceIntoScene();
+         virtual void doRemoveFromScene();
++        CeGuiString mScene;
+ 
+-
+     private:
+         static int sNextGameObjectId;    
+ 
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/include/Slot.h	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -33,7 +33,7 @@
+     // item-state etc, returns true, if succeeded to set item, false indicates to to nothing
+     // subclasses MUST call this method when overriding
+     virtual bool setItem(Item* item);
+-    virtual void update() {} // this must only be called from creature::doPlaceIntoScene
++    virtual void update(); // this must only be called from creature::doPlaceIntoScene
+     Item* getItem() const;
+     bool isAllowed(const Item* item) const;
+     bool isEmpty() const {return mItem == NULL;}
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/src/Container.cpp	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -158,6 +158,7 @@
+             else
+                 item-&gt;setOwner(this);
+ 			item-&gt;setState(GOS_IN_POSSESSION);
++            item-&gt;setScene(mScene);
+ 
+ 			return true;
+ 		}
+@@ -178,6 +179,7 @@
+             // this is the case, if the item is removed automatically
+             // don't change this without looking at Item::setState
+             item-&gt;removeOldState();
++            item-&gt;setScene(&quot;&quot;);
+         }
+         else
+         {
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/src/Creature.cpp	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -1292,5 +1292,13 @@
+     void Creature::doRemoveFromScene()
+     {
+         GameObject::doRemoveFromScene();
++
++        // check items in inventory
++        Inventory::SlotMap slots = mInventory-&gt;getAllSlots();
++        Inventory::SlotMap::iterator it = slots.begin();
++        for( ; it != slots.end(); it++ )
++        {
++            it-&gt;second-&gt;update();
++        }
+     }
+ }
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -44,6 +44,7 @@
+     const Ogre::String GameObject::PROPERTY_CLASS_ID = &quot;classid&quot;;
+     const Ogre::String GameObject::PROPERTY_BASE_CLASS = &quot;baseclass&quot;;
+     const Ogre::String GameObject::PROPERTY_POSITION = &quot;position&quot;;
++    const Ogre::String GameObject::PROPERTY_SCENE = &quot;scene&quot;;
+     const Ogre::String GameObject::PROPERTY_INHERITS = &quot;inherits&quot;;
+     const Ogre::String GameObject::PROPERTY_ORIENTATION = &quot;orientation&quot;;
+     const Ogre::String GameObject::PROPERTY_NAME = &quot;name&quot;;
+@@ -71,7 +72,8 @@
+             mMass(0),
+             mGeometryType(GT_NONE),
+             mDefaultAction(DEFAULT_VIEW_OBJECT_ACTION),
+-            mState(GOS_LOADED)
++            mState(GOS_LOADED),
++            mScene(&quot;&quot;)
+     {
+         mEffectManager = new EffectManager(this);
+ 
+@@ -163,6 +165,16 @@
+         mSubmeshPreName = name;
+     }
+ 
++    const CeGuiString&amp; GameObject::getScene() const
++    {
++        return mScene;
++    }
++
++    void GameObject::setScene(const CeGuiString&amp; scene)
++    {
++        mScene = scene;
++    }
++
+     void GameObject::addAction(Action* action, int option)
+     {
+         if (action == NULL)
+@@ -703,6 +715,7 @@
+             {
+                 actor-&gt;placeIntoScene(mPosition, mOrientation);
+                 setActor(actor);
++                mScene = CoreSubsystem::getSingleton().getCurrentScene();
+ 
+                 // this is done in setstate now
+                 //GameObjectState tmpState = mState;
+@@ -736,6 +749,7 @@
+ 
+                 setActor(NULL);
+                 actor-&gt;removeFromScene();
++                mScene = &quot;&quot;;
+             }
+ 
+             // give the setstate function the possibility to reuse the actor
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2008-05-31 09:10:29 UTC (rev 4386)
++++ rl/trunk/engine/rules/src/Slot.cpp	2008-05-31 09:12:17 UTC (rev 4387)
+@@ -96,7 +96,26 @@
+         return true;
+     }
+ 
++    void Slot::update()
++    {
++        if (isEmpty()) 
++        {
++            return;
++        }
+ 
++        if (mOwner-&gt;getState() == GOS_IN_SCENE
++            || mOwner-&gt;getState() == GOS_HELD
++            || mOwner-&gt;getState() == GOS_READY)
++        {
++            mItem-&gt;setScene(mOwner-&gt;getScene());
++        }
++        else 
++        {
++            mItem-&gt;setScene(&quot;&quot;);
++        }
++    }
++
++
+     BoneSlot::BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; bone)
+         : Slot(owner, name, itemReadyMask, itemHeldMask), mBone(bone)
+     {
+@@ -128,6 +147,7 @@
+ 
+     void BoneSlot::update()
+     {
++        Slot::update();
+         if( mItem &amp;&amp; (mOwner-&gt;getState() == GOS_IN_SCENE
+                 || mOwner-&gt;getState() == GOS_HELD
+                 || mOwner-&gt;getState() == GOS_READY) )
+@@ -208,6 +228,7 @@
+ 
+     void SubmeshSlot::update()
+     {
++        Slot::update();
+ 	    if (mOwner-&gt;getActor())
+ 	    {
+ 		    MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
+@@ -309,6 +330,7 @@
+ 
+     void MaterialSlot::update()
+     {
++        Slot::update();
+         if (mItem)
+         {
+             try
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001457.html">[Dsa-hl-svn] r4386 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001459.html">[Dsa-hl-svn] r4388 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1458">[ date ]</a>
+              <a href="thread.html#1458">[ thread ]</a>
+              <a href="subject.html#1458">[ subject ]</a>
+              <a href="author.html#1458">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

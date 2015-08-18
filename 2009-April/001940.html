@@ -1,0 +1,905 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4883 - in rl/trunk/engine: core/include core/src	rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4883%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20ui/src&In-Reply-To=%3C200904031330.n33DUvT5027977%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001939.html">
+   <LINK REL="Next"  HREF="001941.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4883 - in rl/trunk/engine: core/include core/src	rules/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4883%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20ui/src&In-Reply-To=%3C200904031330.n33DUvT5027977%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4883 - in rl/trunk/engine: core/include core/src	rules/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr  3 15:30:57 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001939.html">[Dsa-hl-svn] r4882 - in dependencies/OgreNewt: inc src
+</A></li>
+        <LI>Next message: <A HREF="001941.html">[Dsa-hl-svn] r4884 - in modules: common/dsa regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1940">[ date ]</a>
+              <a href="thread.html#1940">[ thread ]</a>
+              <a href="subject.html#1940">[ subject ]</a>
+              <a href="author.html#1940">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-04-03 15:30:53 +0200 (Fri, 03 Apr 2009)
+New Revision: 4883
+
+Modified:
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+-set center of mass of physics proxy correctly
+-some small changes...
+
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -226,7 +226,7 @@
+ 		GeometryType getGeometryType() const;
+ 		void setBody(OgreNewt::Body* body);
+ 
+-        OgreNewt::CollisionPtr createCollision(PhysicalObject* po, Ogre::Vector3&amp; inertia) const;
++        OgreNewt::CollisionPtr createCollision(PhysicalObject* po, Ogre::Vector3&amp; inertia, Ogre::Vector3&amp; centerOfMass) const;
+ 
+         //! the ragdoll, if this thing is controlled by a ragdoll
+         PhysicsRagDoll* mRagDoll;
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -222,6 +222,7 @@
+ 		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
++		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
+ 		*/
+ 		OgreNewt::CollisionPtr createCollision(
+ 			Ogre::Entity* entity,
+@@ -230,7 +231,8 @@
+ 			Ogre::Vector3* offset = NULL,
+ 			Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+ 
+         /** creates a collision primitive for OgreNewt.
+ 		 * The collision primitive created has got a basic orientation which can be influenced by
+@@ -248,6 +250,7 @@
+ 		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
++		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
+ 		*/
+         OgreNewt::CollisionPtr createCollision(
+             const Ogre::String&amp; name,
+@@ -256,7 +259,8 @@
+             Ogre::Vector3* offset = NULL,
+ 			Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+ 
+         /** Makes the collision primitive generation available to non mesh objects.
+          * Non mesh objects need collision objects too. Therefore they can
+@@ -401,13 +405,15 @@
+ 		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
++		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
+ 		*/
+         OgreNewt::CollisionPtr createCollisionFromEntity(Ogre::Entity* entity,
+             const GeometryType&amp; geomType,
+             Ogre::Vector3* offset = NULL, 
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real Mass = 0,
+-            Ogre::Vector3* inertiaCoefficients = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+ 
+         /** creates a collision primitive for OgreNewt from an AABB box.
+ 		 * The collision primitive created has got a basic orientation which can be influenced by
+@@ -423,13 +429,15 @@
+ 		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
++		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
+ 		*/
+         OgreNewt::CollisionPtr createCollisionFromAABB(const Ogre::AxisAlignedBox aabb,
+             const GeometryType&amp; geomType,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real Mass = 0,
+-            Ogre::Vector3* inertiaCoefficients = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+     protected:
+         /** creates a box collision primitive with offset at middle of bottom layer.
+          * It's actually a convenience function used by both createCollision functions.
+@@ -438,12 +446,14 @@
+          * @param orientation when not null, specifies the euler angle of orientation.
+          * @param mass gives the mass for inertia calculation.
+          * @param inertia when not null, an inertia is calculated and passed back.
++         * @param centerOfMass when not null, an centerOfMass is calculated and passed back.
+          */
+         OgreNewt::CollisionPtr createBox(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+         /** creates a pyramid collision primitive with offset at middle of bottom layer.
+          * It's actually a convenience function used by both createCollision functions.
+          * @param aabb gives the axis aligned dimension to create the primitive for.
+@@ -451,12 +461,14 @@
+          * @param orientation when not null, specifies the euler angle of orientation.
+          * @param mass gives the mass for inertia calculation.
+          * @param inertia when not null, an inertia is calculated and passed back.
++         * @param centerOfMass when not null, an centerOfMass is calculated and passed back.
+          */
+         OgreNewt::CollisionPtr createPyramid(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+         /** creates a sphere collision primitive with offset at middle of bottom layer.
+          * It's actually a convenience function used by both createCollision functions.
+          * @param aabb gives the axis aligned dimension to create the primitive for.
+@@ -464,12 +476,14 @@
+          * @param orientation when not null, specifies the euler angle of orientation.
+          * @param mass gives the mass for inertia calculation.
+          * @param inertia when not null, an inertia is calculated and passed back.
++         * @param centerOfMass when not null, an centerOfMass is calculated and passed back.
+          */
+         OgreNewt::CollisionPtr createSphere(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+         /** creates a ellipsoid collision primitive with offset at middle of bottom layer.
+          * It's actually a convenience function used by both createCollision functions.
+          * @param aabb gives the axis aligned dimension to create the primitive for.
+@@ -477,12 +491,14 @@
+          * @param orientation when not null, specifies the euler angle of orientation.
+          * @param mass gives the mass for inertia calculation.
+          * @param inertia when not null, an inertia is calculated and passed back.
++         * @param centerOfMass when not null, an centerOfMass is calculated and passed back.
+          */
+         OgreNewt::CollisionPtr createEllipsoid(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+         /** creates a capsule collision primitive with offset at middle of bottom layer.
+          * It's actually a convenience function used by both createCollision functions.
+          * @param aabb gives the axis aligned dimension to create the primitive for.
+@@ -490,12 +506,14 @@
+          * @param orientation when not null, specifies the euler angle of orientation.
+          * @param mass gives the mass for inertia calculation.
+          * @param inertia when not null, an inertia is calculated and passed back.
++         * @param centerOfMass when not null, an centerOfMass is calculated and passed back.
+          */
+         OgreNewt::CollisionPtr createCapsule(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset = NULL,
+             Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+-            Ogre::Vector3* inertia = NULL);
++            Ogre::Vector3* inertia = NULL,
++            Ogre::Vector3* centerOfMass = NULL);
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -239,8 +239,12 @@
+         if( mBody &amp;&amp; !mRagDoll )
+         {
+             Vector3 inertia;
+-            mBody-&gt;getMassMatrix(mMass, inertia);
++            Real oldMass;
++            mBody-&gt;getMassMatrix(oldMass, inertia);
+             mMass = mass;
++            if( oldMass &gt; 0 )
++                inertia = inertia/oldMass*mass;
++                
+             mBody-&gt;setMassMatrix(mass, inertia);
+         }
+         mMass = mass;
+@@ -443,8 +447,8 @@
+                 &quot;PhysicalThing::createPhysicsProxy: cannot create physics proxy while the PhysicalThing is controlled by a RagDoll!&quot;);
+ 		if (!mBody)
+ 		{
+-            Vector3 inertia;
+-            OgreNewt::CollisionPtr coll = createCollision(mPhysicalObject, inertia);
++            Vector3 inertia, centerOfMass;
++            OgreNewt::CollisionPtr coll = createCollision(mPhysicalObject, inertia, centerOfMass);
+ 
+ 			OgreNewt::Body* body = new OgreNewt::Body(
+                 PhysicsManager::getSingleton()._getNewtonWorld(), coll);
+@@ -454,6 +458,7 @@
+ 			if (mass &gt; 0.0 &amp;&amp; mGeometryType != GT_MESH)
+             {
+                 body-&gt;setMassMatrix(mass, inertia);
++                body-&gt;setCenterOfMass(centerOfMass);
+             }
+ 
+ 			body-&gt;setCustomForceAndTorqueCallback(PhysicsManager::genericForceCallback);
+@@ -469,7 +474,7 @@
+         }
+ 	}
+ 
+-    OgreNewt::CollisionPtr PhysicalThing::createCollision(PhysicalObject* po, Vector3&amp; inertia) const
++    OgreNewt::CollisionPtr PhysicalThing::createCollision(PhysicalObject* po, Vector3&amp; inertia, Vector3&amp; centerOfMass) const
+     {
+         OgreNewt::CollisionPtr coll;
+ 
+@@ -488,7 +493,8 @@
+                 NULL,
+                 NULL,
+                 mMass,
+-                &amp;inertia);
++                &amp;inertia,
++                &amp;centerOfMass);
+         }
+         else
+         {
+@@ -499,7 +505,8 @@
+                 NULL,
+                 NULL,
+                 mMass,
+-                &amp;inertia);
++                &amp;inertia,
++                &amp;centerOfMass);
+         }
+ 
+         return coll;
+@@ -511,13 +518,14 @@
+         {
+             mPoseCollisions.clear();
+ 
+-            Vector3 inertia;
++            Vector3 inertia, centerOfMass;
+ 
+             // update the collision
+-		    mBody-&gt;setCollision(createCollision(mPhysicalObject, inertia));
++		    mBody-&gt;setCollision(createCollision(mPhysicalObject, inertia, centerOfMass));
+ 		    if (mMass &gt; 0.0 &amp;&amp; mGeometryType != GT_MESH)
+             {
+                 mBody-&gt;setMassMatrix(mMass, inertia);
++                mBody-&gt;setCenterOfMass(centerOfMass);
+             }
+         }
+     }
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -507,7 +507,8 @@
+     OgreNewt::CollisionPtr PhysicsManager::createCollision(
+         Ogre::Entity* entity, const GeometryType&amp; geomType,
+ 		const Ogre::String animName, Ogre::Vector3* offset,
+-        Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia)
++        Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia,
++        Ogre::Vector3* centerOfMass)
+     {
+         // problem here is that a mesh can have different animations with
+         // different extents. Therefore we add the animName to the meshname
+@@ -515,7 +516,7 @@
+         Ogre::String collisionName (entity-&gt;getMesh()-&gt;getName() + animName);
+ 
+         // result value
+-        CollisionPtr rval;
++        CollisionPtr rval(NULL);
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[collisionName]);
+@@ -534,70 +535,6 @@
+                 // found it
+                 rval = usedcol.colPtr;
+ 
+-
+-                if( inertia )
+-                {
+-
+-                    // we must set inertia here, the calling function doesn't know we are not creating a new collision
+-                    switch(usedcol.geomType)
+-                    {
+-                    case GT_BOX: // from createBox
+-                    case GT_CAPSULE: // from createCapsule
+-                    case GT_CONVEXHULL: // from createCollisionFromEntity
+-                    case GT_ELLIPSOID: // from createEllipsoid
+-                    case GT_PYRAMID: // createPyramid
+-                    case GT_SPHERE:
+-                    case GT_MESH:
+-                    case GT_NONE:
+-                        *inertia = Ogre::Vector3::ZERO;
+-                        break;
+-                    }
+-/*
+-                    Ogre::AxisAlignedBox aabb(entity-&gt;getBoundingBox());
+-                    Vector3 size( aabb.getSize() );
+-                    switch(usedcol.geomType)
+-                    {
+-                    case GT_BOX: // from createBox
+-                        *inertia = OgreNewt::MomentOfInertia::CalcBoxSolid(mass, aabb.getSize());
+-                        break;
+-                    case GT_CAPSULE: // from createCapsule
+-                        {
+-                            double radius = std::max(size.x, size.z) / 2.0;
+-                            double sradius = radius*radius;
+-                            *inertia = Vector3(sradius, size.y*size.y, sradius) * mass;
+-                        }
+-                        break;
+-                    case GT_CONVEXHULL: // from createCollisionFromEntity
+-				        *inertia = Vector3(
+-				        size.x*size.x/6.0f,
+-				        size.y*size.y/6.0f,
+-			            size.z*size.z/6.0f) * mass;
+-                        break;
+-                    case GT_ELLIPSOID: // from createEllipsoid
+-                        {
+-                            Vector3 s(size/2.0);
+-                            s.x = std::max(s.x, s.z);
+-                            s.z = s.x;
+-                            *inertia = Vector3(s.x*s.x, s.y*s.y, s.z*s.z) * mass;
+-                        }
+-                        break;
+-                    case GT_MESH:
+-                    case GT_NONE:
+-                        *inertia = Ogre::Vector3::ZERO;
+-                        break;
+-                    case GT_PYRAMID: // createPyramid
+-                        *inertia = Ogre::Vector3(size.x,size.y/2.0f, size.z) * mass;
+-                        break;
+-                    case GT_SPHERE:
+-                        {
+-                            double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
+-                            //*inertia = OgreNewt::MomentOfInertia::CalcSphereSolid(Mass,radius);
+-                            *inertia = mass * Vector3(radius*radius, radius*radius, radius*radius);
+-                        }
+-                        break;
+-                    }
+-*/
+-                }
+             }
+         }
+ 
+@@ -605,7 +542,7 @@
+         {
+             // if there is none, then create a new collision object
+             rval = mPhysicsCollisionFactory-&gt;createCollisionFromEntity(
+-                entity, geomType, offset, orientation, mass, inertia );
++                entity, geomType, offset, orientation, mass, inertia, centerOfMass );
+ 
+             usedcol.geomType = geomType;
+             usedcol.colPtr = rval;
+@@ -617,10 +554,11 @@
+     OgreNewt::CollisionPtr PhysicsManager::createCollision(
+         const Ogre::String&amp; name, const Ogre::AxisAlignedBox&amp; aabb,
+         const GeometryType&amp; geomType, Ogre::Vector3* offset,
+-        Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia)
++        Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia,
++        Ogre::Vector3* centerOfMass)
+     {
+         // result value
+-        CollisionPtr rval;
++        CollisionPtr rval(NULL);
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[name]);
+@@ -645,7 +583,7 @@
+         {
+             // if there is none, then create a new collision object
+             rval = mPhysicsCollisionFactory-&gt;createCollisionFromAABB(
+-                aabb, geomType, offset, orientation, mass, inertia );
++                aabb, geomType, offset, orientation, mass, inertia, centerOfMass );
+ 
+             usedcol.geomType = geomType;
+             usedcol.colPtr = rval;
+@@ -732,7 +670,8 @@
+         Ogre::Vector3* offset,
+         Ogre::Quaternion* orientation,
+         const Ogre::Real Mass,
+-        Ogre::Vector3* inertia)
++        Ogre::Vector3* inertia,
++        Ogre::Vector3* centerOfMass)
+     {
+         // size of the mesh
+         Vector3 size( aabb.getSize() );
+@@ -740,7 +679,7 @@
+         bool forceBox (false);
+ 
+         // result value
+-        CollisionPtr rval;
++        CollisionPtr rval(NULL);
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+         if (checkSize(size) == false )
+@@ -772,23 +711,23 @@
+ 	    */
+ 		if (geomType == GT_BOX || forceBox == true)
+         {
+-			rval = createBox(aabb, offset, orientation, Mass, inertia);
++			rval = createBox(aabb, offset, orientation, Mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_PYRAMID)
+         {
+-            rval = createPyramid(aabb, offset, orientation, Mass, inertia);
++            rval = createPyramid(aabb, offset, orientation, Mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_SPHERE)
+         {
+-			rval = createSphere(aabb, offset, orientation, Mass, inertia);
++			rval = createSphere(aabb, offset, orientation, Mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_ELLIPSOID)
+         {
+-            rval = createEllipsoid(aabb, offset, orientation, Mass, inertia);
++            rval = createEllipsoid(aabb, offset, orientation, Mass, inertia, centerOfMass);
+         }
+ 		else if (geomType == GT_CAPSULE)
+ 		{
+-			rval = createCapsule(aabb, offset, orientation, Mass, inertia);
++			rval = createCapsule(aabb, offset, orientation, Mass, inertia, centerOfMass);
+ 		}
+         return rval;
+     }
+@@ -797,8 +736,9 @@
+         const GeometryType&amp; geomType,
+         Ogre::Vector3* offset,
+         Ogre::Quaternion* orientation,
+-        const Ogre::Real Mass,
+-        Ogre::Vector3* inertia)
++        const Ogre::Real mass,
++        Ogre::Vector3* inertia,
++        Ogre::Vector3* centerOfMass)
+     {
+         // bounding box of the mesh
+         const Ogre::AxisAlignedBox aabb(entity-&gt;getBoundingBox());
+@@ -808,7 +748,7 @@
+         bool forceBox (false);
+ 
+         // result value
+-        CollisionPtr rval;
++        CollisionPtr rval(NULL);
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+         if (checkSize(size) == false )
+@@ -829,23 +769,23 @@
+ 	    */
+ 		if (geomType == GT_BOX || forceBox == true)
+         {
+-			rval = createBox(aabb, offset, orientation, Mass, inertia);
++			rval = createBox(aabb, offset, orientation, mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_PYRAMID)
+         {
+-            rval = createPyramid(aabb, offset, orientation, Mass, inertia);
++            rval = createPyramid(aabb, offset, orientation, mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_SPHERE)
+         {
+-			rval = createSphere(aabb, offset, orientation, Mass, inertia);
++			rval = createSphere(aabb, offset, orientation, mass, inertia, centerOfMass);
+         }
+         else if (geomType == GT_ELLIPSOID)
+         {
+-            rval = createEllipsoid(aabb, offset, orientation, Mass, inertia);
++            rval = createEllipsoid(aabb, offset, orientation, mass, inertia, centerOfMass);
+         }
+ 		else if (geomType == GT_CAPSULE)
+ 		{
+-			rval = createCapsule(aabb, offset, orientation, Mass, inertia);
++			rval = createCapsule(aabb, offset, orientation, mass, inertia, centerOfMass);
+ 		}
+         else if (geomType == GT_CONVEXHULL)
+         {
+@@ -865,17 +805,22 @@
+                 PhysicsManager::getSingleton()._getNewtonWorld(),
+ 				entity, /*entity-&gt;hasSkeleton(),*/ *orientation, *offset));
+ 
+-			if (inertia != NULL)
+-			{
+-                            Vector3 inert_offs=Vector3::ZERO;
+-                            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-                            *inertia *= Mass;
+-			}
++            if (inertia != NULL || centerOfMass != NULL )
++            {
++                Vector3 temp_inertia, temp_centerOfMass;
++                static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++                if( inertia != NULL )
++                    *inertia = temp_inertia*mass;
++                if( centerOfMass != NULL )
++                    *centerOfMass = temp_centerOfMass;
++            }
+         }
+         else if (geomType == GT_MESH)
+         {
+             if (inertia != NULL)
+                 *inertia = Ogre::Vector3::ZERO;
++            if (centerOfMass != NULL)
++                *centerOfMass = Ogre::Vector3::ZERO;
+ 
+             rval = CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+                 PhysicsManager::getSingleton()._getNewtonWorld(),
+@@ -906,7 +851,8 @@
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+             const Ogre::Real mass,
+-            Ogre::Vector3* inertia)
++            Ogre::Vector3* inertia,
++            Ogre::Vector3* centerOfMass)
+     {
+         // offset of the collision primitiv
+         Ogre::Vector3 object_offset( aabb.getCenter() );
+@@ -923,11 +869,16 @@
+         OgreNewt::CollisionPtr rval(new OgreNewt::CollisionPrimitives::Box(
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             aabb.getSize(), *orientation, *offset));
+-        if (inertia)
++
++
++        if (inertia != NULL || centerOfMass != NULL )
+         {
+-            Vector3 inert_offs=Vector3::ZERO;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-            *inertia *= mass;
++            Vector3 temp_inertia, temp_centerOfMass;
++            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++            if( inertia )
++                *inertia = temp_inertia*mass;
++            if( centerOfMass )
++                *centerOfMass = temp_centerOfMass;
+         }
+ 
+         return rval;
+@@ -937,7 +888,8 @@
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+             const Ogre::Real mass,
+-            Ogre::Vector3* inertia)
++            Ogre::Vector3* inertia,
++            Ogre::Vector3* centerOfMass)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+         // positional offset of the collision primitiv
+@@ -954,13 +906,18 @@
+         OgreNewt::CollisionPtr rval(new OgreNewt::CollisionPrimitives::Pyramid(
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             size, *orientation, *offset));
+-        if (inertia)
++
++
++        if (inertia != NULL || centerOfMass != NULL )
+         {
+-            Vector3 inert_offs=Vector3::ZERO;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-            *inertia *= mass;
++            Vector3 temp_inertia, temp_centerOfMass;
++            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++            if( inertia )
++                *inertia = temp_inertia*mass;
++            if( centerOfMass )
++                *centerOfMass = temp_centerOfMass;
+         }
+-
++ 
+         return rval;
+     }
+ 
+@@ -968,7 +925,8 @@
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+             const Ogre::Real mass,
+-            Ogre::Vector3* inertia)
++            Ogre::Vector3* inertia,
++            Ogre::Vector3* centerOfMass)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+         // calculate the maximum radius needed to include 'everything'
+@@ -989,12 +947,18 @@
+         OgreNewt::CollisionPtr rval(new OgreNewt::CollisionPrimitives::Ellipsoid(
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             Vector3(radius, radius, radius), *orientation, *offset));
+-        if (inertia)
++ 
++
++        if (inertia != NULL || centerOfMass != NULL )
+         {
+-            Vector3 inert_offs=Vector3::ZERO;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-            *inertia *= mass;
++            Vector3 temp_inertia, temp_centerOfMass;
++            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++            if( inertia )
++                *inertia = temp_inertia*mass;
++            if( centerOfMass )
++                *centerOfMass = temp_centerOfMass;
+         }
++ 
+         return rval;
+     }
+ 
+@@ -1002,7 +966,8 @@
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+             const Ogre::Real mass,
+-            Ogre::Vector3* inertia)
++            Ogre::Vector3* inertia,
++            Ogre::Vector3* centerOfMass)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+         // set the size x/z values to the maximum
+@@ -1025,13 +990,17 @@
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             s, *orientation, *offset));
+ 
+-        if (inertia)
++
++        if (inertia != NULL || centerOfMass != NULL )
+         {
+-            Vector3 inert_offs=Vector3::ZERO;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-            *inertia *= mass;
++            Vector3 temp_inertia, temp_centerOfMass;
++            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++            if( inertia )
++                *inertia = temp_inertia*mass;
++            if( centerOfMass )
++                *centerOfMass = temp_centerOfMass;
+         }
+-
++ 
+         return rval;
+     }
+ 
+@@ -1039,7 +1008,8 @@
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+             const Ogre::Real mass,
+-            Ogre::Vector3* inertia)
++            Ogre::Vector3* inertia,
++            Ogre::Vector3* centerOfMass)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+         // positional offset of the collision primitiv
+@@ -1064,12 +1034,18 @@
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             radius, height, *orientation, *offset));
+ 
+-        if (inertia)
++
++        if (inertia != NULL || centerOfMass != NULL )
+         {
+-            Vector3 inert_offs=Vector3::ZERO;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-            *inertia *= mass;
++            Vector3 temp_inertia, temp_centerOfMass;
++            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++            if( inertia )
++                *inertia = temp_inertia*mass;
++            if( centerOfMass )
++                *centerOfMass = temp_centerOfMass;
+         }
++ 
++ 
+         return rval;
+     }
+ }
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -80,8 +80,8 @@
+ 
+         mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+ 
+-//        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;setAngularDamping(0*Vector3::UNIT_SCALE);
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;setContinuousCollisionMode(1);
++        //mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;setAngularDamping(0*Vector3::UNIT_SCALE);
++        //mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;setContinuousCollisionMode(1);
+ 
+ 
+         std::pair&lt;MovementType, AbstractMovement*&gt; movementPair;
+@@ -407,11 +407,12 @@
+ 
+         Vector3 charPos;
+         Quaternion charOri;
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getPositionOrientation(charPos, charOri);
++        OgreNewt::Body* charBody = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++        charBody-&gt;getPositionOrientation(charPos, charOri);
+         bool isFloorCollision(false);
+ 
+-        AxisAlignedBox CharAab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
+-        Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
++        AxisAlignedBox charAab = charBody-&gt;getCollision()-&gt;getAABB();
++        Real charHeight = charAab.getMaximum().y - charAab.getMinimum().y;
+         Real stepHeight = point.y - charPos.y;
+ 
+         if( stepHeight &lt; charHeight/2 )
+@@ -426,6 +427,17 @@
+                 mLastFloorContact = time;
+             }
+         }
++
++        // set contact direction to point to the center of mass
++        contact.setNormalDirection((charPos + charBody-&gt;getCenterOfMass() - point).normalisedCopy());
++        contact.setNormalAcceleration(0);
++        // no friction
++        contact.setFrictionState(0,0);
++        contact.setFrictionState(0,1);
++        contact.setTangentAcceleration(0,0);
++        contact.setTangentAcceleration(0,1);
++
++
+ /*
+ //        setContactNormalDirection(((Vector3::UNIT_Y.dotProduct(point-charPos)*Vector3::UNIT_Y + charPos) - point).normalisedCopy());
+         setContactNormalDirection(point - (charPos + charHeight/2));
+@@ -434,8 +446,8 @@
+         setContactFrictionState(0,1);
+         setContactTangentAcceleration(0, 0);
+         setContactTangentAcceleration(0, 1);
++*/
+ 
+-*/
+ //std::ostringstream oss;
+ //Vector3 vec1, vec2;
+ //oss &lt;&lt; &quot; Collision: Point: &quot; &lt;&lt; point-charPos;
+@@ -448,10 +460,10 @@
+ //oss &lt;&lt; &quot;  \t Tangent-Directions: &quot; &lt;&lt; vec1 &lt;&lt; &quot; &quot; &lt;&lt; vec2;
+ //LOG_MESSAGE(Logger::RULES, oss.str());
+ 
+-        contact.rotateTangentDirections(/*charOri*mDirection + */Vector3::UNIT_Y);
+-        contact.setFrictionState(1,0);
+-        contact.setFrictionState(0,1);
+-
++//        contact.rotateTangentDirections(/*charOri*mDirection + */Vector3::UNIT_Y);
++//        contact.setFrictionState(0,0);
++//        contact.setFrictionState(0,1);
++/*
+         if( stepHeight &lt; 0.4 )
+         {
+             if(stepHeight &gt; 0.01f) // experimantal value, 
+@@ -485,6 +497,7 @@
+                 //setContactFrictionState(0,1);
+             }
+         }
++*/
+ }
+ 
+         if(mMovement != NULL)
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -110,7 +110,6 @@
+         PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;));
+         mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(Vector3::ZERO);
+         
+         // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
+         OgreNewt::MaterialPair* mat_pair = NULL;
+
+Modified: rl/trunk/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeflightControlState.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/ui/src/FreeflightControlState.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -63,11 +63,12 @@
+     void FreeflightControlState::pause()
+     {
+ 		mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-		//mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++		mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++
++// for testing the OgreNewt player controller
+ //        delete mOgreNewtPlayerController;
+ 
+         mOgreNewtPlayerController = NULL;
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;setUpConstraint();
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+ 
+         // Char&lt;-&gt;Level collision back to default
+@@ -86,8 +87,9 @@
+     void FreeflightControlState::resume()
+     {
+         mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-		//mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
++		mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
++
++// for testing the OgreNewt player controller
+ //        mOgreNewtPlayerController = new OgreNewt::PlayerController(mCharBody);
+ 
+         resetCamera();
+@@ -352,8 +354,11 @@
+             Vector3 currentVel = body-&gt;getVelocity();
+             Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep();
+             Vector3 force = mass*(orientation * mDesiredVelocity - currentVel) / delay;
+-if( mCollisionsEnabled )
+-    force = mass*(- currentVel) / delay;
++
++// for testing the OgreNewt player controller
++//if( mCollisionsEnabled )
++//    force = mass*(- currentVel) / delay;
++
+             body-&gt;setForce(force);
+         }
+     }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-04-02 10:20:14 UTC (rev 4882)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-04-03 13:30:53 UTC (rev 4883)
+@@ -240,7 +240,6 @@
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;));
+         mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(Vector3::ZERO);
+ 
+         // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
+         OgreNewt::MaterialPair* mat_pair = NULL;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001939.html">[Dsa-hl-svn] r4882 - in dependencies/OgreNewt: inc src
+</A></li>
+	<LI>Next message: <A HREF="001941.html">[Dsa-hl-svn] r4884 - in modules: common/dsa regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1940">[ date ]</a>
+              <a href="thread.html#1940">[ thread ]</a>
+              <a href="subject.html#1940">[ subject ]</a>
+              <a href="author.html#1940">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

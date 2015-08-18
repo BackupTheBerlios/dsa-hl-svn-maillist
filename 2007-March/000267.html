@@ -1,0 +1,421 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3196 - rl/trunk/engine/core/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3196%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703260950.l2Q9ofFb030059%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000266.html">
+   <LINK REL="Next"  HREF="000268.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3196 - rl/trunk/engine/core/include</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3196%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703260950.l2Q9ofFb030059%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3196 - rl/trunk/engine/core/include">natoka at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar 26 11:50:41 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000266.html">[Dsa-hl-svn] r3195 - rl/trunk/engine/core/include
+</A></li>
+        <LI>Next message: <A HREF="000268.html">[Dsa-hl-svn] r3197 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#267">[ date ]</a>
+              <a href="thread.html#267">[ thread ]</a>
+              <a href="subject.html#267">[ subject ]</a>
+              <a href="author.html#267">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-26 11:50:07 +0200 (Mon, 26 Mar 2007)
+New Revision: 3196
+
+Modified:
+   rl/trunk/engine/core/include/QuadTree.h
+Log:
+added non default constructors allowing the proper initialisation of the contents of a quad
+
+
+Modified: rl/trunk/engine/core/include/QuadTree.h
+===================================================================
+--- rl/trunk/engine/core/include/QuadTree.h	2007-03-25 21:14:59 UTC (rev 3195)
++++ rl/trunk/engine/core/include/QuadTree.h	2007-03-26 09:50:07 UTC (rev 3196)
+@@ -13,15 +13,18 @@
+  *  along with this program; if not you can get it here
+  *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+  */
+-  
++
+ #ifndef __QUADTREE_H__
+ #define __QUADTREE_H__
+ 
+ namespace Ogre {
+-	class AxisAlignedBoundingBox;
++	class AxisAlignedBox;
++	class Vector2;
++	class Vector3;
+ };
+ 
+ #include &quot;CorePrerequisites.h&quot;
++#include &quot;Exception.h&quot;
+ 
+ namespace rl
+ {
+@@ -38,8 +41,9 @@
+  * NodeLocation.
+  */
+ template &lt;class TData&gt;
+-struct TQuadTreeBasicNode
++class TQuadTreeBasicNode
+ {
++public:
+ 	/** Tells where the node within an array is located.
+ 	 * creates a counterclockwise location of nodes.
+ 	 */
+@@ -55,7 +59,7 @@
+ 	 * @returns a const reference to the internally stored data
+ 	 */
+ 	const TData&amp; getData() { return mData; }
+-
++protected:
+ 	bool		mSubDivided;	//!&lt; true if node has subnodes
+ 	TData		mData;			//!&lt; data of this node
+ };
+@@ -65,16 +69,27 @@
+  * nodes can be allocated and inserted on demand.
+  */
+ template &lt;class TData, class TNode&gt;
+-struct TQuadTreeBasicPointerNode : public TQuadTreeBasicNode&lt; TData &gt;
++class TQuadTreeBasicPointerNode : public TQuadTreeBasicNode&lt; TData &gt;
+ {
++protected:
+ 	TNode*		mNodes[4];	//!&lt; four pointers to subnodes
+ 
++public:
++	/** default constructor.
++	 * Initializes the subquad pointers to NULL
++	 */
++	TQuadTreeBasicPointerNode();
++
++	/** Retrieve the specified subnode.
++	 * Accounting the nature of (non) uniform quadtrees the returned pointer might
++	 * be NULL.
++	 * @param location whether to fetch the upper/lower left/right quad.
++	 * @returns the subquadtree node
++	 */
+ 	TNode*	getNode(enum rl::TQuadTreeBasicNode&lt;TData&gt;::NodeLocation location);
+ 
+-	TQuadTreeBasicPointerNode();
+-
+ 	// function for recursively deleting the quad tree
+-	void removeNode (TQuadTreeBasicPointerNode&lt;TData, TNode&gt; *node);
++	void remove(); //Node (TQuadTreeBasicPointerNode&lt;TData, TNode&gt; *node);
+ };
+ 
+ template &lt;class TData, class TNode&gt;
+@@ -87,13 +102,60 @@
+ /** A basic Quadtree containing vertex data
+  */
+ template &lt;class TData, class TNode&gt;
+-struct TQuadTreeOgreNode : public TQuadTreeBasicPointerNode&lt; TData, TNode &gt;
++class TQuadTreeOgreNode : public TQuadTreeBasicPointerNode&lt; TData, TNode &gt;
+ {
+-	Ogre::Vector3	mVertices[4];	//!&lt; vertices of this node
+-	float			mWidth;	//!&lt; length of this quad
++protected:
++	Ogre::Vector2	mVertexTL;	//!&lt; top left vertex of this node
++	Ogre::Vector2	mVertexBR;	//!&lt; bottom right vertex of this node
++	Ogre::Real		mWidth;		//!&lt; length of this quad
+ 
++public:
++	/** Default constructor.
++	 * initializes a completely empty quad, that even doesn't represent a part
++	 * a space.
++	 */
+ 	TQuadTreeOgreNode();
+ 
++	/** Constructor to use for correct setup of quad.
++	 * Initialises the quad with all necessary data to function properly.
++	 */
++	TQuadTreeOgreNode(Ogre::Vector2&amp; tlc, Ogre::Vector2&amp; brc, float mWidth=0.0f);
++
++	/** Constructor to use for correct setup of quad.
++	 * Initialises the quad with all necessary data to function properly.
++	 */
++	//TQuadTreeOgreNode(Ogre::Vector2&amp; tlc, Ogre::Vector2&amp; blc, Ogre Vector2&amp; lrc);
++
++	/** Fetches the width of the quad.
++	 * @returns the width of the quad.
++	 */
++	inline Ogre::Real getWidth() { return mWidth; }
++
++	/** Retrieve the specified corner vertex.
++	 * Since only the upper left and lower right corner of the quad are stored,
++	 * the two others have to be constructed.
++	 * @param location specifies which vertex to fetch (upper/lower-left/right).
++	 * @returns the wanted vertex.
++	 */
++	inline Ogre::Vector2 getVertex(enum rl::TQuadTreeBasicNode&lt;TData&gt;::NodeLocation location)
++	{
++		switch (location)
++		{
++		case TOP_LEFT:
++			return mVertexTL;
++		case BOTTOM_LEFT:
++			return Ogre::Vector2(mVertexTL.x, mVertexBR.y);
++		case BOTTOM_RIGHT:
++			return mVertexBR;
++		case TOP_RIGHT:
++			return Ogre::Vector2(mVertexBR.x, mVertexTL.y);
++		default:
++			Throw(IllegalArgumentException, &quot;unknown NodeLocation type.&quot;);
++		}
++
++		return Ogre::Vector2(0.0f,0.0f);
++	}
++
+ 	/** tests if the given u value is inside the quad.
+ 	 * Since this is a 2D test, the name refers to u coordinate
+ 	 * (instead of x for the 3D case).
+@@ -101,7 +163,7 @@
+ 	 */
+ 	inline bool isUInside(Ogre::Real u) 
+ 	{ 
+-		return (mVertices[TOP_LEFT].x &lt; u &amp;&amp; u &lt; mVertices[BOTTOM_RIGHT].x);
++		return (mVertices[TOP_LEFT].x &lt; u &amp;&amp; u &lt; mVertices[BOTTOM_RIGHT].);
+ 	}
+ 	/** tests if the given v value is inside the quad.
+ 	 * Since this is a 2D test, the name refers to v coordinate
+@@ -110,7 +172,7 @@
+ 	 */
+ 	inline bool isVInside(Ogre::Real v) 
+ 	{
+-		return (mVertices[TOP_LEFT].z &lt; v &amp;&amp; v &lt; mVertices[BOTTOM_RIGHT].z);
++		return (mVertices[TOP_LEFT].y &lt; v &amp;&amp; v &lt; mVertices[BOTTOM_RIGHT].y);
+ 	}
+ 
+ 	void remove(); //TQuadTree&lt;TData, TNode&gt; *node);
+@@ -118,11 +180,29 @@
+ 
+ template &lt;class TData, class TNode&gt;
+ TQuadTreeOgreNode&lt;TData, TNode&gt;::TQuadTreeOgreNode()
+-: mWidth(0.0f)
++: mWidth(0.0f),
++  mVertexTL(0,0),
++  mVertexBR(0,0)
+ {
+-	memset((char*) mVertices, 0, sizeof(mVertices));
++	//memset((char*) mVertices, 0, sizeof(mVertices));
+ }
+ 
++template &lt;class TData, class TNode&gt;
++TQuadTreeOgreNode&lt;TData, TNode&gt;::TQuadTreeOgreNode(Ogre::Vector2&amp; tlc, Ogre::Vector2&amp; brc, float mWidth)
++: mWidth(mWidth),
++  mVertexTL(tlc),
++  mVertexBR(brc)
++{
++	/*
++	mVertices[TOP_LEFT] = tlc;
++	mVertices[BOTTOM_LEFT].x = tlc.x;
++	mVertices[BOTTOM_LEFT].z = brc.z;
++	mVertices[BOTTOM_RIGHT] = brc;
++	mVertices[TOP_RIGHT].x = brc.x;
++	mVertices[TOP_RIGHT].z = tlc.z;
++	*/
++}
++
+ /** A basic loose quadtree.
+  * A loose quadtree consists of loose quads, which have an extended
+  * 'loose' area around them. So the quads do not only store the
+@@ -134,8 +214,14 @@
+ template &lt;class TData, class TNode&gt;
+ struct TLooseQuadTree : public TQuadTreeOgreNode&lt; std::vector&lt; TData &gt;, TNode &gt;
+ {
++	//! default constructor
+ 	TLooseQuadTree();
+ 
++
++	TLooseQuadTree(int maxData, int maxDepth, float looseness, 
++		Ogre::Vector2&amp; tlc, Ogre::Vector2&amp; brc, float mWidth=0.0f);
++
++
+ 	/** maximum number of elements in one leaf.
+ 	 * Whenever this number is reached a subdivision takes place.
+ 	 */
+@@ -184,8 +270,9 @@
+ 	 */
+ 	inline bool isUInsideLoose(Ogre::Real u) 
+ 	{ 
+-		return (mVertices[TOP_LEFT].x - mLooseness &lt; u &amp;&amp;
+-			u &lt; mVertices[BOTTOM_RIGHT].x + mLooseness);
++		return (mVertexTL.x - mLooseness &lt; u &amp;&amp; u &lt; mVertexBR.x + mLooseness);
++		//return (mVertices[TOP_LEFT].x - mLooseness &lt; u &amp;&amp;
++		//	u &lt; mVertices[BOTTOM_RIGHT].x + mLooseness);
+ 	}
+ 	/** tests if the given v value is inside the quad.
+ 	 * Since this is a 2D test, the name refers to v coordinate
+@@ -194,8 +281,9 @@
+ 	 */
+ 	inline bool isVInsideLoose(Ogre::Real v) 
+ 	{
+-		return (mVertices[TOP_LEFT].z - mLooseness &lt; v &amp;&amp;
+-			v &lt; mVertices[BOTTOM_RIGHT].z + mLooseness);
++		return (mVertexTL.y - mLooseness &lt; v &amp;&amp; v &lt; mVertexBR.y + mLooseness);
++		//return (mVertices[TOP_LEFT].y - mLooseness &lt; v &amp;&amp;
++		//	v &lt; mVertices[BOTTOM_RIGHT].y + mLooseness);
+ 	}
+ 
+ 	/** inserts the specified data.
+@@ -203,7 +291,7 @@
+ 	 * According to that information the data is inserted at one or more
+ 	 * leaf nodes.
+ 	 */
+-	void insert(Ogre::AxisAlignedBox&amp; aabb, TData data);
++	void insert(TData data);
+ 
+ 	/** removes a node.
+ 	 * When the node has got subnodes they are also removed
+@@ -235,23 +323,33 @@
+ }
+ 
+ template &lt;class TData, class TNode&gt;
+-void TLooseQuadTree&lt;TData,TNode&gt;::insert(Ogre::AxisAlignedBox&amp; aabb, TData data)
++TLooseQuadTree&lt;TData, TNode&gt;::TLooseQuadTree(int maxData, int maxDepth,
++											 float looseness, Ogre::Vector2&amp; tlc,
++											 Ogre::Vector2&amp; brc, float mWidth)
++: TQuadTreeOgreNode&lt; std::vector&lt; TData &gt;, TNode &gt;(tlc, brc, mWidth),
++  mMaxData(maxData),
++  mMaxDepth(maxDepth),
++  mLooseness(looseness)
+ {
++}
++
++template &lt;class TData, class TNode&gt;
++void TLooseQuadTree&lt;TData,TNode&gt;::insert(TData data)
++{
+ 	if (mSubDivided)
+ 	{
+ 		// try to add the data to any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+ 			if (mNodes[i])
+-				mNodes[i]-&gt;insert(aabb, data);
++				mNodes[i]-&gt;insert(data);
+ 		}
+ 	}
+ 	else
+ 	{
++		Ogre::AxisAlignedBox aabb = TNode::getAABB(data);
+ 		// check whether any of the 4 edges of the axisalignedbox are in the loose quad
+ 		Ogre::Vector3 flb = aabb.getCorner(Ogre::AxisAlignedBox::FAR_LEFT_BOTTOM);
+-		//aabb.getCorner(Ogre::AxisAlignedBox::FAR_RIGHT_BOTTOM)
+-		//aabb.getCorner(Ogre::AxisAlignedBox::NEAR_LEFT_BOTTOM) 
+ 		Ogre::Vector3 nrb = aabb.getCorner(Ogre::AxisAlignedBox::NEAR_RIGHT_BOTTOM);
+ 		if ( (isVInsideLoose(flb.x) &amp;&amp; (isUInsideLoose(flb.z) || isUInsideLoose(nrb.z))) ||
+ 			 (isVInsideLoose(nrb.x) &amp;&amp; (isUInsideLoose(flb.z) || isUInsideLoose(nrb.z))) )
+@@ -270,20 +368,30 @@
+ template &lt;class TData, class TNode&gt;
+ void TLooseQuadTree&lt;TData,TNode&gt;::split()
+ {
++	Ogre::Real HalfWidth = mWidth/2.0f;
++	Ogre::Vector2 center (getVertex(TOP_LEFT) + Ogre::Vector2(HalfWidth, -HalfWidth));
+ 	// create 4 subnodes
+-	for (int i=0; i&lt;4; i++)
+-	{
+-		if (! mNodes[i])
+-			mNodes[i] = new TNode();
+-	}
++	mNodes[TOP_LEFT] = 
++		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
++		          mVertexTL, center, HalfWidth);
++	mNodes[BOTTOM_LEFT] = 
++		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
++		          Ogre::Vector2(mVertexTL.x, center.y),
++				  Ogre::Vector2(center.x, mVertexBR.y), HalfWidth);
++	mNodes[BOTTOM_RIGHT] =
++		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f, 
++				  center, mVertexBR, HalfWidth);
++	mNodes[TOP_RIGHT] =
++		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
++				  Ogre::Vector2(center.x, mVertexTL.y),
++				  Ogre::Vector2(mVertexBR.x, center.y), HalfWidth);
+ 
+-	// distribute the data accordingly
++	// distribute the data accordingly between the subnodes
+ 	Ogre::AxisAlignedBox aab;
+ 	for (std::vector&lt;TData&gt;::iterator it = mData.begin();
+ 		it != mData.end(); it++)
+ 	{
+-		aab = TNode::getAABB((*it));
+-		insert(aab,(*it));
++		insert((*it));
+ 	}
+ 	// simply erase the data here ...
+ 	mData.clear();
+@@ -298,7 +406,7 @@
+ {
+ 	if (mSubdivided)
+ 	{
+-		// try to add the data to any of the subnodes
++		// try to remove the data of any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+ 			if (mNodes[i]) 
+@@ -316,10 +424,10 @@
+ 	TLooseQuadTree* result = NULL;
+ 	if (mSubdivided)
+ 	{
+-		// try to add the data to any of the subnodes
++		// try to search for the data in any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+-			if (mNodes[i]) 
++			if (mNodes[i])
+ 			{
+ 				result = mNodes[i].find(position);
+ 				if (result)
+@@ -330,10 +438,6 @@
+ 	else
+ 	{
+ 		// check whether any of the 4 edges of the axisalignedbox are in the loose quad
+-		Ogre::Vector3 flb = aabb.getCorner(Ogre::AxisAlignedBox::FAR_LEFT_BOTTOM);
+-		//aabb.getCorner(Ogre::AxisAlignedBox::FAR_RIGHT_BOTTOM)
+-		//aabb.getCorner(Ogre::AxisAlignedBox::NEAR_LEFT_BOTTOM) 
+-		Ogre::Vector3 nrb = aabb.getCorner(Ogre::AxisAlignedBox::NEAR_RIGHT_BOTTOM);
+ 		if ( isUInside(position.x) &amp;&amp; isVInside(position.z) )
+ 		{
+ 			// if position is in the loose quad, return it
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000266.html">[Dsa-hl-svn] r3195 - rl/trunk/engine/core/include
+</A></li>
+	<LI>Next message: <A HREF="000268.html">[Dsa-hl-svn] r3197 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#267">[ date ]</a>
+              <a href="thread.html#267">[ thread ]</a>
+              <a href="subject.html#267">[ subject ]</a>
+              <a href="author.html#267">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

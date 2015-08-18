@@ -1,0 +1,524 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3865 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3865%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig&In-Reply-To=%3C200709231938.l8NJcjt2006318%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000935.html">
+   <LINK REL="Next"  HREF="000937.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3865 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3865%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig&In-Reply-To=%3C200709231938.l8NJcjt2006318%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3865 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep 23 21:38:45 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000935.html">[Dsa-hl-svn] r3864 - in modules: common/scripts	common/scripts/triggers regressiontest/maps
+</A></li>
+        <LI>Next message: <A HREF="000937.html">[Dsa-hl-svn] r3866 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#936">[ date ]</a>
+              <a href="thread.html#936">[ thread ]</a>
+              <a href="subject.html#936">[ subject ]</a>
+              <a href="author.html#936">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-23 21:38:22 +0200 (Sun, 23 Sep 2007)
+New Revision: 3865
+
+Added:
+   rl/trunk/engine/core/src/Trigger.cpp
+Modified:
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/Trigger.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/include/TriggerFactory.h
+   rl/trunk/engine/script/include/UnifiedFactory.h
+   rl/trunk/engine/script/src/ZoneProcessor.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlScript.swig
+Log:
+implemented triggers
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -901,6 +901,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\Trigger.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\World.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/Trigger.h
+===================================================================
+--- rl/trunk/engine/core/include/Trigger.h	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/core/include/Trigger.h	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -25,8 +25,33 @@
+ 	class _RlCoreExport Trigger : public PropertyHolder
+ 	{
+ 	public:
++        Trigger(const Ogre::String &amp;name);
++        virtual ~Trigger() {}
++        /**
++         * return true, if the trigger can be deleted after execution. 
++         * Using ZoneManager::destroyZone in this function is explicitly allowed 
++         * (and intended); the ZoneManager cares for deleted zones, while executing triggers!
++        */
+ 		virtual bool activate() = 0;
++        /**
++         * return true, if the trigger can be deleted after execution. 
++         * Using ZoneManager::destroyZone in this function is explicitly allowed 
++         * (and intended); the ZoneManager cares for deleted zones, while executing triggers!
++        */
+ 		virtual bool deactivate() = 0;
++        /**
++         * if the trigger should also be removed, if the corresponding zone is destroyd, return true
++         * 
++        */
++        virtual bool deleteIfZoneDestroyed() const {return true;}
++
++        const Ogre::String&amp; getName() const {return mName;}
++
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        virtual PropertySet* getAllProperties() const;
++    protected:
++        Ogre::String mName;
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/core/include/ZoneManager.h	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -19,6 +19,7 @@
+ #include &quot;CorePrerequisites.h&quot;
+ #include &quot;CoreDefines.h&quot;
+ #include &quot;GameAreaListener.h&quot;
++#include &quot;GameTask.h&quot;
+ 
+ namespace rl
+ {
+@@ -27,13 +28,15 @@
+ 
+     class _RlCoreExport ZoneManager : 
+         public Ogre::Singleton&lt;ZoneManager&gt;,
+-        public GameAreaListener
++        public GameAreaListener,
++        public GameTask // for deferred deletion of zones
+ 	{
+ 	public:
+ 		ZoneManager();
+ 		~ZoneManager();
+ 
+         Zone* createZone(const Ogre::String&amp; name);
++        /// only marks the zone for deferred deletion
+         void destroyZone(const Ogre::String&amp; name);
+         /// Adds a new area to the zone
+         void addAreaToZone(const Ogre::String&amp; name, 
+@@ -65,12 +68,19 @@
+ 		Zone* getZone(const Ogre::String&amp; name);
+         Zone* getZone(long id);
+ 
++        /// asks wether this zone is currently activated
++        bool isZoneActive(const Zone* zone) const;
++
+ 		void areaLeft(GameAreaEvent* gae);
+ 	    void areaEntered(GameAreaEvent* gae);
+ 
+         /// only needed if the lights/etc of the active zone changed
+         void update();
+-		
++
++        /// inherited from gametask, deletes zones marked for deletion
++        void run(Ogre::Real elapsedTime);
++        /// inherited from gametask
++        const Ogre::String&amp; getName() const;
+ 	private:
+ 		std::map&lt;const Ogre::String, Zone*&gt; mZones;
+         std::map&lt;long, Zone*&gt; mZonesIdMap;
+@@ -79,10 +89,15 @@
+         SoundMap mActiveSounds;
+ 		Zone* mDefaultZone;
+         long mNextZoneId;
++        std::list&lt;Zone*&gt; mZonesToDelete;
+ 
+ 		void switchLights();
+ 		void switchSounds();
+         void switchEaxSettings();
++        void zoneEntered(Zone * zone);
++        void zoneLeft(Zone * zone);
++        
++        void doDestroyZone(Zone *zone);
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -295,6 +295,7 @@
+         LOG_MESSAGE(Logger::CORE,&quot;JobScheduler erzeugt&quot;);
+ 
+ 		mZoneManager = new ZoneManager();
++        GameLoop::getSingleton().addTask(mZoneManager, GameLoop::TG_LOGIC);
+         LOG_MESSAGE(Logger::CORE,&quot;ZoneManager erzeugt&quot;);
+ 
+ 		new meshmagick::OgreEnvironment();
+
+Added: rl/trunk/engine/core/src/Trigger.cpp
+===================================================================
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -26,6 +26,7 @@
+ #include &quot;Sound.h&quot;
+ #include &quot;SoundManager.h&quot;
+ #include &quot;SoundDriver.h&quot;
++#include &quot;Trigger.h&quot;
+ 
+ 
+ using namespace Ogre;
+@@ -36,7 +37,8 @@
+ namespace rl
+ {
+ 	ZoneManager::ZoneManager()
+-		: Ogre::Singleton&lt;ZoneManager&gt;()
++		: Ogre::Singleton&lt;ZoneManager&gt;(),
++        GameTask(false)
+ 	{
+ 		// the default zone is active when no other Zone is active
+ 		mDefaultZone = new Zone(0);
+@@ -103,6 +105,23 @@
+         if(zone == NULL)
+             return;
+ 
++        // remove from active zones
++        if( isZoneActive(zone) )
++            mActiveZones.remove(zone);
++
++        std::map&lt;const Ogre::String, Zone*&gt;::iterator it = mZones.find(name);
++        if( it != mZones.end() )
++            mZones.erase(it);
++
++        std::map&lt;long, Zone*&gt;::iterator it_ = mZonesIdMap.find(zone-&gt;getId());
++        if( it_ != mZonesIdMap.end() )
++            mZonesIdMap.erase(it_);
++
++        mZonesToDelete.push_back(zone);
++    }
++
++    void ZoneManager::doDestroyZone(Zone *zone)
++    {
+         //destroy all areas
+         GameAreaEventSourceList::iterator iter = zone-&gt;getEventSources().begin();
+         for( ; iter != zone-&gt;getEventSources().end(); iter++ )
+@@ -113,17 +132,42 @@
+                 (*iter));
+         }
+ 
+-        std::map&lt;const Ogre::String, Zone*&gt;::iterator it = mZones.find(name);
+-        if( it != mZones.end() )
+-            mZones.erase(it);
++        // ask all triggers if they want to be deleted
++        std::list&lt;Trigger*&gt; triggerList = zone-&gt;getTriggers();
++        std::list&lt;Trigger*&gt;::iterator trig = triggerList.begin();
++        for( ; trig != triggerList.end(); trig++ )
++        {
++            if( (*trig)-&gt;deleteIfZoneDestroyed() )
++                delete (*trig);
++        }
+ 
+-        std::map&lt;long, Zone*&gt;::iterator it_ = mZonesIdMap.find(zone-&gt;getId());
+-        if( it_ != mZonesIdMap.end() )
+-            mZonesIdMap.erase(it_);
+-
+         delete zone;
+     }
+ 
++    const Ogre::String&amp; ZoneManager::getName() const
++    {
++        static Ogre::String NAME = &quot;ZoneManager&quot;;
++
++        return NAME;
++    }
++
++    void ZoneManager::run(Ogre::Real elapsedTime)
++    {
++        std::list&lt;Zone*&gt;::iterator it = mZonesToDelete.begin();
++        for( ; it != mZonesToDelete.end(); it++)
++            doDestroyZone(*it);
++        mZonesToDelete.clear();
++    }
++
++    bool ZoneManager::isZoneActive(const Zone *zone) const
++    {
++        if( zone == NULL )
++            return false;
++
++        std::list&lt;Zone*&gt;::const_iterator iter = std::find(mActiveZones.begin(), mActiveZones.end(), zone);
++        return iter != mActiveZones.end();
++    }
++
+     void ZoneManager::addAreaToZone(const Ogre::String&amp; name, 
+         AxisAlignedBox aabb, GeometryType geom,
+         Vector3 position, Vector3 offset, Quaternion orientation,
+@@ -225,13 +269,13 @@
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+-                    mActiveZones.remove(zone);
++                    zoneLeft(zone);
+             }
+             else
+             {
+                 Zone *zone = getZone(-id); // means we have to subtract this area from the zone
+                 if( zone )
+-                    mActiveZones.push_front(zone);
++                    zoneEntered(zone);
+             }
+ 
+ 		    update();
+@@ -247,19 +291,55 @@
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+-                    mActiveZones.push_front(zone);
++                    zoneEntered(zone);
+             }
+             else
+             {
+                 Zone *zone = getZone(-id); // means we have to subtract this area from the zone
+                 if( zone )
+-                    mActiveZones.remove(zone);
++                    zoneLeft(zone);
+             }
+ 
+ 		    update();
+         }
+ 	}
+ 
++    void ZoneManager::zoneEntered(Zone *zone)
++    {
++        // perhaps the trigger destroys the zone, so we should put the zone in the list, before the triggers does so
++        mActiveZones.push_front(zone);
++
++        std::list&lt;Trigger*&gt; triggerList = zone-&gt;getTriggers();
++        std::list&lt;Trigger*&gt;::iterator iter = triggerList.begin();
++
++        for( ; iter != triggerList.end(); iter++)
++        {
++            if( (*iter)-&gt;activate() )
++            {
++                zone-&gt;removeTrigger(*iter);
++                delete (*iter);                
++            }
++        }
++    }
++
++    void ZoneManager::zoneLeft(Zone *zone)
++    {
++        // perhaps the trigger destroys the zone, so we should put the zone in the list, before the triggers does so
++        mActiveZones.remove(zone);
++
++        std::list&lt;Trigger*&gt; triggerList = zone-&gt;getTriggers();
++        std::list&lt;Trigger*&gt;::iterator iter = triggerList.begin();
++
++        for( ; iter != triggerList.end(); iter++)
++        {
++            if( (*iter)-&gt;deactivate() )
++            {
++                zone-&gt;removeTrigger(*iter);
++                delete (*iter);                
++            }
++        }
++    }
++
+     void ZoneManager::update()
+     {
+         switchLights();
+
+Modified: rl/trunk/engine/script/include/TriggerFactory.h
+===================================================================
+--- rl/trunk/engine/script/include/TriggerFactory.h	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/script/include/TriggerFactory.h	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -26,7 +26,7 @@
+ 	{
+ 	public:
+ 		virtual ~TriggerFactory() {}
+-		virtual Trigger* createTrigger(const Ogre::String&amp; classname) = 0;
++        virtual Trigger* createTrigger(const Ogre::String&amp; classname, const Ogre::String&amp; triggername) = 0;
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/script/include/UnifiedFactory.h
+===================================================================
+--- rl/trunk/engine/script/include/UnifiedFactory.h	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/script/include/UnifiedFactory.h	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -33,7 +33,7 @@
+     public:
+         virtual ~UnifiedFactory() {}
+ 
+-		virtual Trigger* createTrigger(const Ogre::String&amp; classname) = 0;
++        virtual Trigger* createTrigger(const Ogre::String&amp; classname, const Ogre::String&amp; name) = 0;
+         virtual Effect* createEffect(const Ogre::String&amp; name, int stufe) = 0;
+         virtual GameObject* createRubyGameObject(const Ogre::String&amp; classname, unsigned int id) = 0;
+         virtual SteeringBehaviour* createBehaviour(const Ogre::String&amp; classname) = 0;
+
+Modified: rl/trunk/engine/script/src/ZoneProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -182,10 +182,26 @@
+ 									Ogre::String classname =
+ 										getAttributeValueAsStdString(curElem, &quot;classname&quot;);
+ 
++									Ogre::String name =
++										getAttributeValueAsStdString(curElem, &quot;name&quot;);
++
+ 									Trigger* trigger = ScriptSubsystem::getSingleton().getTriggerFactory()
+-										-&gt;createTrigger(classname);
++										-&gt;createTrigger(classname, name);
+ 
+-									///@todo trigger properties
++                                    // add trigger properties
++                                    for( DOMNode* curProperty = cur-&gt;getFirstChild(); curProperty != NULL; curProperty = curProperty-&gt;getNextSibling() )
++                                    {
++                                        if( hasNodeName(curProperty, &quot;property&quot;) )
++                                        {
++                                            PropertyEntry propEntry = processProperty(static_cast&lt;DOMElement*&gt;(curProperty));
++                                            if (propEntry.first != &quot;&quot;)
++                                            {
++                                                trigger-&gt;setProperty(propEntry.first, propEntry.second);
++                                            }
++                                        }
++                                    }
++
++                                    zone-&gt;addTrigger(trigger);
+ 								}
+                                 else if (hasNodeName(curElem, &quot;eaxpreset&quot;))
+                                 {
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -893,13 +893,13 @@
+ public:
+ 	void addLight(Actor* light);
+     void addSound(const Ogre::String&amp; name);
+-	//void addTrigger(Trigger* trigger);
++	void addTrigger(rl::Trigger* trigger);
+ 	std::list&lt;Actor*&gt; getLights() const;
+     std::list&lt;Ogre::String&gt; getSounds() const;
+-	//std::list&lt;Trigger*&gt; getTriggers() const;
++	std::list&lt;rl::Trigger*&gt; getTriggers() const;
+     void removeLight(Actor* light);
+     void removeSound(const Ogre::String&amp; name);
+-    //void removeTrigger(Trigger* trigger);
++    void removeTrigger(rl::Trigger* trigger);
+ protected:
+     Zone(long id);
+ private:
+@@ -943,17 +943,22 @@
+ 	rl::Zone* getDefaultZone();
+ 	rl::Zone* getZone(const Ogre::String&amp; name);
+     rl::Zone* getZone(long id);
++    bool isZoneActive(const rl::Zone *zone) const;
+ };
+ 
++%feature(&quot;director&quot;) Trigger;
+ class  Trigger
+ {
+ public:
++    Trigger(const Ogre::String &amp;name);
++    virtual ~Trigger();
+ 	virtual bool activate() = 0;
+ 	virtual bool deactivate() = 0;
+-	virtual const rl::Property getProperty(const Ogre::String&amp; key) const = 0;
+-    virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value) = 0;
+-    virtual rl::PropertySet* getAllProperties() const = 0;
+-    virtual void setProperties(const rl::PropertySet* props);
++	virtual bool deleteIfZoneDestroyed() const;
++	const Ogre::String&amp; getName() const;
++    virtual const rl::Property getProperty(const Ogre::String&amp; key) const;
++    virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value);
++    virtual rl::PropertySet* getAllProperties() const;
+ };
+ 
+ class SoundFadeJob : public rl::Job
+
+Modified: rl/trunk/engine/script/swig/RlScript.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlScript.swig	2007-09-23 19:35:37 UTC (rev 3864)
++++ rl/trunk/engine/script/swig/RlScript.swig	2007-09-23 19:38:22 UTC (rev 3865)
+@@ -38,7 +38,7 @@
+ 	{
+ 	public:
+ 		virtual ~TriggerFactory();
+-		virtual rl::Trigger* createTrigger(const Ogre::String&amp; classname) = 0;
++		virtual rl::Trigger* createTrigger(const Ogre::String&amp; classname, const Ogre::String&amp; triggername) = 0;
+ 	};
+ 
+ 	%feature(&quot;director&quot;) UnifiedFactory;    
+@@ -51,7 +51,7 @@
+     public:
+         virtual ~UnifiedFactory() {}
+ 
+-		virtual rl::Trigger* createTrigger(const Ogre::String&amp; classname) = 0;
++		virtual rl::Trigger* createTrigger(const Ogre::String&amp; classname, const Ogre::String&amp; triggername) = 0;
+         virtual rl::Effect* createEffect(const Ogre::String&amp; name, int stufe) = 0;
+         virtual rl::GameObject* createRubyGameObject(const Ogre::String&amp; classname, unsigned int id) = 0;
+         virtual rl::SteeringBehaviour* createBehaviour(const Ogre::String&amp; classname) = 0;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000935.html">[Dsa-hl-svn] r3864 - in modules: common/scripts	common/scripts/triggers regressiontest/maps
+</A></li>
+	<LI>Next message: <A HREF="000937.html">[Dsa-hl-svn] r3866 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#936">[ date ]</a>
+              <a href="thread.html#936">[ thread ]</a>
+              <a href="subject.html#936">[ subject ]</a>
+              <a href="author.html#936">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

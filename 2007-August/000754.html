@@ -1,0 +1,455 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3683 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3683%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708122051.l7CKpc2U003605%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000753.html">
+   <LINK REL="Next"  HREF="000755.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3683 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3683%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708122051.l7CKpc2U003605%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3683 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Aug 12 22:51:38 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000753.html">[Dsa-hl-svn] r3682 - in rl/trunk/engine/ai: include src
+</A></li>
+        <LI>Next message: <A HREF="000755.html">[Dsa-hl-svn] r3684 - dependencies/opensteer/include/OpenSteer	dependencies/opensteer/plugins dependencies/opensteer/src	modules/aitest/scripts rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#754">[ date ]</a>
+              <a href="thread.html#754">[ thread ]</a>
+              <a href="subject.html#754">[ subject ]</a>
+              <a href="author.html#754">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-12 22:51:30 +0200 (Sun, 12 Aug 2007)
+New Revision: 3683
+
+Modified:
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+pnyx idea for movementcontroller-mode (VM_PNYX_MODE) 4xf to active ingame, simple movements for testing (no jumps etc)
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2007-08-12 11:04:59 UTC (rev 3682)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2007-08-12 20:51:30 UTC (rev 3683)
+@@ -45,7 +45,7 @@
+         public DebugVisualisable
+     {
+     public:
+-        typedef enum {VM_THIRD_PERSON, VM_FIRST_PERSON, VM_FREE_CAMERA} ViewMode;
++        typedef enum {VM_THIRD_PERSON, VM_FIRST_PERSON, VM_FREE_CAMERA, VM_PNYX_MODE} ViewMode;
+         /**
+          *  @throw NullPointerException if camera or character is NULL.
+          *  @throw InvalidArgumentException if character is not placed in the scene.
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-12 11:04:59 UTC (rev 3682)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-12 20:51:30 UTC (rev 3683)
+@@ -301,119 +301,183 @@
+             Real baseVelocity = 0;
+             if( drehen-&gt;calculateBaseVelocity(baseVelocity) )
+             {
+-                Degree baseVel(baseVelocity*360);
+-                if (movement &amp; TURN_LEFT)
+-                    rotation = elapsedTime * baseVel;
+-                if (movement &amp; TURN_RIGHT)
+-                    rotation = -elapsedTime * baseVel;
+-
+-                // mouse
+-                if( !isCeguiActive() &amp;&amp; mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
++                if( !(movement &amp; MOVE_RIGHT || movement &amp; MOVE_LEFT) )
+                 {
+-                    if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
++                    Degree baseVel(baseVelocity*360);
++                    if( mViewMode != VM_PNYX_MODE )
+                     {
+-                        rotation = -mMouseSensitivity/3.0f * Degree(im-&gt;getMouseRelativeX())/200.0 * baseVel;
++                        if (movement &amp; TURN_LEFT)
++                            rotation = elapsedTime * baseVel;
++                        if (movement &amp; TURN_RIGHT)
++                            rotation = -elapsedTime * baseVel;
+                     }
++
++                    // mouse
++                    if( !isCeguiActive() &amp;&amp; mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
++                    {
++                        if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
++                        {
++                            rotation = -mMouseSensitivity/3.0f * Degree(im-&gt;getMouseRelativeX())/200.0 * baseVel;
++                        }
++                    }
+                 }
+ 
+ 
+-                // virtual yaw
+-                Degree newVirtualYaw(0);
+-                if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) ||
+-                    ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) )
++                if( mViewMode != VM_PNYX_MODE )
+                 {
+-                    newVirtualYaw = Degree(45);
++                    // virtual yaw
++                    Degree newVirtualYaw(0);
++                    if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) ||
++                        ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) )
++                    {
++                        newVirtualYaw = Degree(45);
++                    }
++                    if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) ||
++                        ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) )
++                    {
++                        newVirtualYaw = Degree(-45);
++                    }
++                    if( mCamVirtualYaw != newVirtualYaw )
++                    {
++                        rotation += mCamVirtualYaw - newVirtualYaw;
++                        mCamVirtualYaw = newVirtualYaw;
++                    }
+                 }
+-                if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) ||
+-                    ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) )
+-                {
+-                    newVirtualYaw = Degree(-45);
+-                }
+-                if( mCamVirtualYaw != newVirtualYaw )
+-                {
+-                    rotation += mCamVirtualYaw - newVirtualYaw;
+-                    mCamVirtualYaw = newVirtualYaw;
+-                }
+             }
+ 
+ 
+ 
+-            if( movement &amp; MOVE_SNEAK )
++            if( mViewMode != VM_PNYX_MODE )
+             {
+-                Vector3 direction(Vector3::ZERO);
+-                if (movement &amp; MOVE_FORWARD)
+-                    direction.z = -1;
+-                else if( movement &amp; MOVE_BACKWARD)
+-                    direction.z = 1;
+-                mController-&gt;setMovement(
+-                    CreatureController::MT_SCHLEICHEN,
+-                    direction,
+-                    Vector3(0, rotation.valueRadians(), 0) );
+-            }
+-            else if( movement &amp; MOVE_JUMP &amp;&amp; 
+-                mController-&gt;getMovementFromId(CreatureController::MT_HOCHSPRUNG)-&gt;isPossible() )
+-            {
+-                CreatureController::MovementType type = CreatureController::MT_HOCHSPRUNG;
+-                Vector3 direction = Vector3::UNIT_Y;
+-                if( movement &amp; MOVE_FORWARD )
++                if( movement &amp; MOVE_SNEAK )
+                 {
+-                    type = CreatureController::MT_WEITSPRUNG;
+-                    direction += Vector3::NEGATIVE_UNIT_Z;
++                    Vector3 direction(Vector3::ZERO);
++                    if (movement &amp; MOVE_FORWARD)
++                        direction.z = -1;
++                    else if( movement &amp; MOVE_BACKWARD)
++                        direction.z = 1;
++                    mController-&gt;setMovement(
++                        CreatureController::MT_SCHLEICHEN,
++                        direction,
++                        Vector3(0, rotation.valueRadians(), 0) );
+                 }
+-                mController-&gt;setMovement(
+-                    type,
+-                    direction,
+-                    Vector3(0, rotation.valueRadians(), 0) );
+-            }
+-            else if( movement &amp; MOVE_FORWARD )
+-            {
+-                CreatureController::MovementType type = CreatureController::MT_GEHEN;
+-                if( movement &amp; MOVE_RUN_LOCK )
++                else if( movement &amp; MOVE_JUMP &amp;&amp; 
++                    mController-&gt;getMovementFromId(CreatureController::MT_HOCHSPRUNG)-&gt;isPossible() )
+                 {
+-                    if( movement &amp; MOVE_RUN )
+-                        type = CreatureController::MT_RENNEN;
++                    CreatureController::MovementType type = CreatureController::MT_HOCHSPRUNG;
++                    Vector3 direction = Vector3::UNIT_Y;
++                    if( movement &amp; MOVE_FORWARD )
++                    {
++                        type = CreatureController::MT_WEITSPRUNG;
++                        direction += Vector3::NEGATIVE_UNIT_Z;
++                    }
++                    mController-&gt;setMovement(
++                        type,
++                        direction,
++                        Vector3(0, rotation.valueRadians(), 0) );
++                }
++                else if( movement &amp; MOVE_FORWARD )
++                {
++                    CreatureController::MovementType type = CreatureController::MT_GEHEN;
++                    if( movement &amp; MOVE_RUN_LOCK )
++                    {
++                        if( movement &amp; MOVE_RUN )
++                            type = CreatureController::MT_RENNEN;
++                        else
++                            type = CreatureController::MT_LAUFEN;
++                    }
+                     else
+-                        type = CreatureController::MT_LAUFEN;
++                    {
++                        if( movement &amp; MOVE_RUN )
++                            type = CreatureController::MT_GEHEN;
++                        else
++                            type = CreatureController::MT_JOGGEN;
++                    }
++                    mController-&gt;setMovement(
++                        type,
++                        Vector3(0,0,-1), 
++                        Vector3(0, rotation.valueRadians(), 0) );
+                 }
++                else if (movement &amp; MOVE_BACKWARD )
++                {
++                    CreatureController::MovementType type = CreatureController::MT_RUECKWAERTS_GEHEN;
++                    if( !(movement &amp; MOVE_RUN) )
++                        type = CreatureController::MT_RUECKWAERTS_JOGGEN;
++                    mController-&gt;setMovement(
++                        type,
++                        Vector3(0,0,1), 
++                        Vector3(0, rotation.valueRadians(), 0) );
++                }
++                else if (movement &amp; MOVE_LEFT || movement &amp; MOVE_RIGHT)
++                {
++                    Vector3 direction = Vector3::UNIT_X;
++                    if( movement &amp; MOVE_LEFT )
++                        direction = Vector3::NEGATIVE_UNIT_X;
++                    mController-&gt;setMovement(
++                        CreatureController::MT_SEITWAERTS_GEHEN,
++                        direction, 
++                        Vector3(0, rotation.valueRadians(), 0) );
++                }
+                 else
+                 {
+-                    if( movement &amp; MOVE_RUN )
+-                        type = CreatureController::MT_GEHEN;
+-                    else
+-                        type = CreatureController::MT_JOGGEN;
++                    mController-&gt;setMovement(
++                        CreatureController::MT_STEHEN, 
++                        Vector3(0,0,0),
++                        Vector3(0, rotation.valueRadians(), 0) );
+                 }
+-                mController-&gt;setMovement(
+-                    type,
+-                    Vector3(0,0,-1), 
+-                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-            else if (movement &amp; MOVE_BACKWARD )
++            else // VM_PNYX_MODE
+             {
+-                CreatureController::MovementType type = CreatureController::MT_RUECKWAERTS_GEHEN;
+-                if( !(movement &amp; MOVE_RUN) )
+-                    type = CreatureController::MT_RUECKWAERTS_JOGGEN;
+-                mController-&gt;setMovement(
+-                    type,
+-                    Vector3(0,0,1), 
+-                    Vector3(0, rotation.valueRadians(), 0) );
++                // turn to the direction entered
++                if( movement &amp; MOVE_FORWARD || movement &amp; MOVE_BACKWARD || movement &amp; MOVE_LEFT || movement &amp; MOVE_RIGHT )
++                {
++                    // direction to turn to
++                    int direction = movement &amp; (MOVE_FORWARD | MOVE_BACKWARD | MOVE_RIGHT | MOVE_LEFT);
++                    Degree yaw(0);
++                    switch(direction)
++                    {
++                    case MOVE_FORWARD:
++                        yaw = Degree(0);
++                        break;
++                    case MOVE_FORWARD | MOVE_LEFT:
++                        yaw = Degree(45);
++                        break;
++                    case MOVE_FORWARD | MOVE_RIGHT:
++                        yaw = Degree(-45);
++                        break;
++                    case MOVE_RIGHT:
++                        yaw = Degree(-90);
++                        break;
++                    case MOVE_LEFT:
++                        yaw = Degree(90);
++                        break;
++                    case MOVE_BACKWARD:
++                        yaw = Degree(180);
++                        break;
++                    case MOVE_BACKWARD | MOVE_LEFT:
++                        yaw = Degree(-225);
++                        break;
++                    case MOVE_BACKWARD | MOVE_RIGHT:
++                        yaw = Degree(225);
++                        break;
++                    default:
++                        break;
++                    }
++                    yaw+=mCamYaw;
++                    mController-&gt;setMovement(
++                        CreatureController::MT_JOGGEN,
++                        Vector3::NEGATIVE_UNIT_Z,
++                        Vector3::UNIT_Y * (yaw-mController-&gt;getYaw()).valueRadians());
++                }
++                else
++                {
++                    // don't move
++                    mController-&gt;setMovement(
++                        CreatureController::MT_STEHEN,
++                        Vector3::ZERO,
++                        Vector3::ZERO);
++                }
+             }
+-            else if (movement &amp; MOVE_LEFT || movement &amp; MOVE_RIGHT)
+-            {
+-                Vector3 direction = Vector3::UNIT_X;
+-                if( movement &amp; MOVE_LEFT )
+-                    direction = Vector3::NEGATIVE_UNIT_X;
+-                mController-&gt;setMovement(
+-                    CreatureController::MT_SEITWAERTS_GEHEN,
+-                    direction, 
+-                    Vector3(0, rotation.valueRadians(), 0) );
+-            }
+-            else
+-            {
+-                mController-&gt;setMovement(
+-                    CreatureController::MT_STEHEN, 
+-                    Vector3(0,0,0),
+-                    Vector3(0, rotation.valueRadians(), 0) );
+-            }
+         }
+     }
+ 
+@@ -433,7 +497,7 @@
+             mDesiredDistance = mDistanceRange.second;
+         }
+ 
+-        if( !isCeguiActive() &amp;&amp; mViewMode == VM_FREE_CAMERA )
++        if( !isCeguiActive() &amp;&amp; mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE )
+         {
+             mCamYaw -= 2 * mMouseSensitivity / 4.0 * mRotationSpeed * Degree(im-&gt;getMouseRelativeX() / 15);
+ 
+@@ -476,7 +540,7 @@
+                 Node::TS_WORLD);
+ 
+         }
+-        else if( mViewMode == VM_FREE_CAMERA )
++        else if( mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE )
+         {
+             cameraNode-&gt;lookAt(
+                 charPos + charOri * virtualCamOri * mLookAtOffset,
+@@ -595,7 +659,7 @@
+ 
+ 
+ 
+-        if (mViewMode == VM_THIRD_PERSON || mViewMode == VM_FREE_CAMERA )
++        if (mViewMode == VM_THIRD_PERSON || mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE)
+         {
+ 
+             // wir machen ein paar Raycasts um herauszufinden, ob wir von der jetzigen Position
+@@ -797,13 +861,24 @@
+ 
+ 
+ 
+-        if( mViewMode == VM_THIRD_PERSON || mViewMode == VM_FREE_CAMERA )
++        if( mViewMode == VM_THIRD_PERSON || mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE)
+         {
+             charPos = charPos + charOri * mLookAtOffset;
+-            if(mViewMode == VM_THIRD_PERSON)
++            if(mViewMode == VM_PNYX_MODE)
+             {
++                Quaternion camOri;
++                camOri.FromAngleAxis(mCamYaw, Vector3::UNIT_Y);
+                 targetCamPos =
+                     charPos
++                    + camOri * virtualCamOri * Vector3(
++                                                0,
++                                                Math::Sin(mPitch) * mDesiredDistance,
++                                                Math::Cos(mPitch) * mDesiredDistance);
++            }
++            else if(mViewMode == VM_THIRD_PERSON)
++            {
++                targetCamPos =
++                    charPos
+                     + charOri * virtualCamOri * Vector3(
+                                     0,
+                                     Math::Sin(mPitch) * mDesiredDistance,
+@@ -1040,7 +1115,7 @@
+             LOG_MESSAGE(Logger::UI, &quot;Switch to 3rd person view&quot;);
+             resetCamera();
+         }
+-        else // mode == VM_FREE_CAMERA
++        else if(mode == VM_FREE_CAMERA)
+         {
+             mLookAtOffset = Vector3(0, (aabb.getMaximum() - aabb.getMinimum()).y * 0.80f, 0);
+             mDistanceRange.first = 0.60;
+@@ -1053,6 +1128,19 @@
+             LOG_MESSAGE(Logger::UI, &quot;Switch to free camera view&quot;);
+             resetCamera();
+         }
++        else // mode == VM_PNYX_MODE
++        {
++            mLookAtOffset = Vector3(0, (aabb.getMaximum() - aabb.getMinimum()).y * 0.80f, 0);
++            mDistanceRange.first = 0.60;
++            mDistanceRange.second = 7.00;
++            mDesiredDistance = 2.5;
++            mPitchRange.first = Degree(-75);
++            mPitchRange.second = Degree(85);
++            mPitch = Degree(30);
++            mCamYaw = mCharacter-&gt;getActor()-&gt;getWorldOrientation().getYaw();
++            LOG_MESSAGE(Logger::UI, &quot;Switch to pnyx mode movementcontroller&quot;);
++            resetCamera();
++        }
+     }
+ 
+     //------------------------------------------------------------------------
+@@ -1105,6 +1193,8 @@
+             setViewMode(VM_FIRST_PERSON);
+         else if(getViewMode() == VM_FIRST_PERSON)
+             setViewMode(VM_FREE_CAMERA);
++        else if(getViewMode() == VM_FREE_CAMERA)
++            setViewMode(VM_PNYX_MODE);
+         else
+             setViewMode(VM_THIRD_PERSON);
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000753.html">[Dsa-hl-svn] r3682 - in rl/trunk/engine/ai: include src
+</A></li>
+	<LI>Next message: <A HREF="000755.html">[Dsa-hl-svn] r3684 - dependencies/opensteer/include/OpenSteer	dependencies/opensteer/plugins dependencies/opensteer/src	modules/aitest/scripts rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#754">[ date ]</a>
+              <a href="thread.html#754">[ thread ]</a>
+              <a href="subject.html#754">[ subject ]</a>
+              <a href="author.html#754">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

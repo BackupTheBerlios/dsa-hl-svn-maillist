@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3307 - modules/common/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3307%20-%20modules/common/scripts&In-Reply-To=%3C200704181448.l3IEmeTL023663%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000376.html">
+   <LINK REL="Next"  HREF="000378.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3307 - modules/common/scripts</H1>
+    <B>vincent22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3307%20-%20modules/common/scripts&In-Reply-To=%3C200704181448.l3IEmeTL023663%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3307 - modules/common/scripts">vincent22 at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 18 16:48:40 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000376.html">[Dsa-hl-svn] r3306 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="000378.html">[Dsa-hl-svn] r3308 - rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#377">[ date ]</a>
+              <a href="thread.html#377">[ thread ]</a>
+              <a href="subject.html#377">[ subject ]</a>
+              <a href="author.html#377">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: vincent22
+Date: 2007-04-18 16:48:38 +0200 (Wed, 18 Apr 2007)
+New Revision: 3307
+
+Added:
+   modules/common/scripts/gameobjectprops.rb
+Modified:
+   modules/common/scripts/door.rb
+Log:
+Neues Ruby Modul GameObjectProperties um den generischen Zugriff auf alle Properties eines GOs zu erm?\195?\182glichen. ?\195?\132ndern der Namen der Properties in Door, um sie als Property zu kennzeichnen. Namenskonvention: Property-Member starten mit @_prop_
+
+Modified: modules/common/scripts/door.rb
+===================================================================
+--- modules/common/scripts/door.rb	2007-04-18 14:45:08 UTC (rev 3306)
++++ modules/common/scripts/door.rb	2007-04-18 14:48:38 UTC (rev 3307)
+@@ -2,6 +2,7 @@
+ #require 'actorupdateanimationlistener.rb'
+ require 'jobs/soundjobs.rb'
+ require 'jobs/animationjobs.rb'
++require 'gameobjectprops.rb'
+ 
+ class OpenDoorAction &lt; Action
+   def initialize
+@@ -49,17 +50,19 @@
+ 
+ class Door &lt; GameObject
+   
++  include GameObjectProperties
++  
+   def initialize(id)
+     super(id);
+   end
+ 
+   def setProperty(name, value)
+     if (name == &quot;sound&quot;)
+-      @mSound = value;
++      @_prop_Sound = value;
+     elsif (name == &quot;open&quot;)
+-      @mOpen = value;
++      @_prop_Open = value;
+     elsif (name == &quot;openable&quot;)
+-      @mCanBeOpened = value;
++      @_prop_CanBeOpened = value;
+     else
+       super(name, value)
+     end
+@@ -73,31 +76,31 @@
+   def addActions()
+     @mOpenAction = OpenDoorAction.new()
+     @mCloseAction = CloseDoorAction.new()
+-    if (@mCanBeOpened)
+-    	addAction(@mOpenAction);
+-    	addAction(@mCloseAction);
++    if (@_prop_CanBeOpened)
++        addAction(@mOpenAction);
++        addAction(@mCloseAction);
+     else
+-    	addAction(@mOpenAction, Action::ACT_DISABLED);
+-    	addAction(@mCloseAction, Action::ACT_DISABLED);
++        addAction(@mOpenAction, Action::ACT_DISABLED);
++        addAction(@mCloseAction, Action::ACT_DISABLED);
+     end
+ 
+-    doAction(&quot;opendoor&quot;) unless not @mOpen
++    doAction(&quot;opendoor&quot;) unless not @_prop_Open
+   end
+   
+   def setOpen(isOpen)
+-    @mOpen = isOpen
++    @_prop_Open = isOpen
+     fireObjectStateChangeEvent();
+   end
+   
+   def isOpen()
+-    @mOpen
++    @_prop_Open
+   end
+   
+   def getDefaultAction(actor)
+-     if (not @mCanBeOpened)
++     if (not @_prop_CanBeOpened)
+        super(actor)
+      else
+-       if (@mOpen)
++       if (@_prop_Open)
+          @mCloseAction
+        else
+          @mOpenAction
+
+Added: modules/common/scripts/gameobjectprops.rb
+===================================================================
+--- modules/common/scripts/gameobjectprops.rb	2007-04-18 14:45:08 UTC (rev 3306)
++++ modules/common/scripts/gameobjectprops.rb	2007-04-18 14:48:38 UTC (rev 3307)
+@@ -0,0 +1,29 @@
++load &quot;embed.rb&quot;
++
++module GameObjectProperties
++  
++    def getAllProperties()
++        #  Get all properties from the parent C++ class
++        ps = PropertySet.new
++        ps = super.getAllProperties()
++    
++        #  Get all instance variables from the ruby class
++        aPropArray = instance_variables
++    
++        # For every variable check if it is a property
++        for aPropertyName in aPropArray
++            if aPropertyName =~ /^@_prop_/
++                # Get the value of the variable
++                aPropertyValue = instance_variable_get(aPropertyName)      
++                $SCRIPT.log(&quot;Property &lt;&quot; + &quot;#{$'}&quot; + &quot;,&quot; + 
++                    instance_variable_get(aPropertyName).to_s + &quot;&gt; added to PropertySet&quot;);
++          
++                # Add property to the property set
++                #newProp = Property.new(aPropertyValue)
++                #ps.setProperty(&quot;#{$'}&quot;, newProp)
++            end
++        end
++        return ps
++    end
++  
++end
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000376.html">[Dsa-hl-svn] r3306 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="000378.html">[Dsa-hl-svn] r3308 - rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#377">[ date ]</a>
+              <a href="thread.html#377">[ thread ]</a>
+              <a href="subject.html#377">[ subject ]</a>
+              <a href="author.html#377">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

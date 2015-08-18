@@ -1,0 +1,1932 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2999 - in rl/trunk: . engine/common/include	engine/common/src engine/core/include engine/core/src	engine/rules/include engine/startup/src engine/ui/src m4
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2999%20-%20in%20rl/trunk%3A%20.%20engine/common/include%0A%09engine/common/src%20engine/core/include%20engine/core/src%0A%09engine/rules/include%20engine/startup/src%20engine/ui/src%20m4&In-Reply-To=%3C200701221249.l0MCnqQh022966%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000069.html">
+   <LINK REL="Next"  HREF="000071.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2999 - in rl/trunk: . engine/common/include	engine/common/src engine/core/include engine/core/src	engine/rules/include engine/startup/src engine/ui/src m4</H1>
+    <B>chrber at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2999%20-%20in%20rl/trunk%3A%20.%20engine/common/include%0A%09engine/common/src%20engine/core/include%20engine/core/src%0A%09engine/rules/include%20engine/startup/src%20engine/ui/src%20m4&In-Reply-To=%3C200701221249.l0MCnqQh022966%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2999 - in rl/trunk: . engine/common/include	engine/common/src engine/core/include engine/core/src	engine/rules/include engine/startup/src engine/ui/src m4">chrber at mail.berlios.de
+       </A><BR>
+    <I>Mon Jan 22 13:49:52 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000069.html">[Dsa-hl-svn] r2998 - modules/regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="000071.html">[Dsa-hl-svn] r3000 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#70">[ date ]</a>
+              <a href="thread.html#70">[ thread ]</a>
+              <a href="subject.html#70">[ subject ]</a>
+              <a href="author.html#70">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: chrber
+Date: 2007-01-22 13:49:50 +0100 (Mon, 22 Jan 2007)
+New Revision: 2999
+
+Removed:
+   rl/trunk/engine/core/src/ConfigurationManagerLinux.cpp
+   rl/trunk/engine/core/src/ConfigurationManagerMac.cpp
+   rl/trunk/engine/core/src/ConfigurationManagerWin32.cpp
+Modified:
+   rl/trunk/configure.in
+   rl/trunk/engine/common/include/Logger.h
+   rl/trunk/engine/common/src/Logger.cpp
+   rl/trunk/engine/common/src/Makefile.am
+   rl/trunk/engine/common/src/XmlErrorHandler.cpp
+   rl/trunk/engine/core/include/ConfigurationManager.h
+   rl/trunk/engine/core/include/Makefile.am
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/Makefile.am
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/startup/src/RastullahMain.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+   rl/trunk/m4/boost.m4
+   rl/trunk/rastullah.conf.in
+Log:
+Removed the need for different ConfigurationManager implementations
+Restructured the ConfigurationManager so that multiple configuration files can be loaded
+Added boost::filesystem to be able to create directories and check for existence of files and directories
+Support for up to three variables in the configuration file
+Corrected newline warnings in some files
+
+
+Modified: rl/trunk/configure.in
+===================================================================
+--- rl/trunk/configure.in	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/configure.in	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -107,12 +107,12 @@
+ fi
+ 
+ # Ogre
+-PKG_CHECK_MODULES(OGRE, OGRE &gt;= 1.2.0)
++PKG_CHECK_MODULES(OGRE, OGRE &gt;= 1.3.0)
+ AC_ARG_WITH(ogre-plugins,[  --with-ogre-plugins=path        Set location of Ogre plugins],[ OGRE_PLUGINDIR=&quot;$withval&quot;], [OGRE_PLUGINDIR=/usr/local/lib/OGRE])
+ AC_SUBST(OGRE_PLUGINDIR)
+ 
+ # CEGUI
+-PKG_CHECK_MODULES(CEGUI, CEGUI &gt;= 0.4.0)
++PKG_CHECK_MODULES(CEGUI, CEGUI &gt;= 0.5.0)
+ PKG_CHECK_MODULES(CEGUIOGRE, CEGUI-OGRE)
+ 
+ # OpenSteer
+@@ -153,6 +153,7 @@
+ # Boost
+ AX_BOOST_BASE(1.33.1)
+ AX_BOOST_THREAD()
++AX_BOOST_FILESYSTEM()
+ 
+ dnl --------------------------------------------
+ dnl       determine location of RUBY (auto)
+
+Modified: rl/trunk/engine/common/include/Logger.h
+===================================================================
+--- rl/trunk/engine/common/include/Logger.h	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/common/include/Logger.h	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+ * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
++*
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the Clarified Artistic License.
+ *
+@@ -16,12 +16,15 @@
+ #ifndef __LOGGER_H__
+ #define __LOGGER_H__
+ 
+-
+ #include &quot;CommonPrerequisites.h&quot;
+ #include &lt;OgreSingleton.h&gt;
+ #include &lt;OgreLog.h&gt;
+ #include &lt;CEGUILogger.h&gt;
++#include &lt;boost/filesystem/operations.hpp&gt;
++#include &lt;boost/filesystem/exception.hpp&gt;
+ 
++namespace fs = boost::filesystem;
++
+ namespace rl {
+ 	class _RlCommonExport Logger : public Ogre::Singleton&lt;Logger&gt;
+ 	{
+@@ -47,7 +50,7 @@
+ 
+ 		static const char* LEVEL_TEXT[6];
+ 
+-		Logger(const Ogre::String&amp; logPath, const Ogre::String&amp; ogreLogPath);
++		Logger(const Ogre::String&amp; logDirectory, const Ogre::String&amp; ogreLogFile, const Ogre::String&amp; rastullahLogFile);
+ 		virtual ~Logger();
+ 
+         // Singleton Stuff
+@@ -55,23 +58,23 @@
+         static Logger * getSingletonPtr(void);
+ 
+ 		void log(
+-			const LogLevel level, 
+-			const Ogre::String&amp; component, 
+-			const char* message, 
++			const LogLevel level,
++			const Ogre::String&amp; component,
++			const char* message,
+ 			const Ogre::String&amp; ident = &quot;&quot;);
+ 
+ 		void log(
+-			const LogLevel level, 
+-			const Ogre::String&amp; component, 
+-			const Ogre::String&amp; message, 
++			const LogLevel level,
++			const Ogre::String&amp; component,
++			const Ogre::String&amp; message,
+ 			const Ogre::String&amp; ident = &quot;&quot;);
+ 
+ 		void log(
+-			const LogLevel level, 		
+-			const Ogre::String&amp; component, 
+-			const CeGuiString&amp; msg, 
++			const LogLevel level,
++			const Ogre::String&amp; component,
++			const CeGuiString&amp; msg,
+ 			const Ogre::String&amp; ident = &quot;&quot;);
+-	
++
+ 		void setLogDetail(const LogLevel level);
+         const LogLevel&amp; getLogDetail();
+ 		const CEGUI::LoggingLevel getCeGuiLogDetail() const;
+@@ -81,7 +84,7 @@
+ 		const Ogre::String&amp; getErrorLog() const;
+ 	private:
+ 		void log(const LogLevel level, const Ogre::String&amp; msg );
+-		
++
+ 		Ogre::Log* mLog;
+ 		LogLevel mLogLevel;
+ 		Ogre::String mErrorBuffer;
+@@ -95,7 +98,7 @@
+ 
+ #define RL_LOG(level, component, msg) \
+     RL_LOG2(level, component, msg, &quot;&quot;)
+-    
++
+ #define RL_LOG_SHORT(level, msg) \
+     RL_LOG2(level, &quot;&quot;, msg, &quot;&quot;)
+ 
+
+Modified: rl/trunk/engine/common/src/Logger.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Logger.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/common/src/Logger.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -32,12 +32,12 @@
+ const char* rl::Logger::MAIN = &quot;Main&quot;;
+ const char* rl::Logger::SCRIPT = &quot;Script&quot;;
+ 
+-const char* rl::Logger::LEVEL_TEXT[6] = 
++const char* rl::Logger::LEVEL_TEXT[6] =
+ 	{&quot;(UD)&quot;, &quot;(--)&quot;, &quot;(--)&quot;, &quot;(WW)&quot;, &quot;(EE)&quot;, &quot;(CC)&quot;};
+ 
+ namespace rl
+ {
+-	
++
+ Logger&amp; Logger::getSingleton(void)
+ {
+     return Singleton&lt;Logger&gt;::getSingleton();
+@@ -48,7 +48,7 @@
+     return Singleton&lt;Logger&gt;::getSingletonPtr();
+ }
+ 
+-Logger::Logger(const Ogre::String&amp; logPath, const Ogre::String&amp; ogreLogPath)
++Logger::Logger(const Ogre::String&amp; logDirectory, const Ogre::String&amp; ogreLogFile, const Ogre::String&amp; rastullahLogFile)
+     : mLog(0),
+       mLogLevel(LL_ERROR),
+       mErrorBuffer(&quot;&quot;),
+@@ -59,11 +59,23 @@
+ 	    new LogManager();
+     }
+ 
++	// Check, if logPath exists
++#   if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++	fs::path rastullahLogDirectory(logDirectory, fs::portable_posix_name);
++#   elif
++	fs::path rastullahLogDirectory(logDirectory);
++#   endif
++
++	if (!fs::exists(rastullahLogDirectory))
++	{
++		fs::create_directory(rastullahLogDirectory);
++	}
++
+ 	//Log f&#252;r Ogre
+-	LogManager::getSingleton().setDefaultLog(LogManager::getSingleton().createLog(ogreLogPath));
++	LogManager::getSingleton().setDefaultLog(LogManager::getSingleton().createLog(ogreLogFile));
+ 
+ 	//Log f&#252;r RL
+-	mLog = LogManager::getSingleton().createLog(logPath);
++	mLog = LogManager::getSingleton().createLog(rastullahLogFile);
+ }
+ 
+ Logger::~Logger()
+@@ -72,9 +84,9 @@
+ }
+ 
+ void Logger::log(
+-			const Logger::LogLevel level, 
+-			const Ogre::String&amp; component, 
+-			const Ogre::String&amp; message, 
++			const Logger::LogLevel level,
++			const Ogre::String&amp; component,
++			const Ogre::String&amp; message,
+ 			const Ogre::String&amp; ident)
+ {
+ 	if (ident.length() == 0)
+@@ -84,9 +96,9 @@
+ }
+ 
+ void Logger::log(
+-			const Logger::LogLevel level, 
+-			const Ogre::String&amp; component, 
+-			const CeGuiString&amp; message, 
++			const Logger::LogLevel level,
++			const Ogre::String&amp; component,
++			const CeGuiString&amp; message,
+ 			const Ogre::String&amp; ident)
+ {
+ 	if (ident.length() == 0)
+@@ -97,8 +109,8 @@
+ 
+ void Logger::log(
+ 			const Logger::LogLevel level,
+-			const Ogre::String&amp; component, 
+-			const char* message, 
++			const Ogre::String&amp; component,
++			const char* message,
+ 			const Ogre::String&amp; ident)
+ {
+ 	if (ident.length() == 0)
+@@ -108,13 +120,13 @@
+ }
+ 
+ void Logger::log(
+-			const Logger::LogLevel level, 
++			const Logger::LogLevel level,
+ 			const Ogre::String&amp; msg)
+ {
+ 	if (level &gt;= mLogLevel)
+ 	{
+ 		mLog-&gt;logMessage(LEVEL_TEXT[level] + msg, Ogre::LML_TRIVIAL);
+-	
++
+ 		if (level &gt;= Logger::LL_ERROR) // Fehler
+ 		{
+ 			mErrorBuffer.append(&quot;\n&quot;);
+@@ -126,7 +138,7 @@
+ 
+ void Logger::setLogDetail(const Logger::LogLevel level)
+ {
+-	mLogLevel = level;	
++	mLogLevel = level;
+ 	mLog-&gt;setLogDetail(Ogre::LL_BOREME);
+ }
+ 
+
+Modified: rl/trunk/engine/common/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/common/src/Makefile.am	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/common/src/Makefile.am	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,7 +1,7 @@
+-INCLUDES = $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(STLPORT_CFLAGS) $(CEGUI_CFLAGS) -I../include
++INCLUDES = $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(STLPORT_CFLAGS) $(CEGUI_CFLAGS) -I../include -I../../core/include
+ 
+ lib_LTLIBRARIES = libRlCommon.la
+-libRlCommon_la_LDFLAGS = $(RUBY_LIBS) $(OGRE_LIBS) $(CEGUI_LIBS) $(LIBS)
++libRlCommon_la_LDFLAGS = $(RUBY_LIBS) $(OGRE_LIBS) $(CEGUI_LIBS) $(BOOST_FILESYSTEM_LIB) $(LIBS)
+ libRlCommon_la_SOURCES = \
+   ConfigFile.cpp \
+   EventObject.cpp \
+
+Modified: rl/trunk/engine/common/src/XmlErrorHandler.cpp
+===================================================================
+--- rl/trunk/engine/common/src/XmlErrorHandler.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/common/src/XmlErrorHandler.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2006 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -39,7 +39,7 @@
+         const XERCES_CPP_NAMESPACE::SAXParseException&amp; exc ) const
+ {
+     std::stringstream strs;
+-    strs &lt;&lt; &quot;A&quot; &lt;&lt; type &lt;&lt; &quot; occured while parsing &quot; &lt;&lt; mFileName 
++    strs &lt;&lt; &quot;A&quot; &lt;&lt; type &lt;&lt; &quot; occured while parsing &quot; &lt;&lt; mFileName
+          &lt;&lt; &quot; at line &quot; &lt;&lt; exc.getLineNumber() &lt;&lt; &quot; column &quot; &lt;&lt;  exc.getColumnNumber();
+ 
+     if( exc.getSystemId() != NULL )
+@@ -66,4 +66,4 @@
+ 
+ void XmlErrorHandler::resetErrors()
+ {
+-}
+\ No newline at end of file
++}
+
+Modified: rl/trunk/engine/core/include/ConfigurationManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ConfigurationManager.h	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/include/ConfigurationManager.h	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -13,7 +13,7 @@
+  *  along with this program; if not you can get it here
+  *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+  */
+- 
++
+ #ifndef __RL_CONFIGURATIONMANAGER_H__
+ #define __RL_CONFIGURATIONMANAGER_H__
+ 
+@@ -24,47 +24,131 @@
+  */
+ 
+ #include &lt;OgreConfigFile.h&gt;
++#include &lt;OgreSingleton.h&gt;
++#include &lt;boost/filesystem/operations.hpp&gt;
++#include &lt;boost/filesystem/exception.hpp&gt;
+ 
++namespace fs = boost::filesystem;
++
+ namespace rl
+ {
+-	class _RlCoreExport ConfigurationManager
++	class _RlCoreExport ConfigurationManager : protected Ogre::Singleton&lt;ConfigurationManager&gt;
+ 	{
+ 		public:
++			/**
++			 * Constructs a new ConfigurationManager object.
++			 *
++			 * Sets the name for the Ogre and Rastullah logfiles
++			 * and the Rastullah configuration file. The path
++			 * where configuration files might be reside is also set.
++			 */
+             ConfigurationManager();
+-			virtual ~ConfigurationManager();
+-			
++
++			~ConfigurationManager();
++
+ 			/**
+- 			 * Die Methode gibt einen Pointer auf ein spezialisiertes, von 
+-			 * configurationManager abgeleitetes Objekt zur&#195;&#188;ck welches die 
+-			 * Pfade und sonstigen wichtigen Konfigurationsmerkmale f&#195;&#188;r die 
+-			 * aktuelle Plattform beinhaltet.
+-			 *\retval ein Pointer auf einen spezialisierten 
+-			 *configurationManager
++			 * Returns a pointer to the single instance of the
++			 * ConfigurationManager.
++			 *
++			 * The ConfigurationManager object is created, if it does not
++			 * exist.
++			 * @return Pointer to ConfigurationManager object
+ 			 */
+ 			static ConfigurationManager* getSingletonPtr();
+-			
++
+ 			/**
+- 			 * Die Methode gibt eine Referenz auf ein spezialisiertes, von 
+-			 * configurationManager abgeleitetes Objekt zur&#195;&#188;ck welches die 
+-			 * Pfade und sonstigen wichtigen Konfigurationsmerkmale f&#195;&#188;r die 
+-			 * aktuelle Plattform beinhaltet.
+-			 *\retval eine Referenz auf einen spezialisierten 
+-			 *configurationManager
++			 * Returns a reference to the single instance of the
++			 * ConfigurationManager.
++			 *
++			 * The ConfigurationManager object is created, if it does not
++			 * exist.
++			 * @return Reference to ConfigurationManager object
+ 			 */
+ 			static ConfigurationManager&amp; getSingleton();
+-			
++
++			/**
++			 * Returns the filename for the log written by Ogre
++			 *
++			 * @return filename of Ogre's logfile
++			 */
++			Ogre::String getOgreLogFile() const;
++
++			/**
++			 * Returns the filename for the log written by Rastullah
++			 *
++			 * @return filename of Rastullah's logfile
++			 */
++			Ogre::String getRastullahLogFile() const;
++
++			/**
++			 * Returns the filename for the log written by CEGUI
++			 *
++			 * @return filename of CEGUI's logfile
++			 */
++			Ogre::String getCeguiLogFile() const;
++
++			/**
++			 * Returns the filename of the configuration file for the modules
++			 *
++			 * @return filename of module's configuration file
++			 */
++			Ogre::String getModulesCfgFile() const;
++
++			/**
++			 * Returns the filename of the configuration file for the OS
++			 * specific plugins
++			 *
++			 * @return filename of the plugin's configuration file
++			 */
++			Ogre::String getPluginCfgFile() const;
++
++			/**
++			 * Returns a list of paths, were Rastullah configuration files
++			 * reside
++			 *
++			 * The list is seperated via the : character and has to be
++			 * processed, before usage
++			 *
++			 * @return colon seperated path of Rastullah configuration
++			 *         directories
++			 */
++			Ogre::String getRastullahCfgPath() const;
++
++			/**
++			 * Returns the root of the Rastullah modules directory
++			 *
++			 * @return directory where Rastullah modules reside
++			 */
++			Ogre::String getModulesRootDirectory() const;
++
++			/**
++			 * Returns the directory where Rastullah stores all its log files
++			 *
++			 * @return directoy where Rastullah logfiles are stored
++			 */
++			Ogre::String getRastullahLogDirectory() const;
++
++			/**
++			 * Returns the filename of the current keymap file used by
++			 * Rastullah
++			 *
++			 * @return filename of keymap file
++			 */
++			Ogre::String getKeymap() const;
++
++			/**
++			 * @todo Remove, after other subsystems were changed to
++			 *       new ConfigurationManager style
++			 */
+ 			Ogre::String getOgreLogPath() const;
+-			Ogre::String getRastullahCfgPath() const;
+ 			Ogre::String getPluginCfgPath() const;
+ 			Ogre::String getRastullahLogPath() const;
+ 			Ogre::String getModulesCfgPath() const;
+ 			Ogre::String getConfigModulePath() const;
+-			Ogre::String getModulesRootDirectory() const;
+             Ogre::String getRastullahSystemCfgPath() const;
+ 			Ogre::String getSoundCfgPath() const;
+-			Ogre::String getKeymap() const;
+ 			Ogre::String getInputConfigPath() const;
+-            
++
+ 			Ogre::String getStringSetting(const Ogre::String&amp; name, const Ogre::String&amp; _default = Ogre::StringUtil::BLANK) const;
+ 			Ogre::Real getRealSetting(const Ogre::String&amp; name, Ogre::Real _default = 0.0f) const;
+ 			int getIntSetting(const Ogre::String&amp; name, int _default = 0) const;
+@@ -80,20 +164,66 @@
+ 			bool shouldUseStaticGeometry() const;
+ 			Ogre::String getTextureUnitScheme() const;
+ 
++			/**
++			 * Loads configuration files from the configuration directories
++			 *
++			 * Loads up to four configuration files (systemwide, user, current
++			 * directory, module) and sets certain settings for the game
++			 */
+             void loadConfig();
+-						
++
+ 		protected:
++			Ogre::String mRastullahCfgFile;
++			Ogre::String mOgreLogFile;
++			Ogre::String mRastullahLogFile;
++			Ogre::String mCeguiLogFile;
++			Ogre::String mSoundCfgFile;
++			Ogre::String mModulesCfgFile;
++			Ogre::String mPluginCfgFile;
++
++			Ogre::String mModulesRootDirectory;
++			Ogre::String mRastullahLogDirectory;
++			Ogre::String mModulesCfgDirectory;
++			Ogre::String mRastullahCfgPath;
++
++			/**
++			 * @todo Remove, after other subsystems were changed to
++			 *       new ConfigurationManager style
++			 */
+ 			Ogre::String mOgreLogPath;
+-			Ogre::String mRastullahCfgPath;
+ 			Ogre::String mPluginCfgPath;
+ 			Ogre::String mRastullahLogPath;
+ 			Ogre::String mModulesCfgPath;
+ 			Ogre::String mConfigModuleDirectory;
+-			Ogre::String mModulesRootDirectory;
+             Ogre::String mRastullahSystemCfgPath;
+ 			Ogre::String mSoundCfgPath;
++			Ogre::String mRastullahOgreCfgPath;
+ 
+         private:
++			/**
++			 * Sets the path where configuration files may reside
++			 * based on the operating system.
++			 */
++			void setRastullahCfgPath();
++
++			/**
++			 * Adds the specified path to the Rastullah configuration path
++			 * variable.
++			 *
++			 * All values are seperated via a colon.
++			 *
++			 * @param cfg_dir Directory where a configuration file may reside
++			 */
++			void addToCfgPath(const std::string&amp; cfg_dir);
++
++			/**
++			 * Check if a specified file exists.
++			 *
++			 * @param filename File being checked for existence
++			 * @return true if file exists, false otherwise
++			 */
++			bool checkForFile(const std::string&amp; filename);
++
+             Ogre::ConfigFile* mSystemConfig;
+ 	};
+ }
+
+Modified: rl/trunk/engine/core/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/include/Makefile.am	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/include/Makefile.am	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -8,9 +8,6 @@
+ 	BoxPrimitive.h \
+ 	CameraObject.h \
+ 	ConfigurationManager.h \
+-	ConfigurationManagerLinux.h \
+-	ConfigurationManagerMac.h \
+-	ConfigurationManagerWin32.h \
+ 	ContentModule.h \
+ 	CoreEvents.h \
+ 	CorePrerequisites.h \
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -13,11 +13,8 @@
+  *  along with this program; if not you can get it here
+  *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+  */
+- 
++
+ #include &quot;ConfigurationManager.h&quot;
+-#include &quot;ConfigurationManagerLinux.h&quot;
+-#include &quot;ConfigurationManagerWin32.h&quot;
+-#include &quot;ConfigurationManagerMac.h&quot;
+ 
+ #include &lt;OgreRenderSystem.h&gt;
+ #include &lt;OgreResourceGroupManager.h&gt;
+@@ -26,69 +23,109 @@
+ 
+ using namespace Ogre;
+ 
++template&lt;&gt; rl::ConfigurationManager* Singleton&lt;rl::ConfigurationManager&gt;::ms_Singleton = 0;
++
+ namespace rl
+ {
+ 	ConfigurationManager* ConfigurationManager::getSingletonPtr()
+ 	{
+-#       if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+-		    return ConfigurationManagerLinux::getSingletonPtr();
+-#       elif OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-		    return ConfigurationManagerWin32::getSingletonPtr();
+-#       else
+-		    return ConfigurationManagerMac::getSingletonPtr();
+-#       endif
++		if (ms_Singleton == NULL)
++		{
++			ms_Singleton = new ConfigurationManager();
++		}
++
++		return ms_Singleton;
+ 	}
+-	
++
+ 	ConfigurationManager&amp; ConfigurationManager::getSingleton()
+ 	{
+-#       if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+-		    return ConfigurationManagerLinux::getSingleton();
+-#       elif OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-		    return ConfigurationManagerWin32::getSingleton();
+-#       else
+-		    return ConfigurationManagerMac::getSingleton();
+-#       endif
++		if (ms_Singleton == NULL)
++		{
++			ms_Singleton = new ConfigurationManager();
++		}
++
++		return *ms_Singleton;
+ 	}
+-	
++
+     ConfigurationManager::ConfigurationManager() :
+         mSystemConfig(NULL)
+     {
++    	mRastullahCfgFile = &quot;rastullah.conf&quot;;
++    	mOgreLogFile = &quot;ogre.log&quot;;
++    	mCeguiLogFile = &quot;cegui.log&quot;;
++		mModulesCfgFile = &quot;modules.cfg&quot;;
++
++    	setRastullahCfgPath();
+     }
+ 
+ 	ConfigurationManager::~ConfigurationManager()
+ 	{
+         delete mSystemConfig;
+ 	}
+-	
+-	Ogre::String ConfigurationManager::getOgreLogPath() const
++
++	Ogre::String ConfigurationManager::getOgreLogFile() const
+ 	{
+-		return mOgreLogPath;
++		return mRastullahLogDirectory + &quot;/&quot; + mOgreLogFile;
+ 	}
+-	
++
++	Ogre::String ConfigurationManager::getRastullahLogFile() const
++	{
++		return mRastullahLogDirectory + &quot;/&quot; + mRastullahLogFile;
++	}
++
++	Ogre::String ConfigurationManager::getCeguiLogFile() const
++	{
++		return mRastullahLogDirectory + &quot;/&quot; + mCeguiLogFile;
++	}
++
++	Ogre::String ConfigurationManager::getModulesCfgFile() const
++	{
++		return mModulesCfgDirectory  + &quot;/&quot; + mModulesCfgFile;
++	}
++
++	Ogre::String ConfigurationManager::getModulesRootDirectory() const
++	{
++		return mModulesRootDirectory;
++	}
++
++	Ogre::String ConfigurationManager::getRastullahLogDirectory() const
++	{
++		return mRastullahLogDirectory;
++	}
++
++	/**
++	 * @todo Remove, after other subsystems were changed to
++	 *       new ConfigurationManager style
++	 */
+ 	Ogre::String ConfigurationManager::getRastullahCfgPath() const
+ 	{
+-		return mRastullahCfgPath;
++		return mRastullahOgreCfgPath;
+ 	}
+-	
++
++	Ogre::String ConfigurationManager::getPluginCfgFile() const
++	{
++		return mPluginCfgFile;
++	}
++
++	Ogre::String ConfigurationManager::getOgreLogPath() const
++	{
++		return mOgreLogPath;
++	}
++
+ 	Ogre::String ConfigurationManager::getPluginCfgPath() const
+ 	{
+ 		return mPluginCfgPath;
+ 	}
+-	
++
+ 	Ogre::String ConfigurationManager::getRastullahLogPath() const
+ 	{
+ 		return mRastullahLogPath;
+ 	}
+-	
++
+ 	Ogre::String ConfigurationManager::getModulesCfgPath() const
+ 	{
+ 		return mModulesCfgPath;
+ 	}
+-	
+-	Ogre::String ConfigurationManager::getModulesRootDirectory() const
+-	{
+-		return mModulesRootDirectory;
+-	}
+ 
+     Ogre::String ConfigurationManager::getRastullahSystemCfgPath() const
+     {
+@@ -99,33 +136,91 @@
+     {
+         return mSoundCfgPath;
+     }
++    /// end remove
+ 
+     void ConfigurationManager::loadConfig()
+     {
+-        if( mSystemConfig == NULL )
++        if(mSystemConfig == NULL)
+         {
++        	// On Linux, we create the .rastullah directory
++#           if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++			fs::path rastullahCfgDirectory(string(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah&quot;, fs::portable_posix_name);
++
++			if (!fs::exists(rastullahCfgDirectory))
++			{
++				fs::create_directory(rastullahCfgDirectory);
++			}
++
++			mRastullahOgreCfgPath = string(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/rastullah_ogre.cfg&quot;;
++#           else
++			mRastullahOgreCfgPath = &quot;./rastullah_ogre.cfg&quot;;
++#           endif
++
+             mSystemConfig = new Ogre::ConfigFile();
++            std::vector&lt;String&gt; cfg_paths;
+ 
+-            try
+-            {            
+-                mSystemConfig-&gt;load( mRastullahSystemCfgPath, &quot;=&quot;, true );
+-            }           
+-            catch ( Ogre::Exception  ) 
+-            {
+-                LOG_ERROR2(Logger::CORE, 
+-                    &quot;Konnte Rastullah-System-Konfiguration aus '&quot; + mRastullahSystemCfgPath + 
+-                    &quot;' nicht laden! Defaulteinstellungen werden benutzt.&quot;,&quot;Configuration&quot;);
+-            }
+-        }        
++			if (mRastullahCfgPath.find(&quot;:&quot;) == std::string::npos)
++			{
++				cfg_paths.push_back(mRastullahCfgPath);
++			}
++			else
++			{
++				// Split the path at the ':' character
++				cfg_paths = StringUtil::split(mRastullahCfgPath, &quot;:&quot;);
++			}
++
++			for (int i = 0; i &lt; cfg_paths.size(); i++)
++			{
++				try
++				{
++					std::cout &lt;&lt; &quot;Loading Configuration File &quot; &lt;&lt; cfg_paths[i] &lt;&lt; std::endl;
++					mSystemConfig-&gt;load(cfg_paths[i] + mRastullahCfgFile, &quot;=&quot;, true);
++				}
++				catch (Ogre::Exception)
++				{
++					LOG_ERROR2(Logger::CORE,
++						&quot;Konnte Rastullah-Konfiguration in '&quot; + cfg_paths[i] +
++						&quot;' nicht laden! Defaulteinstellungen werden benutzt.&quot;,&quot;Configuration&quot;);
++				}
++
++				// Set log and modules directory and plugin cfg file name
++				mRastullahLogDirectory = mSystemConfig-&gt;getSetting(&quot;LogDirectory&quot;, &quot;Rastullah&quot;);
++
++				if (mRastullahLogDirectory.empty())
++				{
++#                   if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++					mRastullahLogDirectory = string(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/logs&quot;;
++#                   else
++					mRastullahLogDirectory = &quot;./logs&quot;;
++#                   endif
++				}
++
++				mModulesRootDirectory = mSystemConfig-&gt;getSetting(&quot;ModulesDirectory&quot;, &quot;Rastullah&quot;);
++				mPluginCfgFile = mSystemConfig-&gt;getSetting(&quot;PluginCfg&quot;, &quot;Rastullah&quot;);
++			}
++        }
++
++		mModulesCfgDirectory = mModulesRootDirectory + &quot;/modules/config&quot;;
++
++		/**
++		 * @todo Remove, after other subsystems were changed to
++		 *       new ConfigurationManager style
++		 */
++		mRastullahCfgPath = &quot;./rastullah_ogre.cfg&quot;;
++		mRastullahSystemCfgPath = mModulesCfgDirectory + &quot;/rastullah_system.cfg&quot;;
++		mSoundCfgPath = mModulesCfgDirectory + &quot;/sound.cfg&quot;;
++		mPluginCfgPath = mModulesCfgDirectory + &quot;/&quot; + mPluginCfgFile;
++
++		mModulesCfgPath = mModulesRootDirectory + &quot;/modules/modules.cfg&quot;;
+     }
+ 
+     bool ConfigurationManager::shouldUseStaticGeometry() const
+     {
+         Ogre::String mode = mSystemConfig-&gt;getSetting( &quot;use_static_geometry&quot; );
+-        
++
+         if( mode == Ogre::StringUtil::BLANK )
+             mode = &quot;auto&quot;;
+-        
++
+         if( mode.compare(&quot;yes&quot;) == 0 )
+         {
+             return true;
+@@ -133,14 +228,14 @@
+         else if( mode.compare(&quot;no&quot;) == 0 )
+         {
+             return false;
+-        }        
++        }
+         else
+         {
+             // &#220;berpr&#252;fen ob der Renderer VertexBuffer unterst&#252;tzt
+             return Ogre::Root::getSingleton().getRenderSystem()
+                 -&gt;getCapabilities()-&gt;hasCapability( Ogre::RSC_VBO );
+         }
+-        
++
+     }
+ 
+ 	Ogre::String ConfigurationManager::getTextureUnitScheme() const
+@@ -154,10 +249,10 @@
+ 			scheme = &quot;tu6&quot;;
+ 		else if (numTu &gt;= 2)
+ 			scheme = &quot;tu2&quot;;
+-		else 
++		else
+ 			scheme = &quot;tu1&quot;;
+ 
+-		LOG_MESSAGE(Logger::CORE, 
++		LOG_MESSAGE(Logger::CORE,
+ 			&quot;Found &quot;+Ogre::StringConverter::toString(numTu) + &quot; Texture Units, using &quot;+
+ 			&quot;alphablending scheme &quot;+scheme);
+ 		return scheme;
+@@ -181,13 +276,13 @@
+ 		return version;
+ 	}
+ 
+-	static const Ogre::String sMonths[] = 
++	static const Ogre::String sMonths[] =
+ 			{&quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;, &quot;Jul&quot;, &quot;Aug&quot;,
+              &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;};
+ 
+ 	/// __DATE__ sieht ca. so aus : Nov 08 2005
+ 	long parseDate(char* date)
+-	{   
++	{
+ 		Ogre::String dateStr = Ogre::String(date);
+ 		Ogre::String monthStr = dateStr.substr(0,3);
+ 		int day = Ogre::StringConverter::parseInt( dateStr.substr(4,2) );
+@@ -198,9 +293,9 @@
+ 			month++;
+ 
+ 		return /* Jahr */		  year * 100000 +
+-			   /* Monat */	 (month+1) * 1000 + 
+-			   /* Tag */		   day * 10 + 
+-			   /* Sub-Version */	 0;	
++			   /* Monat */	 (month+1) * 1000 +
++			   /* Tag */		   day * 10 +
++			   /* Sub-Version */	 0;
+ 	}
+ 
+ 	long ConfigurationManager::getEngineBuildNumber() const
+@@ -212,7 +307,7 @@
+ 
+ 	const CeGuiString&amp; ConfigurationManager::getAboutText() const
+ 	{
+-		static CeGuiString aboutText = 
++		static CeGuiString aboutText =
+ 			&quot;Rastullahs Lockenpracht\n\nCopyright 2003-2006 Team Pantheon\n\nBenutzte Bibliotheken: Ogre, fmod, Newton, boost, ...&quot;;
+ 		return aboutText;
+ 	}
+@@ -259,4 +354,60 @@
+     {
+         return mConfigModuleDirectory;
+     }
++
++    void ConfigurationManager::setRastullahCfgPath()
++    {
++    	string path = &quot;./&quot;;
++
++    	// First try: Current directory
++    	if (checkForFile(path + mRastullahCfgFile))
++    	{
++			addToCfgPath(path);
++    	}
++
++#		if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
++		// Check system wide /etc/rastullah directory
++		path = &quot;/etc/rastullah/&quot;;
++
++    	if (checkForFile(path + mRastullahCfgFile))
++    	{
++			addToCfgPath(path);
++    	}
++
++		// Check home .rastullah directory
++    	path = string(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/&quot;;
++
++    	if (checkForFile(path + mRastullahCfgFile))
++    	{
++			addToCfgPath(path);
++    	}
++#		endif
++    }
++
++	void ConfigurationManager::addToCfgPath(const std::string&amp; path)
++	{
++		if (mRastullahCfgPath.size() &gt; 0)
++		{
++			mRastullahCfgPath += &quot;:&quot; + path;
++		}
++		else
++		{
++			mRastullahCfgPath = path;
++		}
++	}
++
++	bool ConfigurationManager::checkForFile(const std::string&amp; filename)
++	{
++		try {
++			if (fs::exists(filename))
++			{
++				return true;
++			}
++		}
++		catch (fs::filesystem_error&amp; fe) {
++			return false;
++		}
++
++		return false;
++	}
+ }
+
+Deleted: rl/trunk/engine/core/src/ConfigurationManagerLinux.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManagerLinux.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/ConfigurationManagerLinux.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,164 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Perl Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Perl Artistic License for more details.
+- *
+- *  You should have received a copy of the Perl Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+- */
+-
+-#include &quot;ConfigurationManagerLinux.h&quot;
+-#include &lt;iostream&gt;
+-#include &lt;fstream&gt;
+-
+-rl::ConfigurationManager* rl::ConfigurationManagerLinux::sInstance = NULL;
+-
+-using namespace std;
+-
+-namespace rl
+-{
+-	ConfigurationManager* ConfigurationManagerLinux::getSingletonPtr()
+-	{
+-		if(sInstance == 0)
+-		{
+-			sInstance = new ConfigurationManagerLinux;
+-		}
+-		return sInstance;
+-	}
+-	
+-	ConfigurationManager&amp; ConfigurationManagerLinux::getSingleton()
+-	{
+-		if(sInstance == 0)
+-		{
+-			sInstance = new ConfigurationManagerLinux;
+-		}
+-		return *sInstance;
+-	}
+-	
+-	ConfigurationManagerLinux::ConfigurationManagerLinux()
+-	{
+-		mModulesRootDirectory = findModulesRootDir();
+-		mConfigModuleDirectory = mModulesRootDirectory + &quot;/modules/config&quot;;
+-	        mPluginCfgPath = mConfigModuleDirectory + &quot;/plugins-linux.cfg&quot;;
+-		mSoundCfgPath = mConfigModuleDirectory + &quot;/sound.cfg&quot;;
+-		mRastullahCfgPath = findRastullahConf( &quot;rastullah_ogre.cfg&quot; );
+-		mRastullahSystemCfgPath = findRastullahConf( &quot;rastullah_system.cfg&quot; );
+-
+-		if (!checkForFile(mRastullahSystemCfgPath))
+-		{
+-			string filename = mConfigModuleDirectory + &quot;/rastullah_system.cfg&quot;;
+-			if (checkForFile(filename))
+-			{
+-				mRastullahSystemCfgPath = filename;
+-			}
+-		}
+-
+-		mOgreLogPath = mModulesRootDirectory + &quot;/logs/ogre.log&quot;;
+-		mRastullahLogPath = mModulesRootDirectory + &quot;/logs/rastullah.log&quot;;
+-		mModulesCfgPath = mModulesRootDirectory + &quot;/modules/modules.cfg&quot;;
+-	}
+-	
+-	ConfigurationManagerLinux::~ConfigurationManagerLinux()
+-	{
+-	}
+-	
+-	string ConfigurationManagerLinux::findModulesRootDir()
+-	{
+-		// ModulesRootDir ist in rastullah.conf definiert, also suchen wir danach
+-    	
+-		// erster Ansatz wie immer das HOME des users (getenv gef&#195;&#164;hrlich)
+-		string filename = string(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah.conf&quot;;
+-    	
+-		if(checkForFile(filename))
+-		{
+-			// wir geben die erste nichtleere Zeile aus dem File zur&#195;&#188;ck, 
+-			// da diese den gesuchten Pfad repr&#195;&#164;sentiert
+-			// sp&#195;&#164;ter mit tags die einzelnen Variablen beschreiben, 
+-			// die dann vern&#195;&#188;nftig geparst werden!
+-			ifstream file(filename.c_str());
+-			string line;
+-			while(getline(file, line))
+-			{
+-				if(line.length() &gt; 0)
+-				{
+-					file.close();
+-					return line;
+-				}
+-			}
+-			file.close();
+-		}
+-	
+-		// der n&#195;&#164;chste Versuch die Datei zu finden ist /etc/rastullah/rastullah.conf
+-		filename = &quot;/etc/rastullah/rastullah.conf&quot;;
+-		if(checkForFile(filename))
+-		{
+-			// wir geben die erste nichtleere Zeile aus dem File zur&#195;&#188;ck, 
+-			// da diese den gesuchten Pfad repr&#195;&#164;sentiert
+-			// sp&#195;&#164;ter mit tags die einzelnen Variablen beschreiben, 
+-			// die dann vern&#195;&#188;nftig geparst werden!
+-			ifstream file(filename.c_str());
+-			string line;
+-			while(getline(file, line))
+-			{
+-				if(line.length() &gt; 0)
+-				{
+-					file.close();
+-					return line;
+-				}
+-			}
+-			file.close();
+-		}
+-    
+-		// alles war erfolglos, also gehen wir mal vom aktuellen Verzeichnis
+-		// aus
+-		return &quot;.&quot;;
+-	}
+-
+-	//Sp&#195;&#164;ter die gesamten ausgeschriebenen Pfade durch das Install-
+-	//prefix welches vom configure script gesetzt wird ersetzen
+-	string ConfigurationManagerLinux::findRastullahConf( const string&amp; cfg_name )
+-	{
+-		// Erstmal im Homeverzeichnis suchen.
+-		// getenv(home) nicht ungef&#195;&#164;hrlich...
+-		string filename = string(::getenv(&quot;HOME&quot;)) + &quot;/.&quot; + cfg_name;
+-        
+-		//wenn die Datei existiert ist das unsere favorisierte Wahl
+-		if(checkForFile(filename)) return filename;
+-       
+-		// Als n&#195;&#164;chstes schauen wir mal ob in /etc/rl eine standard
+-		// config vorhanden ist
+-		filename = &quot;/etc/rastullah/&quot; + cfg_name;
+-		if(checkForFile(filename)) return filename;
+-        
+-		// /usr/local/share/games/rastullah und /usr/share/games/rastullah w&#195;&#164;ren
+-		// noch Kandidaten
+-		filename = &quot;/usr/local/share/games/rastullah/&quot; + cfg_name;
+-		if(checkForFile(filename)) return filename;
+-        
+-		filename = &quot;/usr/share/games/rastullah/&quot; + cfg_name;
+-		if(checkForFile(filename)) return filename;
+-        
+-		//nix gefunden, also geben wir das home des Benutzers zur&#195;&#188;ck, damit eine
+-		//neue Datei angelegt werden kann.
+-		//TODO: Es sollte IMMER wenn im home des current calling users keine 
+-		//.rastullah_ogre.cfg ist eine f&#195;&#188;r diesen Benutzer mit seinen pers&#195;&#182;nlichen
+-		//settings angelegt werden, oder aber aus den oben genannten Standard
+-		//pfade eine kopiert und angepasst!!!
+-		return string(::getenv(&quot;HOME&quot;)) + &quot;/.&quot; + cfg_name;
+-	}
+-    
+-	bool ConfigurationManagerLinux::checkForFile(const std::string&amp; filename)
+-	{
+-		ifstream file(filename.c_str());
+-		bool retval = file.is_open();
+-		if(retval) file.close();
+-		return retval;
+-	}
+-}
+
+Deleted: rl/trunk/engine/core/src/ConfigurationManagerMac.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManagerMac.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/ConfigurationManagerMac.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,63 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Perl Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Perl Artistic License for more details.
+- *
+- *  You should have received a copy of the Perl Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+- */
+-
+-#include &quot;ConfigurationManagerMac.h&quot;
+-
+-rl::ConfigurationManager* rl::ConfigurationManagerMac::sInstance = NULL;
+-
+-using namespace std;
+-
+-namespace rl
+-{
+-	ConfigurationManager* ConfigurationManagerMac::getSingletonPtr()
+-	{
+-		if(sInstance == NULL)
+-		{
+-			sInstance = new ConfigurationManagerMac;
+-		}
+-		return sInstance;
+-	}
+-	
+-	ConfigurationManager&amp; ConfigurationManagerMac::getSingleton()
+-	{
+-		if(sInstance == NULL)
+-		{
+-			sInstance = new ConfigurationManagerMac;
+-		}
+-		return *sInstance;
+-	}
+-	
+-	ConfigurationManagerMac::ConfigurationManagerMac()
+-	{
+-		mModulesRootDirectory = &quot;.&quot;;
+-
+-        mConfigModuleDirectory = mModulesRootDirectory+&quot;/modules/config&quot;;
+-       
+-		mPluginCfgPath = mConfigModuleDirectory + &quot;/plugins-mac.cfg&quot;;
+-		mRastullahCfgPath = mConfigModuleDirectory + &quot;/rastullah_ogre.cfg&quot;;
+-		mRastullahSystemCfgPath = mConfigModuleDirectory + &quot;/rastullah_system.cfg&quot;;
+-		mSoundCfgPath = mConfigModuleDirectory + &quot;sound.cfg&quot;;
+-
+-		mOgreLogPath = mModulesRootDirectory + &quot;/logs/ogre.log&quot;;
+-		mRastullahLogPath = mModulesRootDirectory + &quot;/logs/rastullah.log&quot;;
+-		mModulesCfgPath = &quot;./modules/modules.cfg&quot;;
+-
+-	}
+-	
+-	ConfigurationManagerMac::~ConfigurationManagerMac()
+-	{
+-	}
+-}
+
+Deleted: rl/trunk/engine/core/src/ConfigurationManagerWin32.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManagerWin32.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/ConfigurationManagerWin32.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,61 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-
+-#include &quot;ConfigurationManagerWin32.h&quot;
+-using namespace std;
+-
+-rl::ConfigurationManager* rl::ConfigurationManagerWin32::sInstance = 0;
+-
+-
+-namespace rl
+-{
+-	ConfigurationManager* ConfigurationManagerWin32::getSingletonPtr()
+-	{
+-		if(sInstance == NULL)
+-		{
+-			sInstance = new ConfigurationManagerWin32;
+-		}
+-		return sInstance;
+-	}
+-	
+-	ConfigurationManager&amp; ConfigurationManagerWin32::getSingleton()
+-	{
+-		if(sInstance == NULL)
+-		{
+-			sInstance = new ConfigurationManagerWin32;
+-		}
+-		return *sInstance;
+-	}
+-	
+-	ConfigurationManagerWin32::ConfigurationManagerWin32()
+-	{
+-		mModulesRootDirectory = &quot;.&quot;;
+-		mConfigModuleDirectory = mModulesRootDirectory + &quot;/modules/config&quot;;
+-		mPluginCfgPath = mConfigModuleDirectory + &quot;/plugins-win.cfg&quot;;
+-		mRastullahCfgPath = mConfigModuleDirectory + &quot;/rastullah_ogre.cfg&quot;;
+-        mRastullahSystemCfgPath = mConfigModuleDirectory + &quot;/rastullah_system.cfg&quot;;
+-		mSoundCfgPath = mConfigModuleDirectory + &quot;/sound.cfg&quot;;
+-		mOgreLogPath = &quot;logs/ogre.log&quot;;
+-		mRastullahLogPath = &quot;logs/rastullah.log&quot;;
+-		mModulesCfgPath = mModulesRootDirectory + &quot;/modules/modules.cfg&quot;;
+-	}
+-	
+-	ConfigurationManagerWin32::~ConfigurationManagerWin32()
+-	{
+-	    sInstance = NULL;
+-	}
+-	
+-}
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+ * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
++*
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the Clarified Artistic License.
+ *
+@@ -73,12 +73,12 @@
+         mDebugVisualsManager(NULL)
+     {
+         resetClock();
+-        initializeCoreSubsystem();        
++        initializeCoreSubsystem();
+         resetClock();
+     }
+ 
+-    CoreSubsystem::~CoreSubsystem() 
+-    {  
++    CoreSubsystem::~CoreSubsystem()
++    {
+ 		mCoreEventCaster.removeEventListeners();
+ 
+         delete mWorld;
+@@ -92,7 +92,7 @@
+         delete mScriptWrapper;
+         delete mConfigurationManager;
+ 		delete mSoundManager;
+-        delete mOgreRoot;		
++        delete mOgreRoot;
+         delete mRubyInterpreter;
+ 	}
+ 
+@@ -127,7 +127,7 @@
+     }
+ 
+     bool CoreSubsystem::setupConfiguration()
+-    {      
++    {
+         if(Root::getSingleton().restoreConfig()
+             || Root::getSingleton().showConfigDialog())
+         {
+@@ -165,9 +165,9 @@
+     {
+         mConfigurationManager = ConfigurationManager::getSingletonPtr();
+         mOgreRoot = new Root(
+-        	mConfigurationManager-&gt;getPluginCfgPath(), 
+-        	mConfigurationManager-&gt;getRastullahCfgPath(), 
+-        	mConfigurationManager-&gt;getOgreLogPath()
++        	mConfigurationManager-&gt;getPluginCfgPath(),
++        	mConfigurationManager-&gt;getRastullahCfgPath(),
++        	mConfigurationManager-&gt;getOgreLogFile()
+         );
+ 
+         //Root::getSingleton().setFrameSmoothingPeriod(0.5f);
+@@ -178,10 +178,10 @@
+ 
+ 		// EDIT:
+ 		LOG_MESSAGE(Logger::CORE,&quot;init&quot;);
+-        
++
+         bool carryOn = setupConfiguration();
+ 
+-        if (!carryOn) 
++        if (!carryOn)
+             return false;
+ 
+ 		mGameLoopManager = new GameLoop();
+@@ -194,7 +194,7 @@
+ 		LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter erzeugt&quot;);
+ 		mRubyInterpreter-&gt;initializeInterpreter();
+ 		LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter initialisiert&quot;);
+-		
++
+         mActorManager = new ActorManager();
+ 		LOG_MESSAGE(Logger::CORE,&quot;Aktormanager erzeugt&quot;);
+ 
+@@ -206,15 +206,15 @@
+         // Set default mipmap level (NB some APIs ignore this)
+         //TODO: In Config-Datei verlagern
+         TextureManager::getSingleton().setDefaultNumMipmaps(5);
+-        MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_TRILINEAR); 
++        MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_TRILINEAR);
+         MaterialManager::getSingleton().setDefaultAnisotropy(
+             ConfigurationManager::getSingleton().getIntSetting(&quot;max_anisotropy&quot;,1));
+-        
+-        
++
++
+         mWorld = new DotSceneOctreeWorld();
+ 		mActorManager-&gt;setWorld(mWorld);
+ 
+-		mPhysicsManager = new PhysicsManager();        
++		mPhysicsManager = new PhysicsManager();
+         GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+ 
+         mAnimationManager = new AnimationManager();
+@@ -222,7 +222,7 @@
+ 
+         mGameEventManager = new GameEventManager();
+         GameLoop::getSingleton().addTask(mGameEventManager, GameLoop::TG_LOGIC);
+-        
++
+         mDebugVisualsManager = new DebugVisualsManager();
+         GameLoop::getSingleton().addTask(mDebugVisualsManager, GameLoop::TG_GRAPHICS);
+ 
+@@ -237,14 +237,14 @@
+         // und die per kompletten Verezeichnis erfragt werden
+ 		ResourceGroupManager::getSingleton().addResourceLocation(
+ 			ConfigurationManager::getSingleton().
+-				getModulesRootDirectory(), 
+-            &quot;FileSystem&quot;, 
++				getModulesRootDirectory(),
++            &quot;FileSystem&quot;,
+ 			ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+ 
+         ResourceGroupManager::getSingleton().addResourceLocation(
+ 			ConfigurationManager::getSingleton().
+-                getConfigModulePath(), 
+-            &quot;FileSystem&quot;, 
++                getConfigModulePath(),
++            &quot;FileSystem&quot;,
+ 			ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+ 
+         mConfigurationManager-&gt;loadConfig();
+@@ -264,7 +264,7 @@
+ 			if (key.compare(&quot;module&quot;) == 0)
+             {
+ 				mRubyInterpreter-&gt;executeFile(ContentModule::getInitFile(value));
+-				
++
+ 				ContentModule* module = getModule(value);
+ 
+ 				if (module == NULL)
+@@ -308,12 +308,12 @@
+ 	{
+ 		String tuScheme = mConfigurationManager-&gt;getTextureUnitScheme();
+ 
+-		for (ResourceManager::ResourceMapIterator itMat = 
++		for (ResourceManager::ResourceMapIterator itMat =
+ 			MaterialManager::getSingleton().getResourceIterator();
+ 			itMat.hasMoreElements();)
+ 		{
+ 			MaterialPtr mat = itMat.getNext();
+-			for (Material::TechniqueIterator itTech = 
++			for (Material::TechniqueIterator itTech =
+ 				mat-&gt;getTechniqueIterator();
+ 				itTech.hasMoreElements();)
+ 			{
+@@ -366,11 +366,11 @@
+ 
+     void CoreSubsystem::loadModule(ContentModule* module)
+     {
+-        if (module-&gt;getMinimumEngineVersion() 
++        if (module-&gt;getMinimumEngineVersion()
+             &gt; ConfigurationManager::getSingleton().getEngineBuildNumber())
+ 		{
+ 			Throw(
+-				rl::RuntimeException, 
++				rl::RuntimeException,
+ 				&quot;Module &quot;
+ 				+ Ogre::String(module-&gt;getName().c_str())
+ 				+ &quot; needs engine &gt;=&quot;
+@@ -387,9 +387,9 @@
+             if (modIt == mModules.end())
+             {
+ 			    Throw(
+-				    rl::RuntimeException, 
+-				    &quot;Depedency Module &quot; + depName 
+-                    + &quot; needed by &quot; + Ogre::String(module-&gt;getName().c_str()) 
++				    rl::RuntimeException,
++				    &quot;Depedency Module &quot; + depName
++                    + &quot; needed by &quot; + Ogre::String(module-&gt;getName().c_str())
+                     + &quot; not found.&quot;);
+             }
+ 
+@@ -431,7 +431,7 @@
+ 	}
+ 
+     World* CoreSubsystem::getWorld()
+-    { 
++    {
+         return mWorld;
+     }
+ 
+@@ -457,7 +457,7 @@
+ 		return mModules;
+ 	}
+ 
+-    void CoreSubsystem::loadMap(const String type, const String filename, 
++    void CoreSubsystem::loadMap(const String type, const String filename,
+     	const String module, const String startupScript)
+     {
+         mWorld-&gt;loadScene(filename, module);
+
+Modified: rl/trunk/engine/core/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/src/Makefile.am	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/core/src/Makefile.am	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -12,9 +12,6 @@
+ 	BoxPrimitive.cpp \
+ 	CameraObject.cpp \
+ 	ConfigurationManager.cpp \
+-	ConfigurationManagerLinux.cpp \
+-	ConfigurationManagerWin32.cpp \
+-	ConfigurationManagerMac.cpp \
+ 	ContentModule.cpp \
+ 	CoreEvents.cpp \
+ 	CoreSubsystem.cpp \
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/rules/include/Slot.h	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -43,4 +43,4 @@
+ 
+ } // namespace rl
+ 
+-#endif //__SLOT_H__
+\ No newline at end of file
++#endif //__SLOT_H__
+
+Modified: rl/trunk/engine/startup/src/RastullahMain.cpp
+===================================================================
+--- rl/trunk/engine/startup/src/RastullahMain.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/startup/src/RastullahMain.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+ * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
++*
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the Clarified Artistic License.
+ *
+@@ -48,15 +48,16 @@
+ 	rl::UiSubsystem* ui =  NULL;
+ 	rl::ScriptSubsystem* script =  NULL;
+ 	rl::Logger* logger = NULL;
+-	
++
+ #ifndef _DEBUG
+ 	try {
+ #endif // #ifndef _DEBUG
+         rl::ConfigurationManager::getSingleton().loadConfig();
+ 
+ 		logger = new rl::Logger(
+-			rl::ConfigurationManager::getSingleton().getRastullahLogPath(),
+-			rl::ConfigurationManager::getSingleton().getOgreLogPath());
++			rl::ConfigurationManager::getSingleton().getRastullahLogDirectory(),
++			rl::ConfigurationManager::getSingleton().getOgreLogFile(),
++			rl::ConfigurationManager::getSingleton().getRastullahLogFile());
+         // @todo in ConfigDatei auslagern/ oder auch Parameter
+ 
+ 		rl::Logger::getSingleton().setLogDetail(
+@@ -71,7 +72,7 @@
+ 
+ 		dialog = new rl::DialogSubsystem();
+ 		LOG_MESSAGE_SHORT(&quot;DialogSubsystem gestartet&quot;);
+-	
++
+ 		ai = new rl::AiSubsystem();
+ 		LOG_MESSAGE_SHORT(&quot;AiSubsystem gestartet&quot;);
+ 
+@@ -87,34 +88,37 @@
+ 			core-&gt;setDefaultActiveModule(module);
+ 
+ 		core-&gt;startCore();
+-		
+ 
++
+ #ifndef _DEBUG
+-	} 
++	}
+ 	catch(Ogre::Exception&amp; oe) {
+ 		rl::showError(oe.getFullDescription());
+-	} 
++	}
+ 	catch(rl::Exception&amp; re) {
+ 		rl::showError(re.toString());
+-	} 
++	}
+ 	catch(CEGUI::Exception&amp; ce) {
+ 		rl::showError(ce.getMessage().c_str());
+ 	}
++	catch(fs::filesystem_error&amp; fe) {
++		rl::showError(fe.what());
++	}
+ 	catch(std::runtime_error&amp; rte) {
+ 		rl::showError(rte.what());
+-	} 
++	}
+ 	catch(std::exception&amp; exp) {
+ 		rl::showError( exp.what() );
+-	} 
++	}
+ 	catch(std::string&amp; err) {
+ 		rl::showError( err );
+-	} 
++	}
+ 	catch(...) {
+ 		rl::showError( &quot;Unknown exception occured&quot; );
+ 	}
+ 
+ 
+-	try 
++	try
+     {
+ #endif // #ifndef _DEBUG
+         LOG_MESSAGE_SHORT(&quot;Soundkonfiguration gespeichert&quot;);
+@@ -131,22 +135,22 @@
+ 	}
+ 	catch(Ogre::Exception&amp; oe) {
+ 		rl::showError(oe.getFullDescription());
+-	} 
++	}
+ 	catch(rl::Exception&amp; re) {
+ 		rl::showError(re.toString());
+-	} 
++	}
+ 	catch(std::runtime_error&amp; rte) {
+ 		rl::showError(rte.what());
+-	} 
++	}
+ 	catch(std::exception&amp; exp) {
+ 		rl::showError( exp.what() );
+-	} 
++	}
+ 	catch(std::string&amp; err) {
+ 		rl::showError( err );
+-	} 
++	}
+ 	catch(...) {
+ 		rl::showError( &quot;Unknown exception occured&quot; );
+-	}	
++	}
+ #endif //#ifndef _DEBUG
+ 
+ }
+@@ -181,7 +185,7 @@
+ 		argv[argIdx][len-1] = '\0';
+ 	}
+ 
+-	bool developer; 
++	bool developer;
+ 	Ogre::String module;
+ 	analyzeParameters(argc, argv, developer, module);
+ 
+@@ -191,7 +195,7 @@
+ 	}
+ 	delete[] argv;
+ 	LocalFree(argList);
+-	
++
+     startupRl(developer, module);
+ 
+ 	return 0;
+@@ -201,7 +205,7 @@
+ 
+ int main(int argc, char **argv)
+ {
+-	bool developer; 
++	bool developer;
+ 	Ogre::String module;
+ 
+ 	analyzeParameters(argc, argv, developer, module);
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -78,8 +78,8 @@
+ 		mWindowFactory = new WindowFactory();
+ 	}
+ 
+-    UiSubsystem::~UiSubsystem() 
+-    {  
++    UiSubsystem::~UiSubsystem()
++    {
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;removeSceneChangeListener(this);
+ 
+ 		delete mWindowFactory;
+@@ -94,7 +94,7 @@
+         delete mGuiResourceProvider;
+         delete mGuiRenderer;
+ 	}
+-	
++
+     void UiSubsystem::initializeSubsystem()
+     {
+ 		using namespace CEGUI;
+@@ -103,7 +103,7 @@
+             &quot;Initialisiere UI&quot;, &quot;UiSubsystem::initializeUiSubsystem&quot;);
+         World* world = CoreSubsystem::getSingleton().getWorld();
+         SceneManager* sceneMgr = world-&gt;getSceneManager();
+-		
++
+ 		Ogre::RenderWindow* window = Ogre::Root::getSingleton().getAutoCreatedWindow();
+ 		LOG_MESSAGE2(Logger::UI,
+             &quot;Initializing CEGUI Renderer.&quot;, &quot;UiSubsystem::initializeUiSubsystem&quot;);
+@@ -115,12 +115,12 @@
+         mGuiResourceProvider = new OgreCEGUIResourceProvider();
+         CEGUI::System::setDefaultXMLParserName(&quot;XercesParser&quot;);
+ 		mGuiSystem = new System(mGuiRenderer, mGuiResourceProvider,
+-            NULL, NULL, (utf8*)&quot;cegui.config&quot;);
++            NULL, NULL, (utf8*)&quot;cegui.config&quot;, ConfigurationManager::getSingleton().getCeguiLogFile());
+ 		CEGUI::Logger::getSingleton().setLoggingLevel(
+             rl::Logger::getSingleton().getCeGuiLogDetail());
+ 		LOG_MESSAGE2(Logger::UI,
+             &quot;CEGUI System initialized.&quot;, &quot;UiSubsystem::initializeUiSubsystem&quot;);
+-        
++
+ 		// load scheme and set up defaults
+ 		///@todo Hier sollte was Lookunabh&#228;ngiges rein!!! FIXME TODO BUG!
+ 		System::getSingleton().setDefaultMouseCursor((utf8*)&quot;RastullahLook-Images&quot;,
+@@ -133,7 +133,7 @@
+             &quot;UiSubsystem::initializeUiSubsystem&quot;);
+ 		sheet-&gt;setSize(
+             CeGuiHelper::asAbsolute(CEGUI::Vector2(
+-                Ogre::Root::getSingleton().getAutoCreatedWindow()-&gt;getWidth(), 
++                Ogre::Root::getSingleton().getAutoCreatedWindow()-&gt;getWidth(),
+ 				Ogre::Root::getSingleton().getAutoCreatedWindow()-&gt;getHeight())));
+ 		sheet-&gt;setPosition(CeGuiHelper::asAbsolute(CEGUI::Point(0, 0)));
+ 		System::getSingleton().setGUISheet(sheet);
+@@ -204,13 +204,13 @@
+ 			{
+ 				ScriptWrapper::getSingleton().owned( person );
+ 				mCharacter = person;
+-				
++
+ 				world-&gt;setActiveActor(person-&gt;getActor());
+ 				mWindowFactory-&gt;setActiveCharacter(person);
+ 
+ 				mCharacter-&gt;getActor()-&gt;attach(SoundManager::getSingleton().getListenerActor());
+ 				LOG_MESSAGE(Logger::UI, &quot;SoundListener attached.&quot;);
+-	            
++
+ 				setCharacterController(CharacterController::CTRL_MOVEMENT);
+ 			}
+         }
+@@ -234,7 +234,7 @@
+ 			LOG_MESSAGE(Logger::UI,
+                 &quot;Old CharacterController deleted.&quot;);
+ 		}
+-        
++
+    		if( type == CharacterController::CTRL_NONE )
+         {
+ 			mCharacterController = NULL;
+@@ -280,7 +280,7 @@
+ 			Throw(IllegalArgumentException, &quot;Unknown CharacterControllerType.&quot;);
+ 		}
+ 		mCharacterControllerType = type;
+-		
++
+ 		mInputManager-&gt;setCharacterController(mCharacterController);
+ 
+ 	    LOG_MESSAGE(Logger::UI, &quot;CharacterController created.&quot;);
+
+Modified: rl/trunk/m4/boost.m4
+===================================================================
+--- rl/trunk/m4/boost.m4	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/m4/boost.m4	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -281,3 +281,91 @@
+ LDFLAGS=&quot;$LDFLAGS_SAVED&quot;
+ ])
+ 
++dnl @synopsis AX_BOOST_FILESYSTEM
++dnl
++dnl Test for Filesystem library from the Boost C++ libraries. The macro
++dnl requires a preceding call to AX_BOOST_BASE. Further documentation
++dnl is available at &lt;<A HREF="http://randspringer.de/boost/index.html">http://randspringer.de/boost/index.html</A>&gt;.
++dnl
++dnl This macro calls:
++dnl
++dnl   AC_SUBST(BOOST_FILESYSTEM_LIB)
++dnl
++dnl And sets:
++dnl
++dnl   HAVE_BOOST_FILESYSTEM
++dnl
++dnl @category InstalledPackages
++dnl @category Cxx
++dnl @author Thomas Porschberg &lt;<A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">thomas at randspringer.de</A>&gt;
++dnl @author Michael Tindal &lt;<A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">mtindal at paradoxpoint.com</A>&gt;
++dnl @version 2006-06-15
++dnl @license AllPermissive
++
++AC_DEFUN([AX_BOOST_FILESYSTEM],
++[
++	AC_ARG_WITH([boost-filesystem],
++	AS_HELP_STRING([--with-boost-filesystem@&lt;:@=special-lib@:&gt;@],
++                   [use the Filesystem library from boost - it is possible to specify a certain library for the linker
++                        e.g. --with-boost-filesystem=boost_filesystem-gcc-mt ]),
++        [
++        if test &quot;$withval&quot; = &quot;yes&quot;; then
++            want_boost=&quot;yes&quot;
++            ax_boost_user_filesystem_lib=&quot;&quot;
++        else
++		    want_boost=&quot;yes&quot;
++        	ax_boost_user_filesystem_lib=&quot;$withval&quot;
++		fi
++        ],
++        [want_boost=&quot;yes&quot;]
++	)
++
++	if test &quot;x$want_boost&quot; = &quot;xyes&quot;; then
++        AC_REQUIRE([AC_PROG_CC])
++		CPPFLAGS_SAVED=&quot;$CPPFLAGS&quot;
++		CPPFLAGS=&quot;$CPPFLAGS $BOOST_CPPFLAGS&quot;
++		export CPPFLAGS
++
++		LDFLAGS_SAVED=&quot;$LDFLAGS&quot;
++		LDFLAGS=&quot;$LDFLAGS $BOOST_LDFLAGS&quot;
++		export LDFLAGS
++
++        AC_CACHE_CHECK(whether the Boost::Filesystem library is available,
++					   ax_cv_boost_filesystem,
++        [AC_LANG_PUSH([C++])
++         AC_COMPILE_IFELSE(AC_LANG_PROGRAM([[@%:@include &lt;boost/filesystem/path.hpp&gt;]],
++                                   [[using namespace boost::filesystem;
++                                   path my_path( &quot;foo/bar/data.txt&quot; );
++                                   return 0;]]),
++            				       ax_cv_boost_filesystem=yes, ax_cv_boost_filesystem=no)
++         AC_LANG_POP([C++])
++		])
++		if test &quot;x$ax_cv_boost_filesystem&quot; = &quot;xyes&quot;; then
++			AC_DEFINE(HAVE_BOOST_FILESYSTEM,,[define if the Boost::Filesystem library is available])
++			BN=boost_filesystem
++            if test &quot;x$ax_boost_user_filesystem_lib&quot; = &quot;x&quot;; then
++    			for ax_lib in $BN $BN-$CC $BN-$CC-mt $BN-$CC-mt-s $BN-$CC-s \
++                              lib$BN lib$BN-$CC lib$BN-$CC-mt lib$BN-$CC-mt-s lib$BN-$CC-s \
++                              $BN-mgw $BN-mgw $BN-mgw-mt $BN-mgw-mt-s $BN-mgw-s ; do
++				    AC_CHECK_LIB($ax_lib, main,
++                                 [BOOST_FILESYSTEM_LIB=&quot;-l$ax_lib&quot; AC_SUBST(BOOST_FILESYSTEM_LIB) link_filesystem=&quot;yes&quot; break],
++                                 [link_filesystem=&quot;no&quot;])
++  				done
++            else
++               for ax_lib in $ax_boost_user_filesystem_lib $BN-$ax_boost_user_filesystem_lib; do
++				      AC_CHECK_LIB($ax_lib, main,
++                                   [BOOST_FILESYSTEM_LIB=&quot;-l$ax_lib&quot; AC_SUBST(BOOST_FILESYSTEM_LIB) link_filesystem=&quot;yes&quot; break],
++                                   [link_filesystem=&quot;no&quot;])
++                  done
++
++            fi
++			if test &quot;x$link_filesystem&quot; = &quot;xno&quot;; then
++				AC_MSG_ERROR(Could not link against $ax_lib !)
++			fi
++		fi
++
++		CPPFLAGS=&quot;$CPPFLAGS_SAVED&quot;
++    	LDFLAGS=&quot;$LDFLAGS_SAVED&quot;
++	fi
++])
++
+
+Modified: rl/trunk/rastullah.conf.in
+===================================================================
+--- rl/trunk/rastullah.conf.in	2007-01-18 13:08:19 UTC (rev 2998)
++++ rl/trunk/rastullah.conf.in	2007-01-22 12:49:50 UTC (rev 2999)
+@@ -1 +1,3 @@
+<A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">- at RL_MODULE_DIR</A>@
++[Rastullah]
++ModulesDirectory=@RL_MODULE_DIR@
++PluginCfg=plugins-linux.cfg
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000069.html">[Dsa-hl-svn] r2998 - modules/regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="000071.html">[Dsa-hl-svn] r3000 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#70">[ date ]</a>
+              <a href="thread.html#70">[ thread ]</a>
+              <a href="subject.html#70">[ subject ]</a>
+              <a href="author.html#70">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

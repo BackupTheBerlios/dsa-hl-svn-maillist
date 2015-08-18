@@ -1,0 +1,280 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4231 - in modules: common/dsa common/scripts	regressiontest/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4231%20-%20in%20modules%3A%20common/dsa%20common/scripts%0A%09regressiontest/scripts&In-Reply-To=%3C200803080037.m280bsiK022330%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001301.html">
+   <LINK REL="Next"  HREF="001303.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4231 - in modules: common/dsa common/scripts	regressiontest/scripts</H1>
+    <B>josch at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4231%20-%20in%20modules%3A%20common/dsa%20common/scripts%0A%09regressiontest/scripts&In-Reply-To=%3C200803080037.m280bsiK022330%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4231 - in modules: common/dsa common/scripts	regressiontest/scripts">josch at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 01:37:54 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001301.html">[Dsa-hl-svn] r4230 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001303.html">[Dsa-hl-svn] r4232 - dependencies
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1302">[ date ]</a>
+              <a href="thread.html#1302">[ thread ]</a>
+              <a href="subject.html#1302">[ subject ]</a>
+              <a href="author.html#1302">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: josch
+Date: 2008-03-08 01:37:52 +0100 (Sat, 08 Mar 2008)
+New Revision: 4231
+
+Modified:
+   modules/common/dsa/gameobjectdefinitions.gof
+   modules/common/scripts/torch.rb
+   modules/regressiontest/scripts/SoundTest.rb
+Log:
+- Fixes for sound fading
+
+Modified: modules/common/dsa/gameobjectdefinitions.gof
+===================================================================
+--- modules/common/dsa/gameobjectdefinitions.gof	2008-03-08 00:29:53 UTC (rev 4230)
++++ modules/common/dsa/gameobjectdefinitions.gof	2008-03-08 00:37:52 UTC (rev 4231)
+@@ -107,7 +107,7 @@
+ 		&lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;ins_fackel_01.mesh&quot;/&gt;
+ 		&lt;property name=&quot;sound&quot; type=&quot;STRING&quot; data=&quot;feuer_knisternd_01.ogg&quot;/&gt;
+ 		&lt;property name=&quot;flames&quot; type=&quot;STRING&quot; data=&quot;feuertest&quot;/&gt;
+-		&lt;property name=&quot;lightable&quot; type=&quot;BOOL&quot; data=&quot;true&quot;/&gt;
++		&lt;!-- &lt;property name=&quot;lightable&quot; type=&quot;BOOL&quot; data=&quot;true&quot;/&gt; --&gt;
+ 		&lt;property name=&quot;lit&quot; type=&quot;BOOL&quot; data=&quot;true&quot;/&gt;
+ 	&lt;/gameobjectclass&gt;
+ 
+
+Modified: modules/common/scripts/torch.rb
+===================================================================
+--- modules/common/scripts/torch.rb	2008-03-08 00:29:53 UTC (rev 4230)
++++ modules/common/scripts/torch.rb	2008-03-08 00:37:52 UTC (rev 4231)
+@@ -22,28 +22,7 @@
+     end
+     
+     def doAction(torch, user, target)
+-        return if torch.lit?
+-        # Fackel hat ein Licht am Slot SLOT_FAR_END
+-        # Man k&#246;nnte es auch so machen, dass dieses Licht jetzt
+-        # erzeugt und angeheftet wird. Spr&#228;che einiges daf&#252;r.
+-        # Das alles ist implizites Wissen. Deshalb sollte es
+-        # allgemeine Richtlinien geben und die Item-Doku sollte
+-        # sowas ganz klar ausweisen. Da aber alles innerhalb von Ruby
+-        # geschieht, ist das nicht so tragisch. Die C++-Seite ist
+-        # an der Stelle nur dumm und macht was Ruby sagt.
+-        
+-        torchActor = torch.getActor();
+-        #torchActor.getChildByName(&quot;TorchSparks&quot;).activate();
+-        #torchActor.getChildByName(&quot;TorchCrackle&quot;).activate();
+-        # Activation sollte folgenderma&#223;en geregelt sein:
+-        #       ist Child activated, so wird er angezeigt/erklingt
+-        #       wenn Parent-Activation true ist, sonst nicht
+-        #       Parent-Activity-Flag wird nicht an die
+-        #       Childs weitergereicht.
+-        
+-        #TODO timer setzen, damit die Fackel nach Ablauf ihrer Lebensdauer
+-        # ausgeht.
+-        torch.setLit(true);
++        torch.setLit(true) unless torch.lit?;
+     end
+ end
+ 
+@@ -60,9 +39,7 @@
+     end
+     
+     def doAction(torch, user, target)
+-        return unless torch.lit?
+-        
+-        torch.setLit(false);
++        torch.setLit(false) if torch.lit?;
+     end
+ end
+ 
+@@ -74,27 +51,25 @@
+     attr :_prop_sound
+     attr :_prop_color
+     attr :_prop_lit
+-    attr :_prop_lightable
+-
+     
+     def initialize(id)
+         super(id)
+-		addActions()
+ 		@_prop_color = [0.8, 0.7, 0.5, 1];
++		addActions()
+     end
+     
+     def setLit(lit)
+-        @_prop_lit = lit
++        @_prop_lit = lit;
+ 		updateState();
+     end
+     
+     def lit?
+-        @_prop_lit
++        @_prop_lit;
+     end
+     
+     def setProperty(name, value)
+ 		if (name == &quot;lit&quot;)
+-			setLit(value)
++			setLit(value);
+ 		elsif (name == &quot;sound&quot;)
+ 			@_prop_sound = value;
+ 		elsif (name == &quot;flames&quot;)
+@@ -104,16 +79,29 @@
+         end
+     end
+     
++    def getProperty(name)
++		if (name == &quot;lit&quot;)
++			return lit?;
++		elsif (name == &quot;sound&quot;)
++			return @_prop_sound;
++		elsif (name == &quot;flames&quot;)
++			return @_prop_flames;
++		else
++			return super(name, value);
++        end
++    end
++
+     def onStateChange(oldState, newState)
+-		p &quot;New state&quot;+newState.to_s()
++		p &quot;New state &quot;+newState.to_s();
+ 		updateState();
+     end
+ 	
+ 	def updateState()
+ 		
+ 		if (getState() == RlScript::GOS_IN_SCENE || getState() == RlScript::GOS_HELD)
+-			if (@_prop_sound != nil &amp;&amp; @_prop_sound != &quot;&quot; &amp;&amp; @soundObj == nil)
++			if (@_prop_sound != nil &amp;&amp; @_prop_sound != &quot;&quot; &amp;&amp; @sound == nil)
+ 				@sound = $AM.createSoundSampleActor(getId().to_s()+&quot;_sound&quot;, @_prop_sound)
++				@sound.getControlledObject().setVolume(1.0);
+ 		        @sound.getControlledObject().setLooping(true)
+ 		        @sound.getControlledObject().set3d(true)
+ 				getActor().attachToSlot(@sound, &quot;SLOT_FAR_END&quot;)
+@@ -135,7 +123,11 @@
+ 				@flammen.getControlledObject().setActive(@_prop_lit);
+ 			end
+ 			if (@sound != nil)
+-				@sound.getControlledObject().setActive(@_prop_lit);
++				if lit?
++					@sound.getControlledObject().play();
++				else
++					@sound.getControlledObject().stop();
++				end
+ 			end
+ 			
+ 			
+@@ -144,26 +136,15 @@
+ 	end
+     
+     def addActions()
+-        @mLightAction = LightTorchAction.new
+-        @mPutoutAction = PutoutTorchAction.new
+-        if @_prop_lightable
+-            addAction(@mLightAction)
+-            addAction(@mPutoutAction)
+-        else
+-            addAction(@mLightAction, Action::ACT_DISABLED)
+-            addAction(@mPutoutAction, Action::ACT_DISABLED)
+-        end        
++        addAction(LightTorchAction.new)
++        addAction(PutoutTorchAction.new)
+     end
+     
+     def getDefaultAction(actor)
+-        if not @_prop_Lightable
+-            super(actor)
++        if @_prop_lit
++            @mPutoutAction
+         else
+-            if @_prop_lit
+-                @mPutoutAction
+-            else
+-                @mLightAction
+-            end
++            @mLightAction
+         end
+     end
+ end
+
+Modified: modules/regressiontest/scripts/SoundTest.rb
+===================================================================
+--- modules/regressiontest/scripts/SoundTest.rb	2008-03-08 00:29:53 UTC (rev 4230)
++++ modules/regressiontest/scripts/SoundTest.rb	2008-03-08 00:37:52 UTC (rev 4231)
+@@ -6,6 +6,10 @@
+ class SoundFadeAction &lt; Action
+   def initialize
+     super(&quot;SoundFadeAction&quot;, &quot;Tests fading code.&quot;)
++    sound = $SM.createSound(&quot;ruchin001.ogg&quot;)
++    @sound = SoundObject.new(sound, &quot;SoundFadeTest&quot;)
++    @sound.set3d(false);
++    @sound.play();
+   end
+   
+   def canDo(go, user)
+@@ -14,10 +18,9 @@
+   
+   def doAction(go, user, target)
+     p &quot;SoundFadeAction&quot;
+-    sound = $SM.createSound(&quot;ruchin001.ogg&quot;)
+-    @sound = SoundObject.new(sound, &quot;SoundFadeTest&quot;)
+-    @functor = LinearSoundFadeFunctor.new(120, false)
+-    @job = SoundFadeJob.new(@sound, @functor, true)
++    functor = LinearSoundFadeFunctor.new(5, false)
++    job = SoundFadeJob.new(@sound, functor, true)
++    $JS.addJob(job)
+   end
+   
+ end
+@@ -47,7 +50,7 @@
+       fackel = $GOM.createGameObject(&quot;torch&quot;)
+       fackel.setDescription(&quot;Fackel&quot; + radian.to_s)
+       fackel.setPosition(rel_pos([x, @@height, y]))
+-      fackel.setLit(true)
++      fackel.setLit(false)
+       fackel.placeIntoScene()
+     end
+     
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001301.html">[Dsa-hl-svn] r4230 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001303.html">[Dsa-hl-svn] r4232 - dependencies
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1302">[ date ]</a>
+              <a href="thread.html#1302">[ thread ]</a>
+              <a href="subject.html#1302">[ subject ]</a>
+              <a href="author.html#1302">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

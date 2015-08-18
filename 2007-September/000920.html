@@ -1,0 +1,393 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3849 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3849%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200709101913.l8AJD9Xq011530%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000919.html">
+   <LINK REL="Next"  HREF="000921.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3849 - in rl/trunk/engine/rules: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3849%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200709101913.l8AJD9Xq011530%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3849 - in rl/trunk/engine/rules: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Mon Sep 10 21:13:09 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000919.html">[Dsa-hl-svn] r3848 - modules
+</A></li>
+        <LI>Next message: <A HREF="000921.html">[Dsa-hl-svn] r3850 - dependencies/opensteer	rl/trunk/engine/core/src rl/trunk/engine/rules/src	rl/trunk/engine/startup/src rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#920">[ date ]</a>
+              <a href="thread.html#920">[ thread ]</a>
+              <a href="subject.html#920">[ subject ]</a>
+              <a href="author.html#920">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-10 21:12:58 +0200 (Mon, 10 Sep 2007)
+New Revision: 3849
+
+Modified:
+   rl/trunk/engine/rules/include/SaveGameFile.h
+   rl/trunk/engine/rules/include/SaveGameManager.h
+   rl/trunk/engine/rules/src/SaveGameFile.cpp
+   rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/rules/src/SaveGameManager.cpp
+Log:
+- SaveGameFile is a PropertyHolder now
+- Time and ModuleID -&gt; PropertyMap
+- building a index file of all savegames
+
+Modified: rl/trunk/engine/rules/include/SaveGameFile.h
+===================================================================
+--- rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-10 13:28:47 UTC (rev 3848)
++++ rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-10 19:12:58 UTC (rev 3849)
+@@ -20,32 +20,34 @@
+ #include &quot;RulesPrerequisites.h&quot;
+ #include &lt;OgreDataStream.h&gt;
+ 
++#include &lt;Property.h&gt;
++#include &lt;Properties.h&gt;
++
+ #include &lt;xercesc/framework/XMLFormatter.hpp&gt;
+ 
+ #include &lt;ctime&gt;
+ 
+ namespace rl
+ {
+-    class _RlRulesExport SaveGameFile
++    class _RlRulesExport SaveGameFile : public PropertyHolder
+     {
+     public:
+-        SaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleID, tm* localTime);
++        SaveGameFile(const CeGuiString &amp;name);
+         ~SaveGameFile();
+         CeGuiString buildFilename();
+         CeGuiString getName();
+         bool saveGameExists();
+ 
+-        tm* getLocalTime();
+-        CeGuiString getLocalTimeAsString() const;
+-
+-        CeGuiString getModuleID();
+-
+         Ogre::DataStreamPtr getDataStream();
+         XERCES_CPP_NAMESPACE::XMLFormatTarget* getFormatTarget();
++
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        virtual PropertySet* getAllProperties() const;
+     protected:
+         CeGuiString mName;
+         CeGuiString mModuleID;
+-        tm* mLocalTime;
++        CeGuiString mLocalTime;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/SaveGameManager.h	2007-09-10 13:28:47 UTC (rev 3848)
++++ rl/trunk/engine/rules/include/SaveGameManager.h	2007-09-10 19:12:58 UTC (rev 3849)
+@@ -38,13 +38,14 @@
+     {
+     public:
+         SaveGameIndexReader();
+-        SaveGameEntryMap &amp;parseIndexFile() const;
++        SaveGameEntryMap parseIndexFile() const;
+     };
+ 
+     class _RlRulesExport SaveGameManager : public Ogre::Singleton&lt;SaveGameManager&gt;
+     {
+     public:
+         SaveGameManager();
++        virtual ~SaveGameManager();    
+ 
+         SaveGameEntryMap listSaveGames();
+         void saveSaveGameFile(const CeGuiString &amp;name);
+
+Modified: rl/trunk/engine/rules/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-10 13:28:47 UTC (rev 3848)
++++ rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-10 19:12:58 UTC (rev 3849)
+@@ -27,11 +27,9 @@
+ namespace rl
+ {
+ 
+-    SaveGameFile::SaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleID, tm* localTime)
++    SaveGameFile::SaveGameFile(const CeGuiString &amp;name)
+     {
+         mName = name;
+-        mModuleID = moduleID;
+-        mLocalTime = localTime;
+     }
+ 
+     SaveGameFile::~SaveGameFile()
+@@ -66,24 +64,35 @@
+         return !Ogre::DataStreamPtr( new Ogre::FileHandleDataStream(fopen(this-&gt;buildFilename().c_str(), &quot;r&quot;))).isNull();
+     }
+ 
+-    tm* SaveGameFile::getLocalTime()
++    const Property SaveGameFile::getProperty(const Ogre::String&amp; key) const
+     {
+-        return mLocalTime;
++        if(key == &quot;ModuleID&quot;)
++            return Property(mModuleID);
++        else if(key == &quot;Time&quot;)
++            return Property(mLocalTime);
++        else
++            return Property();
+     }
+ 
+-    CeGuiString SaveGameFile::getLocalTimeAsString() const
++    void SaveGameFile::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+     {
+-        CeGuiString string = ((Ogre::String)(Ogre::StringConverter::toString(mLocalTime-&gt;tm_mday) + &quot;.&quot; 
+-            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_mon) + &quot;.&quot;
+-            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_year + 1900) + &quot; - &quot; 
+-            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_hour) + &quot;:&quot;
+-            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_min) + &quot;:&quot; 
+-            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_sec))).c_str();
+-        return string;
++        if(key == &quot;ModuleID&quot;)
++        {
++            if(value.isString())
++                mModuleID = value.toString();
++        }
++        else if(key == &quot;Time&quot;)
++        {
++            if(value.isString())
++                mLocalTime = value.toString();
++        }
+     }
+ 
+-    CeGuiString SaveGameFile::getModuleID()
++    PropertySet* SaveGameFile::getAllProperties() const
+     {
+-        return mModuleID;
++        PropertySet* set = new PropertySet();
++        set-&gt;setProperty(&quot;ModuleID&quot;, getProperty(&quot;ModuleID&quot;));
++        set-&gt;setProperty(&quot;Time&quot;, getProperty(&quot;Time&quot;));
++        return set;
+     }
+ }
+
+Modified: rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-10 13:28:47 UTC (rev 3848)
++++ rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-10 19:12:58 UTC (rev 3849)
+@@ -52,7 +52,6 @@
+         mWriter = static_cast&lt;DOMImplementationLS*&gt;(mImplementation)-&gt;createDOMWriter();
+         mTarget = file-&gt;getFormatTarget();
+         mDocument = static_cast&lt;DOMImplementation*&gt;(mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameFile&quot;), 0);
+-        mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameFile&quot;));
+ 
+         if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
+             mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
+@@ -60,15 +59,21 @@
+         if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
+              mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
+ 
++        mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameFile&quot;)); //Set name of document root node
++
++        //Write SaveGameVersion
++        setAttributeValueAsString(mDocument-&gt;getDocumentElement(), &quot;Version&quot;, &quot;0.1&quot;);
++
+         //Write modul of save game
+         DOMElement* header = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;header&quot;);
+         setAttributeValueAsString(header, &quot;ModuleID&quot;, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId());
+         setAttributeValueAsInteger(header, &quot;EngineVersion&quot;, CoreSubsystem::getSingleton().getEngineBuildNumber());
+-        
++        setAttributeValueAsString(header, &quot;LocalTime&quot;, file-&gt;getProperty(&quot;Time&quot;).toString());
++
+         //Write date and time
+-        DOMElement* timeNode = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;time&quot;);
++        //DOMElement* timeNode = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;time&quot;);
+         
+-        tm* timeinfo = file-&gt;getLocalTime();
++        /*tm* timeinfo = file-&gt;getLocalTime();
+ 
+         setAttributeValueAsInteger(timeNode, &quot;day&quot;, timeinfo-&gt;tm_mday);
+         setAttributeValueAsInteger(timeNode, &quot;month&quot;, timeinfo-&gt;tm_mon);
+@@ -76,7 +81,7 @@
+ 
+         setAttributeValueAsInteger(timeNode, &quot;hour&quot;, timeinfo-&gt;tm_hour);
+         setAttributeValueAsInteger(timeNode, &quot;minute&quot;, timeinfo-&gt;tm_min);
+-        setAttributeValueAsInteger(timeNode, &quot;second&quot;, timeinfo-&gt;tm_sec);
++        setAttributeValueAsInteger(timeNode, &quot;second&quot;, timeinfo-&gt;tm_sec);*/
+ 
+         //Write globals
+         DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
+
+Modified: rl/trunk/engine/rules/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameManager.cpp	2007-09-10 13:28:47 UTC (rev 3848)
++++ rl/trunk/engine/rules/src/SaveGameManager.cpp	2007-09-10 19:12:58 UTC (rev 3849)
+@@ -20,24 +20,88 @@
+ 
+ #include &lt;CoreSubsystem.h&gt;
+ #include &lt;ContentModule.h&gt;
++#include &lt;ConfigurationManager.h&gt;
+ 
++#include &lt;xercesc/framework/LocalFileFormatTarget.hpp&gt;
++
+ template&lt;&gt; rl::SaveGameManager* Ogre::Singleton&lt;rl::SaveGameManager&gt;::ms_Singleton = 0;
+ 
++using namespace XERCES_CPP_NAMESPACE;
++
+ namespace rl
+ {
++    CeGuiString printTimeAsString(tm* time)
++    {
++        CeGuiString string = ((Ogre::String)(Ogre::StringConverter::toString(time-&gt;tm_mday) + &quot;.&quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_mon) + &quot;.&quot;
++            + Ogre::StringConverter::toString(time-&gt;tm_year + 1900) + &quot; - &quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_hour) + &quot;:&quot;
++            + Ogre::StringConverter::toString(time-&gt;tm_min) + &quot;:&quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_sec))).c_str();
++        return string;
++    }
++
+     SaveGameIndexWriter::SaveGameIndexWriter()
+     {
+     }
+ 
+     void SaveGameIndexWriter::buildIndexFile(const SaveGameEntryMap &amp;map)
+     {
++        initializeXml();
++
++        XMLCh tempStr[256];
++        XMLString::transcode(&quot;LS&quot;, tempStr, 255);
++        mImplementation = DOMImplementationRegistry::getDOMImplementation(tempStr);
++        mWriter = static_cast&lt;DOMImplementationLS*&gt;(mImplementation)-&gt;createDOMWriter();
++        XMLString::transcode(((Ogre::String)(ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/saves/index.saves&quot;)).c_str(), tempStr, 255);
++        mTarget = new LocalFileFormatTarget(tempStr);
++        mDocument = static_cast&lt;DOMImplementation*&gt;(mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameIndexFile&quot;), 0);
++        
++        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
++            mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
++
++        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
++             mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
++
++        mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameIndexFile&quot;)); //Set name of document root node
++
++         //Write SaveGameIndexVersion
++        setAttributeValueAsString(mDocument-&gt;getDocumentElement(), &quot;Version&quot;, &quot;0.1&quot;);
++
++
++        //write save games
++        SaveGameEntryMap::const_iterator it_saves;
++
++        for(it_saves = map.begin(); it_saves != map.end(); it_saves++)
++        {
++            DOMElement* saveGame = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;savegame&quot;);
++            setAttributeValueAsString(saveGame, &quot;Name&quot;, it_saves-&gt;second-&gt;getName());
++
++            PropertyMap map = it_saves-&gt;second-&gt;getAllProperties()-&gt;toPropertyMap();
++            PropertyMap::iterator it_properties;
++            for(it_properties = map.begin(); it_properties != map.end(); it_properties++)
++            {
++                this-&gt;processProperty(saveGame, PropertyEntry(it_properties-&gt;first.c_str(), it_properties-&gt;second));
++            }
++        }        
++
++
++        mWriter-&gt;writeNode(mTarget, *mDocument);
++
++
++        mWriter-&gt;release();
++
++        delete mDocument;
++        delete mTarget;
++
++        shutdownXml();
+     }
+ 
+     SaveGameIndexReader::SaveGameIndexReader()
+     {
+     }
+ 
+-    SaveGameEntryMap &amp;SaveGameIndexReader::parseIndexFile() const
++    SaveGameEntryMap SaveGameIndexReader::parseIndexFile() const
+     {
+         SaveGameEntryMap entries;
+         return entries;
+@@ -45,8 +109,16 @@
+ 
+     SaveGameManager::SaveGameManager()
+     {
++        mReader = new SaveGameIndexReader();
++        mWriter = new SaveGameIndexWriter();
+     }
+ 
++    SaveGameManager::~SaveGameManager()
++    {
++        delete mReader;
++        delete mWriter;
++    }
++
+     SaveGameEntryMap SaveGameManager::listSaveGames()
+     {
+         return mReader-&gt;parseIndexFile();
+@@ -58,13 +130,21 @@
+         tm* localTime; 
+         time(&amp;rawTime);
+         localTime = localtime(&amp;rawTime); 
+-        SaveGameFile file(name, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId(), localTime);
++        SaveGameFile file(name);
++        file.setProperty(&quot;Time&quot;, Property(printTimeAsString(localTime)));
++        file.setProperty(&quot;ModuleID&quot;, Property(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getName()));
+ 
++        SaveGameEntryMap map = listSaveGames();
++        map[name] = &file;
++
++        mWriter-&gt;buildIndexFile(map);
++
+         SaveGameFileWriter writer;
+         writer.buildSaveGameFile(&amp;file);
+     }
+ 
+     void SaveGameManager::loadSaveGameFile(const CeGuiString &amp;name)
+     {
++        ///@todo: SaveGameReader
+     }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000919.html">[Dsa-hl-svn] r3848 - modules
+</A></li>
+	<LI>Next message: <A HREF="000921.html">[Dsa-hl-svn] r3850 - dependencies/opensteer	rl/trunk/engine/core/src rl/trunk/engine/rules/src	rl/trunk/engine/startup/src rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#920">[ date ]</a>
+              <a href="thread.html#920">[ thread ]</a>
+              <a href="subject.html#920">[ subject ]</a>
+              <a href="author.html#920">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

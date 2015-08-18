@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4133 - rl/trunk/engine/core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4133%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200803042156.m24LuRmu025633%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001203.html">
+   <LINK REL="Next"  HREF="001205.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4133 - rl/trunk/engine/core/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4133%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200803042156.m24LuRmu025633%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4133 - rl/trunk/engine/core/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  4 22:56:27 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001203.html">[Dsa-hl-svn] r4132 - modules/regressiontest/dsa
+</A></li>
+        <LI>Next message: <A HREF="001205.html">[Dsa-hl-svn] r4134 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1204">[ date ]</a>
+              <a href="thread.html#1204">[ thread ]</a>
+              <a href="subject.html#1204">[ subject ]</a>
+              <a href="author.html#1204">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-04 22:56:25 +0100 (Tue, 04 Mar 2008)
+New Revision: 4133
+
+Modified:
+   rl/trunk/engine/core/src/MergeableMeshObject.cpp
+   rl/trunk/engine/core/src/MeshObject.cpp
+   rl/trunk/engine/core/src/SaveGameFileReader.cpp
+Log:
+Some fixes
+
+Modified: rl/trunk/engine/core/src/MergeableMeshObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MergeableMeshObject.cpp	2008-03-04 21:54:32 UTC (rev 4132)
++++ rl/trunk/engine/core/src/MergeableMeshObject.cpp	2008-03-04 21:56:25 UTC (rev 4133)
+@@ -68,13 +68,30 @@
+ 				for (MeshPartMap::const_iterator it = mMeshes.begin(); it != mMeshes.end(); ++it)
+ 				{
+ 					String curMeshfile = (*it).second;
+-					MeshPtr meshToAdd = MeshManager::getSingleton().load(curMeshfile, &quot;regressiontest&quot;); ///@todo this is just for testing
+-					mm.addMesh(meshToAdd);
++                    MeshPtr meshToAdd = MeshManager::getSingleton().getByName(curMeshfile);  
++
++                    if (!meshToAdd.isNull())
++                    {
++                        meshToAdd-&gt;load();
++
++                        try 
++                        {
++	    				    mm.addMesh(meshToAdd);
++                        }
++                        catch (const std::logic_error&amp; ex)
++                        {
++                            LOG_ERROR(Logger::CORE, ex.what());
++                        }
++                    }
++                    else
++                    {
++                        LOG_ERROR(Logger::CORE, &quot;Mesh '&quot; + curMeshfile + &quot;' could not be found for merging.&quot;);
++                    }
+ 				}
+-
+ 				newMesh = mm.bake(newMeshName);
+ 			}
+ 
++
+ 			switchTo(newMesh);
+ 
+ 			mCombinedMeshName = newMeshName;
+
+Modified: rl/trunk/engine/core/src/MeshObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MeshObject.cpp	2008-03-04 21:54:32 UTC (rev 4132)
++++ rl/trunk/engine/core/src/MeshObject.cpp	2008-03-04 21:56:25 UTC (rev 4133)
+@@ -279,7 +279,7 @@
+ 		AnimationStateSet* ass = entity-&gt;getAllAnimationStates();
+ 
+ 		// Test if wanted anim is available for the entity
+-		if (!ass-&gt;hasAnimationState(animName))
++		if (!ass || !ass-&gt;hasAnimationState(animName))
+ 		{
+ 			Throw(IllegalArgumentException, String(&quot;No animation &quot; + animName +
+ 				&quot; for entity &quot; + entity-&gt;getName()));
+
+Modified: rl/trunk/engine/core/src/SaveGameFileReader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileReader.cpp	2008-03-04 21:54:32 UTC (rev 4132)
++++ rl/trunk/engine/core/src/SaveGameFileReader.cpp	2008-03-04 21:56:25 UTC (rev 4133)
+@@ -110,4 +110,4 @@
+ 
+         return properties;
+     }
+-}
+\ No newline at end of file
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001203.html">[Dsa-hl-svn] r4132 - modules/regressiontest/dsa
+</A></li>
+	<LI>Next message: <A HREF="001205.html">[Dsa-hl-svn] r4134 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1204">[ date ]</a>
+              <a href="thread.html#1204">[ thread ]</a>
+              <a href="subject.html#1204">[ subject ]</a>
+              <a href="author.html#1204">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

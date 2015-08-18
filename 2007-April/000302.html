@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3231 - in rl/trunk/engine: core/include core/src	rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3231%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200704041750.l34Ho0kE014176%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000301.html">
+   <LINK REL="Next"  HREF="000303.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3231 - in rl/trunk/engine: core/include core/src	rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3231%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200704041750.l34Ho0kE014176%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3231 - in rl/trunk/engine: core/include core/src	rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr  4 19:50:00 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000301.html">[Dsa-hl-svn] r3230 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000303.html">[Dsa-hl-svn] r3232 - in rl/trunk/engine: script/swig ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#302">[ date ]</a>
+              <a href="thread.html#302">[ thread ]</a>
+              <a href="subject.html#302">[ subject ]</a>
+              <a href="author.html#302">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-04 19:49:53 +0200 (Wed, 04 Apr 2007)
+New Revision: 3231
+
+Modified:
+   rl/trunk/engine/core/include/Actor.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+Log:
+Show gameobject's name above actor (if name is set)
+
+Modified: rl/trunk/engine/core/include/Actor.h
+===================================================================
+--- rl/trunk/engine/core/include/Actor.h	2007-04-04 17:46:04 UTC (rev 3230)
++++ rl/trunk/engine/core/include/Actor.h	2007-04-04 17:49:53 UTC (rev 3231)
+@@ -262,7 +262,7 @@
+         void _update(unsigned long flags = UF_ALL);
+ 
+         /// Setzt diesem Aktor ein Highlight
+-        void setHighlighted(bool highlight);
++        void setHighlighted(bool highlight, const CeGuiString&amp; descriptionText = &quot;&quot;);
+         /// Gibt zur&#252;ck ob der Aktor gehighlighted ist
+         bool isHighlighted() const;
+ 
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2007-04-04 17:46:04 UTC (rev 3230)
++++ rl/trunk/engine/core/src/Actor.cpp	2007-04-04 17:49:53 UTC (rev 3231)
+@@ -732,7 +732,7 @@
+         _update();
+     }
+ 
+-    void Actor::setHighlighted(bool highlight)
++    void Actor::setHighlighted(bool highlight, const CeGuiString&amp; descriptionText)
+     {
+         if (highlight != mHighlighted)
+         {
+@@ -744,7 +744,17 @@
+         {
+ 			if (mSceneNode != NULL)
+ 			{
+-				mDescription = new MovableText(mName + &quot;_desc&quot;, mName);
++				String desc;
++				if (descriptionText != &quot;&quot;)
++				{
++					desc = descriptionText.c_str();
++				}
++				else
++				{
++					desc = mName;
++				}
++
++				mDescription = new MovableText(mName + &quot;_desc&quot;, desc);
+ 				mDescription-&gt;showOnTop(true);
+ 				mDescription-&gt;setAlignment(MovableText::ALIGN_CENTER);
+ 				if (mActorControlledObject &amp;&amp; mActorControlledObject-&gt;isMeshObject())
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-04-04 17:46:04 UTC (rev 3230)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-04-04 17:49:53 UTC (rev 3231)
+@@ -257,22 +257,25 @@
+ 	
+ 	void GameObject::setActor(Actor* actor)
+ 	{
+-        if (mActor != NULL)
+-        {
+-            mActor-&gt;setGameObject(NULL);
+-        }
++		if (mActor != actor)
++		{
++			if (mActor != NULL)
++			{
++				mActor-&gt;setGameObject(NULL);
++			}
+ 
+-        if (actor != NULL)
+-        {
+-            if (actor-&gt;isInScene())
+-            {
+-                actor-&gt;setPosition(mPosition);
+-                actor-&gt;setOrientation(mOrientation);
+-            }
+-		    actor-&gt;setGameObject(this);
+-        }
+-		
+-        mActor = actor;
++			if (actor != NULL)
++			{
++				if (actor-&gt;isInScene())
++				{
++					actor-&gt;setPosition(mPosition);
++					actor-&gt;setOrientation(mOrientation);
++				}
++				actor-&gt;setGameObject(this);
++			}
++			
++			mActor = actor;
++		}
+ 	}
+ 	
+ 	Actor* GameObject::getActor()
+@@ -305,7 +308,7 @@
+     {
+         if (mHighlightingEnabled &amp;&amp; mActor != NULL)
+         {
+-            mActor-&gt;setHighlighted(highlight);
++			mActor-&gt;setHighlighted(highlight, getName());
+         }
+     }
+ 
+@@ -605,14 +608,23 @@
+ 
+         if (targetstate == GOS_LOADED &amp;&amp; mState == GOS_IN_SCENE)
+         {
+-            /// Statechange-Event is triggered in this function
++            // Statechange event is triggered in this function
+             doRemoveFromScene();
+         }
+         else if (targetstate == GOS_IN_SCENE &amp;&amp; mState == GOS_LOADED)
+         {
+-            //Statechange-Event is triggered in this function
++            //Statechange event is triggered in this function
+             doPlaceIntoScene();
+         }
++		else
++		{
++			LOG_ERROR(
++				Logger::RULES, 
++				&quot;GameObject '&quot; + getName() 
++				+ &quot;' could not change state from &quot;
++				+ Ogre::StringConverter::toString(mState) + &quot; to &quot;
++				+ Ogre::StringConverter::toString(targetstate));
++		}
+     }
+ 
+     GameObjectState GameObject::getState() const
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000301.html">[Dsa-hl-svn] r3230 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000303.html">[Dsa-hl-svn] r3232 - in rl/trunk/engine: script/swig ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#302">[ date ]</a>
+              <a href="thread.html#302">[ thread ]</a>
+              <a href="subject.html#302">[ subject ]</a>
+              <a href="author.html#302">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

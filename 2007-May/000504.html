@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3433 - in rl/trunk: docs/documents	engine/script/include engine/script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3433%20-%20in%20rl/trunk%3A%20docs/documents%0A%09engine/script/include%20engine/script/src&In-Reply-To=%3C200705102119.l4ALJWXR025039%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000503.html">
+   <LINK REL="Next"  HREF="000505.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3433 - in rl/trunk: docs/documents	engine/script/include engine/script/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3433%20-%20in%20rl/trunk%3A%20docs/documents%0A%09engine/script/include%20engine/script/src&In-Reply-To=%3C200705102119.l4ALJWXR025039%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3433 - in rl/trunk: docs/documents	engine/script/include engine/script/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu May 10 23:19:32 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000503.html">[Dsa-hl-svn] r3432 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000505.html">[Dsa-hl-svn] r3434 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#504">[ date ]</a>
+              <a href="thread.html#504">[ thread ]</a>
+              <a href="subject.html#504">[ subject ]</a>
+              <a href="author.html#504">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-10 23:19:25 +0200 (Thu, 10 May 2007)
+New Revision: 3433
+
+Modified:
+   rl/trunk/docs/documents/scene_format_proposal.xml
+   rl/trunk/engine/script/include/EntityNodeProcessor.h
+   rl/trunk/engine/script/src/EntityNodeProcessor.cpp
+   rl/trunk/engine/script/src/EnvironmentProcessor.cpp
+Log:
+MapLoader:
+- interface for animation processing
+- fog
+
+Modified: rl/trunk/docs/documents/scene_format_proposal.xml
+===================================================================
+--- rl/trunk/docs/documents/scene_format_proposal.xml	2007-05-10 20:43:42 UTC (rev 3432)
++++ rl/trunk/docs/documents/scene_format_proposal.xml	2007-05-10 21:19:25 UTC (rev 3433)
+@@ -180,9 +180,18 @@
+         		&lt;skydomesettings curvature=&quot;10&quot; tiling = &quot;8&quot; /&gt;
+         	&lt;/sky&gt;
+ 
+-        	&lt;fog type=&quot;exp&quot; expdensity=&quot;0.001&quot; /&gt;
++        	&lt;fog type=&quot;exp&quot; density=&quot;0.001&quot;&gt;
++        	     &lt;colour r=&quot;0.3&quot; g=&quot;0.3&quot; b=&quot;0.3&quot; /&gt;
++        	&lt;/fog&gt;
+ 
+-        	&lt;fog type=&quot;linear&quot; start=&quot;0.0&quot; end=&quot;1.0&quot;/&gt;
++        	&lt;fog type=&quot;exp2&quot; density=&quot;0.001&quot;&gt;
++        	     &lt;colour r=&quot;0.3&quot; g=&quot;0.3&quot; b=&quot;0.3&quot; /&gt;
++        	&lt;/fog&gt;
++
++        	&lt;fog type=&quot;linear&quot; start=&quot;0.0&quot; end=&quot;1.0&quot;&gt;
++        	     &lt;colour r=&quot;0.5&quot; g=&quot;0.5&quot; b=&quot;0.5&quot; /&gt;
++        	&lt;/fog&gt;
++
+        	&lt;/environment&gt;
+ 
+ &lt;/rastullahmap&gt;
+
+Modified: rl/trunk/engine/script/include/EntityNodeProcessor.h
+===================================================================
+--- rl/trunk/engine/script/include/EntityNodeProcessor.h	2007-05-10 20:43:42 UTC (rev 3432)
++++ rl/trunk/engine/script/include/EntityNodeProcessor.h	2007-05-10 21:19:25 UTC (rev 3433)
+@@ -47,7 +47,8 @@
+         Ogre::String mResourceGroup;
+ 
+         void createCollision(Ogre::Entity* entity, Ogre::String meshFile, XERCES_CPP_NAMESPACE::DOMElement* physicsProxyElem);
+-    };
++		void processAnimation(Ogre::Entity* entity, xercesc_2_7::DOMElement *animationElem);
++	};
+ }
+ 
+ #endif // __EntityNodeProcessor_H__
+
+Modified: rl/trunk/engine/script/src/EntityNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/EntityNodeProcessor.cpp	2007-05-10 20:43:42 UTC (rev 3432)
++++ rl/trunk/engine/script/src/EntityNodeProcessor.cpp	2007-05-10 21:19:25 UTC (rev 3433)
+@@ -18,6 +18,7 @@
+ #include &lt;OgreEntity.h&gt;
+ #include &lt;OgreMeshManager.h&gt;
+ #include &lt;OgreNewt_CollisionPrimitives.h&gt;
++#include &lt;xercesc/dom/DOM.hpp&gt;
+ 
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+@@ -125,6 +126,17 @@
+         {
+             parentNode-&gt;scale(processVector3(scaleElem));
+         }
++
++		AutoXMLCh animation(&quot;animation&quot;);
++		DOMNodeList* list = nodeElem-&gt;getElementsByTagName(animation.data());
++		for (XMLSize_t idx = 0; idx &lt; list-&gt;getLength(); idx++)
++		{
++			DOMNode* cur = list-&gt;item(idx);
++			if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++			{
++				processAnimation(newEnt, static_cast&lt;DOMElement*&gt;(cur));
++			}
++		}
+         
+         return true;
+     }
+@@ -278,4 +290,9 @@
+         }
+ 	}
+ 
++	void EntityNodeProcessor::processAnimation(Ogre::Entity* entity, xercesc_2_7::DOMElement *animationElem)
++	{
++		///@todo EntityNodeProcessor::processAnimation
++	}
++
+ }
+
+Modified: rl/trunk/engine/script/src/EnvironmentProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/EnvironmentProcessor.cpp	2007-05-10 20:43:42 UTC (rev 3432)
++++ rl/trunk/engine/script/src/EnvironmentProcessor.cpp	2007-05-10 21:19:25 UTC (rev 3433)
+@@ -104,6 +104,65 @@
+ 	void EnvironmentProcessor::processFogSettings(XERCES_CPP_NAMESPACE::DOMElement* fogElem)
+ 	{
+ 		///@todo process fog node
++		if (!XmlHelper::hasAttribute(fogElem, &quot;material&quot;))
++		{
++			LOG_ERROR(
++				Logger::RULES, 
++				&quot;&lt;fog&gt; element must have at least the attribute 'type'.&quot;);
++			return;
++		}
++
++		DOMElement* colourElem = XmlHelper::getChildNamed(fogElem, &quot;colour&quot;);
++		if (colourElem == NULL)
++		{
++			LOG_ERROR(Logger::RULES, &quot;No fog colour set.&quot;);
++			return;
++		}
++		ColourValue fogColour = processColour(colourElem);
++
++		Ogre::String type = XmlHelper::getAttributeValueAsStdString(fogElem, &quot;type&quot;);
++		if (type == &quot;exp&quot; || type == &quot;exp2&quot;)
++		{
++			if (XmlHelper::hasAttribute(fogElem, &quot;density&quot;))
++			{
++				Ogre::Real density = XmlHelper::getAttributeValueAsReal(fogElem, &quot;density&quot;);
++				if (type == &quot;exp&quot;)
++				{
++					CoreSubsystem::getSingleton().getWorld()-&gt;setFog(
++						World::FOG_EXP, fogColour, density);
++				}
++				else if (type == &quot;exp2&quot;)
++				{
++					CoreSubsystem::getSingleton().getWorld()-&gt;setFog(
++						World::FOG_EXP2, fogColour, density);
++				}
++			}
++			else
++			{
++				LOG_ERROR(
++					Logger::RULES, type + &quot; fog needs attribute 'density'.&quot;);
++			}
++		}
++		else if (type == &quot;linear&quot;)
++		{
++			if (XmlHelper::hasAttribute(fogElem, &quot;start&quot;)
++				&amp;&amp; XmlHelper::hasAttribute(fogElem, &quot;end&quot;))
++			{
++				Ogre::Real start = XmlHelper::getAttributeValueAsReal(fogElem, &quot;start&quot;);
++				Ogre::Real end = XmlHelper::getAttributeValueAsReal(fogElem, &quot;end&quot;);
++				CoreSubsystem::getSingleton().getWorld()-&gt;setFog(
++					World::FOG_LINEAR, fogColour, 0, start, end);
++			}
++			else
++			{
++				LOG_ERROR(
++					Logger::RULES, &quot;linear fog needs attributes 'start' and 'end'.&quot;);
++			}
++		}
++		else
++		{
++			LOG_ERROR(
++				Logger::RULES, type + &quot; is an unknown fog type.&quot;);
++		}
+ 	}
+-
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000503.html">[Dsa-hl-svn] r3432 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000505.html">[Dsa-hl-svn] r3434 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#504">[ date ]</a>
+              <a href="thread.html#504">[ thread ]</a>
+              <a href="subject.html#504">[ subject ]</a>
+              <a href="author.html#504">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

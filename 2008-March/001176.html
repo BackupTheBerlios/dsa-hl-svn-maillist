@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4105 - in modules/common: dsa scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4105%20-%20in%20modules/common%3A%20dsa%20scripts&In-Reply-To=%3C200803031203.m23C36sh001759%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001175.html">
+   <LINK REL="Next"  HREF="001177.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4105 - in modules/common: dsa scripts</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4105%20-%20in%20modules/common%3A%20dsa%20scripts&In-Reply-To=%3C200803031203.m23C36sh001759%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4105 - in modules/common: dsa scripts">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  3 13:03:06 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001175.html">[Dsa-hl-svn] r4104 - in rl/trunk/engine/common: include src
+</A></li>
+        <LI>Next message: <A HREF="001177.html">[Dsa-hl-svn] r4106 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1176">[ date ]</a>
+              <a href="thread.html#1176">[ thread ]</a>
+              <a href="subject.html#1176">[ subject ]</a>
+              <a href="author.html#1176">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-03 13:03:04 +0100 (Mon, 03 Mar 2008)
+New Revision: 4105
+
+Modified:
+   modules/common/dsa/gameobjectdefinitions.gof
+   modules/common/scripts/door.rb
+   modules/common/scripts/gameobjectprops.rb
+Log:
+Generic GameObjectProperties module for property access now has generic setProperty/getProperty functions. Both try to access a @_prop_&lt;keyname&gt; member variable, if present it is considered a property and set/get, else the super class get/setProperty is called.
+In order for this to work, all property holding member variables have to be defined in the constructor, attribute definitions do not suffice!
+
+Door uses this now, missing doornames fixed too.
+
+Modified: modules/common/dsa/gameobjectdefinitions.gof
+===================================================================
+--- modules/common/dsa/gameobjectdefinitions.gof	2008-03-03 11:57:54 UTC (rev 4104)
++++ modules/common/dsa/gameobjectdefinitions.gof	2008-03-03 12:03:04 UTC (rev 4105)
+@@ -2,10 +2,10 @@
+ &lt;GameObjectDefinitions&gt;
+ 
+ 	&lt;gameobjectclass classid=&quot;door&quot; baseclass=&quot;Door&quot;&gt;
++	    &lt;property name=&quot;name&quot; type=&quot;STRING&quot; data=&quot;Tuer&quot;/&gt;
+ 		&lt;property name=&quot;description&quot; type=&quot;STRING&quot; data=&quot;Eine T&#252;r&quot;/&gt;
+ 		&lt;property name=&quot;geometrytype&quot; type=&quot;STRING&quot; data=&quot;convexhull&quot;/&gt;
+ 		&lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;arc_tuer_01.mesh&quot;/&gt;
+-		&lt;property name=&quot;sound&quot; type=&quot;STRING&quot; data=&quot;doorcreak.ogg&quot;/&gt;
+ 		&lt;property name=&quot;open&quot; type=&quot;BOOL&quot; data=&quot;false&quot;/&gt;
+ 		&lt;property name=&quot;openable&quot; type=&quot;BOOL&quot; data=&quot;true&quot;/&gt;
+ 	&lt;/gameobjectclass&gt;
+
+Modified: modules/common/scripts/door.rb
+===================================================================
+--- modules/common/scripts/door.rb	2008-03-03 11:57:54 UTC (rev 4104)
++++ modules/common/scripts/door.rb	2008-03-03 12:03:04 UTC (rev 4105)
+@@ -54,20 +54,10 @@
+   
+   def initialize(id)
+     super(id);
++	@_prop_openable = true;
++	@_prop_open = false;
+   end
+ 
+-  def setProperty(name, value)
+-    if (name == &quot;sound&quot;)
+-      @_prop_Sound = value;
+-    elsif (name == &quot;open&quot;)
+-      @_prop_Open = value;
+-    elsif (name == &quot;openable&quot;)
+-      @_prop_CanBeOpened = value;
+-    else
+-      super(name, value)
+-    end
+-  end
+-
+   def placeIntoScene()
+     super()
+     addActions();
+@@ -76,7 +66,7 @@
+   def addActions()
+     @mOpenAction = OpenDoorAction.new()
+     @mCloseAction = CloseDoorAction.new()
+-    if (@_prop_CanBeOpened)
++    if (@_prop_openable)
+         addAction(@mOpenAction);
+         addAction(@mCloseAction);
+     else
+@@ -84,23 +74,23 @@
+         addAction(@mCloseAction, Action::ACT_DISABLED);
+     end
+ 
+-    doAction(&quot;opendoor&quot;) unless not @_prop_Open
++    doAction(&quot;opendoor&quot;) unless not @_prop_open
+   end
+   
+   def setOpen(isOpen)
+-    @_prop_Open = isOpen
++    @_prop_open = isOpen
+     fireObjectStateChangeEvent();
+   end
+   
+   def isOpen()
+-    @_prop_Open
++    @_prop_open
+   end
+   
+   def getDefaultAction(actor)
+-     if (not @_prop_CanBeOpened)
++     if (not @_prop_openable)
+        super(actor)
+      else
+-       if (@_prop_Open)
++       if (@_prop_open)
+          @mCloseAction
+        else
+          @mOpenAction
+
+Modified: modules/common/scripts/gameobjectprops.rb
+===================================================================
+--- modules/common/scripts/gameobjectprops.rb	2008-03-03 11:57:54 UTC (rev 4104)
++++ modules/common/scripts/gameobjectprops.rb	2008-03-03 12:03:04 UTC (rev 4105)
+@@ -27,12 +27,28 @@
+         return ps
+     end
+ 	
+-#	def setProperty(key, value)
+-#		instance_variable_set(&quot;@_prop_&quot;+key, value)
+-#	end
++	# Generic setProperty method. This will query self for a member variable @_prop_&lt;key&gt;
++	# and, if it is available set the property accordingly. If not, setProperty of the super class is
++	# called instead.
++	def setProperty(key, value)
++		if instance_variables.include?(&quot;@_prop_&quot;+key)
++	        begin
++	            instance_variable_set(&quot;@_prop_&quot;+key, value)
++            rescue
++		        super(key, value)
++		    end
++		else
++		    super(key, value);
++		end
++	end
+ 
+-#	def getProperty(key)
+-#		return instance_variable_get(&quot;@_prop_&quot;+key)
+-#	end
+-  
++	# Generic getProperty method. This will query self for a member variable @_prop_&lt;key&gt;
++	# If present, its value is returned, else getProperty of the super class is called.
++	def getProperty(key)
++	    begin
++		    return instance_variable_get(&quot;@_prop_&quot;+key)
++		rescue
++		    return super(key)
++		end
++	end
+ end
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001175.html">[Dsa-hl-svn] r4104 - in rl/trunk/engine/common: include src
+</A></li>
+	<LI>Next message: <A HREF="001177.html">[Dsa-hl-svn] r4106 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1176">[ date ]</a>
+              <a href="thread.html#1176">[ thread ]</a>
+              <a href="subject.html#1176">[ subject ]</a>
+              <a href="author.html#1176">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

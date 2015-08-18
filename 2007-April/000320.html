@@ -1,0 +1,648 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3249 - in modules: common/materials/programs	ruchin/materials/textures ruchin/models
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3249%20-%20in%20modules%3A%20common/materials/programs%0A%09ruchin/materials/textures%20ruchin/models&In-Reply-To=%3C200704110927.l3B9RBMO028681%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000319.html">
+   <LINK REL="Next"  HREF="000321.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3249 - in modules: common/materials/programs	ruchin/materials/textures ruchin/models</H1>
+    <B>pnyx at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3249%20-%20in%20modules%3A%20common/materials/programs%0A%09ruchin/materials/textures%20ruchin/models&In-Reply-To=%3C200704110927.l3B9RBMO028681%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3249 - in modules: common/materials/programs	ruchin/materials/textures ruchin/models">pnyx at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 11 11:27:11 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000319.html">[Dsa-hl-svn] r3248 - rl/trunk
+</A></li>
+        <LI>Next message: <A HREF="000321.html">[Dsa-hl-svn] r3250 - modules/ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#320">[ date ]</a>
+              <a href="thread.html#320">[ thread ]</a>
+              <a href="subject.html#320">[ subject ]</a>
+              <a href="author.html#320">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: pnyx
+Date: 2007-04-11 11:20:06 +0200 (Wed, 11 Apr 2007)
+New Revision: 3249
+
+Added:
+   modules/common/materials/programs/NormalMapSpecular2LightsAO.hlsl
+   modules/common/materials/programs/NormalMapSpecularAO.program
+   modules/ruchin/materials/textures/ruchin_ao_s_n.png
+   modules/ruchin/materials/textures/ruchin_atlas_normal.png
+   modules/ruchin/materials/textures/ruchin_atlas_spec.png
+Removed:
+   modules/ruchin/models/Temple.material
+Modified:
+   modules/ruchin/models/Ruchintest.material
+Log:
+NormalMapSpecular2LightsAO.hlsl shader added
+
+Added: modules/common/materials/programs/NormalMapSpecular2LightsAO.hlsl
+===================================================================
+--- modules/common/materials/programs/NormalMapSpecular2LightsAO.hlsl	2007-04-11 08:15:05 UTC (rev 3248)
++++ modules/common/materials/programs/NormalMapSpecular2LightsAO.hlsl	2007-04-11 09:20:06 UTC (rev 3249)
+@@ -0,0 +1,188 @@
++struct VS_OUTPUT 
++{
++   float4 Pos         : POSITION;
++   float2 UV          : TEXCOORD0;
++   float2 UV2         : TEXCOORD1;
++   float3 Light1DirTS : TEXCOORD2;
++   float3 Half1DirTS  : TEXCOORD3;
++   float3 Light2DirTS : TEXCOORD4;
++   float3 Half2DirTS  : TEXCOORD5;
++};
++
++VS_OUTPUT vs_main_1uv(float4 inPos     : POSITION,
++                      float3 inNormal  : NORMAL,
++                      float3 inTangent : TEXCOORD1,
++                      float2 inUV      : TEXCOORD0,
++                      uniform float4 EyePosOS,
++                      uniform float4 Light1PosOS,
++                      uniform float4 Light2PosOS,
++                      uniform float4x4 WorldViewProjMatrix)
++{
++    VS_OUTPUT Out;
++
++    Out.Pos = mul(WorldViewProjMatrix, inPos);
++    Out.UV = inUV;
++	Out.UV2 = inUV;
++    
++    float3 Light1Dir = normalize(Light1PosOS.xyz - inPos.xyz*Light1PosOS.w);
++    float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
++    float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
++
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
++    float3x3 TangentSpace;
++    TangentSpace[0] = inTangent;
++    TangentSpace[1] = binormal;
++    TangentSpace[2] = inNormal;
++
++    Out.Half1DirTS  = mul(TangentSpace, normalize(Light1Dir + EyeDir));
++    Out.Half2DirTS  = mul(TangentSpace, normalize(Light2Dir + EyeDir));
++    Out.Light1DirTS = mul(TangentSpace, Light1Dir);
++    Out.Light2DirTS = mul(TangentSpace, Light2Dir);
++
++    return Out;
++}
++
++VS_OUTPUT vs_main_2uv(float4 inPos     : POSITION,
++                      float3 inNormal  : NORMAL,
++                      float3 inTangent : TEXCOORD2,
++                      float2 inUV      : TEXCOORD0,
++                      float2 inUV2      : TEXCOORD1,
++                      uniform float4 EyePosOS,
++                      uniform float4 Light1PosOS,
++                      uniform float4 Light2PosOS,
++                      uniform float4x4 WorldViewProjMatrix)
++{
++    VS_OUTPUT Out;
++
++    Out.Pos = mul(WorldViewProjMatrix, inPos);
++    Out.UV = inUV;
++    Out.UV2 = inUV2;
++
++    float3 Light1Dir = normalize(Light1PosOS.xyz - inPos.xyz*Light1PosOS.w);
++    float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
++    float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
++
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
++    float3x3 TangentSpace;
++    TangentSpace[0] = inTangent;
++    TangentSpace[1] = binormal;
++    TangentSpace[2] = inNormal;
++
++    Out.Half1DirTS  = mul(TangentSpace, normalize(Light1Dir + EyeDir));
++    Out.Half2DirTS  = mul(TangentSpace, normalize(Light2Dir + EyeDir));
++    Out.Light1DirTS = mul(TangentSpace, Light1Dir);
++    Out.Light2DirTS = mul(TangentSpace, Light2Dir);
++
++    return Out;
++}
++
++
++VS_OUTPUT vs_main_3uv(float4 inPos     : POSITION,
++                      float3 inNormal  : NORMAL,
++                      float3 inTangent : TEXCOORD3,
++                      float2 inUV      : TEXCOORD0,
++                      float2 inUV2      : TEXCOORD1,
++                      uniform float4 EyePosOS,
++                      uniform float4 Light1PosOS,
++                      uniform float4 Light2PosOS,
++                      uniform float4x4 WorldViewProjMatrix)
++{
++    VS_OUTPUT Out;
++
++    Out.Pos = mul(WorldViewProjMatrix, inPos);
++    Out.UV = inUV;
++	Out.UV2 = inUV2;
++    
++    float3 Light1Dir = normalize(Light1PosOS.xyz - inPos.xyz*Light1PosOS.w);
++    float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
++    float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
++
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
++    float3x3 TangentSpace;
++    TangentSpace[0] = inTangent;
++    TangentSpace[1] = binormal;
++    TangentSpace[2] = inNormal;
++
++    Out.Half1DirTS  = mul(TangentSpace, normalize(Light1Dir + EyeDir));
++    Out.Half2DirTS  = mul(TangentSpace, normalize(Light2Dir + EyeDir));
++    Out.Light1DirTS = mul(TangentSpace, Light1Dir);
++    Out.Light2DirTS = mul(TangentSpace, Light2Dir);
++
++    return Out;
++}
++
++
++
++
++float4 ps_main(VS_OUTPUT In,
++               uniform sampler DiffuseMap : register(s0),
++               uniform sampler NormalMap  : register(s1),
++               uniform sampler SpecMap	  : register(s2),
++               uniform sampler aoMap  : register(s3),
++               uniform float4  MaterialAmbient,
++               uniform float4  MaterialDiffuse,
++               uniform float   MaterialSpecularExponent,
++               uniform float4  Light1Diffuse,
++               uniform float4  Light1Specular,
++               uniform float4  Light2Diffuse,
++               uniform float4  Light2Specular,
++               uniform float4  AmbientLight) : COLOR 
++{
++    // Read normal from texture. *2-1 to convert it from signed to unsigned.
++    float4 Normal = tex2D(NormalMap, In.UV) * 2 - 1;
++    float4 TexColour = tex2D(DiffuseMap, In.UV);
++    float4 aoColour = tex2D(aoMap, In.UV2);
++    
++    // Spec
++    float4 SpecColour= tex2D(SpecMap, In.UV);
++
++    // Ambient component
++    float4 Ambient = MaterialAmbient * AmbientLight;
++
++    float NdotL1 = (dot(Normal.xyz, normalize(In.Light1DirTS)));
++    float NdotL2 = (dot(Normal.xyz, normalize(In.Light2DirTS)));
++    float4 Diffuse1, Diffuse2, Specular1, Specular2;
++    
++    // We only need to calculate lighting, if surface is facing the light.
++    if (NdotL1 &gt; 0.0)
++    {
++        // Diffuse component
++        Diffuse1 = MaterialDiffuse * Light1Diffuse * NdotL1;
++
++        // Specular component
++        float SpecularAttn = pow(saturate(
++            dot(Normal.xyz, normalize(In.Half1DirTS))),
++                MaterialSpecularExponent);
++        Specular1 = Light1Specular * SpecularAttn * SpecColour /2;
++    }
++    
++    else
++    {
++        // Diffuse component
++        Diffuse1 =((MaterialDiffuse*Light1Diffuse * NdotL1)/2.5);
++    }
++
++    if (NdotL2 &gt; 0.0)
++    {
++        // Diffuse component
++        Diffuse2 = MaterialDiffuse * Light2Diffuse * NdotL2;
++
++        // Specular component
++        float SpecularAttn = pow(saturate(
++            dot(Normal.xyz, normalize(In.Half2DirTS))),
++                MaterialSpecularExponent);
++        Specular2 = Light2Specular * SpecularAttn * SpecColour /2;
++    }
++    
++    else
++    {
++        // Diffuse component
++        Diffuse2 =((MaterialDiffuse*Light2Diffuse * NdotL2)/2.5);
++    }
++    
++    return (TexColour * (Ambient*1.5 + Diffuse1 + Diffuse2)) + Specular1 + Specular2;
++}
++
+
+Added: modules/common/materials/programs/NormalMapSpecularAO.program
+===================================================================
+--- modules/common/materials/programs/NormalMapSpecularAO.program	2007-04-11 08:15:05 UTC (rev 3248)
++++ modules/common/materials/programs/NormalMapSpecularAO.program	2007-04-11 09:20:06 UTC (rev 3249)
+@@ -0,0 +1,240 @@
++vertex_program NormalMap2Lights1UVSpecAO_VS_HLSL hlsl
++{
++    source NormalMapSpecular2LightsAO.hlsl
++    entry_point vs_main_1uv
++    target vs_2_0
++}
++
++vertex_program NormalMap2Lights2UVSpecAO_VS_HLSL hlsl
++{
++    source NormalMapSpecular2LightsAO.hlsl
++    entry_point vs_main_2uv
++    target vs_2_0
++}
++
++vertex_program NormalMap2Lights3UVSpecAO_VS_HLSL hlsl
++{
++    source NormalMapSpecular2LightsAO.hlsl
++    entry_point vs_main_3uv
++    target vs_2_0
++}
++
++
++fragment_program NormalMap2LightsSpecAO_PS_HLSL hlsl
++{
++    source NormalMapSpecular2LightsAO.hlsl
++    entry_point ps_main
++    target ps_2_0
++}
++
++material NormalMapMaterialSpecular2LightsAO1UV
++{
++    technique hlsl
++    {
++        pass
++        {
++	        alpha_rejection greater 128
++            vertex_program_ref NormalMap2Lights1UVSpecAO_VS_HLSL
++            {
++                param_named_auto WorldViewProjMatrix worldviewproj_matrix
++                param_named_auto Light1PosOS light_position_object_space 0
++                param_named_auto Light2PosOS light_position_object_space 1
++                param_named_auto EyePosOS camera_position_object_space
++            }
++
++            fragment_program_ref NormalMap2LightsSpecAO_PS_HLSL
++            {
++                param_named_auto Light1Diffuse  light_diffuse_colour  0
++                param_named_auto Light1Specular light_specular_colour 0
++                param_named_auto Light2Diffuse  light_diffuse_colour  1
++                param_named_auto Light2Specular light_specular_colour 1
++                param_named_auto AmbientLight  ambient_light_colour
++
++                param_named MaterialAmbient float4 0.6 0.6 0.6 1.0
++                param_named MaterialDiffuse float4 0.7 0.7 0.7 1.0
++                param_named MaterialSpecularExponent float 20.0
++            }
++			
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++
++            // Normal map
++            texture_unit normalmap
++            {
++                texture_alias normalmap
++            }
++            
++            // Spec map
++            texture_unit specmap
++            {
++                texture_alias specmap
++            }
++            
++            texture_unit aomap
++            {
++                texture_alias aomap
++            }
++        }
++    }
++
++    technique fixed_function
++    {
++        pass
++        {
++            ambient 0.6 0.6 0.6 1.0
++            diffuse 0.7 0.7 0.7 1.0
++            specular 0.3 0.3 0.3 1.0 16.0
++
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++        } 
++    }
++}
++
++material NormalMapMaterialSpecular2LightsAO2UV
++{
++    technique hlsl
++    {
++        pass
++        {
++	        alpha_rejection greater 128
++            vertex_program_ref NormalMap2Lights2UVSpecAO_VS_HLSL
++            {
++                param_named_auto WorldViewProjMatrix worldviewproj_matrix
++                param_named_auto Light1PosOS light_position_object_space 0
++                param_named_auto Light2PosOS light_position_object_space 1
++                param_named_auto EyePosOS camera_position_object_space
++            }
++
++            fragment_program_ref NormalMap2LightsSpecAO_PS_HLSL
++            {
++                param_named_auto Light1Diffuse  light_diffuse_colour  0
++                param_named_auto Light1Specular light_specular_colour 0
++                param_named_auto Light2Diffuse  light_diffuse_colour  1
++                param_named_auto Light2Specular light_specular_colour 1
++                param_named_auto AmbientLight  ambient_light_colour
++
++                param_named MaterialAmbient float4 0.6 0.6 0.6 1.0
++                param_named MaterialDiffuse float4 0.7 0.7 0.7 1.0
++                param_named MaterialSpecularExponent float 20.0
++            }
++			
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++
++            // Normal map
++            texture_unit normalmap
++            {
++                texture_alias normalmap
++            }
++            
++            // Spec map
++            texture_unit specmap
++            {
++                texture_alias specmap
++            }
++            
++            texture_unit aomap
++            {
++                texture_alias aomap
++            }
++        }
++    }
++    
++    technique fixed_function
++    {
++        pass
++        {
++            ambient 0.6 0.6 0.6 1.0
++            diffuse 0.7 0.7 0.7 1.0
++            specular 0.3 0.3 0.3 1.0 16.0
++
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++        } 
++    }
++}
++    
++material NormalMapMaterialSpecular2LightsAO3UV
++{
++    technique hlsl
++    {
++        pass
++        {
++	                    alpha_rejection greater 128
++            vertex_program_ref NormalMap2Lights3UVSpecAO_VS_HLSL
++            {
++                param_named_auto WorldViewProjMatrix worldviewproj_matrix
++                param_named_auto Light1PosOS light_position_object_space 0
++                param_named_auto Light2PosOS light_position_object_space 1
++                param_named_auto EyePosOS camera_position_object_space
++            }
++
++            fragment_program_ref NormalMap2LightsSpecAO_PS_HLSL
++            {
++                param_named_auto Light1Diffuse  light_diffuse_colour  0
++                param_named_auto Light1Specular light_specular_colour 0
++                param_named_auto Light2Diffuse  light_diffuse_colour  1
++                param_named_auto Light2Specular light_specular_colour 1
++                param_named_auto AmbientLight  ambient_light_colour
++
++                param_named MaterialAmbient float4 0.6 0.6 0.6 1.0
++                param_named MaterialDiffuse float4 0.7 0.7 0.7 1.0
++                param_named MaterialSpecularExponent float 20.0
++            }
++			
++
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++
++            // Normal map
++            texture_unit normalmap
++            {
++                texture_alias normalmap
++            }
++            
++            // Spec map
++            texture_unit specmap
++            {
++                texture_alias specmap
++            }
++            
++            texture_unit aomap
++            {
++                texture_alias aomap
++            }
++        }
++    }
++
++    technique fixed_function
++    {
++        pass
++        {
++            ambient 0.6 0.6 0.6 1.0
++            diffuse 0.7 0.7 0.7 1.0
++            specular 0.3 0.3 0.3 1.0 16.0
++
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++        } 
++    }
++}
++
+
+Added: modules/ruchin/materials/textures/ruchin_ao_s_n.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: modules/ruchin/materials/textures/ruchin_ao_s_n.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: modules/ruchin/materials/textures/ruchin_atlas_normal.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: modules/ruchin/materials/textures/ruchin_atlas_normal.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: modules/ruchin/materials/textures/ruchin_atlas_spec.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: modules/ruchin/materials/textures/ruchin_atlas_spec.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Modified: modules/ruchin/models/Ruchintest.material
+===================================================================
+--- modules/ruchin/models/Ruchintest.material	2007-04-11 08:15:05 UTC (rev 3248)
++++ modules/ruchin/models/Ruchintest.material	2007-04-11 09:20:06 UTC (rev 3249)
+@@ -325,37 +325,27 @@
+ 	}
+ }
+ 
+-material Ruchin/base
+-{
+-//lighting off
+-	receive_shadows off
+-	technique
++material Ruchin/base : NormalMapMaterialSpecular2Lights2UV
+ 	{
+-		pass
+-		{
+-			ambient 0.8 0.8 0.8 1
+-			//ambient 0.0 0.0 0.0 1
+-			//ambient vertexcolour
+- 
+-			//specular 0 0 0 1 10
+-			
+-			//diffuse 0.9 0.9 0.9 
+-			//emissive 0.105882 0.105882 0.105882 1
+-			//emissive vertexcolour
+-			
+-			texture_unit
+-			{
+-				texture ruchin_atlasmap.dds
+-			}
+ 
+-			
+-		}
+-
+-	}
++			set_texture_alias normalmap ruchin_atlas_normal.dds
++			set_texture_alias diffusemap ruchin_atlasmap.dds
++			set_texture_alias specmap ruchin_atlas_spec.dds
+ }
+ 
++material base : NormalMapMaterialSpecular2LightsAO2UV
++{
++	
+ 
+ 
++			set_texture_alias normalmap ruchin_atlas_normal.png
++			set_texture_alias diffusemap ruchin_atlasmap.png
++			set_texture_alias specmap ruchin_atlas_spec.png
++			set_texture_alias aomap ruchin_AO_s_n.png
++
++}
++
++
+ material Ruchin/Schiefer
+ {
+ //lighting off
+
+Deleted: modules/ruchin/models/Temple.material
+===================================================================
+--- modules/ruchin/models/Temple.material	2007-04-11 08:15:05 UTC (rev 3248)
++++ modules/ruchin/models/Temple.material	2007-04-11 09:20:06 UTC (rev 3249)
+@@ -1,36 +0,0 @@
+-
+-material orig_06_-_Default
+-{
+-	technique
+-	{
+-		pass
+-		{
+-			ambient 0.47451 0.47451 0.47451 1
+-			diffuse 0.533333 0.533333 0.533333 1
+-			specular 0.0784314 0.0784314 0.0784314 1 10
+-			emissive 0.235294 0.235294 0.235294 1
+-
+-			texture_unit
+-			{
+-				texture_alias 0
+-				texture arc_Temple_diffuse.png
+-			}
+-
+-			texture_unit
+-			{
+-				texture_alias 1
+-				texture arc_Temple_Dirtmap.png
+-				tex_coord_set 1
+-			}
+-
+-			texture_unit
+-			{
+-				texture_alias 2
+-				texture temple_outside_AO.png
+-				tex_coord_set 2
+-			}
+-		}
+-
+-	}
+-
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000319.html">[Dsa-hl-svn] r3248 - rl/trunk
+</A></li>
+	<LI>Next message: <A HREF="000321.html">[Dsa-hl-svn] r3250 - modules/ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#320">[ date ]</a>
+              <a href="thread.html#320">[ thread ]</a>
+              <a href="subject.html#320">[ subject ]</a>
+              <a href="author.html#320">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

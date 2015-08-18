@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2958 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2958%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200701090006.l0906Q7w021095%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000028.html">
+   <LINK REL="Next"  HREF="000030.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2958 - rl/trunk/engine/ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2958%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200701090006.l0906Q7w021095%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2958 - rl/trunk/engine/ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Tue Jan  9 01:06:26 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000028.html">[Dsa-hl-svn] r2957 - in rl/trunk/engine: ai dialog rules
+</A></li>
+        <LI>Next message: <A HREF="000030.html">[Dsa-hl-svn] r2959 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#29">[ date ]</a>
+              <a href="thread.html#29">[ thread ]</a>
+              <a href="subject.html#29">[ subject ]</a>
+              <a href="author.html#29">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-01-09 01:06:22 +0100 (Tue, 09 Jan 2007)
+New Revision: 2958
+
+Modified:
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+Animation fixes. 0 length animations are not played.
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-01-09 00:03:59 UTC (rev 2957)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-01-09 00:06:22 UTC (rev 2958)
+@@ -1195,6 +1195,8 @@
+         static bool jumpNextFrame(false);
+         unsigned int animTimesToPlay = 0;
+         Real gs = mCharacter-&gt;getWert(Creature::WERT_GS);
++		static String lastCollisionPose = &quot;&quot;;
++		String collisionPose = &quot;idle&quot;;
+ 
+         // the different factors used to calculate the animation-speed from the character-speed
+         const Real factor_hocke_gehen = 0.7;
+@@ -1237,8 +1239,8 @@
+             if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+             {
+                 newAnimation = &quot;hocke_idle&quot;;
++				collisionPose = &quot;hocke_idle&quot;;
+                 mCharacterState.mPose = CharacterState::Crouch;
+-                pt-&gt;fitToPose(newAnimation);
+             }
+             // kamera-offset interpolieren grrr
+             Real factor;
+@@ -1250,11 +1252,13 @@
+             if (vel &gt; 0.1 &amp;&amp; movement &amp; MOVE_FORWARD)
+             {
+                 newAnimation = &quot;hocke_gehen&quot;;
++				collisionPose = &quot;hocke_idle&quot;;
+                 animSpeed = charVelocity.length() * factor_hocke_gehen;
+             }
+             else
+             {
+                 newAnimation = &quot;hocke_idle&quot;;
++				collisionPose = &quot;hocke_idle&quot;;
+             }
+         }
+         else if (mCharacterState.mPose == CharacterState::Crouch)
+@@ -1271,7 +1275,6 @@
+             {
+                 newAnimation = &quot;idle&quot;;
+                 mCharacterState.mPose = CharacterState::Stand;
+-                pt-&gt;fitToPose(newAnimation);
+             }
+             // kamera-offset interpolieren grrr
+             Real factor;
+@@ -1285,7 +1288,10 @@
+                 MeshAnimation *meshAnim = mesh-&gt;getAnimation(&quot;rennen_absprung&quot;);
+                 if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+                 {
+-                    newAnimation = &quot;rennen_sprung&quot;;
++					///\todo Animation &quot;rennen_sprung&quot; has length of 0.0f. Substitute for Idle, till this is resolved.
++                    //newAnimation = &quot;rennen_sprung&quot;;
++                    newAnimation = &quot;idle&quot;;
++
+                     animSpeed = factor_rennen_sprung * vel;
+                     animTimesToPlay = 1;
+                     mCharacterState.mPose = CharacterState::Jumping;
+@@ -1297,7 +1303,10 @@
+                 MeshAnimation *meshAnim = mesh-&gt;getAnimation(&quot;idle_absprung&quot;);
+                 if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+                 {
+-                    newAnimation = &quot;idle_sprung&quot;;
++					///\todo Animation &quot;idle_sprung&quot; has length of 0.0f. Substitute for Idle, till this is resolved.
++                    //newAnimation = &quot;idle_sprung&quot;;
++                    newAnimation = &quot;idle&quot;;
++
+                     animTimesToPlay = 1;
+                     mCharacterState.mPose = CharacterState::Jumping;
+                     mCharacterState.mStartJump = true;
+@@ -1426,11 +1435,16 @@
+ 
+         if (newAnimation != &quot;&quot;)
+         {
+-            if( animSpeed &lt; 1 ) // nur schneller nicht langsamer ausf&#252;hren!
+-                animSpeed = 1;
++			// nur schneller nicht langsamer ausf&#252;hren!
++            if (animSpeed &lt; 1) animSpeed = 1;
++                
+             if (lastAnimation != newAnimation)
+             {
+-                //pt-&gt;fitToPose(newAnimation);
++				if (collisionPose != lastCollisionPose)
++				{
++					pt-&gt;fitToPose(collisionPose);
++					lastCollisionPose = collisionPose;
++				}
+                 mesh-&gt;stopAllAnimations();
+                 mesh-&gt;startAnimation(newAnimation, animSpeed, animTimesToPlay);
+                 lastAnimation = newAnimation;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000028.html">[Dsa-hl-svn] r2957 - in rl/trunk/engine: ai dialog rules
+</A></li>
+	<LI>Next message: <A HREF="000030.html">[Dsa-hl-svn] r2959 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#29">[ date ]</a>
+              <a href="thread.html#29">[ thread ]</a>
+              <a href="subject.html#29">[ subject ]</a>
+              <a href="author.html#29">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

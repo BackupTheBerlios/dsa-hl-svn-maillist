@@ -1,0 +1,656 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2975 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2975%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20ui/src&In-Reply-To=%3C200701121911.l0CJBIBG013309%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000045.html">
+   <LINK REL="Next"  HREF="000047.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2975 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2975%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20ui/src&In-Reply-To=%3C200701121911.l0CJBIBG013309%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2975 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Fri Jan 12 20:11:18 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000045.html">[Dsa-hl-svn] r2974 - in rl/trunk: . engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src
+</A></li>
+        <LI>Next message: <A HREF="000047.html">[Dsa-hl-svn] r2976 - modules/Maptest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#46">[ date ]</a>
+              <a href="thread.html#46">[ thread ]</a>
+              <a href="subject.html#46">[ subject ]</a>
+              <a href="author.html#46">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-01-12 20:11:02 +0100 (Fri, 12 Jan 2007)
+New Revision: 2975
+
+Modified:
+   rl/trunk/engine/ai/src/AiSubsystem.cpp
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/GameLoop.cpp
+   rl/trunk/engine/rules/src/TimerManager.cpp
+   rl/trunk/engine/ui/src/DebugWindow.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+Use our own game loop now instead of Ogre's startRendering(). No functional change to the task system yet.
+
+Modified: rl/trunk/engine/ai/src/AiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -62,8 +62,7 @@
+ 	mWorld = new AiWorld();
+ 
+     CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;addSceneChangeListener(this);
+-	GameLoopManager::getSingleton().addSynchronizedTask(AgentManager::getSingletonPtr(),
+-		FRAME_ENDED);
++	GameLoopManager::getSingleton().addTask(AgentManager::getSingletonPtr());
+ }
+ 
+ void AiSubsystem::onBeforeClearScene()
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -18,6 +18,7 @@
+ #define __GameLoop_H__
+ 
+ #include &lt;list&gt;
++#include &lt;deque&gt;
+ #include &lt;OgreSingleton.h&gt;
+ #include &lt;boost/thread.hpp&gt;
+ 
+@@ -30,64 +31,36 @@
+ class SynchronizedGameLoop;
+ 
+ typedef std::list&lt;GameTask*&gt; GameTaskList;
+-enum GameLoopSyncTime {
+-	FRAME_STARTED,
+-	FRAME_ENDED
+-};
+ 
+ class _RlCoreExport GameLoopManager : protected Ogre::Singleton&lt;GameLoopManager&gt;
+ {
+ public:
+-	GameLoopManager(unsigned long millisPerAsyncTick);
++	GameLoopManager();
+ 	virtual ~GameLoopManager();
+ 
+-    void addSynchronizedTask(GameTask* newTask, GameLoopSyncTime syncTime);
+-	void removeSynchronizedTask(GameTask* oldTask);
++    void addTask(GameTask* newTask);
++	void removeTask(GameTask* oldTask);
++
++	/// Request the game to quit. The current task loop will finish though.
+ 	void quitGame();
+-      
+-    bool isPaused();
+-    void setPaused(bool pause);
+ 
++    /// Main loop of RL.
++    void loop();
++      
+     static GameLoopManager &amp; getSingleton(void);
+ 	static GameLoopManager * getSingletonPtr(void);
+ 
+ private:
+-	SynchronizedGameLoop* mSynchronizedFrameStartedGameLoop;
+-	SynchronizedGameLoop* mSynchronizedFrameEndedGameLoop;
+-};
+-
+-class GameLoop
+-{
+-public:
+-	GameLoop();
+-	virtual ~GameLoop();
+-
+-	void add(GameTask* task);
+-	void remove(GameTask* task);
+-	bool isPaused();
+-	void setPaused(bool pause);
+-
+-protected:
+-	void loop( Ogre::Real timeSinceLastCall );
+-	
+-private:	
+ 	GameTaskList mTaskList;
+-	bool mPaused;
+-};
++    std::deque&lt;unsigned long&gt; mLastTimes;
++    /// In milliseconds, because Ogre's timer works this way.
++    unsigned long mSmoothPeriod;
++    Ogre::Real mMaxFrameTime;
++	bool mQuitRequested;
+ 
+-class SynchronizedGameLoop : public GameLoop, public Ogre::FrameListener
+-{
+-private:
+-	bool mRunning;
+-	GameLoopSyncTime mSyncTime;
+-
+-public:
+-	SynchronizedGameLoop(GameLoopSyncTime syncTime);
+-    
+-	void quitGame();
+-
+-	bool frameStarted(const Ogre::FrameEvent &amp; evt);
+-	bool frameEnded(const Ogre::FrameEvent &amp; evt);
++    /// Averages frame rate over mSmoothPeriod milliseconds.
++    /// Steadies Controls and Physics a bit.
++    unsigned long smoothTime(unsigned long time);
+ };
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -118,7 +118,7 @@
+ 			startAdventureModule(mod);
+ 		}
+ 
+-        Root::getSingleton().startRendering();
++		mGameLoopManager-&gt;loop();
+ 
+         mWorld-&gt;clearScene();
+         unloadPlugins();
+@@ -184,7 +184,7 @@
+         if (!carryOn) 
+             return false;
+ 
+-		mGameLoopManager = new GameLoopManager(100); //TODO: In Config-Datei verlagern
++		mGameLoopManager = new GameLoopManager();
+         LOG_MESSAGE(Logger::CORE,&quot;GameLoopmanager erzeugt&quot;);
+ 
+ 		mScriptWrapper = new ScriptWrapper();
+@@ -215,16 +215,16 @@
+ 		mActorManager-&gt;setWorld(mWorld);
+ 
+ 		mPhysicsManager = new PhysicsManager();        
+-        GameLoopManager::getSingleton().addSynchronizedTask(mPhysicsManager, FRAME_ENDED);
++        GameLoopManager::getSingleton().addTask(mPhysicsManager);
+ 
+         mAnimationManager = new AnimationManager();
+-        GameLoopManager::getSingleton().addSynchronizedTask(mAnimationManager, FRAME_ENDED);
++        GameLoopManager::getSingleton().addTask(mAnimationManager);
+ 
+         mGameEventManager = new GameEventManager();
+-        GameLoopManager::getSingleton().addSynchronizedTask(mGameEventManager, FRAME_ENDED);
++        GameLoopManager::getSingleton().addTask(mGameEventManager);
+         
+         mDebugVisualsManager = new DebugVisualsManager();
+-        GameLoopManager::getSingleton().addSynchronizedTask(mDebugVisualsManager, FRAME_ENDED);
++        GameLoopManager::getSingleton().addTask(mDebugVisualsManager);
+ 
+ 		return true;
+     }
+@@ -460,13 +460,8 @@
+     void CoreSubsystem::loadMap(const String type, const String filename, 
+     	const String module, const String startupScript)
+     {
+-        GameLoopManager::getSingleton().setPaused(true);
+-
+         mWorld-&gt;loadScene(filename, module);
+-        if (startupScript.length() &gt; 0)
+-            mRubyInterpreter-&gt;executeFile(startupScript);
+-
+-        GameLoopManager::getSingleton().setPaused(false);
++        if (startupScript.length() &gt; 0) mRubyInterpreter-&gt;executeFile(startupScript);
+     }
+ 
+     void CoreSubsystem::loadPlugins()
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -1,18 +1,18 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
++* Copyright (C) 2003-2005 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
+ 
+ #include &lt;OgreRoot.h&gt;
+ 
+@@ -21,164 +21,92 @@
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;FixRubyHeaders.h&quot;
+ 
+-using Ogre::Singleton;
+-using Ogre::Real;
++#include &lt;numeric&gt;
+ 
++using namespace Ogre;
++
+ template&lt;&gt; rl::GameLoopManager* Singleton&lt;rl::GameLoopManager&gt;::ms_Singleton = 0;
+ 
+ namespace rl {
+ 
+-	GameLoopManager* GameLoopManager::getSingletonPtr(void)
+-	{
+-		return Singleton&lt;GameLoopManager&gt;::getSingletonPtr();
+-	}
+-	GameLoopManager&amp; GameLoopManager::getSingleton(void)
+-	{
+-		return Singleton&lt;GameLoopManager&gt;::getSingleton();
+-	}
+-using namespace Ogre;
++    GameLoopManager* GameLoopManager::getSingletonPtr(void)
++    {
++        return Singleton&lt;GameLoopManager&gt;::getSingletonPtr();
++    }
++    GameLoopManager&amp; GameLoopManager::getSingleton(void)
++    {
++        return Singleton&lt;GameLoopManager&gt;::getSingleton();
++    }
+ 
+-	GameLoopManager::GameLoopManager(unsigned long timePerAsyncTick)
+-	{
+-		mSynchronizedFrameStartedGameLoop = new SynchronizedGameLoop(FRAME_STARTED);
+-		mSynchronizedFrameEndedGameLoop = new SynchronizedGameLoop(FRAME_ENDED);
+-		Ogre::Root::getSingleton().addFrameListener(mSynchronizedFrameStartedGameLoop);
+-		Ogre::Root::getSingleton().addFrameListener(mSynchronizedFrameEndedGameLoop);
+-		setPaused(true);
+-	}
++    GameLoopManager::GameLoopManager()
++        : mTaskList(),
++          mLastTimes(),
++          mSmoothPeriod(5000),
++          mMaxFrameTime(0.5f),
++          mQuitRequested(false)
++    {
++    }
+ 
+-	GameLoopManager::~GameLoopManager()
+-	{
+-		Ogre::Root::getSingleton().removeFrameListener(mSynchronizedFrameStartedGameLoop);
+-		Ogre::Root::getSingleton().removeFrameListener(mSynchronizedFrameEndedGameLoop);
++    GameLoopManager::~GameLoopManager()
++    {
++    }
+ 
+-		delete mSynchronizedFrameStartedGameLoop;
+-		delete mSynchronizedFrameEndedGameLoop;
+-	}
++    void GameLoopManager::addTask(GameTask* task)
++    {
++        mTaskList.push_back(task);
++    }
+ 
+-	void GameLoopManager::addSynchronizedTask(GameTask* newTask, GameLoopSyncTime syncTime)
+-	{
+-		if (syncTime == FRAME_STARTED)
+-			mSynchronizedFrameStartedGameLoop-&gt;add(newTask);
+-		else if (syncTime == FRAME_ENDED)
+-			mSynchronizedFrameEndedGameLoop-&gt;add(newTask);
+-	}
++    void GameLoopManager::removeTask(GameTask* task)
++    {
++        mTaskList.remove(task);
++    }
+ 
+-	void GameLoopManager::removeSynchronizedTask(GameTask* oldTask)
+-	{
+-		mSynchronizedFrameStartedGameLoop-&gt;remove(oldTask);
+-		mSynchronizedFrameEndedGameLoop-&gt;remove(oldTask);
+-	}
++    void GameLoopManager::quitGame()
++    {
++        mQuitRequested = true;
++    }
+ 
+-	bool GameLoopManager::isPaused()
+-	{
+-		return mSynchronizedFrameStartedGameLoop-&gt;isPaused()
+-			&amp;&amp; mSynchronizedFrameEndedGameLoop-&gt;isPaused();
+-	}
++    void GameLoopManager::loop()
++    {
++        Timer* timer = Root::getSingleton().getTimer();
++        // A sensible start value
++        unsigned long timeSinceLastLoop = timer-&gt;getMilliseconds() - 50; 
++        while (!mQuitRequested)
++        {
++            unsigned long elapsedTime = timer-&gt;getMilliseconds();
++            Real frameTime = 0.001f * (Real) smoothTime(elapsedTime - timeSinceLastLoop);
++            timeSinceLastLoop = elapsedTime;
++            if (frameTime &gt; mMaxFrameTime) frameTime = mMaxFrameTime;
+ 
+-	void GameLoopManager::setPaused(bool pause)
+-	{
+-		mSynchronizedFrameStartedGameLoop-&gt;setPaused(pause);
+-		mSynchronizedFrameEndedGameLoop-&gt;setPaused(pause);
+-	}
++			WindowEventUtilities::messagePump();
++            Root::getSingleton().renderOneFrame();
+ 
+-	void GameLoopManager::quitGame()
+-	{
+-		mSynchronizedFrameEndedGameLoop-&gt;quitGame();
+-	}
+-
+-	GameLoop::GameLoop() 
+-		: mPaused(false)
+-	{    
+-		mTaskList.clear();
+-	}
+-
+-	GameLoop::~GameLoop()
+-	{
+-		mTaskList.clear();    
+-	}
+-
+-	void GameLoop::loop(Real timeSinceLastCall)
+-	{
+-		if( !mPaused ) 
+-		{
+-			GameTaskList::iterator i;
+-
+-			for(i = mTaskList.begin(); i != mTaskList.end(); ++i)
+-			{
+-                GameTask* curTask = *i;
+-				if( !curTask-&gt;isPaused() )
++            for (GameTaskList::iterator i = mTaskList.begin(); i != mTaskList.end(); ++i)
++            {
++                if (!(*i)-&gt;isPaused())
+                 {
+-
+-			        LOG_DEBUG(Logger::CORE, curTask-&gt;getName() + &quot; start &quot;);
+-			        double time = (double)CoreSubsystem::getSingleton().getClock();
+-			    	(*i)-&gt;run(timeSinceLastCall);
+-                    time = (double)CoreSubsystem::getSingleton().getClock() - time;
+-			        LOG_DEBUG(Logger::CORE, curTask-&gt;getName() +  &quot; end &quot;
+-                        + Ogre::StringConverter::toString(Ogre::Real(time)));
++                    (*i)-&gt;run(frameTime);
+                 }
+-			}
+-		}
+-	}
++            }
++        }
++    }
+ 
+-	bool GameLoop::isPaused()
+-	{
+-		return mPaused;
+-	}
++    // Idea taken from Ogre, but implementation by us.
++    // smooths time step over the period mSmoothPeriod.
++    unsigned long GameLoopManager::smoothTime(unsigned long time)
++    {
++        mLastTimes.push_back(time);
+ 
+-	void GameLoop::setPaused(bool pause)
+-	{
+-		mPaused = pause;
+-	}
++        unsigned long limit = 0;
++        std::deque&lt;unsigned long&gt;::reverse_iterator i = mLastTimes.rbegin();
++        while (i != mLastTimes.rend() &amp;&amp; limit &lt; mSmoothPeriod)
++        {
++            limit += *i;
++            ++i;
++        }
++        mLastTimes.erase(mLastTimes.begin(), mLastTimes.begin() + (mLastTimes.rend() - i));
+ 
+-	void GameLoop::add(GameTask* task)
+-	{
+-		mTaskList.push_back(task);
+-	}
+-
+-	void GameLoop::remove(GameTask* task)
+-	{
+-		mTaskList.remove(task);
+-	}
+-
+-	bool SynchronizedGameLoop::frameStarted(const Ogre::FrameEvent &amp; evt)
+-	{
+-		if (mSyncTime == FRAME_STARTED)
+-		{
+-			LOG_DEBUG(Logger::CORE, &quot;Sync frame-start start &quot;);
+-			double time = (double)CoreSubsystem::getSingleton().getClock();
+-			loop(evt.timeSinceLastFrame);
+-            time = (double)CoreSubsystem::getSingleton().getClock() - time;
+-			LOG_DEBUG(Logger::CORE, &quot;Sync frame-start end &quot;
+-                + Ogre::StringConverter::toString(Ogre::Real(time)));
+-		}
+-
+-		return true;
+-	}
+-
+-	bool SynchronizedGameLoop::frameEnded(const Ogre::FrameEvent &amp; evt)
+-	{
+-		if (mSyncTime == FRAME_ENDED)
+-		{
+-			LOG_DEBUG(Logger::CORE, &quot;Sync frame-end start &quot;);
+-			double time = (double)CoreSubsystem::getSingleton().getClock();
+-			loop(evt.timeSinceLastFrame);
+-            time = (double)CoreSubsystem::getSingleton().getClock() - time;
+-			LOG_DEBUG(Logger::CORE, &quot;Sync frame-end end &quot;
+-				+ Ogre::StringConverter::toString(Ogre::Real(time)));
+-		}
+-
+-		return mRunning;
+-	}
+-
+-	void SynchronizedGameLoop::quitGame()
+-	{
+-		mRunning = false;
+-	}
+-
+-	SynchronizedGameLoop::SynchronizedGameLoop(GameLoopSyncTime syncTime)
+-		: mRunning(true), mSyncTime(syncTime), GameLoop()
+-	{
+-	}
+-
++        return std::accumulate(mLastTimes.begin(), mLastTimes.end(), 0)
++            / std::max(mLastTimes.size(), (size_t)1);
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/TimerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/TimerManager.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/rules/src/TimerManager.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -44,7 +44,7 @@
+ 	TimerManager::TimerManager() :
+ 		mTimers()
+ 	{
+-		GameLoopManager::getSingleton().addSynchronizedTask(this, FRAME_ENDED);
++		GameLoopManager::getSingleton().addTask(this);
+ 	}
+ 
+ 	TimerManager::~TimerManager()
+@@ -56,7 +56,7 @@
+ 			ScriptWrapper::getSingleton().disowned( currTimer );
+ 		}
+ 		mTimers.clear();
+-		GameLoopManager::getSingleton().removeSynchronizedTask(this);
++		GameLoopManager::getSingleton().removeTask(this);
+ 	}
+ 
+ 	void TimerManager::run(Ogre::Real elapsedTime)
+
+Modified: rl/trunk/engine/ui/src/DebugWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DebugWindow.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ui/src/DebugWindow.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -214,9 +214,9 @@
+ 	{
+ 		CeGuiWindow::setVisible(visible, destroyAfterHide);
+ 		if (visible)
+-			GameLoopManager::getSingleton().addSynchronizedTask(this, FRAME_ENDED);
++			GameLoopManager::getSingleton().addTask(this);
+ 		else
+-			GameLoopManager::getSingleton().removeSynchronizedTask(this);
++			GameLoopManager::getSingleton().removeTask(this);
+ 	}
+ 
+     const Ogre::String&amp; DebugWindow::getName() const
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -64,12 +64,12 @@
+         mInputManager(NULL)
+ 	{
+         initializeOis(win);
+-        GameLoopManager::getSingleton().addSynchronizedTask(this, FRAME_ENDED);
++        GameLoopManager::getSingleton().addTask(this);
+     }
+ 
+ 	InputManager::~InputManager()
+ 	{
+-        GameLoopManager::getSingleton().removeSynchronizedTask(this);
++        GameLoopManager::getSingleton().removeTask(this);
+ 		if( mInputManager )
+ 		{
+ 			mInputManager-&gt;destroyInputObject( mMouse );
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -131,7 +131,7 @@
+ 			boost::bind(&amp;InventoryWindow::handleClose, this));
+ 
+         mInventoryArrangeTask = new InventoryArrangeTask();
+-		GameLoopManager::getSingletonPtr()-&gt;addSynchronizedTask(mInventoryArrangeTask, FRAME_ENDED);
++		GameLoopManager::getSingletonPtr()-&gt;addTask(mInventoryArrangeTask);
+ 	}
+ 	
+ 	InventoryWindow::~InventoryWindow()
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -85,7 +85,7 @@
+ 		delete mWindowFactory;
+ 		delete mWindowManager;
+ 
+-        GameLoopManager::getSingleton().removeSynchronizedTask(mCharacterController);
++        GameLoopManager::getSingleton().removeTask(mCharacterController);
+ 		delete mCharacterController;
+ 
+ 		delete mInputManager;
+@@ -159,7 +159,7 @@
+ 
+         mWindowFactory-&gt;initialize();
+ 
+-		GameLoopManager::getSingleton().addSynchronizedTask(this, FRAME_ENDED);
++		GameLoopManager::getSingleton().addTask(this);
+     }
+ 
+ 
+@@ -225,7 +225,7 @@
+ 			if (mCharacterController-&gt;getType() == type)
+ 				return;
+ 
+-			GameLoopManager::getSingleton().removeSynchronizedTask(mCharacterController);
++			GameLoopManager::getSingleton().removeTask(mCharacterController);
+ 			delete mCharacterController;
+             mCharacterController = NULL;
+ 			LOG_MESSAGE(Logger::UI,
+@@ -281,7 +281,7 @@
+ 		mInputManager-&gt;setCharacterController(mCharacterController);
+ 
+ 	    LOG_MESSAGE(Logger::UI, &quot;CharacterController created.&quot;);
+-		GameLoopManager::getSingleton().addSynchronizedTask(mCharacterController, FRAME_ENDED );
++		GameLoopManager::getSingleton().addTask(mCharacterController);
+         LOG_MESSAGE(Logger::UI, &quot;CharacterController task added.&quot;);
+ 	}
+ 
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2007-01-12 15:38:29 UTC (rev 2974)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2007-01-12 19:11:02 UTC (rev 2975)
+@@ -32,13 +32,13 @@
+ 	WindowManager::WindowManager()
+ 	{
+ 		mWindowUpdater = new WindowUpdater();
+-		GameLoopManager::getSingleton().addSynchronizedTask(mWindowUpdater, FRAME_ENDED);
++		GameLoopManager::getSingleton().addTask(mWindowUpdater);
+ 		//mWindowUpdater-&gt;setPaused(true);
+ 	}
+ 
+ 	WindowManager::~WindowManager()
+ 	{
+-		GameLoopManager::getSingleton().removeSynchronizedTask(mWindowUpdater);
++		GameLoopManager::getSingleton().removeTask(mWindowUpdater);
+ 		delete mWindowUpdater;
+ 	}
+ 	
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000045.html">[Dsa-hl-svn] r2974 - in rl/trunk: . engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src
+</A></li>
+	<LI>Next message: <A HREF="000047.html">[Dsa-hl-svn] r2976 - modules/Maptest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#46">[ date ]</a>
+              <a href="thread.html#46">[ thread ]</a>
+              <a href="subject.html#46">[ subject ]</a>
+              <a href="author.html#46">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

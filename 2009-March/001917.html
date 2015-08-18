@@ -1,0 +1,638 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4860 - in rl/trunk/editors/Lockenwickler/src: . media
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4860%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200903221625.n2MGPKob027524%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001916.html">
+   <LINK REL="Next"  HREF="001918.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4860 - in rl/trunk/editors/Lockenwickler/src: . media</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4860%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200903221625.n2MGPKob027524%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4860 - in rl/trunk/editors/Lockenwickler/src: . media">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 22 17:25:20 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001916.html">[Dsa-hl-svn] r4859 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001918.html">[Dsa-hl-svn] r4861 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1917">[ date ]</a>
+              <a href="thread.html#1917">[ thread ]</a>
+              <a href="subject.html#1917">[ subject ]</a>
+              <a href="author.html#1917">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-22 17:25:15 +0100 (Sun, 22 Mar 2009)
+New Revision: 4860
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+   rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material
+Log:
+- zones load partially into the editor
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -421,8 +421,6 @@
+         self.ogreMainWindow.toggleViewportGrid()
+ 
+     def createDockWindows(self):
+-
+-
+         self.modelSelectionDock = QtGui.QDockWidget(self.tr(&quot;Models&quot;), self)
+         self.modelSelectionDock.setObjectName(&quot;ModelSelectionDockWindow&quot;)
+         self.modelSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+@@ -503,9 +501,7 @@
+         for a in actions:
+             menu.addAction(a)
+ 
+-            
+         menu.exec_(QCursor.pos())
+-        
+ 
+     def connectActionButtons(self):
+         pass
+@@ -525,6 +521,8 @@
+             settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
+             settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
+             settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
++            
++            self.ogreRoot.shutdown()
+         else:
+             event.ignore()
+ 
+@@ -546,5 +544,7 @@
+     form = Lockenwickler()
+     form.show()
+ 
+-    sys.exit(app.exec_())
++    app.exec_()
++    
++    sys.exit(0)
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -307,9 +307,11 @@
+             childItem.setIcon(0, QIcon(&quot;media/icons/dissociatecell.png&quot;))
+             childItem.setIcon(1, QIcon(&quot;media/icons/14_layer_visible.png&quot;))
+             
++            i = 0
+             for area in zone.areaList:
+                 childItem2 = QTreeWidgetItem(childItem)
+-                childItem2.setText(0, &quot;Area &quot; + str(area.id))
++                childItem2.setText(0, &quot;Area &quot; + str(i))
++                i += 1
+                 
+     def setCurrentModule(self, module):
+         self.module = module
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -103,7 +103,7 @@
+             return &quot;EntityCustomOptions&quot;
+ 
+ class Map():
+-    def __init__(self, pathToFile, sceneManager, ogreRoot, gocManager, emptyMap = False):
++    def __init__(self, pathToFile, sceneManager, ogreRoot, gocManager, zoneManager, emptyMap = False):
+         self.pathToMapFile = pathToFile
+         
+         mapName = pathToFile.replace(&quot;\\&quot;, &quot;/&quot;)
+@@ -117,6 +117,7 @@
+         self.mapNode = sceneManager.getRootSceneNode().createChildSceneNode(self.pathToMapFile)
+         self.ogreRoot = ogreRoot
+         self.gocManager = gocManager
++        self.zoneManager = zoneManager
+         self.isHidden = False
+         
+         self.zoneList = []
+@@ -127,7 +128,7 @@
+ 
+             if root.attrib[&quot;formatVersion&quot;] == &quot;0.4.0&quot;:
+                 self.parseMapNodes(root.find(&quot;nodes&quot;))
+-                #self.parseMapZones(root.find(&quot;zones&quot;))
++                self.parseMapZones(root.find(&quot;zones&quot;))
+             else:
+                 print pathToFile + &quot; has wrong format version. It needs to be 0.4.0&quot;
+                 return
+@@ -150,6 +151,9 @@
+         
+         self.isHidden = False
+     
++    def parseMapZones(self, zonesElement):
++        self.zoneManager.parseZonesFromXml(zonesElement, self)
++    
+     def parseMapNodes(self, nodeElement):
+         nodes = nodeElement.getiterator(&quot;gameobject&quot;)
+         self.createGameObjects(nodes)
+@@ -231,7 +235,6 @@
+             except:
+                 print &quot;Warning: Meshfile &quot; + meshFile + &quot; could not be found.&quot;
+                 return
+-            
+ 
+             e.setUserObject(eco)
+             n = self.mapNode.createChild(&quot;entity_&quot; + entityName + &quot;_node&quot;)
+@@ -257,8 +260,6 @@
+             spotlightinner = None
+             spotlightouter = None
+             falloff = None 
+-            
+-
+                 
+             transformations = l.getiterator()
+             for t in transformations:
+@@ -501,12 +502,13 @@
+ #            print name
+ 
+ class Scene():
+-    def __init__(self, moduleroot, pathToFile, sceneManager, ogreRoot, gocManager, emptyScene = False, sceneName = &quot;NewScene&quot;):
++    def __init__(self, moduleroot, pathToFile, sceneManager, ogreRoot, gocManager, zoneManager, emptyScene = False, sceneName = &quot;NewScene&quot;):
+         self.moduleRoot = moduleroot
+         self.pathToFile = pathToFile
+         self.sceneManager = sceneManager
+         self.ogreRoot = ogreRoot
+         self.gocManager = gocManager
++        self.zoneManager = zoneManager
+         self.mapFiles = [] # a list in case the module has more than one map file
+         mappaths = []
+         self.name = sceneName
+@@ -522,11 +524,11 @@
+                 mappaths.append(join(self.moduleRoot, join(&quot;maps&quot;, m.attrib[&quot;file&quot;])))
+                 
+             for m in mappaths:
+-                self.mapFiles.append(Map(m, self.sceneManager, self.ogreRoot, self.gocManager))
++                self.mapFiles.append(Map(m, self.sceneManager, self.ogreRoot, self.gocManager, self.zoneManager))
+             
+     def addMap(self, name):
+         path = join(self.moduleRoot, join(&quot;maps&quot;, name + &quot;.rlmap.xml&quot;))
+-        self.mapFiles.append(Map(path, self.sceneManager, self.ogreRoot, self.gocManager, True))
++        self.mapFiles.append(Map(path, self.sceneManager, self.ogreRoot, self.gocManager, self.zoneManager, True))
+         
+     def save(self):
+         root = xml.Element(&quot;scene&quot;)
+@@ -540,13 +542,12 @@
+         indent(root)
+         xml.ElementTree(root).write(self.pathToFile)
+ 
+-
+-
+ class Module():
+-    def __init__(self,name, modulePath, sceneManager, ogreRoot, gameObjectManager):
++    def __init__(self,name, modulePath, sceneManager, ogreRoot, gameObjectManager, zoneManager):
+         self.sceneManager = sceneManager
+         self.ogreRoot = ogreRoot
+         self.gocManager = gameObjectManager
++        self.zoneManager = zoneManager
+         
+         self.name = name
+         self.moduleRoot = join(modulePath, name)
+@@ -566,7 +567,7 @@
+         self.playerStart = None
+         
+     def addScene(self, name):
+-        self.scenes.append(Scene(self.moduleRoot, join(self.moduleRoot, (&quot;maps/&quot; + name + &quot;.rlscene&quot;)), self.sceneManager, self.ogreRoot, self.gocManager, True, name))
++        self.scenes.append(Scene(self.moduleRoot, join(self.moduleRoot, (&quot;maps/&quot; + name + &quot;.rlscene&quot;)), self.sceneManager, self.ogreRoot, self.gocManager, self.zoneManager, True, name))
+     
+     def addMapToScene(self, sceneName, mapName):
+         for scene in self.scenes:
+@@ -654,7 +655,7 @@
+         
+     def loadScenes(self, sceneFiles):
+         for s in sceneFiles:
+-            self.scenes.append(Scene(self.moduleRoot, s, self.sceneManager, self.ogreRoot, self.gocManager))
++            self.scenes.append(Scene(self.moduleRoot, s, self.sceneManager, self.ogreRoot, self.gocManager, self.zoneManager))
+ 
+     def save(self):
+         for s in self.scenes:
+@@ -743,13 +744,11 @@
+         self.middleMouseDown = False
+         self.rightMouseDown = False
+ 
+-       
+         self.dropNode = None
+         self.dropEntity = None
+         self.dropCollisionPlane = og.Plane(og.Vector3().UNIT_Y, og.Vector3().ZERO)
+         self.dropMat = None
+         
+-        self.numerOfCopys = 0 #everytime a copy is made this numer is increased to generate unique node and mesh names
+         self.moduleConfigIsParsed = False
+ 
+         self.selectionBuffer = None
+@@ -788,7 +787,7 @@
+             if line.startswith('module='):
+                 splines = line.split('=')
+                 str = splines[1].rstrip().rstrip()
+-                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;), self.sceneManager, self.ogreRoot, self.gocManager))
++                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;), self.sceneManager, self.ogreRoot, self.gocManager, self.zoneManager))
+ 
+         self.moduleConfigIsParsed = True
+ 
+@@ -965,8 +964,10 @@
+ 
+         for so in self.userSelectionList:
+             node = so.entity.getParentNode()
+-
+-            if node.getName().startswith(&quot;light_&quot;):
++            if node.getName().startswith(&quot;area_&quot;):
++                self.zoneManager.deleteArea(so.entity.getUserObject())
++                continue
++            elif node.getName().startswith(&quot;light_&quot;):
+                 light = extractLight(node)
+                 self.sceneManager.destroyLight(light)
+                 
+@@ -977,24 +978,6 @@
+ 
+         self.userSelectionList = []
+ 
+-    def incrementNameSuffixNumber(self, name):
+-        newName = &quot;&quot;
+-        split = name.split(&quot;_&quot;)
+-        lastPart = len(split)-1
+-        newName = name.rstrip(split[lastPart])
+-        newName = newName + str(self.numerOfCopys)
+-
+-#        if split[lastPart].isdigit() and not split[lastPart].startswith(&quot;0&quot;):
+-#            num = int(split[lastPart])
+-#            num = num + 1
+-#            newName = name.rstrip(split[lastPart])
+-#            newName = newName + str(num)
+-#        else:
+-#            newName = name + &quot;_1&quot;
+-
+-        self.numerOfCopys = self.numerOfCopys + 1
+-        return newName
+-
+     def copyObjects(self):
+         if len(self.userSelectionList) &lt; 1 or self.currentMap is None:
+             print &quot;Warning: No map selected!&quot;
+@@ -1017,7 +1000,6 @@
+                         newGO = GameObjectRepresentation(ModuleManager.dropCount, so.entity.getUserObject().gocName, newNode, meshFile)
+                         self.gocManager.addGameObjectRepresentation(newGO)
+                         newEntity.setUserObject(newGO)
+-                        #newGO.setPosition(og.Vector3(0, 0, 0))
+ 
+                         newSO = SelectionObject(newEntity)
+                         newSO.setSelected(True)
+
+Modified: rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -188,7 +188,11 @@
+                 newColor = QColorDialog.getColor(QColor(col.r * 255, col.g * 255, col.g * 255), self)
+                 ModuleManager.extractLight(self.node).setSpecularColour(og.ColourValue(min * newColor.red(), min * newColor.green(), min * newColor.blue()))
+                 self.showProperties(self.so)
+-
++            elif item.text(0) == &quot;Subtract&quot;:
++                bedit = BoolEditor(item.text(column), self)
++                bedit.exec_()
++                item.setText(column, str(bedit.getValue()))
++                self.so.entity.getUserObject().subtract = bedit.getValue()                    
+             else:
+                 self.treeWidget.editItem(item, column)
+ 
+@@ -211,7 +215,7 @@
+                         else:
+                             item.setText(column, self.valueBeforeEdit)
+                             print &quot;Error: Name already exists!&quot;
+-                            
++
+                     elif self.node.getName().startswith(&quot;light_&quot;):
+                         if not self.sceneManager.hasLight(str(item.text(column))):
+                             newLight = self.sceneManager.createLight(str(item.text(column)))
+@@ -233,7 +237,10 @@
+                         else:
+                             item.setText(column, self.valueBeforeEdit)
+                             print &quot;Error: Name already exists!&quot;
+-                            
++
++                elif item.text(0) == &quot;Zone Name&quot;:
++                    self.node.getAttachedObject(0).getUserObject().parentZone.name = str(item.text(column))
++                        
+                 elif item.text(0) == &quot;GameObject Id&quot;:
+                     if not self.gocManager.inWorldIdExists(str(item.text(column))):
+                         val = None
+@@ -407,8 +414,25 @@
+             self.parseDiffuseColor(self.node)
+             self.parseSpecularColor(self.node)
+             self.parseLightAttenuation(self.node)
+-
+-       
++        elif name.startswith(&quot;area_&quot;):
++            area = so.entity.getUserObject()
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Zone Name&quot;)
++            item.setText(1, area.parentZone.name)
++            item.setFlags(item.flags() | Qt.ItemIsEditable)
++            
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Type&quot;)
++            item.setText(1, area.type)
++            
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Subtract&quot;)
++            item.setText(1, str(area.subtract))
++            
++            self.parsePosition(area.areaNode)
++            self.parseOrientation(area.areaNode)
++            self.parseScale(area.areaNode)
++            
+         self.connect(self.treeWidget, SIGNAL(&quot;itemChanged (QTreeWidgetItem *,int)&quot;),
+                        self.onItemChanged)
+                        
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -48,19 +48,20 @@
+ #                        &lt;/trigger&gt;
+ #                &lt;/zone&gt;
+  
+-class Area():
+-    def __init__(self,sceneManager, type, parentZone, id, position, orientation, scale, meshFile = None, transitiondistance = &quot;0.5&quot;):
++class Area(og.UserDefinedObject):
++    def __init__(self,sceneManager, type, parentZone, id, position, orientation, scale, meshFile = None, transitiondistance = &quot;0.5&quot;, subtract = False):
++        og.UserDefinedObject.__init__(self)
+         self.type = type
+         self.parentZone = parentZone
+         if not parentZone:
+            raise Exception(&quot;No parentZone&quot;)
+ 
+-        self.id = id
++        self.id = id # editor internal id for entity and node creation
+         self.areaNode = parentZone.zoneNode.createChildSceneNode(&quot;area_&quot; + parentZone.name + &quot; &quot; + str(id))
+         self.meshFile = meshFile
+         self.areaEntity = None
+         self.transitiondistance = transitiondistance
+-        
++        self.__subtract = subtract
+         self.sceneManager = sceneManager
+         
+         if type == &quot;box&quot;:
+@@ -74,8 +75,6 @@
+         elif type == &quot;pyramid&quot;:
+             print &quot;not yet&quot;
+         elif type == &quot;mesh&quot;:
+-            self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
+-        elif type == &quot;othermesh&quot;:
+             try:
+                 self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
+             except:
+@@ -83,16 +82,35 @@
+                 return None
+                 
+         self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
++        if self.__subtract:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
++            
++        self.areaEntity.setUserObject(self)
+         self.areaNode.attachObject(self.areaEntity)
+         self.areaNode.setPosition(position)
+         if orientation is not None:
+-            self.areaNode.setOrientation(orientation)
++            self.areaNode.setOrientation(orientation.qw, orientation.qx, orientation.qy, orientation.qz)
+         if scale is not None:
+             self.areaNode.setScale(scale)
++    
++    def __del__(self):
++        self.areaNode.detachAllObjects()
++        self.areaNode.getParent().removeAndDestroyChild(self.areaNode.getName())
++        self.sceneManager.destroyEntity(self.areaEntity.getName())
++    
++    def getsubtract(self):
++        return self.__subtract
+         
+-        if type == &quot;mesh&quot;:
+-            self.areaNode.setScale(self.areaNode.getScale() + 0.05)
+-            
++    def setsubtract(self, val):
++        if not val:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
++        else:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
++        
++        self.__subtract = val
++        
++    subtract = property(getsubtract, setsubtract)
++    
+ class Zone():
+     def __init__(self,sceneManager, map, name):
+         self.map = map
+@@ -112,7 +130,13 @@
+         if area is not None:
+             self.areaList.append(area)
+             self.areaCounter = self.areaCounter + 1
+-        
++    
++    def deleteArea(self, area):
++        for a in self.areaList:
++            if a.id == area.id:
++                self.areaList.remove(a)
++                del a
++    
+     def hide(self):
+         self.sceneManager.getRootSceneNode().removeChild(self.zoneNode)
+         self.isHidden = True
+@@ -121,13 +145,7 @@
+         self.sceneManager.getRootSceneNode().addChild(self.zoneNode)
+         self.isHidden = False
+         
+-    def __del__(self):
+-        self.areaNode.getParentSceneNode().detachChild(self.areaNode)
+-        self.areaNode.detachAllObjects()
+         
+-        self.sceneMgr.destroySceneNode(self.areaNode)
+-        self.sceneMgr.destroyEntity(self.areaEntity)
+-        
+ class ZoneManager():
+     def __init__(self, sceneManager):
+         self.currentMap = None
+@@ -145,7 +163,66 @@
+         z = Zone(self.sceneManager, self.currentMap, name)
+         self.zoneList.append(z)
+         self.currentMap.zoneList.append(z)
++        return z
+         
++    def parseZonesFromXml(self, zoneXmlNode, map):
++        if zoneXmlNode is None:
++            return
++        
++        self.currentMap = map
++        
++        zoneNodes = zoneXmlNode.getiterator(&quot;zone&quot;)
++        for zone in zoneNodes:
++            zoneName = zone.attrib[&quot;name&quot;]
++            z = self.createZone(zoneName)
++            
++            areaNodes = zone.getiterator(&quot;area&quot;)
++            for area in areaNodes:
++                type = area.attrib[&quot;type&quot;]
++                meshFile = None
++                if type == &quot;mesh&quot;:
++                    meshFile = area.attrib[&quot;meshfile&quot;]
++                
++                pos = og.Vector3()
++                qw = qx = qy = qz = 0
++                scale = None
++                hasRotation = False
++                
++                transformations = area.getiterator()
++                for t in transformations:
++                    if t.tag == &quot;position&quot;:
++                        posx = float(t.attrib[&quot;x&quot;])
++                        posy = float(t.attrib[&quot;y&quot;])
++                        posz = float(t.attrib[&quot;z&quot;])
++                        pos = og.Vector3(posx, posy, posz)
++                    elif t.tag == &quot;rotation&quot;:
++                        qw = float(t.attrib[&quot;qw&quot;])
++                        qx = float(t.attrib[&quot;qx&quot;])
++                        qy = float(t.attrib[&quot;qy&quot;])
++                        qz = float(t.attrib[&quot;qz&quot;])
++                        hasRotation = True
++                    elif type == &quot;mesh&quot; and t.tag == &quot;scale&quot;:
++                        scalex = float(t.attrib[&quot;x&quot;])
++                        scaley = float(t.attrib[&quot;y&quot;])
++                        scalez = float(t.attrib[&quot;z&quot;])
++                        scale = og.Vector3(scalex, scaley, scalez)
++                    elif t.tag == &quot;size&quot;:
++                        scalex = float(t.attrib[&quot;x&quot;])
++                        scaley = float(t.attrib[&quot;y&quot;])
++                        scalez = float(t.attrib[&quot;z&quot;])
++                        scale = og.Vector3(scalex, scaley, scalez)
++                
++                rot = None
++                if hasRotation:
++                    rot = og.Quaternion(qw, qx, qy, qz)
++                    
++                z.addArea(type, pos, rot, scale, meshFile)
++    def deleteArea(self, area):
++        for z in self.zoneList:
++            for a in z.areaList:
++                if a.id == area.id:
++                    z.deleteArea(area)
++    
+     def getZoneMenu(self):
+         self.menuList = []
+         menu = QMenu(&quot;Add Area&quot;)
+@@ -175,14 +252,10 @@
+             self.menuList.append(pyramidAction)
+             m.addAction(pyramidAction)
+             
+-            meshAction = self.createAction(&quot;convex hull from: &quot; + self.entityUnderMouse.getName(), functools.partial(self.onZoneNameTriggered, zone, &quot;mesh&quot;))
++            meshAction = self.createAction(&quot;mesh&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;mesh&quot;))
+             self.menuList.append(meshAction)
+             m.addAction(meshAction)
+             
+-            otherMeshAction = self.createAction(&quot;convex hull from another mesh &quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;othermesh&quot;))
+-            self.menuList.append(otherMeshAction)
+-            m.addAction(otherMeshAction)
+-            
+         return menu
+         
+     def onZoneNameTriggered(self, zone, type):
+@@ -192,16 +265,12 @@
+             elif type == &quot;sphere&quot;:
+                 zone.addArea(&quot;sphere&quot;, self.newAreaPosition, None, None)
+             elif type == &quot;mesh&quot;:
+-                resName = self.entityUnderMouse.getMesh().getName()
+-                parentNode = self.entityUnderMouse.getParentSceneNode()
+-                zone.addArea(&quot;mesh&quot;, parentNode.getPosition(), parentNode.getOrientation(), parentNode.getScale(), resName)
+-            elif type == &quot;othermesh&quot;:
+                 dlg = NameInputDlg(QApplication.focusWidget())
+                 resName = &quot;&quot;
+                 if dlg.exec_():
+                     resName = str(dlg.nameInput.text())
+ 
+-                zone.addArea(&quot;othermesh&quot;, self.newAreaPosition, None, None, resName)
++                zone.addArea(&quot;mesh&quot;, self.newAreaPosition, None, None, resName)
+                 
+     def getZone(self, name):
+         for zone in self.zoneList:
+
+Modified: rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material	2009-03-22 09:03:58 UTC (rev 4859)
++++ rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material	2009-03-22 16:25:15 UTC (rev 4860)
+@@ -94,6 +94,31 @@
+ 	}
+ }
+ 
++material Lockenwickler_Area_Subtract
++{
++	technique
++	{
++                pass
++		{
++                        depth_write off
++                        scene_blend alpha_blend
++                        
++			ambient 0.0 0.0 1.0 0.2
++			diffuse 0.0 0.0 1.0 0.2
++			emissive 0.0 0.0 1.0 0.2
++		}
++
++		pass
++		{
++                        polygon_mode wireframe
++
++			ambient 0.0 0.0 1.0 1.0
++			diffuse 0.0 0.0 1.0 1.0
++			emissive 0.0 0.0 1.0 1.0
++		}
++	}
++}
++
+ vertex_program PlainColor_VS cg
+ {
+ 	source PlainColor.cg
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001916.html">[Dsa-hl-svn] r4859 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001918.html">[Dsa-hl-svn] r4861 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1917">[ date ]</a>
+              <a href="thread.html#1917">[ thread ]</a>
+              <a href="subject.html#1917">[ subject ]</a>
+              <a href="author.html#1917">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3579 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3579%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707022024.l62KOFjs010084%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000649.html">
+   <LINK REL="Next"  HREF="000651.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3579 - rl/trunk/engine/rules/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3579%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707022024.l62KOFjs010084%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3579 - rl/trunk/engine/rules/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Jul  2 22:24:15 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000649.html">[Dsa-hl-svn] r3578 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="000651.html">[Dsa-hl-svn] r3580 - in rl/trunk/engine: ai/include ai/src rules	rules/include rules/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#650">[ date ]</a>
+              <a href="thread.html#650">[ thread ]</a>
+              <a href="subject.html#650">[ subject ]</a>
+              <a href="author.html#650">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-07-02 22:24:10 +0200 (Mon, 02 Jul 2007)
+New Revision: 3579
+
+Added:
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+Removed:
+   rl/trunk/engine/rules/src/MovingCreatureManager.cpp
+Log:
+Renamed remotely
+
+Copied: rl/trunk/engine/rules/src/CreatureControllerManager.cpp (from rev 3578, rl/trunk/engine/rules/src/MovingCreatureManager.cpp)
+
+Deleted: rl/trunk/engine/rules/src/MovingCreatureManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreatureManager.cpp	2007-07-02 20:23:38 UTC (rev 3578)
++++ rl/trunk/engine/rules/src/MovingCreatureManager.cpp	2007-07-02 20:24:10 UTC (rev 3579)
+@@ -1,228 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Perl Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Perl Artistic License for more details.
+-*
+-*  You should have received a copy of the Perl Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+-*/
+-
+-
+-#include &quot;Actor.h&quot;
+-#include &quot;Creature.h&quot;
+-#include &quot;GameTask.h&quot;
+-#include &quot;GameLoop.h&quot;
+-#include &quot;Exception.h&quot;
+-#include &quot;MovingCreatureManager.h&quot;
+-#include &quot;MovingCreature.h&quot;
+-
+-
+-using namespace Ogre;
+-using namespace std;
+-
+-
+-template&lt;&gt; rl::MovingCreatureManager* Singleton&lt;rl::MovingCreatureManager&gt;::ms_Singleton = 0;
+-
+-
+-namespace rl
+-{
+-    MovingCreatureManager::MovingCreatureManager() :
+-            mUpdateIdleTime(1.0f),
+-            mTimeSinceLastIdleUpdate(0.0f),
+-            mName(&quot;MovingCreatureManager&quot;)
+-    {
+-        GameLoop::getSingleton().addTask(this, GameLoop::TG_LOGIC);
+-
+-        PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
+-        // the material of moving creatures
+-        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;createMaterialID(&quot;character&quot;);
+-
+-        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;createMaterialID(&quot;default&quot;);
+-        const OgreNewt::MaterialID *level_mat = physicsManager-&gt;createMaterialID(&quot;level&quot;);
+-
+-        physicsManager-&gt;createMaterialPair(char_mat, def_mat)-&gt;setContactCallback(this);
+-        physicsManager-&gt;createMaterialPair(char_mat, level_mat)-&gt;setContactCallback(this);
+-    }
+-
+-    MovingCreatureManager::~MovingCreatureManager()
+-    {
+-        PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
+-        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;getMaterialID(&quot;character&quot;);
+-
+-        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;getMaterialID(&quot;default&quot;);
+-        const OgreNewt::MaterialID *level_mat = physicsManager-&gt;getMaterialID(&quot;level&quot;);
+-
+-        physicsManager-&gt;resetMaterialPair(char_mat, def_mat);
+-        physicsManager-&gt;resetMaterialPair(char_mat, level_mat);
+-
+-
+-        GameLoop::getSingleton().removeTask(this);
+-    }
+-
+-    void MovingCreatureManager::add(MovingCreature *movingCreature)
+-    {
+-        if(movingCreature == NULL)
+-        {
+-            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
+-        }
+-
+-        MovingCreatureVector::const_iterator iter;
+-        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
+-        {
+-            if( (*iter) == movingCreature )
+-            {
+-                Throw(IllegalArgumentException, &quot;MovingCreature wird schon vom MovingCreatureManager verwaltet.&quot;);
+-            }
+-        }
+-        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
+-        {
+-            if( (*iter) == movingCreature )
+-            {
+-                Throw(IllegalArgumentException, &quot;MovingCreature wird schon vom MovingCreatureManager verwaltet.&quot;);
+-            }
+-        }
+-
+-        mMovingCreatureFromBody.insert(make_pair(
+-            movingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody(),
+-            movingCreature));
+-        mIdleCreatures.push_back(movingCreature);
+-    }
+-
+-
+-    void MovingCreatureManager::remove(MovingCreature *movingCreature)
+-    {
+-        if(movingCreature == NULL)
+-        {
+-            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
+-        }
+-
+-        MovingCreatureBodyMap::iterator body_iter = mMovingCreatureFromBody.find(
+-            movingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody());
+-
+-        if( body_iter == mMovingCreatureFromBody.end() )
+-        {
+-            Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
+-        }
+-
+-        mMovingCreatureFromBody.erase(body_iter);
+-
+-
+-        MovingCreatureVector::iterator iter;
+-        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
+-        {
+-            if( (*iter) == movingCreature )
+-            {
+-                mIdleCreatures.erase(iter);
+-                return;
+-            }
+-        }
+-        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
+-        {
+-            if( (*iter) == movingCreature )
+-            {
+-                mActiveCreatures.erase(iter);
+-                return;
+-            }
+-        }
+-        for(iter = mAddToActiveCreatures.begin(); iter != mAddToActiveCreatures.end(); iter++)
+-        {
+-            if( (*iter) == movingCreature )
+-            {
+-                mAddToActiveCreatures.erase(iter);
+-                return;
+-            }
+-        }
+-
+-
+-        Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
+-    }
+-
+-    void MovingCreatureManager::run(Real elapsedTime)
+-    {
+-        mTimeSinceLastIdleUpdate += elapsedTime;
+-
+-
+-        MovingCreatureVector::iterator iter;
+-        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter ++)
+-        {
+-            (*iter)-&gt;run(elapsedTime);
+-        }
+-
+-        if( mTimeSinceLastIdleUpdate &gt;= mUpdateIdleTime )
+-        {
+-            for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
+-            {
+-                (*iter)-&gt;run(mTimeSinceLastIdleUpdate);
+-            }
+-            mTimeSinceLastIdleUpdate = 0.0f;
+-        }
+-    }
+-
+-
+-    void MovingCreatureManager::setActive(MovingCreature* movingCreature)
+-    {
+-        if(movingCreature == NULL)
+-        {
+-            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
+-        }
+-
+-        // we cannot simply add the item to the other list, since it needs to be updated first!!
+-        // i hope there are no errors, if this update is not at the proposed time in the game loop
+-        // since it is not executed with the other runs!!!
+-
+-        MovingCreatureVector::iterator iter;
+-        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
+-        {
+-            if( *iter == movingCreature )
+-            {
+-                movingCreature-&gt;run(mTimeSinceLastIdleUpdate);
+-
+-                mActiveCreatures.push_back(movingCreature);
+-                mIdleCreatures.erase(iter);
+-                return;
+-            }
+-        }
+-
+-        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
+-        {
+-            if( *iter == movingCreature )
+-            {
+-                LOG_DEBUG(Logger::RULES, &quot;Die angegebene MovingCreature ist schon aktiv.&quot;);
+-                return;
+-            }
+-        }
+-
+-
+-        Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
+-    }
+-
+-
+-    int MovingCreatureManager::userProcess()
+-    {
+-        MovingCreatureBodyMap::iterator iter;
+-        iter = mMovingCreatureFromBody.find(m_body0);
+-
+-        if( iter == mMovingCreatureFromBody.end() )
+-        {
+-            iter = mMovingCreatureFromBody.find(m_body1);
+-
+-            if( iter == mMovingCreatureFromBody.end() )
+-            {
+-                LOG_ERROR(Logger::RULES, &quot;Der Kollisionsk&#246;rper konnte keiner Creature zugeordner werden.&quot;);
+-                return 1;
+-            }
+-        }
+-
+-        // i hope this will copy the protected members of the contact callback
+-        OgreNewt::ContactCallback *movingCreature = iter-&gt;second;
+-        *movingCreature = (OgreNewt::ContactCallback)(*this);
+-        return movingCreature-&gt;userProcess();
+-    }
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000649.html">[Dsa-hl-svn] r3578 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="000651.html">[Dsa-hl-svn] r3580 - in rl/trunk/engine: ai/include ai/src rules	rules/include rules/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#650">[ date ]</a>
+              <a href="thread.html#650">[ thread ]</a>
+              <a href="subject.html#650">[ subject ]</a>
+              <a href="author.html#650">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

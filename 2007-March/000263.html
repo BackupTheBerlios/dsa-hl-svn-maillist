@@ -1,0 +1,217 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3192 - rl/trunk/engine/core/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3192%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703231251.l2NCpsZ0012312%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000262.html">
+   <LINK REL="Next"  HREF="000264.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3192 - rl/trunk/engine/core/include</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3192%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703231251.l2NCpsZ0012312%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3192 - rl/trunk/engine/core/include">natoka at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar 23 13:51:54 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000262.html">[Dsa-hl-svn] r3191 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000264.html">[Dsa-hl-svn] r3193 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#263">[ date ]</a>
+              <a href="thread.html#263">[ thread ]</a>
+              <a href="subject.html#263">[ subject ]</a>
+              <a href="author.html#263">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-23 13:51:24 +0100 (Fri, 23 Mar 2007)
+New Revision: 3192
+
+Added:
+   rl/trunk/engine/core/include/QuadTree.h
+Log:
+adding a basic Quadtree template (which is yet not finished, but has to be discussed a bit)
+
+
+Added: rl/trunk/engine/core/include/QuadTree.h
+===================================================================
+--- rl/trunk/engine/core/include/QuadTree.h	2007-03-21 21:42:46 UTC (rev 3191)
++++ rl/trunk/engine/core/include/QuadTree.h	2007-03-23 12:51:24 UTC (rev 3192)
+@@ -0,0 +1,140 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++  
++#ifndef __QUADTREE_H__
++#define __QUADTREE_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++namespace rl
++{
++	
++/** A very basic quad tree template.
++ * It just stores whether the current node is subdivided or not and
++ * the data contained in the node.
++ * Normally this would be used in a uniform flat quadtree. That means
++ * that the quadtrees memory would be preallocated once and indexing
++ * would be used to map the 2D structure into the 1D memory.
++ * Non uniform quadtrees are also possible, but quite useless, because
++ * they consume the preallocated memory anyway.
++ * Anyway the node indexing should follow the defined style by the enum
++ * NodeLocation.
++ */
++template &lt;class TData&gt;
++struct TBasicQuadTree 
++{
++	/** Tells where the node within an array is located.
++	 * creates a counterclockwise location of nodes.
++	 */
++	enum NodeLocation 
++	{
++		TOP_LEFT = 0,		//!&lt; upper left quad
++		BOTTOM_LEFT,		//!&lt; lower left quad
++		BOTTOM_RIGHT,		//!&lt; lower right quad
++		TOP_RIGHT			//!&lt; upper right quad
++	};
++
++	bool		mSubDivided;	//!&lt; true if node has subnodes
++	TData		mData;			//!&lt; data of this node
++};
++
++/** A basic quadtree with pointer to it's children nodes.
++ * This quadree template is for (non) uniform quadtrees where additional
++ * nodes can be allocated and inserted on demand.
++ */
++template &lt;class TData, class TNode&gt;
++struct TBasicPointerQuadTree : public TBasicQuadTree&lt; TData &gt;
++{
++	TNode*		mNodes[4];	//!&lt; four pointers to subnodes
++
++	// function for recursively deleting the quad tree
++	static void Delete (TBasicPointerQuadTree&lt;TData, TNode&gt; *node);
++};
++
++/** A basic Quadtree containing vertex data
++ */
++template &lt;class TData, class TNode&gt;
++struct TQuadTree : public TBasicPointerQuadTree&lt; TData, TNode &gt;
++{
++	Ogre::Vector3	mVertices[4];	//!&lt; vertices of this node
++	float			mWidth;	//!&lt; length of this quad
++
++
++	static void Delete (TQuadTree&lt;TData, TNode&gt; *node);
++}; /* TQuadTree */
++
++/** A basic loose quadtree.
++ * A loose quadtree consists of loose quads, which have an extended
++ * 'loose' area around them. So the quads do not only store the
++ * contents of the quad, but of the extende area too. This can be
++ * helpfull in eliminating additional traversals of the tree, when
++ * objects are near the border of the quad (or reaching into neighbouring
++ * quads).
++ */
++template &lt;class TData, class TNode&gt;
++struct TLooseQuadTree : public TQuadTree&lt; std::vector&lt; TData &gt;, TNode &gt;
++{
++	/** maximum number of elements in one leaf.
++	 * Whenever this number is reached a subdivision takes place.
++	 */
++	int mMaxData;
++	/** maximum level of depth.
++	 * prevents further subdivision when a leafnode is at this subdivision
++	 * level
++	 */
++	int mMaxDepth;
++	/** The looseness factor
++	 * Defines the size of the 'loose' area around the quad.
++	 * Should be between 1.0 and 1.5 - less or more doesn't make sense at all.
++	 */
++	float mLooseness;
++
++
++	void SetLooseness(float looseness);
++	void SetMaxDepth(int maxDepth);
++	void SetMaxData(int maxData);
++
++	float GetLooseness();
++	int GetMaxDepth();
++	int GetMaxData();
++
++	/** inserts the specified data.
++	 * The supplied axisaligned box specifies the extents of the given data.
++	 * According to that information the data is inserted at one or more
++	 * leaf nodes.
++	 */
++	void insert(const Ogre::AxisAlignedBoundingBox&amp; aabb, TData data);
++
++	/** removes a node.
++	 * When the node has got subnodes they are also removed
++	 */
++	void removeNode();
++
++	/** searches the quadtree for a leaf that covers the specified position.
++	 * The search is done as if this is a normal quadtree (without any
++	 * loose boundaries applied 
++	 * @param position in world space coordinates
++	 */
++	TLooseQuadTree* find(Ogre::Vector3 position);
++
++}
++
++// contains the code for the defined functions
++#include &quot;TQuadTree.hpp&quot;
++
++}; /* world */
++
++#endif /* __QUADTREE_H__ */
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000262.html">[Dsa-hl-svn] r3191 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000264.html">[Dsa-hl-svn] r3193 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#263">[ date ]</a>
+              <a href="thread.html#263">[ thread ]</a>
+              <a href="subject.html#263">[ subject ]</a>
+              <a href="author.html#263">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

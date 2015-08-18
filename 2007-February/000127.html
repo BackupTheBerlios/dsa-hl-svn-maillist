@@ -1,0 +1,268 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3056 - in modules/common/scripts: . jobs
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3056%20-%20in%20modules/common/scripts%3A%20.%20jobs&In-Reply-To=%3C200702211603.l1LG33Kk005862%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000126.html">
+   <LINK REL="Next"  HREF="000128.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3056 - in modules/common/scripts: . jobs</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3056%20-%20in%20modules/common/scripts%3A%20.%20jobs&In-Reply-To=%3C200702211603.l1LG33Kk005862%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3056 - in modules/common/scripts: . jobs">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Feb 21 17:03:03 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000126.html">[Dsa-hl-svn] r3055 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig engine/ui/src	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+        <LI>Next message: <A HREF="000128.html">[Dsa-hl-svn] r3057 - modules/common/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#127">[ date ]</a>
+              <a href="thread.html#127">[ thread ]</a>
+              <a href="subject.html#127">[ subject ]</a>
+              <a href="author.html#127">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-02-21 17:02:54 +0100 (Wed, 21 Feb 2007)
+New Revision: 3056
+
+Added:
+   modules/common/scripts/jobs/
+   modules/common/scripts/jobs/soundjobs.rb
+Modified:
+   modules/common/scripts/door.rb
+   modules/common/scripts/globals.rb
+   modules/common/scripts/questsound.rb
+Log:
+Added functions that wrap Sound job creation and registering, to ease the in-game use.
+   PlaySound2d(soundname)
+   PlaySound3d(soundname, position)
+Door and Questsound now use these new function.
+Simplified QuestsoundListener implementation.
+
+Modified: modules/common/scripts/door.rb
+===================================================================
+--- modules/common/scripts/door.rb	2007-02-21 15:58:09 UTC (rev 3055)
++++ modules/common/scripts/door.rb	2007-02-21 16:02:54 UTC (rev 3056)
+@@ -1,5 +1,6 @@
+ load &quot;embed.rb&quot;
+ #require 'actorupdateanimationlistener.rb'
++require 'jobs/soundjobs.rb'
+ 
+ class OpenDoorAction &lt; Action
+   def initialize
+@@ -18,9 +19,7 @@
+     doorActor.getPhysicalThing().fitToPose(&quot;zu&quot;);
+ 
+     doorActor.getControlledObject().replaceAnimation(&quot;zu&quot;, &quot;auf&quot;, 1.0, 1);
+-
+-    knarzActor = door.getSoundActor();
+-    knarzActor.getControlledObject().play();
++    PlaySound3d(&quot;doorcreak.ogg&quot;, doorActor.getPosition());
+     door.setOpen(true);
+   end
+ end
+@@ -42,10 +41,7 @@
+     doorActor.getPhysicalThing().fitToPose(&quot;auf&quot;);
+ 
+     doorActor.getControlledObject.replaceAnimation(&quot;auf&quot;, &quot;zu&quot;, 1.0, 1); 
+-
+-    knarzActor = door.getSoundActor();
+-    knarzActor.getControlledObject().play();
+-
++    PlaySound3d(&quot;doorcreak.ogg&quot;, doorActor.getPosition());
+     door.setOpen(false);
+   end
+ end
+@@ -70,8 +66,6 @@
+ 
+   def placeIntoScene()
+     super()
+-    @mSoundActor = $AM.createSoundSampleActor(&quot;door_&quot; + getId().to_s + &quot;_knarzen&quot;, @mSound);
+-    getActor().attach(@mSoundActor);
+     addActions();
+   end
+ 
+@@ -109,10 +103,5 @@
+        end
+      end
+   end
+-
+-  def getSoundActor()
+-     return @mSoundActor
+-  end
+-
+ end
+ 
+
+Modified: modules/common/scripts/globals.rb
+===================================================================
+--- modules/common/scripts/globals.rb	2007-02-21 15:58:09 UTC (rev 3055)
++++ modules/common/scripts/globals.rb	2007-02-21 16:02:54 UTC (rev 3056)
+@@ -8,6 +8,7 @@
+ GC.disable
+ 
+ $CORE = CoreSubsystem.getSingleton();
++$JS = JobScheduler.getSingleton();
+ $AM = ActorManager.getSingleton();
+ $PM = PhysicsManager.getSingleton();
+ $UI = UiSubsystem.getSingleton();
+@@ -49,4 +50,4 @@
+ rgof = RubyGameObjectFactory.new();
+ $GOM.setGameObjectFactory(rgof);
+ 
+-require( &quot;questsound.rb&quot; );
+\ No newline at end of file
++require( &quot;questsound.rb&quot; );
+
+Added: modules/common/scripts/jobs/soundjobs.rb
+===================================================================
+--- modules/common/scripts/jobs/soundjobs.rb	2007-02-21 15:58:09 UTC (rev 3055)
++++ modules/common/scripts/jobs/soundjobs.rb	2007-02-21 16:02:54 UTC (rev 3056)
+@@ -0,0 +1,14 @@
++require 'globals.rb'
++
++# Play a 2d sound
++def PlaySound2d(sound, volume=1.0)
++    job = PlaySound2dJob.new(sound, volume)
++    $JS.addJob(job)
++end
++
++# Play a 3d sound at position pos
++def PlaySound3d(sound, pos, volume=1.0)
++    job = PlaySound3dJob.new(sound, pos, volume)
++    $JS.addJob(job)
++end
++
+
+Modified: modules/common/scripts/questsound.rb
+===================================================================
+--- modules/common/scripts/questsound.rb	2007-02-21 15:58:09 UTC (rev 3055)
++++ modules/common/scripts/questsound.rb	2007-02-21 16:02:54 UTC (rev 3056)
+@@ -1,74 +1,39 @@
+-load &quot;embed.rb&quot;
++require 'jobs/soundjobs.rb'
+ 
+-class QuestSoundTimer &lt; TimerListener
+-    def initialize(questSoundPlayer)
+-        super()
+-        @mQuestSoundPlayer = questSoundPlayer
+-    end
+-
+-    def timerFired(event)
+-	    @mQuestSoundPlayer.playSound() 
+-    end
+-end
+-
+ class QuestSoundPlayer &lt; QuestListener 
+ 	def initialize()
+ 		super()
+-		@mHasSound = false;
+-		@mSound = nil;
+-		@mSoundTimer = TimerEventSource.new(0, 1000)
+-        @mTimerListener = QuestSoundTimer.new(self)
+-		@mSoundTimer.addTimerListener( @mTimerListener )
++        @lastPlayed = 0
+ 	end
+ 
+ 	def questStateChanged( anEvent )
+-		#p &quot;State ver&#228;ndert&quot;
+-		@mHasSound = true
++        playSound()
+ 	end
+ 
+ 	def questPartsDoneChanged( anEvent )
+-		#p &quot;Teile ver&#228;ndert&quot;
+-		@mHasSound = true
++        playSound()
+ 	end
+ 
+ 	def questKnownChanged( anEvent )
+-		#p &quot;Sichtbarkeit ver&#228;ndert&quot;
+-		@mHasSound = true;
++        playSound()
+ 	end
+ 
+ 	def questSubquestAdded( anEvent )
+-		#p &quot;Subquest hinzugef&#252;gt&quot;
+-		@mHasSound = true
++        playSound()
+ 	end
+ 
+ 	def journalEntryAdded( anEvent )
+-		# Journaleintrag hinzugef&#252;gt
+-		@mHasSound = true
++        playSound()
+ 	end
+     
+ 	def playSound()
+-        begin 
+-            if( @mHasSound )
+-                if( @mSound.nil? )
+-                    @mSound = $AM.createSoundSampleActor( &quot;QuestAenderung&quot;, &quot;quest_aenderung_gekritzel_01.ogg&quot; )
+-                    
+-                    @mSound.getControlledObject().set3d(false)
+-                    @mSound.getControlledObject().load()
+-                end
+-
+-                @mSound.getControlledObject().play()
+-                @mHasSound = false
+-		    end
+-        rescue 
+-            @mSoundTimer.removeTimerListener( @mTimerListener )
+-            @mHasSound = false
+-            p &quot;Questsound ist kaputt gegangen&quot;
+-            p @mSound
+-            p &quot;@mSound.nil? &quot; + (@mSound.nil?).to_s
+-            p &quot;@mSound == nil &quot; + (@mSound == nil).to_s
+-            p &quot;@mSound.is_a? Actor &quot; + (@mSound.is_a? Actor).to_s
++        now = $CORE.getClock()
++        # only play sound, if we didn't play it in the last two seconds
++        if (now - @lastPlayed) &gt; 2.0
++            PlaySound2d(&quot;quest_aenderung_gekritzel_01.ogg&quot;)
++            @lastPlayed = now
+         end
+-	end
++ 	end
+ end
+ 
+-RulesSubsystem.getSingleton().getQuestBook().addQuestListener(  QuestSoundPlayer.new()  )
++RulesSubsystem.getSingleton().getQuestBook().addQuestListener(QuestSoundPlayer.new())
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000126.html">[Dsa-hl-svn] r3055 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig engine/ui/src	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+	<LI>Next message: <A HREF="000128.html">[Dsa-hl-svn] r3057 - modules/common/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#127">[ date ]</a>
+              <a href="thread.html#127">[ thread ]</a>
+              <a href="subject.html#127">[ subject ]</a>
+              <a href="author.html#127">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

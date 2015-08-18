@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4161 - in rl/trunk/engine: common/include common/src	core/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4161%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/src%20ui/src&In-Reply-To=%3C200803051931.m25JVccJ031027%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001231.html">
+   <LINK REL="Next"  HREF="001233.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4161 - in rl/trunk/engine: common/include common/src	core/src ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4161%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/src%20ui/src&In-Reply-To=%3C200803051931.m25JVccJ031027%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4161 - in rl/trunk/engine: common/include common/src	core/src ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  5 20:31:38 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001231.html">[Dsa-hl-svn] r4160 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001233.html">[Dsa-hl-svn] r4162 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1232">[ date ]</a>
+              <a href="thread.html#1232">[ thread ]</a>
+              <a href="subject.html#1232">[ subject ]</a>
+              <a href="author.html#1232">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-05 20:31:35 +0100 (Wed, 05 Mar 2008)
+New Revision: 4161
+
+Modified:
+   rl/trunk/engine/common/include/GameTask.h
+   rl/trunk/engine/common/src/GameTask.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/JobScheduler.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+Log:
+Fix GameTask to enable pausing the game
+
+Modified: rl/trunk/engine/common/include/GameTask.h
+===================================================================
+--- rl/trunk/engine/common/include/GameTask.h	2008-03-05 19:21:20 UTC (rev 4160)
++++ rl/trunk/engine/common/include/GameTask.h	2008-03-05 19:31:35 UTC (rev 4161)
+@@ -28,7 +28,7 @@
+     public:
+ 		/// Konstruktor, startet unpausiert
+         /// @param interruptable set to &lt;code&gt;false&lt;/code&gt; if GameTask can't be paused
+-        GameTask(bool interruptable = true);
++        GameTask(bool interruptable = false);
+ 
+ 		/// Virtueller Basis-Destruktor
+         virtual ~GameTask() {};
+
+Modified: rl/trunk/engine/common/src/GameTask.cpp
+===================================================================
+--- rl/trunk/engine/common/src/GameTask.cpp	2008-03-05 19:21:20 UTC (rev 4160)
++++ rl/trunk/engine/common/src/GameTask.cpp	2008-03-05 19:31:35 UTC (rev 4161)
+@@ -21,8 +21,8 @@
+ namespace rl 
+ {
+ 
+-GameTask::GameTask(bool pauseable)
+-: mInterruptable(false), mPaused(false)
++GameTask::GameTask(bool interruptable)
++: mInterruptable(interruptable), mPaused(false)
+ {
+ }
+         
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-05 19:21:20 UTC (rev 4160)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-05 19:31:35 UTC (rev 4161)
+@@ -166,7 +166,7 @@
+        // mAnimationManager-&gt;setPaused(paused);
+        // mPhysicsManager-&gt;setPaused(paused);
+         mTimeSourceManager-&gt;setPaused(paused);
+-        mGameLoop-&gt;setPaused(true);
++        mGameLoop-&gt;setPaused(paused);
+ 	}
+ 
+     void CoreSubsystem::setTimeFactor(const Ogre::Real &amp;factor)
+
+Modified: rl/trunk/engine/core/src/JobScheduler.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobScheduler.cpp	2008-03-05 19:21:20 UTC (rev 4160)
++++ rl/trunk/engine/core/src/JobScheduler.cpp	2008-03-05 19:31:35 UTC (rev 4161)
+@@ -28,7 +28,8 @@
+ namespace rl
+ {
+     JobScheduler::JobScheduler()
+-        : mJobQueue(), 
++        : GameTask(true),
++        mJobQueue(), 
+         //mRemovedJobs(), 
+         mTokenThreshold(JP_NORMAL), 
+         mTicketCounter(0)
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2008-03-05 19:21:20 UTC (rev 4160)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2008-03-05 19:31:35 UTC (rev 4161)
+@@ -61,7 +61,8 @@
+ 
+ namespace rl {
+ 
+-    InputManager::InputManager(Ogre::RenderWindow* win) :
++    InputManager::InputManager(Ogre::RenderWindow* win) 
++      : GameTask(false),
+         mKeyMapNormal(),
+         mKeyMapShift(),
+         mKeyMapAlt(),
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001231.html">[Dsa-hl-svn] r4160 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001233.html">[Dsa-hl-svn] r4162 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1232">[ date ]</a>
+              <a href="thread.html#1232">[ thread ]</a>
+              <a href="subject.html#1232">[ subject ]</a>
+              <a href="author.html#1232">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

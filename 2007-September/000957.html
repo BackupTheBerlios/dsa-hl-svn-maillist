@@ -1,0 +1,283 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3886 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3886%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200709301237.l8UCbjP0029251%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000956.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3886 - in rl/trunk/engine/core: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3886%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200709301237.l8UCbjP0029251%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3886 - in rl/trunk/engine/core: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep 30 14:37:45 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000956.html">[Dsa-hl-svn] r3885 - in rl/trunk/engine: core/include core/src	rules/include rules/src
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#957">[ date ]</a>
+              <a href="thread.html#957">[ thread ]</a>
+              <a href="subject.html#957">[ subject ]</a>
+              <a href="author.html#957">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-30 14:37:34 +0200 (Sun, 30 Sep 2007)
+New Revision: 3886
+
+Modified:
+   rl/trunk/engine/core/include/SaveGameFileReader.h
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/SaveGameFileReader.cpp
+   rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+Log:
+Get lost damn SaveGameHeaderReader!
+
+Modified: rl/trunk/engine/core/include/SaveGameFileReader.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameFileReader.h	2007-09-30 10:53:57 UTC (rev 3885)
++++ rl/trunk/engine/core/include/SaveGameFileReader.h	2007-09-30 12:37:34 UTC (rev 3886)
+@@ -30,6 +30,7 @@
+     public:
+         SaveGameFileReader();
+         void parseSaveGameFile(SaveGameFile* file, const SaveGameDataSet &amp;set);
++        void parseSaveGameFileHeader(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName, SaveGameFile* file);
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2007-09-30 10:53:57 UTC (rev 3885)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2007-09-30 12:37:34 UTC (rev 3886)
+@@ -40,13 +40,6 @@
+ 
+     typedef std::map&lt;CeGuiString, SaveGameFile*&gt; SaveGameEntryMap;
+ 
+-    class SaveGameHeaderReader : public XmlPropertyReader
+-    {
+-    public:
+-        SaveGameHeaderReader();
+-        void parseHeader(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName, SaveGameFile* file);
+-    };
+-
+     class _RlCoreExport SaveGameManager : public Ogre::Singleton&lt;SaveGameManager&gt;, public Ogre::ScriptLoader
+     {
+     public:
+
+Modified: rl/trunk/engine/core/src/SaveGameFileReader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-09-30 10:53:57 UTC (rev 3885)
++++ rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-09-30 12:37:34 UTC (rev 3886)
+@@ -36,8 +36,45 @@
+ 
+         DOMDocument* doc = loadDocument(file-&gt;getDataStream());
+ 
++        for(SaveGameDataSet::const_iterator data_iter = set.begin(); data_iter != set.end(); data_iter++)
++        {
++            (*data_iter)-&gt;readData(this);
++        }
++
++
+         doc-&gt;release();
+ 
+         shutdownXml();
+     }
++
++    void SaveGameFileReader::parseSaveGameFileHeader(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName, SaveGameFile* file)
++    {
++        initializeXml();
++
++        if(stream-&gt;size())
++        {
++            DOMDocument* doc = loadDocument(stream);
++
++             DOMNodeList* headerDefsXml = doc-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(&quot;header&quot;).data());
++             if(headerDefsXml-&gt;getLength())
++             {
++                 DOMElement* elem = static_cast&lt;DOMElement*&gt;(headerDefsXml-&gt;item(0));
++                 DOMNodeList* headerDefChildren = elem-&gt;getChildNodes();
++                 for(XMLSize_t childIdx = 0; childIdx &lt; headerDefChildren-&gt;getLength(); childIdx++)
++                 {
++                     DOMNode* curChild = headerDefChildren-&gt;item(childIdx);
++                     if (curChild-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                     {
++                         PropertyEntry entry = processProperty(static_cast&lt;DOMElement*&gt;(curChild));
++                         if(entry.first != &quot;&quot;)
++                         {
++                            file-&gt;setProperty(entry.first, entry.second);
++                         }
++                     }
++                 }
++             }
++        }
++
++        shutdownXml();
++    }
+ }
+\ No newline at end of file
+
+Modified: rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-09-30 10:53:57 UTC (rev 3885)
++++ rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-09-30 12:37:34 UTC (rev 3886)
+@@ -71,63 +71,12 @@
+             this-&gt;processProperty(header, PropertyEntry(it_header-&gt;first.c_str(), it_header-&gt;second));
+         }
+ 
+-        /*setAttributeValueAsString(header, &quot;ModuleID&quot;, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId());
+-        setAttributeValueAsInteger(header, &quot;EngineVersion&quot;, CoreSubsystem::getSingleton().getEngineBuildNumber());
+-        setAttributeValueAsString(header, &quot;LocalTime&quot;, file-&gt;getProperty(&quot;Time&quot;).toString());*/
+-
+-        //Write date and time
+-        //DOMElement* timeNode = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;time&quot;);
+-        
+-        /*tm* timeinfo = file-&gt;getLocalTime();
+-
+-        setAttributeValueAsInteger(timeNode, &quot;day&quot;, timeinfo-&gt;tm_mday);
+-        setAttributeValueAsInteger(timeNode, &quot;month&quot;, timeinfo-&gt;tm_mon);
+-        setAttributeValueAsInteger(timeNode, &quot;year&quot;, timeinfo-&gt;tm_year+1900);
+-
+-        setAttributeValueAsInteger(timeNode, &quot;hour&quot;, timeinfo-&gt;tm_hour);
+-        setAttributeValueAsInteger(timeNode, &quot;minute&quot;, timeinfo-&gt;tm_min);
+-        setAttributeValueAsInteger(timeNode, &quot;second&quot;, timeinfo-&gt;tm_sec);*/
+-
+         //Write globals
+         DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
+         DOMElement* gameTime = appendChildElement(mDocument, globals, &quot;gametime&quot;);
+         TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
+         setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
+ 
+-        ////Write Quests
+-        //DOMElement* quests = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;quests&quot;);
+-        //QuestBook* questBook = RulesSubsystem::getSingleton().getQuestBook();
+-        //PropertySet* set = questBook-&gt;getAllProperties();
+-        //for(PropertySetMap::const_iterator it_quests = set-&gt;begin(); it_quests != set-&gt;end(); it_quests++)
+-        //{
+-        //    this-&gt;processProperty(quests, PropertyEntry(it_quests-&gt;first.c_str(), it_quests-&gt;second));
+-        //}
+-
+-        ////Write game objects
+-        //DOMElement* gameobjects = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;gameobjects&quot;);
+-        //
+-
+-        //std::list&lt;const GameObject*&gt; gos = GameObjectManager::getSingleton().getAllGameObjects();
+-
+-        //for(std::list&lt;const GameObject*&gt;::const_iterator it_gameobjects = gos.begin(); it_gameobjects != gos.end(); it_gameobjects++)
+-        //{
+-        //    DOMElement* gameobject = appendChildElement(mDocument, gameobjects, &quot;gameobject&quot;);
+-        //    setAttributeValueAsInteger(gameobject, &quot;ID&quot;, (*it_gameobjects)-&gt;getId());
+-        //    setAttributeValueAsString(gameobject, &quot;ClassID&quot;, (*it_gameobjects)-&gt;getClassId());
+-
+-        //    PropertyMap map = (*it_gameobjects)-&gt;getAllProperties()-&gt;toPropertyMap();
+-        //    PropertyMap::iterator it_properties;
+-        //    for(it_properties = map.begin(); it_properties != map.end(); it_properties++)
+-        //    {
+-        //        this-&gt;processProperty(gameobject, PropertyEntry(it_properties-&gt;first.c_str(), it_properties-&gt;second));
+-        //    }
+-        //}        
+-
+-        ////Write Zones?
+-
+-        ////Write scripts
+-        //DOMElement* scripts = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;scripts&quot;);
+-
+         for(SaveGameDataSet::const_iterator data_iter = set.begin(); data_iter != set.end(); data_iter++)
+         {
+             (*data_iter)-&gt;writeData(this);
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2007-09-30 10:53:57 UTC (rev 3885)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2007-09-30 12:37:34 UTC (rev 3886)
+@@ -54,41 +54,6 @@
+         return string;
+     }
+ 
+-    SaveGameHeaderReader::SaveGameHeaderReader()
+-    {
+-    }
+-
+-    void SaveGameHeaderReader::parseHeader(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName, SaveGameFile* file)
+-    {
+-        initializeXml();
+-
+-        if(stream-&gt;size())
+-        {
+-            DOMDocument* doc = loadDocument(stream);
+-
+-             DOMNodeList* headerDefsXml = doc-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(&quot;header&quot;).data());
+-             if(headerDefsXml-&gt;getLength())
+-             {
+-                 DOMElement* elem = static_cast&lt;DOMElement*&gt;(headerDefsXml-&gt;item(0));
+-                 DOMNodeList* headerDefChildren = elem-&gt;getChildNodes();
+-                 for(XMLSize_t childIdx = 0; childIdx &lt; headerDefChildren-&gt;getLength(); childIdx++)
+-                 {
+-                     DOMNode* curChild = headerDefChildren-&gt;item(childIdx);
+-                     if (curChild-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-                     {
+-                         PropertyEntry entry = processProperty(static_cast&lt;DOMElement*&gt;(curChild));
+-                         if(entry.first != &quot;&quot;)
+-                         {
+-                            file-&gt;setProperty(entry.first, entry.second);
+-                         }
+-                     }
+-                 }
+-             }
+-        }
+-
+-        shutdownXml();
+-    }
+-
+     SaveGameManager::SaveGameManager()
+     { 
+         Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGames&quot;);
+@@ -177,8 +142,8 @@
+         SaveGameFile* file = new SaveGameFile(name);
+         
+         LOG_MESSAGE(Logger::RULES, &quot;Parsing header of save game: &quot; + name);
+-        SaveGameHeaderReader reader;
+-        reader.parseHeader(stream, groupName, file);
++        SaveGameFileReader reader;
++        reader.parseSaveGameFileHeader(stream, groupName, file);
+ 
+         Ogre::DataStream* _stream = new Ogre::MemoryDataStream(*stream, false); //making a copy of the data stream. searching for a better alternative
+         file-&gt;setDataStream(Ogre::DataStreamPtr(_stream));
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000956.html">[Dsa-hl-svn] r3885 - in rl/trunk/engine: core/include core/src	rules/include rules/src
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#957">[ date ]</a>
+              <a href="thread.html#957">[ thread ]</a>
+              <a href="subject.html#957">[ subject ]</a>
+              <a href="author.html#957">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

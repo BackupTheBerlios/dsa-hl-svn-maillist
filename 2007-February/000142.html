@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3071 - in modules: common/scripts/jobs	regressiontest/dsa regressiontest/scripts	regressiontest/scripts/maps
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3071%20-%20in%20modules%3A%20common/scripts/jobs%0A%09regressiontest/dsa%20regressiontest/scripts%0A%09regressiontest/scripts/maps&In-Reply-To=%3C200702232111.l1NLBeT0024495%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000141.html">
+   <LINK REL="Next"  HREF="000143.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3071 - in modules: common/scripts/jobs	regressiontest/dsa regressiontest/scripts	regressiontest/scripts/maps</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3071%20-%20in%20modules%3A%20common/scripts/jobs%0A%09regressiontest/dsa%20regressiontest/scripts%0A%09regressiontest/scripts/maps&In-Reply-To=%3C200702232111.l1NLBeT0024495%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3071 - in modules: common/scripts/jobs	regressiontest/dsa regressiontest/scripts	regressiontest/scripts/maps">tanis at mail.berlios.de
+       </A><BR>
+    <I>Fri Feb 23 22:11:40 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000141.html">[Dsa-hl-svn] r3070 - in rl/trunk/engine: core/src script/swig
+</A></li>
+        <LI>Next message: <A HREF="000143.html">[Dsa-hl-svn] r3072 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-02-23 22:11:02 +0100 (Fri, 23 Feb 2007)
+New Revision: 3071
+
+Added:
+   modules/common/scripts/jobs/jobsequence.rb
+   modules/regressiontest/scripts/JobSequenceTest.rb
+Modified:
+   modules/common/scripts/jobs/animationjobs.rb
+   modules/common/scripts/jobs/soundjobs.rb
+   modules/regressiontest/dsa/gameobjectdefinitions.gof
+   modules/regressiontest/scripts/maps/regressiontest.rb
+Log:
+Added job sequence and test for it.
+
+Modified: modules/common/scripts/jobs/animationjobs.rb
+===================================================================
+--- modules/common/scripts/jobs/animationjobs.rb	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/common/scripts/jobs/animationjobs.rb	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -5,3 +5,7 @@
+     $JS.addJob(job)
+ end
+ 
++def _PlayAnimation(actor, anim, doloop=false, replace=true)
++    PlayAnimationJob.new(actor, anim, doloop, replace)
++end
++
+
+Added: modules/common/scripts/jobs/jobsequence.rb
+===================================================================
+--- modules/common/scripts/jobs/jobsequence.rb	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/common/scripts/jobs/jobsequence.rb	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -0,0 +1,21 @@
++require 'globals.rb'
++
++# Schedule a sequence of jobs.
++# jobs is an array of Jobs and Numerics. Numerics are accumulated pauses
++# till the next job starts.
++def jobSequence (jobs)
++    start = 0
++    p &quot;start&quot;
++    jobs.each { |x|
++        if x.is_a? Numeric:
++            # This is a time, we add it to the start time, of jobs
++            # later in the queue
++            start += x
++            p &quot;starttime #start&quot;
++        else
++            $JS.addJob(x, 20, start)
++            p &quot;job added&quot;
++        end
++    }
++end
++
+
+Modified: modules/common/scripts/jobs/soundjobs.rb
+===================================================================
+--- modules/common/scripts/jobs/soundjobs.rb	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/common/scripts/jobs/soundjobs.rb	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -12,3 +12,12 @@
+     $JS.addJob(job)
+ end
+ 
++def _PlaySound2d(sound, volume=1.0)
++    PlaySound2dJob.new(sound, volume)
++end
++
++# Play a 3d sound at position pos
++def _PlaySound3d(sound, pos, volume=1.0)
++    PlaySound3dJob.new(sound, pos, volume)
++end
++
+
+Modified: modules/regressiontest/dsa/gameobjectdefinitions.gof
+===================================================================
+--- modules/regressiontest/dsa/gameobjectdefinitions.gof	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/regressiontest/dsa/gameobjectdefinitions.gof	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -61,4 +61,13 @@
+         &lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;arc_hebel_01.mesh&quot;/&gt;
+     &lt;/gameobjectclass&gt;
+ 
++    &lt;!-- JobSequenceTest --&gt;
++    &lt;gameobjectclass&gt;
++        &lt;property name=&quot;classid&quot; type=&quot;STRING&quot; data=&quot;JobSequenceTestChest&quot;/&gt;
++        &lt;property name=&quot;baseclass&quot; type=&quot;STRING&quot; data=&quot;GameObject&quot; /&gt;
++        &lt;property name=&quot;description&quot; type=&quot;STRING&quot; data=&quot;Eine Truhe zum Test der JobSequence&quot;/&gt;
++        &lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;ver_truhe_gross01.mesh&quot;/&gt;
++        &lt;property name=&quot;geometrytype&quot; type=&quot;INT&quot; data=&quot;0&quot;/&gt; &lt;!-- GT_BOX --&gt;
++    &lt;/gameobjectclass&gt;
++
+ &lt;/GameObjectDefinitions&gt;
+
+Added: modules/regressiontest/scripts/JobSequenceTest.rb
+===================================================================
+--- modules/regressiontest/scripts/JobSequenceTest.rb	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/regressiontest/scripts/JobSequenceTest.rb	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -0,0 +1,50 @@
++require 'jobs/jobsequence.rb'
++require 'jobs/soundjobs.rb'
++require 'jobs/animationjobs.rb'
++
++class JobSequenceTestAction &lt; Action
++  def initialize
++    super(&quot;checktime&quot;, &quot;Zeit ansagen lassen.&quot;);
++  end
++  
++  def canDo(go, user)
++    true
++  end
++  
++  def doAction(go, user, target)
++    jobSequence(
++            [
++                _PlayAnimation(go.getActor(), &quot;auf&quot;),
++                _PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition()),
++                2,
++                _PlaySound3d(&quot;lachen.ogg&quot;, go.getPosition()),
++                2,
++                _PlayAnimation(go.getActor(), &quot;zu&quot;),
++                _PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())
++            ]
++    );
++  end
++end
++
++class JobSequenceTest &lt; TestCase
++    def initialize(center)
++        super(center)
++
++        # Define a base box to place everything else on.
++        height = 0.3
++        min_base = [-2.0, 0.05, -2.0]
++        max_base = [2.0, height, 2.0]
++        base = $AM.createBoxPrimitiveActor(&quot;JobSequenceTestBase&quot;,
++                                           min_base, max_base, &quot;alpha_green&quot;)
++        base.placeIntoScene(center);
++
++        chest = $GOM.createGameObjectProxy(
++            &quot;JobSequenceTestChest&quot;).getGameObject();
++        chest.addAction(JobSequenceTestAction.new());
++        chest.placeIntoScene();
++        chest.setPosition(rel_pos([0.0, height, 0.0]));
++
++        $SCRIPT.log(&quot;JobSequenceTest initialisiert&quot;);
++    end
++end
++
+
+Modified: modules/regressiontest/scripts/maps/regressiontest.rb
+===================================================================
+--- modules/regressiontest/scripts/maps/regressiontest.rb	2007-02-23 21:07:07 UTC (rev 3070)
++++ modules/regressiontest/scripts/maps/regressiontest.rb	2007-02-23 21:11:02 UTC (rev 3071)
+@@ -9,6 +9,7 @@
+ require 'TimeTest.rb'
+ require 'InventoryTest.rb'
+ require 'ErrorHandlingTest.rb'
++require 'JobSequenceTest.rb'
+ 
+ # Physik aktivieren
+ $PM.setEnabled(true)
+@@ -38,5 +39,5 @@
+ TimeTest.new([-5, 0, -5])
+ ErrorHandlingTest.new([-10, 0, 5])
+ InventoryTest.new([0, 0, 10])
+-
++JobSequenceTest.new([5, 0, -5])
+ $SCRIPT.log(&quot;tests initialisiert.&quot;);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000141.html">[Dsa-hl-svn] r3070 - in rl/trunk/engine: core/src script/swig
+</A></li>
+	<LI>Next message: <A HREF="000143.html">[Dsa-hl-svn] r3072 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

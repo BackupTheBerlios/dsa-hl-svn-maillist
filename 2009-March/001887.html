@@ -1,0 +1,660 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4830 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	modules/regressiontest/scripts	modules/regressiontest/scripts/maps rl/trunk	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig rl/trunk/tests	rl/trunk/tests/dialogtests
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4830%20-%20modules/common/scripts%0A%09modules/regressiontest/dialogs%20modules/regressiontest/dsa%0A%09modules/regressiontest/scripts%0A%09modules/regressiontest/scripts/maps%20rl/trunk%0A%09rl/trunk/engine/rules/include%20rl/trunk/engine/rules/src%0A%09rl/trunk/engine/script/swig%20rl/trunk/tests%0A%09rl/trunk/tests/dialogtests&In-Reply-To=%3C200903151002.n2FA2r0a030028%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001886.html">
+   <LINK REL="Next"  HREF="001888.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4830 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	modules/regressiontest/scripts	modules/regressiontest/scripts/maps rl/trunk	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig rl/trunk/tests	rl/trunk/tests/dialogtests</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4830%20-%20modules/common/scripts%0A%09modules/regressiontest/dialogs%20modules/regressiontest/dsa%0A%09modules/regressiontest/scripts%0A%09modules/regressiontest/scripts/maps%20rl/trunk%0A%09rl/trunk/engine/rules/include%20rl/trunk/engine/rules/src%0A%09rl/trunk/engine/script/swig%20rl/trunk/tests%0A%09rl/trunk/tests/dialogtests&In-Reply-To=%3C200903151002.n2FA2r0a030028%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4830 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	modules/regressiontest/scripts	modules/regressiontest/scripts/maps rl/trunk	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig rl/trunk/tests	rl/trunk/tests/dialogtests">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 15 11:02:53 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001886.html">[Dsa-hl-svn] r4829 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001888.html">[Dsa-hl-svn] r4831 - in rl/trunk/editors/Lockenwickler/src: . media
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1887">[ date ]</a>
+              <a href="thread.html#1887">[ thread ]</a>
+              <a href="subject.html#1887">[ subject ]</a>
+              <a href="author.html#1887">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2009-03-15 11:02:43 +0100 (Sun, 15 Mar 2009)
+New Revision: 4830
+
+Added:
+   modules/regressiontest/dialogs/test_3pers_dialog.dialog
+   rl/trunk/tests/dialogtests/
+Removed:
+   rl/trunk/tests/RlDialogTests/
+Modified:
+   modules/common/scripts/npc.rb
+   modules/regressiontest/dsa/gameobjectdefinitions.gof
+   modules/regressiontest/scripts/NpcTest.rb
+   modules/regressiontest/scripts/maps/regressiontest.rb
+   rl/trunk/
+   rl/trunk/engine/rules/include/Selector.h
+   rl/trunk/engine/rules/src/Selector.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/tests/dialogtests/TestDialog.cpp
+Log:
+Some fixes and tests for 3 person dialogs
+
+
+Modified: modules/common/scripts/npc.rb
+===================================================================
+--- modules/common/scripts/npc.rb	2009-03-14 15:54:04 UTC (rev 4829)
++++ modules/common/scripts/npc.rb	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -6,11 +6,12 @@
+   end
+ 
+   def doAction(object, actor, target)
+-    dialog = DialogManager::getSingleton().createDialog(object.getDialog(), object)  
+-	  agent = AgentManager::getSingleton().createAgent(object)
++    npcs = Array.new();
++    npcs.push(object);
++    npcs += object.getCreaturesNearby(1, false);
++    dialog = DialogManager::getSingleton().createDialog(object.getDialog(), npcs);  
++	  agent = AgentManager::getSingleton().createAgent(object);
+ 	  agent.pushState(RlScript::AST_DIALOG);
+-	  agent.getCurrentState().setDialogPartner(
+-  		AgentManager::getSingleton().createAgent(actor))
+     agent.getCurrentState().setDialog(dialog);
+   end
+ end
+@@ -61,4 +62,15 @@
+ class NPC &lt; Creature
+   include TalkTarget
+   include BehaviourBot
+-end
++  
++  def getCreaturesNearby(range, includePlayers)
++    gos = $GOM.getAllGameObjects();
++    gos.each { |go|
++      if ((go.getPosition() - self.getPosition()).getLength() &lt;= range) and
++          (includePlayers || !PartyManager.getSingleton().isInParty(go))
++        gos -= go;
++      end
++    }
++    return gos;
++  end
++end
+\ No newline at end of file
+
+Added: modules/regressiontest/dialogs/test_3pers_dialog.dialog
+===================================================================
+--- modules/regressiontest/dialogs/test_3pers_dialog.dialog	2009-03-14 15:54:04 UTC (rev 4829)
++++ modules/regressiontest/dialogs/test_3pers_dialog.dialog	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -0,0 +1,27 @@
++&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot; ?&gt;
++&lt;dialog name=&quot;test_3pers_dialog&quot;&gt;
++	&lt;persons&gt;
++		&lt;!-- 
++			Default persons:
++    			player: the current active player char (speaks all options by default)
++	    		nsc: the first dialog partner which is not in the player parts (speaks all responses by default)
++		--&gt;
++		&lt;person id=&quot;player&quot; goid=&quot;10&quot;/&gt;
++		&lt;person id=&quot;2&quot; goclass=&quot;TestPerson2&quot;/&gt;
++		&lt;person id=&quot;3&quot; name=&quot;TestPerson_byName&quot;/&gt;
++	&lt;/persons&gt;
++	&lt;start&gt;
++		&lt;response id=&quot;1&quot; person=&quot;2&quot;&gt;Moin.
++			&lt;option id=&quot;11&quot;&gt;Option 1
++				&lt;response id=&quot;111&quot;&gt;
++					&lt;p person=&quot;2&quot;&gt;Blah Blah&lt;/p&gt;
++					&lt;p person=&quot;3&quot;&gt;Du erzaehlst Unsinn.&lt;/p&gt;
++					&lt;p person=&quot;2&quot;&gt;Stimmt ja gar nicht.&lt;/p&gt;
++					&lt;exit/&gt;
++				&lt;/response&gt;
++			&lt;/option&gt;				
++		&lt;/response&gt;
++		
++	&lt;/start&gt;
++
++&lt;/dialog&gt;
+
+Modified: modules/regressiontest/dsa/gameobjectdefinitions.gof
+===================================================================
+--- modules/regressiontest/dsa/gameobjectdefinitions.gof	2009-03-14 15:54:04 UTC (rev 4829)
++++ modules/regressiontest/dsa/gameobjectdefinitions.gof	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -100,6 +100,8 @@
+ 
+     &lt;/gameobjectclass&gt;
+ 
++    &lt;gameobjectclass classid=&quot;TestPerson2&quot; baseclass=&quot;NPC&quot; inherits=&quot;TestPerson&quot;/&gt;
++
+     &lt;gameobjectclass classid=&quot;TestPersonCapsule&quot; baseclass=&quot;NPC&quot;&gt;
+         &lt;property name=&quot;name&quot; type=&quot;STRING&quot; data=&quot;TestPerson&quot;/&gt;
+         &lt;property name=&quot;description&quot; type=&quot;STRING&quot; data=&quot;Wenn man mal jemanden zum Reden braucht...&quot;/&gt;
+
+Modified: modules/regressiontest/scripts/NpcTest.rb
+===================================================================
+--- modules/regressiontest/scripts/NpcTest.rb	2009-03-14 15:54:04 UTC (rev 4829)
++++ modules/regressiontest/scripts/NpcTest.rb	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -2,8 +2,7 @@
+ require 'npc.rb'
+ 
+ class NpcTest &lt; TestCase
+-    def execute()
+-        
++    def execute()        
+         height = 0.3
+         min_base = [-3.0, 0.05, -3.0]
+         max_base = [3.0, height, 3.0]
+@@ -11,10 +10,19 @@
+                                            min_base, max_base, &quot;alpha_blue&quot;)
+         base.placeIntoScene(getCenter());
+ 
+-        npc1proxy = $GOM.createGameObject(&quot;TestPerson&quot;);
+-        npc1 = npc1proxy;
++        npc1 = $GOM.createGameObject(&quot;TestPerson&quot;);
+         npc1.setPosition(rel_pos([0.0, height, 0.0]));
+ 
+         npc1.placeIntoScene();
++
++        npc2 = $GOM.createGameObject(&quot;TestPerson2&quot;);
++        npc2.setPosition(rel_pos([2.2, height, 2.2]));
++        npc2.setProperty(&quot;dialog&quot;, &quot;test_3pers_dialog&quot;)
++        npc2.placeIntoScene();
++        npc3 = $GOM.createGameObject(&quot;TestPerson&quot;);
++        npc3.setPosition(rel_pos([1.8, height, 1.8]));
++        npc3.setProperty(&quot;dialog&quot;, &quot;test_3pers_dialog&quot;)
++        npc3.setName(&quot;TestPerson_byName&quot;);
++        npc3.placeIntoScene();
+     end
+ end
+
+Modified: modules/regressiontest/scripts/maps/regressiontest.rb
+===================================================================
+--- modules/regressiontest/scripts/maps/regressiontest.rb	2009-03-14 15:54:04 UTC (rev 4829)
++++ modules/regressiontest/scripts/maps/regressiontest.rb	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -60,25 +60,25 @@
+ 	end
+ 	
+ 	def runTests()
+-		runTest(DoorTest, [  0, 0, -5])
+-		runTest(EffectTest, [  5, 0, 5])
+-		runTest(ErrorHandlingTest, [-10, 0, 5])
+-		runTest(GameObjectCreationTest, [0, 0, -10])
+-		runTest(InventoryTest, [  0, 0, 10])
+-		runTest(JobSequenceTest, [  5, 0, -5])
+-		runTest(LightzoneTest, [-10, 0, -5])
+-		runTest(MapLoadingTest, [ -5, 0, -10])
+-		runTest(MaterialSlotTest, [-15, 0, -5])
+-		runTest(MergeableMeshTest, [ 10, 0, 0])
+-		runTest(MeshAreaTest, [-50, 0,-55])
++#		runTest(DoorTest, [  0, 0, -5])
++#		runTest(EffectTest, [  5, 0, 5])
++#		runTest(ErrorHandlingTest, [-10, 0, 5])
++#		runTest(GameObjectCreationTest, [0, 0, -10])
++#		runTest(InventoryTest, [  0, 0, 10])
++#		runTest(JobSequenceTest, [  5, 0, -5])
++#		runTest(LightzoneTest, [-10, 0, -5])
++#		runTest(MapLoadingTest, [ -5, 0, -10])
++#		runTest(MaterialSlotTest, [-15, 0, -5])
++#		runTest(MergeableMeshTest, [ 10, 0, 0])
++#		runTest(MeshAreaTest, [-50, 0,-55])
+ 		runTest(NpcTest, [ -5, 0, 5])
+-		runTest(SelectorTest, [  5, 0, 0])
+-		runTest(SoundTest, [ 10, 0, 10])
+-		runTest(TimeTest, [ -5, 0, -5])
+-		runTest(WalkJobTest, [  0, 0, -3])
+-		runTest(CombatTest, [15, 0, 15])
+-  		runTest(FetchItemJobTest, [-15, 0, 15])
+-        runTest(CharacterSelectionTest, [-15, 0, -15])
++#		runTest(SelectorTest, [  5, 0, 0])
++#		runTest(SoundTest, [ 10, 0, 10])
++#		runTest(TimeTest, [ -5, 0, -5])
++#		runTest(WalkJobTest, [  0, 0, -3])
++#		runTest(CombatTest, [15, 0, 15])
++#  	runTest(FetchItemJobTest, [-15, 0, 15])
++#   runTest(CharacterSelectionTest, [-15, 0, -15])
+ 
+ 		if @mErrors &gt; 0
+ 		  MessageBox.showModal(
+
+
+Property changes on: rl/trunk
+___________________________________________________________________
+Name: svn:ignore
+   - 
+logs
+*.ncb
+*.suo
+rl_dist
+*.obj
+*.exp
+*.lib
+*.dll
+*.idb
+*.pdb
+*.htm
+*.ilk
+*.asm
+configure
+dependencies
+*.in
+*.cfg
+*.conf
+configure
+*.log
+depcomp
+config.guess
+config.sub
+ltmain.sh
+rl.conf
+Makefile
+test
+mkinstalldirs
+config.status
+rastullah.cfg
+libtool
+autom4te.cache
+missing
+*.m4
+install-sh
+_dependencies
+depsources
+doc
+compile
+
+   + logs
+*.ncb
+*.suo
+rl_dist
+*.obj
+*.exp
+*.lib
+*.dll
+*.idb
+*.pdb
+*.htm
+*.ilk
+*.asm
+configure
+dependencies
+*.in
+*.cfg
+*.conf
+configure
+*.log
+depcomp
+config.guess
+config.sub
+ltmain.sh
+rl.conf
+Makefile
+test
+mkinstalldirs
+config.status
+rastullah.cfg
+libtool
+autom4te.cache
+missing
+*.m4
+install-sh
+_dependencies
+depsources
+doc
+compile
+.cproject
+.dep.inc
+
+
+Modified: rl/trunk/engine/rules/include/Selector.h
+===================================================================
+--- rl/trunk/engine/rules/include/Selector.h	2009-03-14 15:54:04 UTC (rev 4829)
++++ rl/trunk/engine/rules/include/Selector.h	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -151,6 +151,43 @@
+ 
+         virtual void doCreatePrimitive();
+     };
++
++    /// Selects this GameObject within a sphere .
++    class _RlRulesExport SphereSelector : public Selector
++    {
++    public:
++        SphereSelector(Ogre::SceneManager* smgr, unsigned long mask = 0xffffffff);
++	SphereSelector(unsigned long mask = 0xffffffff);
++
++        virtual void updateSelection();
++
++        void setRadius(Ogre::Real radius);
++
++        void setPosition(const Ogre::Vector3&amp; pos);
++
++        /// Instead of using transform set with setPosition/Orientation, use the
++        /// GameObject's transform. Set to NULL to disable tracking.
++        void track(GameObject* go);
++
++        /// If check is true, visibility is checked from the POV of the GameObject reference
++        /// This is currently done by casting a ray from the GameObject to the candidate GOs
++        void setCheckVisibility(bool check, GameObject* reference = NULL);
++
++        // Overrides from DebugVisualisable
++
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
++
++    protected:
++        SphereSceneQuery mQuery;
++        bool mCheckVisibility;
++        GameObject* mLoSReferenceGo;
++        GameObject* mTrackedGo;
++
++        virtual const ActorVector&amp; doExecuteQuery();
++
++        virtual void doCreatePrimitive();
++    };
+ }
+ #endif
+ 
+
+Modified: rl/trunk/engine/rules/src/Selector.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Selector.cpp	2009-03-14 15:54:04 UTC (rev 4829)
++++ rl/trunk/engine/rules/src/Selector.cpp	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -301,4 +301,122 @@
+     {
+         mPrimitive = new LineSetPrimitive();
+     }
++
++    //////////////////////////////////////////////////////////////////////////
++
++    SphereSelector::SphereSelector(Ogre::SceneManager* smgr,
++        unsigned long mask)
++        : Selector(mask),
++          mQuery(smgr, mask),
++          mCheckVisibility(false),
++          mLoSReferenceGo(NULL),
++		  mTrackedGo(NULL)
++    {
++    }
++
++    SphereSelector::SphereSelector(unsigned long mask)
++        : Selector(mask),
++		  mQuery(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(), mask),
++          mCheckVisibility(false),
++          mLoSReferenceGo(NULL),
++		  mTrackedGo(NULL)
++    {
++    }
++
++    void SphereSelector::updateSelection()
++    {
++        // Remove old selection
++        mSelection.clear();
++
++        // Auto tracking enabled?
++        if (mTrackedGo != NULL)
++        {
++            // If not in scene, then we're done
++            if (!(mTrackedGo-&gt;getState() &amp; GOS_IN_SCENE))
++            {
++                return;
++            }
++
++            // Set query transform according to position and orientation of tracked GO.
++            setPosition(mTrackedGo-&gt;getPosition());
++        }
++
++        // Do the query, results are in proper order
++        const ActorVector&amp; actors = doExecuteQuery();
++
++        // Set selection to first result with a GameObject attached.
++        for (ActorVector::const_iterator it = actors.begin(), end = actors.end();
++            it != end; ++it)
++        {
++            Actor* actor = *it;
++            GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
++            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
++            {
++                // Is this GO seen when we need it to be seen?
++                if (mCheckVisibility &amp;&amp; mLoSReferenceGo &amp;&amp;
++                    !SelectionHelper::checkLineOfSight(mLoSReferenceGo, go))
++                {
++                    // Nope, check next.
++                    continue;
++                }
++                else if (filter(go))
++                {
++                    // Ok, LoS either not needed or given.
++                    mSelection.push_back(go);
++                }
++            }
++        }
++    }
++
++    void SphereSelector::updatePrimitive()
++    {
++        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++        lineSet-&gt;clear();
++
++        Vector3 pos = mQuery.getPosition();
++        Quaternion ori = mQuery.getOrientation();
++        Real radius = mQuery.getRadius();
++
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_X), ColourValue::Red);
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_Y), ColourValue::Green);
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::NEGATIVE_UNIT_Z),
++            ColourValue::Blue);
++    }
++
++    void SphereSelector::setRadius(Ogre::Real radius)
++    {
++        mQuery.setRadius(radius);
++    }
++
++    void SphereSelector::setPosition(const Ogre::Vector3&amp; pos)
++    {
++        mQuery.setPosition(pos);
++    }
++
++    void SphereSelector::setCheckVisibility(bool check, GameObject* reference)
++    {
++        mCheckVisibility = check;
++        mLoSReferenceGo = reference;
++    }
++
++    void SphereSelector::track(GameObject* go)
++    {
++        mTrackedGo = go;
++    }
++
++    DebugVisualisableFlag SphereSelector::getFlag() const
++    {
++        return DVF_CONTROL;
++    }
++
++    const ActorVector&amp; SphereSelector::doExecuteQuery()
++    {
++        return mQuery.execute();
++    }
++
++    void SphereSelector::doCreatePrimitive()
++    {
++        mPrimitive = new LineSetPrimitive();
++    }
++
+ }
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2009-03-14 15:54:04 UTC (rev 4829)
++++ rl/trunk/engine/script/swig/RlRules.swig	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -127,6 +127,7 @@
+         rl::GameObject* createGameObject(const Ogre::String&amp; classId, unsigned int id = 0);
+         rl::GameObject* getGameObject(unsigned int id) const;
+         void setGameObjectFactory(rl::GameObjectFactory* gof);
++        std::list&lt;rl::GameObject*&gt; getAllGameObjects();
+ 
+     private:
+         GameObjectManager();
+@@ -903,6 +904,16 @@
+         void setOrientation(const Ogre::Quaternion&amp; ori);
+ 		virtual void updatePrimitive();
+ 	};
++
++    /// Selects GameObjects within a sphere.
++    class SphereSelector : public Selector
++    {
++    public:
++        SphereSelector(unsigned long mask = 0xffffffff);
++	    void setRadius(Ogre::Real radius);
++        void setPosition(const Ogre::Vector3&amp; pos);
++		virtual void updatePrimitive();
++    };
+     
+     class PartyManager
+     {
+
+Copied: rl/trunk/tests/dialogtests (from rev 4770, rl/trunk/tests/RlDialogTests)
+
+
+Property changes on: rl/trunk/tests/dialogtests
+___________________________________________________________________
+Name: svn:ignore
+   + 
+.deps
+.libs
+Makefile
+testdialog
+Makefile.in
+
+Name: svn:mergeinfo
+   + 
+
+Modified: rl/trunk/tests/dialogtests/TestDialog.cpp
+===================================================================
+--- rl/trunk/tests/RlDialogTests/TestDialog.cpp	2009-02-17 20:41:04 UTC (rev 4770)
++++ rl/trunk/tests/dialogtests/TestDialog.cpp	2009-03-15 10:02:43 UTC (rev 4830)
+@@ -1,4 +1,4 @@
+-#include &lt;xercesc/util/XMemory.hpp&gt; // Muss vor Ogre stehen (zumindest f&#252;r VS)
++#include &lt;xercesc/util/XMemory.hpp&gt; // Muss vor Ogre stehen (zumindest f&#239;&#191;&#189;r VS)
+ 
+ #include &lt;Ogre.h&gt;
+ #include &lt;OgreLogManager.h&gt;
+@@ -7,11 +7,8 @@
+ 
+ #include &quot;Logger.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+-#include &quot;MultimediaSubsystem.h&quot;
+ #include &quot;RulesSubsystem.h&quot;
+-#include &quot;DialogSubsystem.h&quot;
+ #include &quot;UiSubsystem.h&quot;
+-#include &quot;ScriptSubsystem.h&quot;
+ #include &quot;RubyInterpreter.h&quot;
+ #include &lt;cppunit/extensions/TestFactoryRegistry.h&gt;
+ #include &lt;cppunit/ui/text/TestRunner.h&gt;
+@@ -66,30 +63,30 @@
+         runner.run();
+         rl::Logger::getSingleton().log(rl::Logger::CORE, Ogre::LML_NORMAL, &quot;Ende...&quot;);
+ 
+-    } 
++    }
+     catch(Ogre::Exception&amp; oe) {
+         rl::showError(oe.getFullDescription());
+-    } 
++    }
+     catch(rl::Exception&amp; re) {
+         rl::showError(re.toString());
+-    } 
++    }
+     catch(CEGUI::Exception&amp; ce) {
+         rl::showError(ce.getMessage().c_str());
+     }
+     catch(std::runtime_error&amp; rte) {
+         rl::showError(rte.what());
+-    } 
++    }
+     catch(std::exception&amp; exp) {
+         rl::showError( exp.what() );
+-    } 
++    }
+     catch(std::string&amp; err) {
+         rl::showError( err );
+-    } 
++    }
+     catch(...) {
+         rl::showError( &quot;Unknown exception occured&quot; );
+     }
+ 
+-    try 
++    try
+     {
+         delete script;
+         delete ui;
+@@ -100,23 +97,23 @@
+     }
+     catch(Ogre::Exception&amp; oe) {
+         rl::showError(oe.getFullDescription());
+-    } 
++    }
+     catch(rl::Exception&amp; re) {
+         rl::showError(re.toString());
+-    } 
++    }
+     catch(std::runtime_error&amp; rte) {
+         rl::showError(rte.what());
+-    } 
++    }
+     catch(std::exception&amp; exp) {
+         rl::showError( exp.what() );
+-    } 
++    }
+     catch(std::string&amp; err) {
+         rl::showError( err );
+-    } 
++    }
+     catch(...) {
+         rl::showError( &quot;Unknown exception occured&quot; );
+-    }   
++    }
+ 
+-    
++
+     return 0;
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001886.html">[Dsa-hl-svn] r4829 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001888.html">[Dsa-hl-svn] r4831 - in rl/trunk/editors/Lockenwickler/src: . media
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1887">[ date ]</a>
+              <a href="thread.html#1887">[ thread ]</a>
+              <a href="subject.html#1887">[ subject ]</a>
+              <a href="author.html#1887">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

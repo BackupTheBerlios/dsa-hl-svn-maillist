@@ -1,0 +1,962 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4603 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4603%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200811242201.mAOM1moO007364%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001659.html">
+   <LINK REL="Next"  HREF="001661.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4603 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4603%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200811242201.mAOM1moO007364%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4603 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Nov 24 23:01:48 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001659.html">[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001661.html">[Dsa-hl-svn] r4604 - in rl/trunk/engine: core/src rules/include	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1660">[ date ]</a>
+              <a href="thread.html#1660">[ thread ]</a>
+              <a href="subject.html#1660">[ subject ]</a>
+              <a href="author.html#1660">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-11-24 23:01:45 +0100 (Mon, 24 Nov 2008)
+New Revision: 4603
+
+Modified:
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+Log:
+moved getMeshfile to GameObject
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-11-24 21:59:37 UTC (rev 4602)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-11-24 22:01:45 UTC (rev 4603)
+@@ -64,6 +64,7 @@
+         static const Ogre::String PROPERTY_MASS; 
+         static const Ogre::String PROPERTY_ACTIONS; 
+         static const Ogre::String PROPERTY_DEFAULT_ACTION;
++        static const Ogre::String PROPERTY_IMAGENAME;
+ 
+         static const CeGuiString DEFAULT_VIEW_OBJECT_ACTION;
+         static const CeGuiString DEFAULT_VIEW_OBJECT_ACTION_DEBUG;
+@@ -82,6 +83,9 @@
+         const CeGuiString&amp; getDescription() const;
+         void setDescription(const CeGuiString&amp; description);
+ 
++		const CeGuiString&amp; getImageName() const;
++		void setImageName(const CeGuiString&amp; name);
++        
+         const CeGuiString&amp; getMeshfile() const;
+         void setMeshfile(const CeGuiString&amp; meshfile);
+ 
+@@ -204,6 +208,7 @@
+         
+         CeGuiString mName;
+         CeGuiString mDescription;
++        CeGuiString mImageName;
+         CeGuiString mMeshfile;
+ 		MeshPartMap mMeshParts;
+         CeGuiString mSubmeshPreName;
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2008-11-24 21:59:37 UTC (rev 4602)
++++ rl/trunk/engine/rules/include/Item.h	2008-11-24 22:01:45 UTC (rev 4603)
+@@ -1,124 +1,119 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-
+-#ifndef __ITEM_H__
+-#define __ITEM_H__
+-
+-#include &quot;GameObject.h&quot;
+-
+-namespace rl
+-{
+-	class _RlRulesExport Item;
+-    class Slot;
+-    class Container;
+-
+-	typedef std::vector&lt;Item*&gt; ContainerColumn;
+-	typedef std::vector&lt;ContainerColumn&gt; ContainerLayout;
+-
+-
+-    /// Aufnehmbare Objekte in der Spielwelt.
+-    class _RlRulesExport Item : public GameObject
+-    {
+-    public:
+-		enum ItemType{
+-			ITEMTYPE_WEAPON     = 1 &lt;&lt; 0,
+-			ITEMTYPE_SHIELD     = 1 &lt;&lt; 1,
+-			ITEMTYPE_RING       = 1 &lt;&lt; 2,
+-			ITEMTYPE_GLOVES     = 1 &lt;&lt; 3,
+-			ITEMTYPE_BRACELET   = 1 &lt;&lt; 4,
+-			ITEMTYPE_ARMOR      = 1 &lt;&lt; 5,
+-			ITEMTYPE_CAPE       = 1 &lt;&lt; 6,
+-			ITEMTYPE_BRACERS    = 1 &lt;&lt; 7,
+-			ITEMTYPE_BACKPACK   = 1 &lt;&lt; 8,
+-			ITEMTYPE_BELT       = 1 &lt;&lt; 9,
+-			ITEMTYPE_NECKLACE   = 1 &lt;&lt; 10,
+-			ITEMTYPE_HELMET     = 1 &lt;&lt; 11,
+-			ITEMTYPE_TROUSERS   = 1 &lt;&lt; 12,
+-			ITEMTYPE_SHINBONE   = 1 &lt;&lt; 13,
+-			ITEMTYPE_BOOTS      = 1 &lt;&lt; 14,
+-            ITEMTYPE_CLOTHES    = 1 &lt;&lt; 15,
+-			ITEMTYPE_OTHER      = 1 &lt;&lt; 16,
+-            ITEMTYPE_ALL_ITEMS  = ~(0)
+-		};
+-
+-
+-        static const Ogre::String CLASS_NAME;
+-
+-        static const Ogre::String PROPERTY_ITEMTYPE;
+-        static const Ogre::String PROPERTY_IMAGENAME;
+-        static const Ogre::String PROPERTY_SIZE;
+-        static const Ogre::String PROPERTY_SUBMESHNAME;
+-
+-		Item(unsigned int id);
+-        virtual ~Item(void);
+-
+-		void setItemType(ItemType itemType);
+-		ItemType getItemType() const;
+-
+-		const CeGuiString&amp; getImageName() const;
+-		void setImageName(const CeGuiString&amp; name);
+-
+-        const CeGuiString&amp; getSubmeshName() const;
+-        void setSubmeshName(const CeGuiString&amp; name);
+-
+-		/**
+-		 * @return ob es sich um ein Item handelt,
+-		 * in dem andere gespeichert werden koennen
+-		 */
+-        virtual bool isContainer() const;
+-		
+-		std::pair&lt;int,int&gt; getSize() const;
+-		void setSize(int width, int height);
+-
+-
+-        /**
+-         * F&#252;gt das Verhalten f&#252;r die GO-States: GOS_READY, GOS_HELD und GOS_IN_POSSESION hinzu.
+-         * @warning Bevor einer der drei States gesetzt wird, sollte zun&#228;chst die Funktion removeOldState
+-         * aufgerufen werden, dann m&#252;ssen Owner und ParentSlot/ParentContainer gesetzt werden und
+-         * eventuell doCreateActor. Als letztes muss diese Funktion mit dem neuen State aufgerufen werden.
+-         * Die Reihenfolge ist wichtig, damit die onStateChange-Funktionen funktionieren k&#246;nnen!
+-         **/
+-        virtual void setState(GameObjectState state);
+-        virtual void removeOldState();
+-
+-        void setParentSlot(Slot* slot);
+-        Slot* getParentSlot() const;
+-
+-        void setParentContainer(Container* cont);
+-        Container* getParentContainer() const;
+-
+-        virtual void setOwner(GameObject* go);
+-        GameObject* getOwner() const;
+-
+-        virtual const Property getProperty(const CeGuiString&amp; key) const;
+-        virtual void setProperty(const CeGuiString&amp; key, const Property&amp; value);
+-        virtual PropertyKeys getAllPropertyKeys() const;
+-
+-        void doCreateActor();
+-    protected:
+-		ItemType mItemType;
+-		CeGuiString mImageName;
+-        CeGuiString mSubmeshName;
+-		std::pair&lt;int,int&gt; mSize;
+-        GameObject* mOwner;
+-        Slot* mParentSlot;
+-        Container* mParentContainer;
+-
+-		void doLoose();
+-	};
+-}
+-
+-#endif
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++#ifndef __ITEM_H__
++#define __ITEM_H__
++
++#include &quot;GameObject.h&quot;
++
++namespace rl
++{
++	class _RlRulesExport Item;
++    class Slot;
++    class Container;
++
++	typedef std::vector&lt;Item*&gt; ContainerColumn;
++	typedef std::vector&lt;ContainerColumn&gt; ContainerLayout;
++
++
++    /// Aufnehmbare Objekte in der Spielwelt.
++    class _RlRulesExport Item : public GameObject
++    {
++    public:
++		enum ItemType{
++			ITEMTYPE_WEAPON     = 1 &lt;&lt; 0,
++			ITEMTYPE_SHIELD     = 1 &lt;&lt; 1,
++			ITEMTYPE_RING       = 1 &lt;&lt; 2,
++			ITEMTYPE_GLOVES     = 1 &lt;&lt; 3,
++			ITEMTYPE_BRACELET   = 1 &lt;&lt; 4,
++			ITEMTYPE_ARMOR      = 1 &lt;&lt; 5,
++			ITEMTYPE_CAPE       = 1 &lt;&lt; 6,
++			ITEMTYPE_BRACERS    = 1 &lt;&lt; 7,
++			ITEMTYPE_BACKPACK   = 1 &lt;&lt; 8,
++			ITEMTYPE_BELT       = 1 &lt;&lt; 9,
++			ITEMTYPE_NECKLACE   = 1 &lt;&lt; 10,
++			ITEMTYPE_HELMET     = 1 &lt;&lt; 11,
++			ITEMTYPE_TROUSERS   = 1 &lt;&lt; 12,
++			ITEMTYPE_SHINBONE   = 1 &lt;&lt; 13,
++			ITEMTYPE_BOOTS      = 1 &lt;&lt; 14,
++            ITEMTYPE_CLOTHES    = 1 &lt;&lt; 15,
++			ITEMTYPE_OTHER      = 1 &lt;&lt; 16,
++            ITEMTYPE_ALL_ITEMS  = ~(0)
++		};
++
++
++        static const Ogre::String CLASS_NAME;
++
++        static const Ogre::String PROPERTY_ITEMTYPE;
++        static const Ogre::String PROPERTY_SIZE;
++        static const Ogre::String PROPERTY_SUBMESHNAME;
++
++		Item(unsigned int id);
++        virtual ~Item(void);
++
++		void setItemType(ItemType itemType);
++		ItemType getItemType() const;
++
++        const CeGuiString&amp; getSubmeshName() const;
++        void setSubmeshName(const CeGuiString&amp; name);
++
++		/**
++		 * @return ob es sich um ein Item handelt,
++		 * in dem andere gespeichert werden koennen
++		 */
++        virtual bool isContainer() const;
++		
++		std::pair&lt;int,int&gt; getSize() const;
++		void setSize(int width, int height);
++
++
++        /**
++         * F&#194;&#184;gt das Verhalten f&#194;&#184;r die GO-States: GOS_READY, GOS_HELD und GOS_IN_POSSESION hinzu.
++         * @warning Bevor einer der drei States gesetzt wird, sollte zun&#226;&#128;&#176;chst die Funktion removeOldState
++         * aufgerufen werden, dann m&#194;&#184;ssen Owner und ParentSlot/ParentContainer gesetzt werden und
++         * eventuell doCreateActor. Als letztes muss diese Funktion mit dem neuen State aufgerufen werden.
++         * Die Reihenfolge ist wichtig, damit die onStateChange-Funktionen funktionieren k&#203;&#134;nnen!
++         **/
++        virtual void setState(GameObjectState state);
++        virtual void removeOldState();
++
++        void setParentSlot(Slot* slot);
++        Slot* getParentSlot() const;
++
++        void setParentContainer(Container* cont);
++        Container* getParentContainer() const;
++
++        virtual void setOwner(GameObject* go);
++        GameObject* getOwner() const;
++
++        virtual const Property getProperty(const CeGuiString&amp; key) const;
++        virtual void setProperty(const CeGuiString&amp; key, const Property&amp; value);
++        virtual PropertyKeys getAllPropertyKeys() const;
++
++        void doCreateActor();
++    protected:
++		ItemType mItemType;
++        CeGuiString mSubmeshName;
++		std::pair&lt;int,int&gt; mSize;
++        GameObject* mOwner;
++        Slot* mParentSlot;
++        Container* mParentContainer;
++
++		void doLoose();
++	};
++}
++
++#endif
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-11-24 21:59:37 UTC (rev 4602)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-11-24 22:01:45 UTC (rev 4603)
+@@ -57,11 +57,13 @@
+     const Ogre::String GameObject::PROPERTY_MASS = &quot;mass&quot;;
+     const Ogre::String GameObject::PROPERTY_ACTIONS = &quot;actions&quot;;
+     const Ogre::String GameObject::PROPERTY_DEFAULT_ACTION = &quot;defaultaction&quot;;
+-
++    const Ogre::String GameObject::PROPERTY_IMAGENAME = &quot;imagename&quot;;
++    
+     GameObject::GameObject(unsigned int id)
+         :   mId(id),
+             mName(&quot;&quot;),
+             mDescription(&quot;&quot;),
++            mImageName(&quot;&quot;),
+             mMeshfile(&quot;&quot;),
+ 			mMeshParts(),
+             mQueryFlags(QUERYFLAG_GAMEOBJECT),
+@@ -141,6 +143,16 @@
+         mDescription = description;
+     }
+ 
++	void GameObject::setImageName(const CeGuiString&amp; name)
++	{
++		mImageName = name;
++	}
++    
++	const CeGuiString&amp; GameObject::getImageName() const
++	{
++		return mImageName;
++	}
++    
+     const CeGuiString&amp; GameObject::getMeshfile() const
+     {
+         return mMeshfile;
+@@ -540,6 +552,10 @@
+         {
+             prop.setValue(mDescription);
+         }
++        else if (key == PROPERTY_IMAGENAME)
++        {
++            prop.setValue(mImageName);
++        }
+         else if (key == PROPERTY_MESHFILE)
+         {
+             prop.setValue(mMeshfile);
+@@ -594,6 +610,10 @@
+             {
+                 setDescription(value.toString());
+             }
++            else if (key == PROPERTY_IMAGENAME)
++            {
++                setImageName(value.toString());
++            }
+             else if (key == PROPERTY_MESHFILE)
+             {
+                 setMeshfile(value.toString());
+@@ -682,6 +702,7 @@
+         keys.insert(PROPERTY_MESHPARTS);
+         keys.insert(PROPERTY_GEOMETRY_TYPE);
+         keys.insert(PROPERTY_MASS);
++        keys.insert(PROPERTY_IMAGENAME);
+         return keys;
+     }
+ 
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2008-11-24 21:59:37 UTC (rev 4602)
++++ rl/trunk/engine/rules/src/Item.cpp	2008-11-24 22:01:45 UTC (rev 4603)
+@@ -1,278 +1,258 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;Item.h&quot;
+-
+-#include &quot;Actor.h&quot;
+-#include &quot;Container.h&quot;
+-#include &quot;Exception.h&quot;
+-#include &quot;Slot.h&quot;
+-#include &quot;GameObjectManager.h&quot;
+-
+-using namespace std;
+-
+-namespace rl
+-{
+-    const Ogre::String Item::CLASS_NAME = &quot;Item&quot;;
+-
+-    const Ogre::String Item::PROPERTY_IMAGENAME = &quot;imagename&quot;;
+-    const Ogre::String Item::PROPERTY_ITEMTYPE = &quot;itemtype&quot;;
+-    const Ogre::String Item::PROPERTY_SIZE = &quot;size&quot;;
+-    const Ogre::String Item::PROPERTY_SUBMESHNAME = &quot;submeshfile&quot;;
+-
+-    Item::Item(unsigned int id)
+-        : GameObject(id),
+-		mItemType(ITEMTYPE_OTHER),
+-		mImageName(&quot;&quot;),
+-		mSize(pair&lt;int,int&gt;(1,1)),
+-        mOwner(NULL),
+-        mParentSlot(NULL),
+-        mParentContainer(NULL),
+-        mSubmeshName(&quot;&quot;)
+-    {
+-        mQueryFlags |= QUERYFLAG_ITEM;
+-    }
+-
+-    Item::~Item(void)
+-    {
+-        removeOldState(); // so the parent-container etc knows this item doesn't exists any more
+-    }
+-
+-	void Item::setItemType(ItemType itemType)
+-	{
+-		mItemType = itemType;
+-	}
+-
+-	Item::ItemType Item::getItemType() const
+-	{
+-		return mItemType;
+-	}
+-
+-	void Item::setImageName(const CeGuiString&amp; name)
+-	{
+-		mImageName = name;
+-	}
+-
+-	const CeGuiString&amp; Item::getImageName() const
+-	{
+-		return mImageName;
+-	}
+-
+-	bool Item::isContainer() const
+-	{
+-		return false;
+-	}
+-
+-	pair&lt;int,int&gt; Item::getSize() const
+-	{
+-		return mSize;
+-	}
+-
+-	void Item::setSize(int widthSize,int heightSize)
+-	{
+-		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
+-	}
+-
+-    void Item::doLoose()
+-    {
+-        if (mActor != NULL)
+-        {
+-            mActor-&gt;detachFromParent();
+-        }
+-        if (mParentContainer != NULL)
+-        {
+-            mParentContainer-&gt;_doRemoveItem(this);
+-            mParentContainer = NULL;
+-        }
+-        if (mParentSlot != NULL)
+-        {
+-            mParentSlot-&gt;setItem(NULL);
+-            mParentSlot = NULL;
+-        }
+-        setOwner(NULL);
+-    }
+-
+-    void Item::removeOldState()
+-    {
+-        setState(GOS_LOADED);
+-    }
+-
+-// --------------- Warning ------------
+-// do not change this function without
+-// having a look at the containers and slots
+-    void Item::setState(GameObjectState targetState)
+-    {
+-        if (mState == targetState)
+-        {
+-            return;
+-        }
+-
+-        // do only things that are possible
+-        if( targetState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) &amp;&amp; mState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) )
+-        {
+-            LOG_ERROR(Logger::RULES,
+-                &quot;Item '&quot; + getName() + &quot;' could not change state from '&quot;
+-                + Ogre::StringConverter::toString(mState) + &quot;' to state '&quot;
+-                + Ogre::StringConverter::toString(targetState) + &quot;'!&quot;
+-                + &quot;\nYou need to call 'Item::removeOldState()' first.&quot;);
+-            
+-            // first remove the old state (thats a recursive function call)
+-            //removeOldState();
+-        }
+-
+-        // everything else is not handled here, so give it to the parent
+-        if ((targetState == GOS_IN_SCENE || targetState == GOS_LOADED)
+-            &amp;&amp; (mState == GOS_IN_SCENE || mState == GOS_LOADED))
+-        {
+-            GameObject::setState(targetState);
+-            return;
+-        }
+-
+-        GameObjectState oldState = mState;
+-        onBeforeStateChange(oldState, targetState);        
+-
+-        if (targetState == GOS_LOADED 
+-            &amp;&amp; (mState == GOS_HELD || mState == GOS_READY || GOS_IN_POSSESSION) )
+-        {
+-            mState = targetState; // this is needed here to prevent an endless recursion
+-            // &quot;remove old state&quot;
+-            doLoose();
+-            destroyActor();
+-        }
+-        else if (mState == GOS_LOADED &amp;&amp;
+-                 (targetState == GOS_HELD || targetState == GOS_READY))
+-        {
+-            createActor();
+-            mState = targetState;
+-            // do nothing, the user has to do what he needs himself
+-        }
+-        else if ((mState == GOS_LOADED &amp;&amp; targetState == GOS_IN_POSSESSION)
+-            || (mState == GOS_IN_POSSESSION &amp;&amp; targetState == GOS_LOADED))
+-        {
+-            mState = targetState;
+-        }
+-        else
+-        {
+-            Throw(rl::IllegalStateException, &quot;Unhandled state change&quot;);
+-        }
+-
+-        onAfterStateChange(oldState, targetState);
+-        GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetState);
+-    }
+-
+-    void Item::setProperty(const CeGuiString&amp; key, const Property&amp; value)
+-    {
+-        if (key == Item::PROPERTY_IMAGENAME)
+-        {
+-            mImageName = value.toString();
+-        }
+-        else if (key == Item::PROPERTY_SIZE)
+-        {
+-            mSize = value.toIntPair();
+-        }
+-        else if (key == Item::PROPERTY_ITEMTYPE)
+-        {
+-            mItemType = static_cast&lt;Item::ItemType&gt;(value.toInt());
+-        }
+-        else if (key == Item::PROPERTY_SUBMESHNAME)
+-        {
+-            mSubmeshName = value.toString();
+-        }
+-        else
+-        {
+-            GameObject::setProperty(key, value);
+-        }
+-    }
+-
+-    const Property Item::getProperty(const CeGuiString&amp; key) const
+-    {
+-        if (key == Item::PROPERTY_IMAGENAME)
+-        {
+-            return Property(mImageName);
+-        }
+-        else if (key == Item::PROPERTY_SIZE)
+-        {
+-            return Property(mSize);
+-        }
+-        else if (key == Item::PROPERTY_ITEMTYPE)
+-        {
+-            return Property(mItemType);
+-        }
+-        else if (key == Item::PROPERTY_SUBMESHNAME)
+-        {
+-            return Property(mSubmeshName);
+-        }
+-        else
+-        {
+-            return GameObject::getProperty(key);
+-        }
+-    }
+-
+-    PropertyKeys Item::getAllPropertyKeys() const
+-    {
+-        PropertyKeys keys(GameObject::getAllPropertyKeys());
+-        keys.insert(Item::PROPERTY_IMAGENAME);
+-        keys.insert(Item::PROPERTY_SIZE);
+-        keys.insert(Item::PROPERTY_ITEMTYPE);
+-        return keys;
+-    }
+-
+-    void Item::setOwner(GameObject* owner)
+-    {
+-        mOwner = owner;
+-    }
+-
+-    GameObject* Item::getOwner() const
+-    {
+-        return mOwner;
+-    }
+-
+-    void Item::setParentSlot(Slot* slot)
+-    {
+-        mParentSlot = slot;
+-    }
+-
+-    Slot* Item::getParentSlot() const
+-    {
+-        return mParentSlot;
+-    }
+-
+-    void Item::doCreateActor()
+-    {
+-        setActor(createActor());
+-    }
+-
+-    void Item::setParentContainer(Container* cont)
+-    {
+-        mParentContainer = cont;
+-    }
+-
+-    Container* Item::getParentContainer() const
+-    {
+-        return mParentContainer;
+-    }
+-
+-    const CeGuiString&amp; Item::getSubmeshName() const
+-    {
+-        return mSubmeshName;
+-    }
+-
+-    void Item::setSubmeshName(const CeGuiString&amp; name)
+-    {
+-        mSubmeshName = name;
+-    }
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;Item.h&quot;
++
++#include &quot;Actor.h&quot;
++#include &quot;Container.h&quot;
++#include &quot;Exception.h&quot;
++#include &quot;Slot.h&quot;
++#include &quot;GameObjectManager.h&quot;
++
++using namespace std;
++
++namespace rl
++{
++    const Ogre::String Item::CLASS_NAME = &quot;Item&quot;;
++
++    const Ogre::String Item::PROPERTY_ITEMTYPE = &quot;itemtype&quot;;
++    const Ogre::String Item::PROPERTY_SIZE = &quot;size&quot;;
++    const Ogre::String Item::PROPERTY_SUBMESHNAME = &quot;submeshfile&quot;;
++
++    Item::Item(unsigned int id)
++        : GameObject(id),
++		mItemType(ITEMTYPE_OTHER),
++		mSize(pair&lt;int,int&gt;(1,1)),
++        mOwner(NULL),
++        mParentSlot(NULL),
++        mParentContainer(NULL),
++        mSubmeshName(&quot;&quot;)
++    {
++        mQueryFlags |= QUERYFLAG_ITEM;
++    }
++
++    Item::~Item(void)
++    {
++        removeOldState(); // so the parent-container etc knows this item doesn't exists any more
++    }
++
++	void Item::setItemType(ItemType itemType)
++	{
++		mItemType = itemType;
++	}
++
++	Item::ItemType Item::getItemType() const
++	{
++		return mItemType;
++	}
++
++	bool Item::isContainer() const
++	{
++		return false;
++	}
++
++	pair&lt;int,int&gt; Item::getSize() const
++	{
++		return mSize;
++	}
++
++	void Item::setSize(int widthSize,int heightSize)
++	{
++		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
++	}
++
++    void Item::doLoose()
++    {
++        if (mActor != NULL)
++        {
++            mActor-&gt;detachFromParent();
++        }
++        if (mParentContainer != NULL)
++        {
++            mParentContainer-&gt;_doRemoveItem(this);
++            mParentContainer = NULL;
++        }
++        if (mParentSlot != NULL)
++        {
++            mParentSlot-&gt;setItem(NULL);
++            mParentSlot = NULL;
++        }
++        setOwner(NULL);
++    }
++
++    void Item::removeOldState()
++    {
++        setState(GOS_LOADED);
++    }
++
++// --------------- Warning ------------
++// do not change this function without
++// having a look at the containers and slots
++    void Item::setState(GameObjectState targetState)
++    {
++        if (mState == targetState)
++        {
++            return;
++        }
++
++        // do only things that are possible
++        if( targetState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) &amp;&amp; mState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) )
++        {
++            LOG_ERROR(Logger::RULES,
++                &quot;Item '&quot; + getName() + &quot;' could not change state from '&quot;
++                + Ogre::StringConverter::toString(mState) + &quot;' to state '&quot;
++                + Ogre::StringConverter::toString(targetState) + &quot;'!&quot;
++                + &quot;\nYou need to call 'Item::removeOldState()' first.&quot;);
++            
++            // first remove the old state (thats a recursive function call)
++            //removeOldState();
++        }
++
++        // everything else is not handled here, so give it to the parent
++        if ((targetState == GOS_IN_SCENE || targetState == GOS_LOADED)
++            &amp;&amp; (mState == GOS_IN_SCENE || mState == GOS_LOADED))
++        {
++            GameObject::setState(targetState);
++            return;
++        }
++
++        GameObjectState oldState = mState;
++        onBeforeStateChange(oldState, targetState);        
++
++        if (targetState == GOS_LOADED 
++            &amp;&amp; (mState == GOS_HELD || mState == GOS_READY || GOS_IN_POSSESSION) )
++        {
++            mState = targetState; // this is needed here to prevent an endless recursion
++            // &quot;remove old state&quot;
++            doLoose();
++            destroyActor();
++        }
++        else if (mState == GOS_LOADED &amp;&amp;
++                 (targetState == GOS_HELD || targetState == GOS_READY))
++        {
++            createActor();
++            mState = targetState;
++            // do nothing, the user has to do what he needs himself
++        }
++        else if ((mState == GOS_LOADED &amp;&amp; targetState == GOS_IN_POSSESSION)
++            || (mState == GOS_IN_POSSESSION &amp;&amp; targetState == GOS_LOADED))
++        {
++            mState = targetState;
++        }
++        else
++        {
++            Throw(rl::IllegalStateException, &quot;Unhandled state change&quot;);
++        }
++
++        onAfterStateChange(oldState, targetState);
++        GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetState);
++    }
++
++    void Item::setProperty(const CeGuiString&amp; key, const Property&amp; value)
++    {
++        if (key == Item::PROPERTY_SIZE)
++        {
++            mSize = value.toIntPair();
++        }
++        else if (key == Item::PROPERTY_ITEMTYPE)
++        {
++            mItemType = static_cast&lt;Item::ItemType&gt;(value.toInt());
++        }
++        else if (key == Item::PROPERTY_SUBMESHNAME)
++        {
++            mSubmeshName = value.toString();
++        }
++        else
++        {
++            GameObject::setProperty(key, value);
++        }
++    }
++
++    const Property Item::getProperty(const CeGuiString&amp; key) const
++    {
++        if (key == Item::PROPERTY_SIZE)
++        {
++            return Property(mSize);
++        }
++        else if (key == Item::PROPERTY_ITEMTYPE)
++        {
++            return Property(mItemType);
++        }
++        else if (key == Item::PROPERTY_SUBMESHNAME)
++        {
++            return Property(mSubmeshName);
++        }
++        else
++        {
++            return GameObject::getProperty(key);
++        }
++    }
++
++    PropertyKeys Item::getAllPropertyKeys() const
++    {
++        PropertyKeys keys(GameObject::getAllPropertyKeys());
++        keys.insert(Item::PROPERTY_SUBMESHNAME);
++        keys.insert(Item::PROPERTY_SIZE);
++        keys.insert(Item::PROPERTY_ITEMTYPE);
++        return keys;
++    }
++
++    void Item::setOwner(GameObject* owner)
++    {
++        mOwner = owner;
++    }
++
++    GameObject* Item::getOwner() const
++    {
++        return mOwner;
++    }
++
++    void Item::setParentSlot(Slot* slot)
++    {
++        mParentSlot = slot;
++    }
++
++    Slot* Item::getParentSlot() const
++    {
++        return mParentSlot;
++    }
++
++    void Item::doCreateActor()
++    {
++        setActor(createActor());
++    }
++
++    void Item::setParentContainer(Container* cont)
++    {
++        mParentContainer = cont;
++    }
++
++    Container* Item::getParentContainer() const
++    {
++        return mParentContainer;
++    }
++
++    const CeGuiString&amp; Item::getSubmeshName() const
++    {
++        return mSubmeshName;
++    }
++
++    void Item::setSubmeshName(const CeGuiString&amp; name)
++    {
++        mSubmeshName = name;
++    }
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001659.html">[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001661.html">[Dsa-hl-svn] r4604 - in rl/trunk/engine: core/src rules/include	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1660">[ date ]</a>
+              <a href="thread.html#1660">[ thread ]</a>
+              <a href="subject.html#1660">[ subject ]</a>
+              <a href="author.html#1660">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

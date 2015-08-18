@@ -1,0 +1,490 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4319 - in rl/trunk/engine: rules/include rules/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4319%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200804092231.m39MVdHT021286%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001389.html">
+   <LINK REL="Next"  HREF="001391.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4319 - in rl/trunk/engine: rules/include rules/src	ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4319%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200804092231.m39MVdHT021286%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4319 - in rl/trunk/engine: rules/include rules/src	ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 10 00:31:39 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001389.html">[Dsa-hl-svn] r4318 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001391.html">[Dsa-hl-svn] r4320 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1390">[ date ]</a>
+              <a href="thread.html#1390">[ thread ]</a>
+              <a href="subject.html#1390">[ subject ]</a>
+              <a href="author.html#1390">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-04-10 00:31:28 +0200 (Thu, 10 Apr 2008)
+New Revision: 4319
+
+Modified:
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/include/CombatManager.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+Fixed ownership problem of combatants. Fixed problems with dangling pointers to invalid combatants.
+Still one problem left: Combat instance is created by InputManager but never destroyed. InputManager is probably the wrong place ofr the Combat instance to be created. Combat ownership needs to be placed carefully.
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/rules/include/Combat.h	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -32,6 +32,7 @@
+ namespace rl
+ {
+     class Combatant;
++	class Creature;
+ 	class GameObject;
+ 	class JobSet;
+ 
+@@ -44,9 +45,13 @@
+         ~Combat();
+ 
+         void addOpponent(Combatant*);
++        Combatant* addOpponent(Creature*);
++
+         void removeOpponent(Combatant*);
+ 
+         void addAlly(Combatant*);
++        Combatant* addAlly(Creature*);
++
+         void removeAlly(Combatant*);
+ 
+         const CombatantSet&amp; getAllOpponents() const;
+@@ -77,6 +82,7 @@
+ 		typedef enum {PARADE, AUSWEICHEN} Reaktion;
+ 		struct ActionEntry
+ 		{
++			int id;
+ 			Aktion aktion;
+ 			Combatant* actor;
+ 			Combatant* target;
+@@ -87,17 +93,31 @@
+ 		typedef std::map&lt;Combatant*, Reaktion&gt; CombatantReactionsMap;
+         typedef std::vector&lt;std::pair&lt;int, Combatant*&gt; &gt; CombatantQueue;
+ 
+-        CombatantSet mOpponents;
++        /// Combatants owned by this Combat are also stored here.
++		/// This is needed, in order to destroy removed combatant instances properly.
++		CombatantSet mOwnedCombatants;
++
++		CombatantSet mOpponents;
+         CombatantSet mAllies;
+         /// Combatants in order of their initiative for the current round.
+         CombatantQueue mCombatantQueue;
+         CombatantActionsMap mCombatantActions;
+ 		CombatantReactionsMap mCombatantReactions;
++		/// If a combatant is removed from combat it becomes invalid.
++		/// And thus can't be neither actors nor targets of actions.
++		/// This set stores such action ids.
++		std::set&lt;int&gt; mCancelledActions;
++		/// Store combatants that are removed in current round.
++		/// Instead of destroying them the moment they are out of combat,
++		/// we destroy them at the end of the current combat round.
++		/// This prevents all kinds of problems that dangling pointers would cause else.
++		CombatantSet mRemovedCombatants;
+ 		// Combatants who have registered all their actions for this round
+ 		CombatantSet mFinishedCombatants;
+ 		unsigned long mAnimationSequenceTicket;
+ 
+         unsigned short mCurrentRound;
++		unsigned short mNextActionId;
+ 
+ 		MessagePump::ScopedConnection mLifeStateChangeConnection;
+ 
+@@ -109,6 +129,14 @@
+ 
+ 		Ogre::Real getMaximumAttackeDistance(Combatant* actor) const;
+ 
++		/// Mark any action regarding this combatant as invalid.
++		/// Mark combatant as removed.
++		void checkAndMarkCombatant(Combatant* combatant);
++
++		/// Clear combatant list of removed combatants,
++		/// destroy combatants owned by this combat instance.
++		void clearRemovedCombatantSet();
++
+         // Message handlers
+ 
+         bool onGameObjectLifeStateChanged(GameObject*, Effect::LifeState, Effect::LifeState);
+
+Modified: rl/trunk/engine/rules/include/CombatManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CombatManager.h	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/rules/include/CombatManager.h	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -39,6 +39,7 @@
+         /// Creates a new combat object and sets it active.
+         /// @throw IllegalStateException if there is already a combat running.
+         Combat* startCombat();
++        void stopCombat(Combat*);
+ 
+         /// Return the combat currently running, NULL if there is none.
+         Combat* getCurrentCombat() const;
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -18,6 +18,7 @@
+ #include &quot;Combat.h&quot;
+ 
+ #include &quot;Combatant.h&quot;
++#include &quot;CombatManager.h&quot;
+ #include &quot;CreatureController.h&quot;
+ #include &quot;Effect.h&quot;
+ #include &quot;GameEventLog.h&quot;
+@@ -58,11 +59,16 @@
+     };
+ 
+     Combat::Combat()
+-        : mOpponents(),
++        : mOwnedCombatants(),
++		  mOpponents(),
+           mAllies(),
+           mCombatantQueue(),
+           mCombatantActions(),
++		  mCombatantReactions(),
++		  mCancelledActions(),
++		  mRemovedCombatants(),
+           mCurrentRound(0),
++		  mNextActionId(0),
+ 		  mAnimationSequenceTicket(0)
+     {
+ 		mLifeStateChangeConnection =
+@@ -82,12 +88,21 @@
+ 		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentEntered&gt;(combatant);
+     }
+ 
++    Combatant* Combat::addOpponent(Creature* creature)
++	{
++		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
++		mOwnedCombatants.insert(combatant);
++        addOpponent(combatant);
++		return combatant;
++	}
++
+     void Combat::removeOpponent(Combatant* combatant)
+     {
+         mOpponents.erase(combatant);
+ 		GameEventLog::getSingleton().logEvent(
+ 			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
+ 		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentLeft&gt;(combatant);
++		checkAndMarkCombatant(combatant);
+     }
+ 
+     void Combat::addAlly(Combatant* combatant)
+@@ -95,11 +110,58 @@
+         mAllies.insert(combatant);
+     }
+ 
++    Combatant* Combat::addAlly(Creature* creature)
++	{
++		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
++		mOwnedCombatants.insert(combatant);
++        addAlly(combatant);
++		return combatant;
++	}
++
+     void Combat::removeAlly(Combatant* combatant)
+     {
+         mAllies.erase(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
++		checkAndMarkCombatant(combatant);
+     }
+ 
++	void Combat::checkAndMarkCombatant(Combatant* combatant)
++	{
++		// Cancel any action this combatant takes part in.
++		for (CombatantActionsMap::iterator it = mCombatantActions.begin();
++			it != mCombatantActions.end(); ++it)
++		{
++			for (size_t i = 0; i &lt; it-&gt;second.size(); ++i)
++			{
++				const ActionEntry&amp; ae = it-&gt;second[i];
++				if (ae.actor == combatant || ae.target == combatant)
++				{
++					mCancelledActions.insert(it-&gt;second[i].id);
++				}
++			}
++		}
++		mRemovedCombatants.insert(combatant);
++	}
++
++	void Combat::clearRemovedCombatantSet()
++	{
++		for (CombatantSet::iterator i = mRemovedCombatants.begin();
++			i != mRemovedCombatants.end(); ++i)
++		{
++			// Are we owner of this combatant? If so, delete it.
++			CombatantSet::iterator it = std::find(
++				mOwnedCombatants.begin(), mOwnedCombatants.end(), *i);
++			if (it != mOwnedCombatants.end())
++			{
++				Combatant* combatant = *it;
++				mOwnedCombatants.erase(it);
++				CombatManager::getSingleton().destroyCombatant(combatant);
++			}
++		}
++		mRemovedCombatants.clear();
++	}
++
+     const Combat::CombatantSet&amp; Combat::getAllOpponents() const
+     {
+         return mOpponents;
+@@ -139,6 +201,7 @@
+ 	void Combat::registerAttacke(Combatant* actor, Combatant* target)
+ 	{
+ 		ActionEntry entry;
++		entry.id = mNextActionId++;
+ 		entry.aktion = ATTACKE;
+ 		entry.actor = actor;
+ 		entry.target = target;
+@@ -159,6 +222,7 @@
+ 	void Combat::registerBewegen(Combatant* actor, const Ogre::Vector3&amp; targetPos)
+ 	{
+ 		ActionEntry entry;
++		entry.id = mNextActionId++;
+ 		entry.aktion = BEWEGEN;
+ 		entry.actor = actor;
+ 		entry.targetPos = targetPos;
+@@ -169,6 +233,7 @@
+ 	void Combat::registerFolgen(Combatant* actor, Combatant* target)
+ 	{
+ 		ActionEntry entry;
++		entry.id = mNextActionId++;
+ 		entry.aktion = FOLGEN;
+ 		entry.actor = actor;
+ 		entry.target = target;
+@@ -221,6 +286,7 @@
+ 
+         mCombatantActions.clear();
+ 		mCombatantReactions.clear();
++		mCancelledActions.clear();
+ 		mFinishedCombatants.clear();
+ 
+ 		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
+@@ -258,39 +324,43 @@
+ 			{
+ 				Combatant* combatant = it-&gt;second;
+ 
+-                if (!(combatant-&gt;getCreature()-&gt;getLifeState() &amp; Effect::LS_NO_COMBAT))
+-                {
+-				    // Is there an action registed for combatant?
+-				    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
+-				    if (actionsIt != mCombatantActions.end())
++			    // Is there an action registed for combatant?
++			    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
++			    if (actionsIt != mCombatantActions.end())
++			    {
++				    // Do we have an action for this pass ?
++				    if (actionIndex &lt; actionsIt-&gt;second.size())
+ 				    {
+-					    // Do we have an action for this pass ?
+-					    if (actionIndex &lt; actionsIt-&gt;second.size())
++					    // Yes we do.
++					    ActionEntry entry = actionsIt-&gt;second[actionIndex];
++
++						// Ignore action if cancelled
++						if (mCancelledActions.find(entry.id) != mCancelledActions.end())
++						{
++							continue;
++						}
++
++					    if (entry.aktion == ATTACKE)
+ 					    {
+-						    // Yes we do.
+-						    ActionEntry entry = actionsIt-&gt;second[actionIndex];
+-						    if (entry.aktion == ATTACKE)
++						    // Check whether possible
++						    if (canAttack(combatant, entry.target))
+ 						    {
+-							    // Check whether possible
+-							    if (canAttack(combatant, entry.target))
+-							    {
+-								    doAttacke(jobSet, combatant, entry.target);
+-							    }
++							    doAttacke(jobSet, combatant, entry.target);
+ 						    }
+-						    else if (entry.aktion == BEWEGEN)
+-						    {
+-							    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
+-								    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
+-							    combatant-&gt;doBewegen(jobSet, entry.targetPos);
+-						    }
+-						    else if (entry.aktion == FOLGEN)
+-						    {
+-							    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
+-								    + entry.target-&gt;getName(), GET_COMBAT);
+-							    combatant-&gt;doFolgen(jobSet, entry.target);
+-						    }
+ 					    }
+-                    }
++					    else if (entry.aktion == BEWEGEN)
++					    {
++						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
++							    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
++						    combatant-&gt;doBewegen(jobSet, entry.targetPos);
++					    }
++					    else if (entry.aktion == FOLGEN)
++					    {
++						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
++							    + entry.target-&gt;getName(), GET_COMBAT);
++						    combatant-&gt;doFolgen(jobSet, entry.target);
++					    }
++				    }
+ 				}
+ 			}
+ 			jobQueue-&gt;add(jobSet);
+@@ -301,6 +371,7 @@
+ 
+     void Combat::endRound()
+     {
++		clearRemovedCombatantSet();
+         // All actions executed. Analyze outcome of this round.
+         if (mAllies.empty())
+         {
+@@ -388,7 +459,8 @@
+ 		}
+ 	}
+ 
+-    bool Combat::onGameObjectLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate, Effect::LifeState newstate)
++    bool Combat::onGameObjectLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
++		Effect::LifeState newstate)
+ 	{
+         if (newstate &amp; Effect::LS_NO_COMBAT)
+ 		{
+@@ -429,6 +501,7 @@
+ 							removeAlly(mCombatantQueue[i].second);
+ 						}
+ 					}
++					break;
+ 				}
+ 			}
+ 		}
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -102,9 +102,7 @@
+         {
+             for (size_t i = 0; i &lt; enemies.size(); ++i)
+             {
+-                Combatant* opponent = mCombatManager-&gt;createCombatant(
+-                    static_cast&lt;Creature*&gt;(enemies[i]));
+-                mCombat-&gt;addOpponent(opponent);
++                mCombat-&gt;addOpponent(static_cast&lt;Creature*&gt;(enemies[i]));
+             }
+         }
+         else
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -404,9 +404,9 @@
+             controller = new DialogControlState(mCommandMapper, camera, character);
+             break;
+         case CST_COMBAT:
+-            {
+-                Combat* combat = CombatManager::getSingleton().startCombat();
+-                controller = new CombatControlState(mCommandMapper, camera, character, combat);
++            {                
++				mCombat = CombatManager::getSingleton().startCombat();
++				controller = new CombatControlState(mCommandMapper, camera, character, combat);
+             }
+             break;
+         default:
+@@ -418,9 +418,6 @@
+             mControlStates.top()-&gt;pause();
+         }
+ 
+-        //mKeyboard-&gt;setEventCallback(controller);
+-        //mMouse-&gt;setEventCallback(controller);
+-
+         mControlStates.push(controller);
+         mControlStates.top()-&gt;resume();
+     }
+@@ -435,15 +432,8 @@
+         if (!mControlStates.empty())
+         {
+             ControlState* newController = mControlStates.top();
+-            //mKeyboard-&gt;setEventCallback(newController);
+-            //mMouse-&gt;setEventCallback(newController);
+             newController-&gt;resume();
+         }
+-        else
+-        {
+-            //mKeyboard-&gt;setEventCallback(NULL);
+-            //mMouse-&gt;setEventCallback(NULL);
+-        }
+     }
+ 
+     void InputManager::clearControlStates()
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2008-04-09 22:28:53 UTC (rev 4318)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2008-04-09 22:31:28 UTC (rev 4319)
+@@ -1098,7 +1098,9 @@
+         for (size_t i = 0, end = gov.size(); i &lt; end; ++i)
+         {
+             Creature* creature = dynamic_cast&lt;Creature*&gt;(gov.at(i));
+-            if (creature &amp;&amp; creature-&gt;getAlignment() == Creature::ALIGNMENT_ENEMY)
++            if (creature &amp;&amp;
++				creature-&gt;getAlignment() == Creature::ALIGNMENT_ENEMY &amp;&amp;
++				creature-&gt;getLifeState() | Effect::LS_NO_COMBAT)
+             {
+                 return true;
+             }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001389.html">[Dsa-hl-svn] r4318 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001391.html">[Dsa-hl-svn] r4320 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1390">[ date ]</a>
+              <a href="thread.html#1390">[ thread ]</a>
+              <a href="subject.html#1390">[ subject ]</a>
+              <a href="author.html#1390">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

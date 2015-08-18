@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3378 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3378%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200705021906.l42J6lpb029204%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000448.html">
+   <LINK REL="Next"  HREF="000450.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3378 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3378%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200705021906.l42J6lpb029204%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3378 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed May  2 21:06:47 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000448.html">[Dsa-hl-svn] r3377 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000450.html">[Dsa-hl-svn] r3379 - modules/common/scripts rl/trunk/docs/documents	rl/trunk/engine/core rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script	rl/trunk/engine/script/include rl/trunk/engine/script/src	rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#449">[ date ]</a>
+              <a href="thread.html#449">[ thread ]</a>
+              <a href="subject.html#449">[ subject ]</a>
+              <a href="author.html#449">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-05-02 21:06:34 +0200 (Wed, 02 May 2007)
+New Revision: 3378
+
+Modified:
+   rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+   rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+Log:
+yaw and pitch work correctly now (turning right/left is always treated as rotation of the (global)y-axis)
+
+Modified: rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-05-02 18:47:52 UTC (rev 3377)
++++ rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-05-02 19:06:34 UTC (rev 3378)
+@@ -68,6 +68,8 @@
+ 		Ogre::Real mRotationSpeed;
+         Ogre::Vector3 mDesiredVelocity;
+         Ogre::Vector3 mCameraUpConstraint;
++        Ogre::Radian mYaw;
++        Ogre::Radian mPitch;
+         bool mCollisionsEnabled;
+         Ogre::Real mMouseSensitivity;
+         bool mInvertedMouse;
+
+Modified: rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-05-02 18:47:52 UTC (rev 3377)
++++ rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-05-02 19:06:34 UTC (rev 3378)
+@@ -43,7 +43,9 @@
+         mDesiredVelocity(Vector3::ZERO),
+         mCollisionsEnabled(false),
+         mPitchRange(Degree(-89), Degree(89)),
+-        mCameraUpConstraint(Vector3::ZERO)
++        mCameraUpConstraint(Vector3::ZERO),
++        mYaw(Degree(0)),
++        mPitch(Degree(0))
+ 	{
+         mMouseSensitivity = ConfigurationManager::getSingleton().getIntSetting(&quot;Input&quot;, &quot;Mouse Sensitivity&quot;);
+         mInvertedMouse = ConfigurationManager::getSingleton().getBoolSetting(&quot;Input&quot;, &quot;Mouse Invert&quot;);
+@@ -156,34 +158,34 @@
+ 		}
+ 
+ 
+-        Radian yaw;
+         if (movement &amp; TURN_LEFT)
+-            yaw = elapsedTime * Degree(120.0f);
++            mYaw += elapsedTime * Degree(120.0f);
+         if (movement &amp; TURN_RIGHT)
+-            yaw = -elapsedTime * Degree(120.0f);
++            mYaw -= elapsedTime * Degree(120.0f);
+ 
+         // mouse
+         if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
+         {
+-            yaw = -mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
++            mYaw -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
+         }
+-        while (yaw.valueDegrees() &gt; 360.0f) yaw -= Degree(360.0f);
+-        while (yaw.valueDegrees() &lt; -360.0f) yaw += Degree(360.0f);
++        while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
++        while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+ 
+-        Radian pitch;
++
+         if (mInvertedMouse)
+-            pitch = mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++            mPitch += mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+         else
+-            pitch = -mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++            mPitch -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+ 
+-        while (pitch.valueDegrees() &gt; 360.0f) pitch -= Degree(360.0f);
+-        while (pitch.valueDegrees() &lt; -360.0f) pitch += Degree(360.0f);
+-        if (pitch &lt; mPitchRange.first) pitch = mPitchRange.first;
+-        if (pitch &gt; mPitchRange.second) pitch = mPitchRange.second;
++        while (mPitch.valueDegrees() &gt; 360.0f) mPitch -= Degree(360.0f);
++        while (mPitch.valueDegrees() &lt; -360.0f) mPitch += Degree(360.0f);
++        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
++        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
+ 
++        mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+         mCameraActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
+-        mCameraActor-&gt;yaw(yaw.valueDegrees());
+-        mCameraActor-&gt;pitch(pitch.valueDegrees());
++        mCameraActor-&gt;yaw(mYaw.valueDegrees());
++        mCameraActor-&gt;pitch(mPitch.valueDegrees());
+     }
+ 
+ 	void FreeFlightCharacterController::toggleCameraCollision()
+@@ -212,6 +214,8 @@
+ 		    mCameraActor-&gt;setOrientation( Quaternion::IDENTITY );
+             mCameraActor-&gt;setPosition( Vector3::ZERO );
+         }
++        mYaw = Degree(0);
++        mPitch = Degree(0);
+ 	}
+ 
+ 	bool FreeFlightCharacterController::injectKeyDown(int keycode)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000448.html">[Dsa-hl-svn] r3377 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000450.html">[Dsa-hl-svn] r3379 - modules/common/scripts rl/trunk/docs/documents	rl/trunk/engine/core rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script	rl/trunk/engine/script/include rl/trunk/engine/script/src	rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#449">[ date ]</a>
+              <a href="thread.html#449">[ thread ]</a>
+              <a href="subject.html#449">[ subject ]</a>
+              <a href="author.html#449">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

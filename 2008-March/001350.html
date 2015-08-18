@@ -1,0 +1,228 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4279 - in modules/regressiontest: dsa scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4279%20-%20in%20modules/regressiontest%3A%20dsa%20scripts&In-Reply-To=%3C200803091224.m29COrEa021432%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001349.html">
+   <LINK REL="Next"  HREF="001351.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4279 - in modules/regressiontest: dsa scripts</H1>
+    <B>josch at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4279%20-%20in%20modules/regressiontest%3A%20dsa%20scripts&In-Reply-To=%3C200803091224.m29COrEa021432%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4279 - in modules/regressiontest: dsa scripts">josch at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar  9 13:24:53 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001349.html">[Dsa-hl-svn] r4278 - modules/common/materials/particle
+</A></li>
+        <LI>Next message: <A HREF="001351.html">[Dsa-hl-svn] r4280 - in rl/trunk/engine: core core/include	core/include/nulldriver core/src core/src/nulldriver script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1350">[ date ]</a>
+              <a href="thread.html#1350">[ thread ]</a>
+              <a href="subject.html#1350">[ subject ]</a>
+              <a href="author.html#1350">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: josch
+Date: 2008-03-09 13:24:51 +0100 (Sun, 09 Mar 2008)
+New Revision: 4279
+
+Modified:
+   modules/regressiontest/dsa/gameobjectdefinitions.gof
+   modules/regressiontest/scripts/SoundTest.rb
+Log:
+Soundtest was expanded to include a test for sound sequences (stitching)
+
+Modified: modules/regressiontest/dsa/gameobjectdefinitions.gof
+===================================================================
+--- modules/regressiontest/dsa/gameobjectdefinitions.gof	2008-03-09 08:32:12 UTC (rev 4278)
++++ modules/regressiontest/dsa/gameobjectdefinitions.gof	2008-03-09 12:24:51 UTC (rev 4279)
+@@ -133,13 +133,6 @@
+         &lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;arc_hebel_01.mesh&quot;/&gt;
+     &lt;/gameobjectclass&gt;
+ 
+-    &lt;!-- SoundTest --&gt;
+-    &lt;gameobjectclass classid=&quot;SoundFadeTest&quot; baseclass=&quot;GameObject&quot;&gt;
+-        &lt;property name=&quot;name&quot; type=&quot;STRING&quot; data=&quot;SoundFadeTest&quot;/&gt;
+-        &lt;property name=&quot;description&quot; type=&quot;STRING&quot; data=&quot;The Sound Fading TestCase&quot;/&gt;
+-        &lt;property name=&quot;meshfile&quot; type=&quot;STRING&quot; data=&quot;arc_hebel_01.mesh&quot;/&gt;
+-    &lt;/gameobjectclass&gt;
+-
+     &lt;!-- JobSequenceTest --&gt;
+     &lt;gameobjectclass classid=&quot;JobSequenceTestChest&quot; baseclass=&quot;GameObject&quot;&gt;
+         &lt;property name=&quot;name&quot; type=&quot;STRING&quot; data=&quot;JobSequence-Truhe&quot;/&gt;
+
+Modified: modules/regressiontest/scripts/SoundTest.rb
+===================================================================
+--- modules/regressiontest/scripts/SoundTest.rb	2008-03-09 08:32:12 UTC (rev 4278)
++++ modules/regressiontest/scripts/SoundTest.rb	2008-03-09 12:24:51 UTC (rev 4279)
+@@ -1,61 +1,71 @@
+-require 'util/vector_util.rb'
+-require 'testcase.rb'
+-require 'torch.rb'
+-
+-
+-class SoundFadeAction &lt; Action
+-  def initialize
+-    super(&quot;SoundFadeAction&quot;, &quot;Tests fading code.&quot;)
+-    sound = $SM.createSound(&quot;ruchin001.ogg&quot;)
+-    @sound = SoundObject.new(sound, &quot;SoundFadeTest&quot;)
+-    @sound.set3d(false);
+-    @sound.play();
+-  end
+-  
+-  def canDo(go, user)
+-    true
+-  end
+-  
+-  def doAction(go, user, target)
+-    p &quot;SoundFadeAction&quot;
+-    functor = LinearSoundFadeFunctor.new(5, false)
+-    job = SoundFadeJob.new(@sound, functor, true)
+-    $JS.addJob(job)
+-  end
+-  
+-end
+-
+-class SoundTest &lt; TestCase
+-  include Math
+-  
+-  @@torchcount = 10
+-  @@height = 0.30
+-  @@radius = 5
+-  
+-  def execute()
+-    min_base = [-@@radius, 0.05, -@@radius]
+-    max_base = [@@radius, @@height, @@radius]
+-    base = $AM.createBoxPrimitiveActor(&quot;SoundTestBase&quot;, min_base, max_base, &quot;alpha_blue&quot;)
+-    base.placeIntoScene(getCenter())
+-    
+-    eh = $GOM.createGameObject(&quot;SoundFadeTest&quot;)
+-    eh.addAction(SoundFadeAction.new())
+-    eh.placeIntoScene()
+-    eh.setPosition(rel_pos([0.0, @@height, 0.0]))
+-    
+-    step = 2 * PI / @@torchcount
+-    0.step(2 * PI, step) do |radian|
+-      x = cos(radian) * @@radius
+-      y = sin(radian) * @@radius
+-      fackel = $GOM.createGameObject(&quot;torch&quot;)
+-      fackel.setDescription(&quot;Fackel&quot; + radian.to_s)
+-      fackel.setPosition(rel_pos([x, @@height, y]))
+-      fackel.setLit(false)
+-      fackel.placeIntoScene()
+-    end
+-    
+-    $SCRIPT.log(&quot;SoundTest initialisiert&quot;)
+-    
+-  end
+-  
+-end
++require 'jobs/jobsequence.rb'
++require 'util/vector_util.rb'
++require 'testcase.rb'
++require 'torch.rb'
++require 'switch.rb'
++
++class SwitchChanger &lt; ObjectStateChangeListener
++
++  def initialize(switch)
++    super()
++    @switch = switch
++    @switch.addObjectStateChangeListener(self)
++  end
++
++  def objectStateChanged(event)
++    state = @switch.getState();
++    doFadeTest() if state == Switch3Way::STATE_OBEN
++    doStitchingTest() if state == Switch3Way::STATE_UNTEN
++  end
++  
++  def doFadeTest
++    p &quot;SoundFadeAction&quot;
++    sound = $SM.createSound(&quot;ruchin001.ogg&quot;)
++    soundobject = SoundObject.new(sound, &quot;SoundFadeTest&quot;)
++    soundobject.set3d(false);
++    soundobject.play();
++    functor = LinearSoundFadeFunctor.new(5, false)
++    job = SoundFadeJob.new(soundobject, functor, true)
++    jobSequence([5, job])
++  end
++  
++  def doStitchingTest
++    p &quot;SoundStitchingAction&quot;
++    stitching = Stitching
++  end
++end
++
++class SoundTest &lt; TestCase
++  include Math
++  
++  @@torchcount = 10
++  @@height = 0.30
++  @@radius = 5
++  
++  def execute()
++    min_base = [-@@radius, 0.05, -@@radius]
++    max_base = [@@radius, @@height, @@radius]
++    base = $AM.createBoxPrimitiveActor(&quot;SoundTestBase&quot;, min_base, max_base, &quot;alpha_blue&quot;)
++    base.placeIntoScene(getCenter())
++
++    eh = $GOM.createGameObject(&quot;switch3way&quot;)
++    eh.placeIntoScene()
++    eh.setPosition(rel_pos([0.0, @@height, 0.0]))
++    SwitchChanger.new(eh)
++    
++    step = 2 * PI / @@torchcount
++    0.step(2 * PI, step) do |radian|
++      x = cos(radian) * @@radius
++      y = sin(radian) * @@radius
++      fackel = $GOM.createGameObject(&quot;torch&quot;)
++      fackel.setDescription(&quot;Fackel&quot; + radian.to_s)
++      fackel.setPosition(rel_pos([x, @@height, y]))
++      fackel.setLit(false)
++      fackel.placeIntoScene()
++    end
++    
++    $SCRIPT.log(&quot;SoundTest initialisiert&quot;)
++    
++  end
++  
++end
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001349.html">[Dsa-hl-svn] r4278 - modules/common/materials/particle
+</A></li>
+	<LI>Next message: <A HREF="001351.html">[Dsa-hl-svn] r4280 - in rl/trunk/engine: core core/include	core/include/nulldriver core/src core/src/nulldriver script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1350">[ date ]</a>
+              <a href="thread.html#1350">[ thread ]</a>
+              <a href="subject.html#1350">[ subject ]</a>
+              <a href="author.html#1350">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

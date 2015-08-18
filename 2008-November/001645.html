@@ -1,0 +1,332 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4588 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4588%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200811151249.mAFCnkVR030276%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001644.html">
+   <LINK REL="Next"  HREF="001646.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4588 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4588%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200811151249.mAFCnkVR030276%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4588 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sat Nov 15 13:49:46 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001644.html">[Dsa-hl-svn] r4587 - in modules/kanalisation: maps scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001646.html">[Dsa-hl-svn] r4589 - rl/branches/persistence/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1645">[ date ]</a>
+              <a href="thread.html#1645">[ thread ]</a>
+              <a href="subject.html#1645">[ subject ]</a>
+              <a href="author.html#1645">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2008-11-15 13:49:44 +0100 (Sat, 15 Nov 2008)
+New Revision: 4588
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+Log:
+- entity nodes load correctly
+
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-11-15 10:12:49 UTC (rev 4587)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-11-15 12:49:44 UTC (rev 4588)
+@@ -36,15 +36,73 @@
+ from MyRaySceneQueryListener import *
+ 
+ class Map():
+-    def __init__(self):
+-        return
++    def __init__(self, pathToFile, sceneManager, ogreRoot):
++        self.pathToMapFile = pathToFile
++        self.sceneManager = sceneManager
++        self.mapNode = sceneManager.getRootSceneNode().createChildSceneNode(self.pathToMapFile)
++        self.ogreRoot = ogreRoot
+ 
++        xmlTree = xml.parse(pathToFile)
++        root = xmlTree.getroot()
++
++        if root.attrib[&quot;formatVersion&quot;] == &quot;0.4.0&quot;:
++            self.parseMap(root)
++        else:
++            print pathToFile + &quot; has wrong format version. It needs to be 0.4.0&quot;
++            return
++
++    def parseMap(self, rootElement):
++        nodes = rootElement.getiterator(&quot;entity&quot;)
++        for n in nodes:
++            entityName = n.attrib[&quot;name&quot;]
++            meshFile = n.attrib[&quot;meshfile&quot;]
++            nodePosition = None
++            nodeRotation = None
++            nodeScale = None
++
++            transformations = n.getiterator()
++            for t in transformations:
++                if t.tag == &quot;position&quot;:
++                    x = float(t.attrib[&quot;x&quot;])
++                    y = float(t.attrib[&quot;y&quot;])
++                    z = float(t.attrib[&quot;z&quot;])
++                    nodePosition = og.Vector3(x, y, z)
++                elif t.tag == &quot;rotation&quot;:
++                    qw = float(t.attrib[&quot;qw&quot;])
++                    qx = float(t.attrib[&quot;qx&quot;])
++                    qy = float(t.attrib[&quot;qy&quot;])
++                    qz = float(t.attrib[&quot;qz&quot;])
++                    nodeRotation = og.Quaternion(qw, qx, qy, qz)
++                elif t.tag == &quot;scale&quot;:
++                    x = float(t.attrib[&quot;x&quot;])
++                    y = float(t.attrib[&quot;y&quot;])
++                    z = float(t.attrib[&quot;z&quot;])
++                    nodeScale = og.Vector3(x, y, z)
++
++            try:
++                e = self.sceneManager.createEntity(entityName, meshFile)
++            except:
++                print &quot;Warning: Meshfile &quot; + meshFile + &quot; could not be found.&quot;
++                return
++
++            n = self.mapNode.createChild(entityName + &quot;_node&quot;)
++            n.attachObject(e)
++            n.setPosition(nodePosition)
++            n.setOrientation(nodeRotation)
++            n.setScale(nodeScale)
++
++
++
++
+ class Scene():
+     def __init__(self):
+         return
+ 
+ class Module():
+-    def __init__(self,name, modulePath):
++    def __init__(self,name, modulePath, sceneManager, ogreRoot):
++        self.sceneManager = sceneManager
++        self.ogreRoot = ogreRoot
++
+         self.name = name
+         self.moduleRoot = join(modulePath, name)
+         self.__isCommon = False
+@@ -55,6 +113,10 @@
+         self.mapFiles = [] # a list in case the module has more than one map file
+         self.gofFiles = [] # gof File list
+ 
++        self.scenes =[]
++
++        self.isLoaded = False
++
+     def isCommon(self):
+         modConfig = join(self.moduleRoot,  &quot;scripts/moduleconfig.rb&quot;)
+         if isfile(modConfig): # is the modconfig existing?
+@@ -62,7 +124,7 @@
+         else:
+             print (&quot;Error: couldn't find module config&quot;)
+             return
+-
++        isDependencieLine = False
+         for i, line in enumerate(f):
+             lStripped = line.strip() #strip the whitespace away, not needed here
+             if lStripped.startswith(&quot;super(&quot;):
+@@ -71,9 +133,24 @@
+                     self.__isCommon = True
+                     return True
+ 
++
++            elif isDependencieLine:
++                if lStripped == &quot;end&quot;:
++                    isDependencieLine = False
++                else:
++                    self.hasDependencies = True
++                    self.moduleDependencies.append(lStripped.split('&quot;')[1])
++
++            elif lStripped == &quot;def getDependencies()&quot;:
++                isDependencieLine = True
++
+         return False
+ 
+     def load(self):
++        if self.isLoaded:
++            return
++
++        self.isLoaded = True
+         modConfig = join(self.moduleRoot,  &quot;scripts/moduleconfig.rb&quot;)
+         if isfile(modConfig): # is the modconfig existing?
+             f = codecs.open(modConfig, 'r', 'utf-8')
+@@ -81,22 +158,28 @@
+             print (&quot;Error: couldn't find module config&quot;)
+             return
+ 
+-        isDependencieLine = False
++        #for i, line in enumerate(f):
++            #lStripped = line.strip() #strip the whitespace away, not needed here
+ 
+-        for i, line in enumerate(f):
+-            lStripped = line.strip() #strip the whitespace away, not needed here
++        self.setResourcePaths()
++        og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+ 
+-            if isDependencieLine:
+-                if lStripped == &quot;end&quot;:
+-                    isDependencieLine = False
+-                else:
+-                    self.moduleDependencies.append(lStripped.split('&quot;')[1])
++        if not self.isCommon():
++            cmd = join(self.moduleRoot, &quot;maps/*.rlmap.xml&quot;)
++            maps = glob.glob(cmd)
++            for m in maps:
++                self.mapFiles.append(Map(m, self.sceneManager, self.ogreRoot))
+ 
+-            elif lStripped == &quot;def getDependencies()&quot;:
+-                isDependencieLine = True
++            cmd = join(self.moduleRoot, &quot;maps/*.rlscene&quot;)
++            sceneFile = glob.glob(cmd)
++            #self.loadScenes(sceneFile)
+ 
+-        self.setResourcePaths()
++    def saveMaps(self):
++        return
+ 
++    def saveScenes(self):
++        return
++
+     def setResourcePaths(self, recurseFolder = &quot;&quot;):
+         if recurseFolder == &quot;&quot;:
+             rootFolder = self.moduleRoot
+@@ -108,50 +191,13 @@
+ 
+ 
+             if file.startswith('.'): #ignore dot files (hidden)
+-                continue
++                pass
+             if os.path.isdir(curFile):
+                 og.ResourceGroupManager.getSingleton().addResourceLocation(curFile, &quot;FileSystem&quot;, self.name, False)
+                 self.setResourcePaths(curFile)
+-                continue
+             if os.path.isfile(curFile):
+                 pass
+ 
+-
+-#                spl = lStripped.split('&quot;')
+-#                for a in spl:
+-#                    if a.endswith(&quot;.xml&quot;):
+-#                        pathToMapFile = self.workingDir + &quot;/maps/&quot; + a
+-#                        self.mapFiles.append(pathToMapFile)
+-
+-#        self.setWindowTitle(moduleName)
+-#
+-#        self.modelSelectionDialog.scanDirForModels(self.workingDir, moduleName)
+-#        self.modelSelectionDialog.scanDirForModels(self.workingDirCommon, &quot;common&quot;)
+-#
+-#        self.setResourcePaths(self.workingDir, moduleName)
+-#        self.setResourcePaths(self.workingDirCommon, &quot;common&quot;)
+-#        og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+-#
+-#        command = (os.path.join(self.workingDir,  &quot;maps&quot;) + &quot;/*.xml&quot;)
+-#        for mf in glob.glob(command): # search for all xml files in the maps directory and add them
+-#            self.mapFiles.append(mf)
+-#
+-#        command = (os.path.join(self.workingDir,  &quot;maps&quot;) + &quot;/*.scene&quot;)
+-#        for mf in glob.glob(command): # search for all .scene files in the maps directory and add them
+-#            self.mapFiles.append(mf)
+-#
+-#        command = (os.path.join(self.workingDir,  &quot;dsa&quot;) + &quot;/*.gof&quot;)
+-#        for gf in glob.glob(command): # search for all .gof files in the dsa directory in the module dir
+-#            self.gofFiles.append(gf)
+-#
+-#        command = (os.path.join(self.workingDirCommon,  &quot;dsa&quot;) + &quot;/*.gof&quot;)
+-#        for gf in glob.glob(command): # search for all .gof files in the dsa directory in the common module dir
+-#            self.gofFiles.append(gf)
+-#
+-#        self.moduleManager.load(moduleName,  self.mapFiles,  self.gofFiles)
+-
+-
+-
+ class ModuleManager():
+     def __init__(self,  ogreRoot,  sceneManager):
+         self.sceneManager = sceneManager
+@@ -160,6 +206,8 @@
+ 
+         self.gocManager = GameObjectClassManager()
+ 
++        self.mainModule = []
++        self.mainModuledependencieList =[]
+         self.moduleList = []
+         self.userSelectionList = []
+         self.cutList = [] # selection objects that has been cut out and wait to be pasted again
+@@ -205,7 +253,7 @@
+             if line.startswith('module='):
+                 splines = line.split('=')
+                 str = splines[1].rstrip().rstrip()
+-                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;)))
++                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;), self.sceneManager, self.ogreRoot))
+ 
+         self.moduleConfigIsParsed = True
+ 
+@@ -230,13 +278,22 @@
+         layout.addWidget(btnBox)
+         dlg.setLayout(layout)
+         if dlg.exec_():
+-            self.loadModule(list.currentItem().text())
++            self.loadModule(str(list.currentItem().text()))
+ 
+     def loadModule(self, moduleName):
+         for m in self.moduleList:
+             if m.name == moduleName:
++                if m.hasDependencies:
++                    for moduleDependencie in m.moduleDependencies:
++                        for m2 in self.moduleList:
++                            if m2.name == moduleDependencie:
++                                m2.load()
++                                self.mainModuledependencieList.append(m2)
++
+                 m.load()
++                self.mainModule = m
+ 
++
+     # called when a click into Main Ogre Window occurs
+     def selectionClick(self,  ray,  controlDown=False,  shiftDown=False):
+         self.listenerDings.reset()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001644.html">[Dsa-hl-svn] r4587 - in modules/kanalisation: maps scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001646.html">[Dsa-hl-svn] r4589 - rl/branches/persistence/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1645">[ date ]</a>
+              <a href="thread.html#1645">[ thread ]</a>
+              <a href="subject.html#1645">[ subject ]</a>
+              <a href="author.html#1645">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

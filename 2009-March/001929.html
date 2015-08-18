@@ -1,0 +1,300 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4872 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4872%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903301500.n2UF0qlx030542%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001928.html">
+   <LINK REL="Next"  HREF="001930.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4872 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4872%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903301500.n2UF0qlx030542%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4872 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar 30 17:00:52 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001928.html">[Dsa-hl-svn] r4871 - in dependencies/OgreNewt:	demos/Demo08_RagdollExample inc src
+</A></li>
+        <LI>Next message: <A HREF="001930.html">[Dsa-hl-svn] r4873 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1929">[ date ]</a>
+              <a href="thread.html#1929">[ thread ]</a>
+              <a href="subject.html#1929">[ subject ]</a>
+              <a href="author.html#1929">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-30 17:00:49 +0200 (Mon, 30 Mar 2009)
+New Revision: 4872
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+   rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+Log:
+- bugfix
+- more work on ModuleExplorer
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-29 16:57:06 UTC (rev 4871)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-30 15:00:49 UTC (rev 4872)
+@@ -90,7 +90,7 @@
+         self.setAnimated(True)
+ 
+         self.setHeaderLabels([&quot;Structure&quot;, &quot;Visibility&quot;])
+-        self.setSelectionMode(3)
++        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+         
+     def setMenuCallback(self, callback):
+         self.onMenuCallback = callback
+@@ -118,6 +118,7 @@
+         
+         self.moduleManager = None
+         self.mapSelectedCallback = None
++        self.selectionChangedCallback = None
+         self.mapItems = []
+         
+         self.lastSelectedMap = None
+@@ -129,6 +130,7 @@
+         self.showZones = True
+ 
+     def selectItems(self, selectedItems):
++        self.disconnect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
+         self.deselectAll()
+         
+         if selectedItems is None:
+@@ -139,8 +141,10 @@
+             items = self.sceneTreeView.findItems(nodeName, Qt.MatchFixedString | Qt.MatchRecursive)
+             for item in items:
+                 self.sceneTreeView.setItemSelected(item, True)
++        self.connect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
+     
+     def selectItem(self, so, select):
++        self.disconnect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
+         nodeName = so.entity.getParentNode().getName()
+        
+         items = None
+@@ -152,23 +156,40 @@
+             items = self.sceneTreeView.findItems(go.gocName + &quot; id:&quot; + str(go.inWorldId), Qt.MatchFixedString | Qt.MatchRecursive)    
+         elif nodeName.startswith(&quot;entity_&quot;) and self.showEntities:
+             items = self.sceneTreeView.findItems(so.entityName, Qt.MatchFixedString | Qt.MatchRecursive)    
++        elif nodeName.startswith(&quot;area_&quot;) and self.showZones:
++            area = so.entity.getUserObject()
++            items = self.sceneTreeView.findItems(&quot;Area &quot; + str(area.id), Qt.MatchFixedString | Qt.MatchRecursive)    
+         
+-        if select:
++        if select and items is not None:
+             for item in items:
+                 self.sceneTreeView.setItemSelected(item, True)
+                 self.sceneTreeView.expandItem(item)
+         else:
+-            for item in items:
+-                self.sceneTreeView.setItemSelected(item, False)
++            if items is not None:
++                for item in items:
++                    self.sceneTreeView.setItemSelected(item, False)
++        self.connect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
++        
++    def onSelectionChanged(self):
++        if self.selectionChangedCallback is None:
++            return
++            
++        nodeNames = []
++        items = self.sceneTreeView.selectedItems()
++        for item in items:
++            name = str(item.data(0, Qt.UserRole).toString())
++            if len &gt; 0:
++                nodeNames.append(name)
+                 
+-    def onSelectionChanged(self):
+-        pass
+-
++        self.selectionChangedCallback(nodeNames)
+     def deselectAll(self):
++        self.disconnect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
++        
+         for item in self.sceneTreeView.selectedItems():
+             self.sceneTreeView.setItemSelected(item, False)
++            
++        self.connect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
+ 
+-
+     def onClick(self, item, column):
+         if self.mapSelectedCallback is None:
+             return
+@@ -342,13 +363,16 @@
+         while i &lt; map.mapNode.numChildren(): 
+             if map.mapNode.getChild(i).getName().startswith(&quot;light_&quot;) and self.showLights:
+                 childItem2 = QTreeWidgetItem(childItem) 
++                childItem2.setData(0, Qt.UserRole, QVariant(map.mapNode.getChild(i).getName()))
+                 childItem2.setText(0, extractLight(map.mapNode.getChild(i)).getName()) 
+             elif map.mapNode.getChild(i).getName().startswith(&quot;gameobject_&quot;) and self.showGameObjects:
+                 childItem2 = QTreeWidgetItem(childItem) 
+                 go = map.mapNode.getChild(i).getAttachedObject(0).getUserObject()
++                childItem2.setData(0, Qt.UserRole, QVariant(map.mapNode.getChild(i).getName()))
+                 childItem2.setText(0, go.gocName + &quot; id:&quot; + str(go.inWorldId)) 
+             elif map.mapNode.getChild(i).getName().startswith(&quot;entity_&quot;) and self.showEntities:
+                 childItem2 = QTreeWidgetItem(childItem) 
++                childItem2.setData(0, Qt.UserRole, QVariant(map.mapNode.getChild(i).getName()))
+                 childItem2.setText(0, map.mapNode.getChild(i).getAttachedObject(0).getName()) 
+             i = i+1
+ 
+@@ -377,13 +401,15 @@
+         for zone in map.zoneList:
+             childItem = QTreeWidgetItem(parentItem) 
+             childItem.setText(0, &quot;Zone: &quot; + zone.name)
++            childItem.setData(0, Qt.UserRole, QVariant(zone.zoneNode.getName()))
+             childItem.setIcon(0, QIcon(&quot;media/icons/dissociatecell.png&quot;))
+             childItem.setIcon(1, QIcon(&quot;media/icons/14_layer_visible.png&quot;))
+             
+             i = 0
+             for area in zone.areaList:
+                 childItem2 = QTreeWidgetItem(childItem)
+-                childItem2.setText(0, &quot;Area &quot; + str(i))
++                childItem2.setText(0, &quot;Area &quot; + str(area.id))
++                childItem2.setData(0, Qt.UserRole, QVariant(area.areaNode.getName()))
+                 i += 1
+                 
+     def setCurrentModule(self, module):
+@@ -395,3 +421,6 @@
+         
+     def setMapSelectedCallback(self, callback):
+         self.mapSelectedCallback = callback
++
++    def setSelectionChangedCallback(self, callback):
++        self.selectionChangedCallback = callback
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-29 16:57:06 UTC (rev 4871)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-30 15:00:49 UTC (rev 4872)
+@@ -886,10 +886,15 @@
+     def setModuleExplorer(self, moduleExplorer):
+         self.moduleExplorer = moduleExplorer
+         self.moduleExplorer.setMapSelectedCallback(self.selectMapCallback)
++        self.moduleExplorer.setSelectionChangedCallback(self.selectionChangedCallback)
+         self.moduleExplorer.setModuleManager(self)
+     
+     def setPropertyWindow(self, propertyWin):
+         self.propertyWindow = propertyWin
++    
++    def selectionChangedCallback(self, items):
++        self.resetSelection()
++        self.userSelectionList = self.selectionBuffer.manualSelectObjects(items)
+         
+     def selectMapCallback(self, sceneName, mapName):
+         self.currentMap = self.mainModule.getMap(mapName, sceneName)
+@@ -1092,8 +1097,9 @@
+             self.pivot.stopTransforming()
+ 
+     def resetSelection(self):
+-        for so in self.userSelectionList:
+-            so.setSelected(False)
++        if self.userSelectionList is not None:
++            for so in self.userSelectionList:
++                so.setSelected(False)
+ 
+         self.userSelectionList = []
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-29 16:57:06 UTC (rev 4871)
++++ rl/trunk/editors/Lockenwickler/src/ObjectPropertyWin.py	2009-03-30 15:00:49 UTC (rev 4872)
+@@ -426,6 +426,14 @@
+             item.setText(1, area.type)
+             
+             item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Dbg Area Id:&quot;)
++            item.setText(1, str(area.id))
++            
++            item = QTreeWidgetItem(self.treeWidget)
++            item.setText(0, &quot;Dbg Area Entity Name:&quot;)
++            item.setText(1, area.areaEntity.getName())
++            
++            item = QTreeWidgetItem(self.treeWidget)
+             item.setText(0, &quot;Subtract&quot;)
+             item.setText(1, str(area.subtract))
+             
+
+Modified: rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-29 16:57:06 UTC (rev 4871)
++++ rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-30 15:00:49 UTC (rev 4872)
+@@ -23,6 +23,16 @@
+ 
+ import ogre.renderer.OGRE as og
+ 
++# get the light out of a light node
++def extractLight(node):
++        i = 0
++        num = node.numAttachedObjects()
++        while i &lt; node.numAttachedObjects():
++            c = node.getAttachedObject(i)
++            tp = str(type(c))
++            if tp == &quot;&lt;class 'ogre.renderer.OGRE._ogre_.Light'&gt;&quot;:
++                return c
++            i += 1
+ 
+ # a class to store information about a object that got selected
+ class SelectionObject():
+@@ -243,6 +253,20 @@
+ 
+         return None
+         
++    def manualSelectObjects(self, itemNodes):
++        return
++        
++        items = []
++        for item in itemNodes:
++            if item.startswith(&quot;light_&quot;):
++                pass
++            obj = self.sceneMgr.getRootSceneNode().getChild(item).getAttachedObject(0)
++            so = SelectionObject(obj)
++            items.append(so)
++        
++        return items
++        
++        
+     def createRTTOverlays(self):
+         baseWhite = og.MaterialManager.getSingletonPtr().getByName(&quot;Lockenwickler_Pivot_X&quot;)
+         SelectionBufferTexture = baseWhite.clone(&quot;SelectionDebugMaterial&quot;)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001928.html">[Dsa-hl-svn] r4871 - in dependencies/OgreNewt:	demos/Demo08_RagdollExample inc src
+</A></li>
+	<LI>Next message: <A HREF="001930.html">[Dsa-hl-svn] r4873 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1929">[ date ]</a>
+              <a href="thread.html#1929">[ thread ]</a>
+              <a href="subject.html#1929">[ subject ]</a>
+              <a href="author.html#1929">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

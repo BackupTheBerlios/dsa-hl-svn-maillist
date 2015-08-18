@@ -1,0 +1,956 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3471 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3471%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200705212149.l4LLnN7l006399%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000541.html">
+   <LINK REL="Next"  HREF="000543.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3471 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3471%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200705212149.l4LLnN7l006399%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3471 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon May 21 23:49:23 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000541.html">[Dsa-hl-svn] r3470 - in rl/trunk/engine: ai/src script/swig ui/src
+</A></li>
+        <LI>Next message: <A HREF="000543.html">[Dsa-hl-svn] r3472 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#542">[ date ]</a>
+              <a href="thread.html#542">[ thread ]</a>
+              <a href="subject.html#542">[ subject ]</a>
+              <a href="author.html#542">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-21 23:49:08 +0200 (Mon, 21 May 2007)
+New Revision: 3471
+
+Modified:
+   rl/trunk/engine/rules/include/Container.h
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/include/Weapon.h
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/rules/src/Weapon.cpp
+Log:
+Save state in properties
+
+
+Modified: rl/trunk/engine/rules/include/Container.h
+===================================================================
+--- rl/trunk/engine/rules/include/Container.h	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/include/Container.h	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -24,6 +24,7 @@
+ namespace rl
+ {
+     typedef std::set&lt;Item*&gt; ItemSet;
++	typedef std::pair&lt;unsigned int, unsigned int&gt; UintPair;
+ 
+     /// Behaelter fr Items.
+     class _RlRulesExport Container : public Item
+@@ -34,33 +35,44 @@
+         static const Ogre::String PROPERTY_VOLUME;
+         static const Ogre::String PROPERTY_CAPACITY;
+         static const Ogre::String PROPERTY_CONTENT;
++        static const Ogre::String PROPERTY_CONTENT_OBJECTS;
++        static const Ogre::String PROPERTY_CONTENT_POSITIONS;
+ 
++		/** Creates a new container
++		 * @param id the gameobject ID
++		 */
+         Container(unsigned int id);
+         virtual ~Container(void);
+ 
+-        /// Fassungsvermoegen in Unzen
++		/// Get the weight capacity (in Stein)
+         Ogre::Real getCapacity() const;
+ 
+-        /// Fassungsvermoegen in Unzen
++		/// Set the weight capacity (in Stein)
+         void setCapacity(Ogre::Real capacity);
+ 
+-		// Volumen in x (breite) * y (hoehe)
++		/// Set the &quot;volume&quot; to x (width) * y (height) spaces
+ 		void setVolume(unsigned int x, unsigned int y);
+-        std::pair&lt;unsigned int, unsigned int&gt; getVolume() const;
+ 
+-        /// ist dieser Gegenstand ein Container
++		/// Get the container's &quot;volume&quot; spaces
++		UintPair getVolume() const;
++
++        /** Returns whether this item is a container
++		 * @return always &lt;code&gt;true&lt;/code&gt;
++		 */
+         virtual bool isContainer() const;
+ 
+ 		/// Liefert Gesamtgewicht des Inhalts.
+         Ogre::Real getContentWeight() const;
+-        virtual Ogre::Real getWeight() const;
+ 
++		virtual Ogre::Real getMass() const;
++
+ 		/**
+ 		 * Add an item to the container's content
+ 		 * @param item the item
+ 		 * @return &lt;code&gt;true&lt;/code&gt; if adding was successful, &lt;code&gt;false&lt;/code&gt; otherwise (e.g. not enough space)
+ 		 */
+         bool addItem(Item* item);
++		bool addItem(Item* item, UintPair position);
+         void removeItem(Item* item);
+ 
+         ItemSet getItems() const;
+@@ -72,14 +84,14 @@
+         void putItemAt(Item* item, unsigned int x, unsigned int y);
+         bool canPlaceAt(Item* item, unsigned int xPos, unsigned int yPos) const;
+         void setItemPosition(Item* item, unsigned int xPos, unsigned int yPos);
+-        std::pair&lt;unsigned int,unsigned int&gt; getItemPosition(Item* item) const;
++        UintPair getItemPosition(Item* item) const;
+ 
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertySet* getAllProperties() const;
+ 
+     private:
+-		static const std::pair&lt;unsigned int, unsigned int&gt; NO_SPACE_FOR_ITEM;
++		static const UintPair NO_SPACE_FOR_ITEM;
+ 
+         Ogre::Real mCapacity;
+ 		std::pair&lt;unsigned int,unsigned int&gt; mVolume;
+@@ -90,10 +102,14 @@
+ 
+         ItemSet mItems;
+ 
+-        std::map&lt;Item*, std::pair&lt;unsigned int, unsigned int&gt; &gt; mItemPositions;
++        std::map&lt;Item*, UintPair&gt; mItemPositions;
+ 
+-        std::pair&lt;unsigned int, unsigned int&gt; findPositionWithEnoughSpace(std::pair&lt;unsigned int, unsigned int&gt; space) const;
+-        bool checkSpace(unsigned int xStart, unsigned int yStart, std::pair&lt;unsigned int,unsigned int&gt; space) const;
++        std::pair&lt;unsigned int, unsigned int&gt; 
++			findPositionWithEnoughSpace(UintPair space) const;
++        bool checkSpace(
++			unsigned int xStart, 
++			unsigned int yStart, 
++			UintPair space) const;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/include/Creature.h	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -110,6 +110,20 @@
+             static const Ogre::String CLASS_NAME;
+             static const Ogre::String PROPERTY_BEHAVIOURS;
+ 			static const Ogre::String PROPERTY_INVENTORY_WINDOW_TYPE;
++            static const Ogre::String PROPERTY_CURRENT_LE;
++            static const Ogre::String PROPERTY_CURRENT_AE;
++            static const Ogre::String PROPERTY_CURRENT_AU;
++            static const Ogre::String PROPERTY_CURRENT_FATIGUE;
++            static const Ogre::String PROPERTY_EFFECTS;
++            static const Ogre::String PROPERTY_EIGENSCHAFTEN;
++            static const Ogre::String PROPERTY_TALENTE;
++            static const Ogre::String PROPERTY_KAMPFTECHNIKEN;
++            static const Ogre::String PROPERTY_VORTEILE;
++            static const Ogre::String PROPERTY_NACHTEILE;
++            static const Ogre::String PROPERTY_SF;
++            static const Ogre::String PROPERTY_WERTE;
++            static const Ogre::String PROPERTY_AP;
++            static const Ogre::String PROPERTY_INVENTORY;
+ 
+ 			typedef std::string Wert;
+ 
+@@ -768,7 +782,6 @@
+             /// Verwaltet die Effekte die auf die Kreatur wirken.
+             EffectManager* mEffectManager;
+             /// Zeigt auf die gerade aktive Waffe.
+-            Weapon* mActiveWeapon;
+             EigenschaftMap mEigenschaften;
+             TalentMap mTalente;
+             KampftechnikMap mKampftechniken;
+@@ -779,7 +792,7 @@
+             Ap mAp;
+             /// Zeigt auf das Inventar der Kreatur.
+             Inventory* mInventory;
+-        Ogre::String mInventoryWindowType;
++            Ogre::String mInventoryWindowType;
+ 
+             Property mBehaviours;
+ 
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/include/Item.h	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -61,15 +61,9 @@
+ 		Item(unsigned int id);
+         virtual ~Item(void);
+ 
+-	    void setWeight(Ogre::Real weight);
+-        Ogre::Real getWeight() const;
+-
+ 		void setItemType(ItemType itemType);
+ 		ItemType getItemType() const;
+ 
+-		void setPrice(int price);
+-		int getPrice() const;
+- 
+ 		const CeGuiString getImageName() const;
+ 		void setImageName(const CeGuiString name);
+ 
+@@ -90,13 +84,8 @@
+         virtual PropertySet* getAllProperties() const;
+ 
+     protected:
+-        /// Masse in Unzen.
+-        Ogre::Real mWeight;
+ 		ItemType mItemType;
+ 
+-		// Der Standard-Preis (kann variiert werden) in Silbertalern
+-		unsigned int mPrice;
+-
+ 		CeGuiString mImageName;
+ 
+ 		std::pair&lt;int,int&gt; mSize;
+
+Modified: rl/trunk/engine/rules/include/Weapon.h
+===================================================================
+--- rl/trunk/engine/rules/include/Weapon.h	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/include/Weapon.h	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -22,37 +22,44 @@
+ 
+ namespace rl
+ {
+-	/// Objekte die sich mit Kampffertigkeiten einsetzen lassen
++	/// Weapons are objects which can be used with combat talents
+ 	class _RlRulesExport Weapon : public Item
+ 	{
+ 	public:
+ 		enum Distanzklasse 
+ 		{
+-			DK_H=0,
+-			DK_N,
+-			DK_S,
+-			DK_P
++			DK_H = 0,
++			DK_N = 1,
++			DK_S = 2,
++			DK_P = 4
+ 		};
+ 
+         static const Ogre::String CLASS_NAME;
+ 
++        static const Ogre::String PROPERTY_TP;
++        static const Ogre::String PROPERTY_TP_KK;
++        static const Ogre::String PROPERTY_TP_BF;
++        static const Ogre::String PROPERTY_TP_INI;
++        static const Ogre::String PROPERTY_TP_WM;
++        static const Ogre::String PROPERTY_TP_DK;
++        static const Ogre::String PROPERTY_TP_KAMPFTECHNIK;
++
+ 		Weapon (unsigned int id);
+         virtual ~Weapon(void);
+ 
+-		const CeGuiString getDescription() const;
+-
+ 		void setTp(int d6, int d20, int mod);
+ 		const Tripel&lt;int&gt;&amp; getTp() const;
+ 		void setTpKk(int base, int step);
+ 		const std::pair&lt;int, int&gt;&amp; getTpKk() const;
+ 		void setBf(int newBf);
+-		int getBf();
++		int getBf() const;
+ 		void setIni(int newIni);
+-		int getIni();
++		int getIni() const;
+ 		void setWm(std::pair&lt;int, int&gt;&amp; newWm);
+ 		const std::pair&lt;int,int&gt;&amp; getWm() const;
+-		void setDk(Distanzklasse newDk);
+-		Distanzklasse getDk();
++		void setDk(int newDk);
++		int getDk() const;
++        bool hasDk(Distanzklasse dk) const;
+ 		void setKampftechnik(const CeGuiString newKampftechnik);
+ 		const CeGuiString getKampftechnik() const;
+ 
+@@ -66,7 +73,7 @@
+ 		int mBf;
+ 		int mIni;
+ 		std::pair&lt;int, int&gt; mWm;
+-		Distanzklasse mDk;
++		int mDk;
+ 		CeGuiString mKampftechnik;
+ 	};
+ }
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/Container.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -15,20 +15,26 @@
+  */
+ 
+ #include &quot;Container.h&quot;
++
++#include &lt;algorithm&gt;
++
+ #include &quot;Exception.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ #include &quot;Item.h&quot;
+-#include &lt;algorithm&gt;
+ 
+ using namespace std;
+ 
+ namespace rl {
+ 
+-	const std::pair&lt;unsigned int, unsigned int&gt; Container::NO_SPACE_FOR_ITEM = make_pair(1999999999, 1999999999);
++	const UintPair Container::NO_SPACE_FOR_ITEM = make_pair(1999999999, 1999999999);
+ 
+     const Ogre::String Container::CLASS_NAME = &quot;Container&quot;;
+ 
+     const Ogre::String Container::PROPERTY_CAPACITY = &quot;capacity&quot;;
+     const Ogre::String Container::PROPERTY_VOLUME = &quot;volume&quot;;
++	const Ogre::String Container::PROPERTY_CONTENT = &quot;content&quot;;
++    const Ogre::String Container::PROPERTY_CONTENT_OBJECTS = &quot;objects&quot;;
++    const Ogre::String Container::PROPERTY_CONTENT_POSITIONS = &quot;positions&quot;;
+ 
+     Container::Container(unsigned int id)
+         : Item(id),
+@@ -67,7 +73,7 @@
+         Ogre::Real rval = 0;
+         for (ItemSet::const_iterator it = mItems.begin(); it != mItems.end(); it++)
+         {
+-            rval += (*it)-&gt;getWeight();
++            rval += (*it)-&gt;getMass();
+         }
+         return rval;
+     }
+@@ -84,12 +90,23 @@
+ 
+     bool Container::addItem(Item* item)
+     {
++        return addItem(item, findPositionWithEnoughSpace(item-&gt;getSize()));
++    }
++
++    bool Container::addItem(Item* item, UintPair position)
++    {
+         if(item == NULL)
+         {
+             Throw(NullPointerException, &quot;Item ist null.&quot;);
+         }
+ 
+-        pair&lt;unsigned int, unsigned int&gt; pos = findPositionWithEnoughSpace(item-&gt;getSize());
++
++        UintPair pos = position;
++		if (!canPlaceAt(item, pos.first, pos.second))
++		{		
++			pos = findPositionWithEnoughSpace(item-&gt;getSize());
++		}
++
+ 		if (pos != NO_SPACE_FOR_ITEM)
+ 		{
+ 			mItemPositions[item] = pos;
+@@ -169,9 +186,9 @@
+         mItemPositions[item] = make_pair(xPos, yPos);
+     }
+ 
+-	std::pair&lt;unsigned int, unsigned int&gt; Container::getItemPosition(Item* item) const
++	UintPair Container::getItemPosition(Item* item) const
+     {
+-		std::map&lt;Item*, std::pair&lt;unsigned int, unsigned int&gt; &gt;::const_iterator it = 
++		std::map&lt;Item*, UintPair &gt;::const_iterator it = 
+ 			mItemPositions.find(item);
+         if (it == mItemPositions.end())
+         {
+@@ -181,7 +198,7 @@
+ 		return (*it).second;
+     }
+ 
+-    pair&lt;unsigned int, unsigned int&gt; Container::findPositionWithEnoughSpace(pair&lt;unsigned int, unsigned int&gt; space) const
++    UintPair Container::findPositionWithEnoughSpace(UintPair space) const
+     {
+ 		for (unsigned int x = 0; x &lt; mVolume.first; x++)
+         {
+@@ -225,11 +242,11 @@
+ 
+     Item* Container::getItemAt(unsigned int x, unsigned int y) const
+     {
+-        for (map&lt;Item*, pair&lt;unsigned int, unsigned int&gt; &gt;::const_iterator iter = mItemPositions.begin(); 
++        for (map&lt;Item*, UintPair &gt;::const_iterator iter = mItemPositions.begin(); 
+             iter != mItemPositions.end(); iter++)
+         {
+             Item* item = (*iter).first;
+-            pair&lt;unsigned int, unsigned int&gt; pos = (*iter).second;
++            UintPair pos = (*iter).second;
+ 
+             if (pos.first &lt;= x 
+                 &amp;&amp; pos.second &lt;= y 
+@@ -243,9 +260,9 @@
+         return NULL;
+     }
+ 
+-    Ogre::Real Container::getWeight() const
++    Ogre::Real Container::getMass() const
+     {
+-        return mWeight + getContentWeight();
++		return Item::getMass() + getContentWeight();
+     }
+ 
+     void Container::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+@@ -265,6 +282,23 @@
+         {
+             mVolume = value.toIntPair();
+         }
++		else if (key == Container::PROPERTY_CONTENT)
++        {
++			PropertyMap contentMap = value.toMap();
++			PropertyVector objects = contentMap[Container::PROPERTY_CONTENT_OBJECTS].toArray();
++			PropertyVector positions = contentMap[Container::PROPERTY_CONTENT_POSITIONS].toArray();
++
++			for (size_t idx = 0; idx &lt; objects.size(); ++idx)
++			{
++				Property curObjProp = objects[idx];
++				UintPair curObjPos = positions[idx].toIntPair();
++
++				Item* cur = dynamic_cast&lt;Item*&gt;(
++					GameObjectManager::getSingleton().createGameObjectFromProperty(curObjProp));
++
++				addItem(cur, curObjPos);				
++			}
++        }
+         else
+         {
+             Item::setProperty(key, value);
+@@ -281,6 +315,25 @@
+         {
+             return Property(make_pair((int)mVolume.first, (int)mVolume.second));
+         }
++		else if (key == Container::PROPERTY_CONTENT)
++        {
++			PropertyVector positions;
++			PropertyVector objects;
++
++			for (ItemSet::const_iterator it = mItems.begin(); it != mItems.end(); ++it)
++			{
++				Item* cur = *it;
++				UintPair pos = getItemPosition(cur);
++				objects.push_back(GameObjectManager::getSingleton().toProperty(cur));
++				positions.push_back(Property(pos));
++			}
++
++			PropertyMap contentMap;
++			contentMap[Container::PROPERTY_CONTENT_OBJECTS] = objects;
++			contentMap[Container::PROPERTY_CONTENT_POSITIONS] = positions;
++
++			return Property(contentMap);			
++        }
+         else
+         {
+             return Item::getProperty(key);
+@@ -292,6 +345,7 @@
+         PropertySet* ps = Item::getAllProperties();
+         ps-&gt;setProperty(Container::PROPERTY_CAPACITY, Property(mCapacity));
+         ps-&gt;setProperty(Container::PROPERTY_VOLUME, Property(make_pair((int)mVolume.first, (int)mVolume.second)));
++		ps-&gt;setProperty(Container::PROPERTY_CONTENT, getProperty(Container::PROPERTY_CONTENT));
+ 
+         return ps;
+     }
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -37,11 +37,24 @@
+ namespace rl
+ {
+     const Ogre::String Creature::CLASS_NAME = &quot;Creature&quot;;
++
+     const Ogre::String Creature::PROPERTY_BEHAVIOURS = &quot;behaviours&quot;;
+-    
+     const Ogre::String Creature::PROPERTY_INVENTORY_WINDOW_TYPE = &quot;inventorywindowtype&quot;; 
++    const Ogre::String Creature::PROPERTY_CURRENT_LE;
++    const Ogre::String Creature::PROPERTY_CURRENT_AE;
++    const Ogre::String Creature::PROPERTY_CURRENT_AU;
++    const Ogre::String Creature::PROPERTY_CURRENT_FATIGUE;
++    const Ogre::String Creature::PROPERTY_EFFECTS;
++    const Ogre::String Creature::PROPERTY_EIGENSCHAFTEN;
++    const Ogre::String Creature::PROPERTY_TALENTE;
++    const Ogre::String Creature::PROPERTY_KAMPFTECHNIKEN;
++    const Ogre::String Creature::PROPERTY_VORTEILE;
++    const Ogre::String Creature::PROPERTY_NACHTEILE;
++    const Ogre::String Creature::PROPERTY_SF;
++    const Ogre::String Creature::PROPERTY_WERTE;
++    const Ogre::String Creature::PROPERTY_AP;
++    const Ogre::String Creature::PROPERTY_INVENTORY;
+ 
+-
+     // some targets
+ 	const std::string Creature::ALL_EIGENSCHAFTEN = &quot;alle Eigenschaften&quot;;
+ 	const std::string Creature::ALL_TALENTE = &quot;alle Talente&quot;;
+@@ -67,7 +80,6 @@
+ 		mCurrentLe(0),
+         mCurrentAu(0),
+         mCurrentAe(0),
+-	mActiveWeapon(NULL),
+ 		mInventory(NULL),
+ 		mEigenschaften(),
+ 		mWerte(),
+@@ -978,6 +990,70 @@
+         {
+             mInventoryWindowType = value.toString().c_str();
+         }
++        else if (key == Creature::PROPERTY_CURRENT_LE)
++        {
++            mCurrentLe = value.toInt();
++        }
++        else if (key == Creature::PROPERTY_CURRENT_AE)
++        {
++            mCurrentAe = value.toInt();
++        }
++        else if (key == Creature::PROPERTY_CURRENT_AU)
++        {
++            mCurrentAu = value.toInt();
++        }
++        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
++        {
++            mErschoepfung = value.toInt();
++        }
++        //else if (key == Creature::PROPERTY_EFFECTS)
++        //{
++        //    mEffectManager-&gt;setProperty(Creature::PROPERTY_EFFECTS, value);
++        //}
++        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
++        {
++            mEigenschaften.clear();
++            convertToMap(value.toMap(), mEigenschaften);
++        }
++        else if (key == Creature::PROPERTY_TALENTE)
++        {
++            mTalente.clear();
++            convertToMap(value.toMap(), mTalente);
++        }
++        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
++        {
++            mKampftechniken.clear();
++            convertToMap(value.toMap(), mKampftechniken);
++        }
++        else if (key == Creature::PROPERTY_VORTEILE)
++        {
++            mVorteile.clear();
++            convertToMap(value.toMap(), mVorteile);
++        }
++        else if (key == Creature::PROPERTY_NACHTEILE)
++        {
++            mNachteile.clear();
++            convertToMap(value.toMap(), mNachteile);
++        }
++//        else if (key == Creature::PROPERTY_SF)
++//        {
++            ///@todo Sonderfertigkeiten
++//        }
++        else if (key == Creature::PROPERTY_WERTE)
++        {
++            mWerte.clear();
++            convertToMap(value.toMap(), mWerte);
++        }
++        else if (key == Creature::PROPERTY_AP)
++        {
++            IntPair ip = value.toIntPair();
++            mAp.total = ip.first;
++            mAp.used = ip.second;
++        }
++        else if (key == Creature::PROPERTY_INVENTORY)
++        {
++            mInventory-&gt;setProperty(Inventory::PROPERTY_CONTENT, value);
++        }
+         else
+         {
+             GameObject::setProperty(key, value);
+@@ -994,6 +1070,68 @@
+         {
+             return Property(mInventoryWindowType);
+         }
++        else if (key == Creature::PROPERTY_CURRENT_LE)
++        {
++            return Property(mCurrentLe);
++        }
++        else if (key == Creature::PROPERTY_CURRENT_AE)
++        {
++            return Property(mCurrentAe);
++        }
++        else if (key == Creature::PROPERTY_CURRENT_AU)
++        {
++            return Property(mCurrentAu);
++        }
++        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
++        {
++            return Property(mErschoepfung);
++        }
++        //else if (key == Creature::PROPERTY_EFFECTS)
++        //{
++        //    return Property(mEffectManager-&gt;getProperty(Creature::PROPERTY_EFFECTS));
++        //}
++        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mEigenschaften);
++            return Property(map);
++        }
++        else if (key == Creature::PROPERTY_TALENTE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mTalente);
++            return Property(map);
++        }
++        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mKampftechniken);
++            return Property(map);
++        }
++        else if (key == Creature::PROPERTY_VORTEILE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mVorteile);
++            return Property(map);
++        }
++        else if (key == Creature::PROPERTY_NACHTEILE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mNachteile);
++            return Property(map);
++        }
++//        else if (key == Creature::PROPERTY_SF)
++//        {
++            ///@todo Sonderfertigkeiten
++//        }
++        else if (key == Creature::PROPERTY_WERTE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mWerte);
++            return Property(map);
++        }
++        else if (key == Creature::PROPERTY_AP)
++        {
++            return Property(make_pair(mAp.total, mAp.used));
++        }
++        else if (key == Creature::PROPERTY_INVENTORY)
++        {
++            return mInventory-&gt;getProperty(Inventory::PROPERTY_CONTENT);
++        }
+         else
+         {
+             return GameObject::getProperty(key);
+@@ -1005,6 +1143,20 @@
+         PropertySet* ps = GameObject::getAllProperties();
+         ps-&gt;setProperty(Creature::PROPERTY_BEHAVIOURS, mBehaviours);
+         ps-&gt;setProperty(Creature::PROPERTY_INVENTORY_WINDOW_TYPE, Property(mInventoryWindowType));
++        ps-&gt;setProperty(Creature::PROPERTY_CURRENT_LE, getProperty(Creature::PROPERTY_CURRENT_LE));
++        ps-&gt;setProperty(Creature::PROPERTY_CURRENT_AE, getProperty(Creature::PROPERTY_CURRENT_AE));
++        ps-&gt;setProperty(Creature::PROPERTY_CURRENT_AU, getProperty(Creature::PROPERTY_CURRENT_AU));
++        ps-&gt;setProperty(Creature::PROPERTY_CURRENT_FATIGUE, getProperty(Creature::PROPERTY_CURRENT_FATIGUE));
++        //ps-&gt;setProperty(Creature::PROPERTY_EFFECTS, getProperty(Creature::PROPERTY_EFFECTS));
++        ps-&gt;setProperty(Creature::PROPERTY_EIGENSCHAFTEN, getProperty(Creature::PROPERTY_EIGENSCHAFTEN));
++        ps-&gt;setProperty(Creature::PROPERTY_TALENTE, getProperty(Creature::PROPERTY_TALENTE));
++        ps-&gt;setProperty(Creature::PROPERTY_KAMPFTECHNIKEN, getProperty(Creature::PROPERTY_KAMPFTECHNIKEN));
++        ps-&gt;setProperty(Creature::PROPERTY_VORTEILE, getProperty(Creature::PROPERTY_VORTEILE));
++        ps-&gt;setProperty(Creature::PROPERTY_NACHTEILE, getProperty(Creature::PROPERTY_NACHTEILE));
++        //ps-&gt;setProperty(Creature::PROPERTY_SF, getProperty(Creature::PROPERTY_SF));
++        ps-&gt;setProperty(Creature::PROPERTY_WERTE, getProperty(Creature::PROPERTY_WERTE));
++        ps-&gt;setProperty(Creature::PROPERTY_AP, getProperty(Creature::PROPERTY_AP));
++        ps-&gt;setProperty(Creature::PROPERTY_INVENTORY, getProperty(Creature::PROPERTY_INVENTORY));
+ 
+         return ps;
+     }
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -502,8 +502,8 @@
+             }
+             else if (key == PROPERTY_ACTIONS)
+             {
+-                std::vector&lt;Property&gt; vecVal = value.toArray();
+-                for (std::vector&lt;Property&gt;::iterator it = vecVal.begin(); it != vecVal.end(); it++)
++                PropertyVector vecVal = value.toArray();
++                for (PropertyVector::const_iterator it = vecVal.begin(); it != vecVal.end(); it++)
+                 {
+                     Ogre::String actionName = (*it).toString().c_str();
+                     Action* act = ActionManager::getSingleton().getAction(actionName);
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -136,7 +136,7 @@
+ 
+ 		while (it != items.end())
+ 		{
+-			totalWeight += (*it)-&gt;getWeight();
++			totalWeight += (*it)-&gt;getMass();
+ 
+ 			it++;
+ 		}
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/Item.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -31,7 +31,6 @@
+ 
+     Item::Item(unsigned int id)
+         : GameObject(id),
+-		mWeight(0),
+ 		mItemType(ITEMTYPE_OTHER),
+ 		mImageName(&quot;&quot;),
+ 		mSize(pair&lt;int,int&gt;(1,1))
+@@ -43,16 +42,6 @@
+     {
+     }
+ 	
+-    void Item::setWeight(Ogre::Real weight)
+-    {
+-        mWeight = weight;
+-    }
+-
+-    Ogre::Real Item::getWeight() const
+-    {
+-        return mWeight;
+-    }
+-
+ 	void Item::setItemType(ItemType itemType)
+ 	{
+ 		mItemType = itemType;
+@@ -73,16 +62,6 @@
+ 		return mImageName;
+ 	}
+ 
+-	void Item::setPrice(int price)
+-	{
+-		mPrice = price;
+-	}
+-	
+-	int Item::getPrice() const
+-	{
+-		return mPrice;
+-	}
+-
+ 	bool Item::isContainer() const
+ 	{
+ 		return false;
+
+Modified: rl/trunk/engine/rules/src/Weapon.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Weapon.cpp	2007-05-21 21:48:14 UTC (rev 3470)
++++ rl/trunk/engine/rules/src/Weapon.cpp	2007-05-21 21:49:08 UTC (rev 3471)
+@@ -22,9 +22,23 @@
+ namespace rl
+ {
+     const Ogre::String Weapon::CLASS_NAME = &quot;Weapon&quot;;
++    const Ogre::String Weapon::PROPERTY_TP = &quot;TP&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_KK = &quot;TPKK&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_BF = &quot;BF&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_INI = &quot;INI&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_WM = &quot;WM&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_DK = &quot;DK&quot;;
++    const Ogre::String Weapon::PROPERTY_TP_KAMPFTECHNIK = &quot;KT&quot;;
+ 
+ 	Weapon::Weapon(unsigned int id)
+-		: Item(id)
++		: Item(id),
++        mTp(0, 0, 0),
++		mTpKk(0, 0),
++		mBf(0),
++		mIni(0),
++		mWm(0, 0),
++        mDk(DK_H),
++        mKampftechnik(&quot;&quot;)
+ 	{
+         mQueryFlags |= QUERYFLAG_WEAPON;
+ 	}
+@@ -62,7 +76,7 @@
+ 		mBf = newBf;
+ 	}
+ 
+-	int Weapon::getBf()
++	int Weapon::getBf() const
+ 	{
+ 		return mBf;
+ 	}
+@@ -72,7 +86,7 @@
+ 		mIni = newIni;
+ 	}
+ 
+-	int Weapon::getIni()
++	int Weapon::getIni() const
+ 	{
+ 		return mIni;
+ 	}
+@@ -87,16 +101,21 @@
+ 		return mWm;
+ 	}
+ 
+-	void Weapon::setDk(Weapon::Distanzklasse newDk)
++	void Weapon::setDk(int newDk)
+ 	{
+ 		mDk = newDk;
+ 	}
+ 
+-	Weapon::Distanzklasse Weapon::getDk()
++	int Weapon::getDk() const
+ 	{
+ 		return mDk;
+ 	}
+ 
++    bool Weapon::hasDk(Weapon::Distanzklasse newDk) const
++    {
++        return (mDk &amp; newDk) == newDk;
++    }
++
+ 	void Weapon::setKampftechnik(const CeGuiString newKampftechnik)
+ 	{
+ 		mKampftechnik = newKampftechnik;
+@@ -109,36 +128,87 @@
+ 
+     void Weapon::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+     {
+-        //if (key == Weapon::PROPERTY_IMAGENAME)
+-        //{
+-        //    mImageName = value.toString();
+-        //}
+-        //else
+-        //{
++        if (key == Weapon::PROPERTY_TP)
++        {
++            mTp = value.toIntTriple();
++        }
++        else if (key == Weapon::PROPERTY_TP_KK)
++        {
++            mTpKk = value.toIntPair();
++        }
++        else if (key == Weapon::PROPERTY_TP_BF)
++        {
++            mBf = value.toInt();
++        }
++        else if (key == Weapon::PROPERTY_TP_INI)
++        {
++            mIni = value.toInt();
++        }
++        else if (key == Weapon::PROPERTY_TP_WM)
++        {
++            mWm = value.toIntPair();
++        }
++        else if (key == Weapon::PROPERTY_TP_DK)
++        {
++            mDk = value.toInt();
++        }
++        else if (key == Weapon::PROPERTY_TP_KAMPFTECHNIK)
++        {
++            mKampftechnik = value.toString();
++        }
++        else 
++        {
+             Item::setProperty(key, value);
+-        //}
++        }
+     }
+ 
+     const Property Weapon::getProperty(const Ogre::String &amp;key) const
+     {
+-        //if (key == Item::PROPERTY_IMAGENAME)
+-        //{
+-        //    return Property(mImageName);
+-        //}
+-        //else
+-        //{
++        if (key == Weapon::PROPERTY_TP)
++        {
++            return Property(mTp);
++        }
++        else if (key == Weapon::PROPERTY_TP_KK)
++        {
++            return Property(mTpKk);
++        }
++        else if (key == Weapon::PROPERTY_TP_BF)
++        {
++            return Property(mBf);
++        }
++        else if (key == Weapon::PROPERTY_TP_INI)
++        {
++            return Property(mIni);
++        }
++        else if (key == Weapon::PROPERTY_TP_WM)
++        {
++            return Property(mWm);
++        }
++        else if (key == Weapon::PROPERTY_TP_DK)
++        {
++            return Property(mDk);
++        }
++        else if (key == Weapon::PROPERTY_TP_KAMPFTECHNIK)
++        {
++            return Property(mKampftechnik);
++        }
++        else
++        {
+             return Item::getProperty(key);
+-        //}
++        }
+     }
+ 
+     PropertySet* Weapon::getAllProperties() const
+     {
+         PropertySet* ps = Item::getAllProperties();
+-        //ps-&gt;setProperty(Item::PROPERTY_IMAGENAME, Property(mImageName));
+-        //ps-&gt;setProperty(Item::PROPERTY_SIZE, Property(mSize));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP, Property(mTp));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_KK, Property(mTpKk));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_BF, Property(mBf));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_INI, Property(mIni));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_WM, Property(mWm));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_DK, Property(mDk));
++        ps-&gt;setProperty(Weapon::PROPERTY_TP_KAMPFTECHNIK, Property(mKampftechnik));
+ 
+         return ps;
+     }
+-
+ }
+-
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000541.html">[Dsa-hl-svn] r3470 - in rl/trunk/engine: ai/src script/swig ui/src
+</A></li>
+	<LI>Next message: <A HREF="000543.html">[Dsa-hl-svn] r3472 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#542">[ date ]</a>
+              <a href="thread.html#542">[ thread ]</a>
+              <a href="subject.html#542">[ subject ]</a>
+              <a href="author.html#542">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

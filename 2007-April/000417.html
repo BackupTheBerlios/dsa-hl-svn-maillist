@@ -1,0 +1,295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3346 - tools/MaterialParser
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3346%20-%20tools/MaterialParser&In-Reply-To=%3C200704262059.l3QKxxuu001620%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000416.html">
+   <LINK REL="Next"  HREF="000418.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3346 - tools/MaterialParser</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3346%20-%20tools/MaterialParser&In-Reply-To=%3C200704262059.l3QKxxuu001620%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3346 - tools/MaterialParser">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 26 22:59:59 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000416.html">[Dsa-hl-svn] r3345 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000418.html">[Dsa-hl-svn] r3347 - in modules: combattest/materials	regressiontest/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#417">[ date ]</a>
+              <a href="thread.html#417">[ thread ]</a>
+              <a href="subject.html#417">[ subject ]</a>
+              <a href="author.html#417">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-04-26 22:59:54 +0200 (Thu, 26 Apr 2007)
+New Revision: 3346
+
+Modified:
+   tools/MaterialParser/MaterialClasses.rb
+   tools/MaterialParser/MaterialParser.rb
+   tools/MaterialParser/Materializer.rb
+   tools/MaterialParser/RdParser.rb
+Log:
+Fixed some remaining bugs - now really parsing and saving all valid material files
+
+Modified: tools/MaterialParser/MaterialClasses.rb
+===================================================================
+--- tools/MaterialParser/MaterialClasses.rb	2007-04-26 20:39:34 UTC (rev 3345)
++++ tools/MaterialParser/MaterialClasses.rb	2007-04-26 20:59:54 UTC (rev 3346)
+@@ -10,6 +10,12 @@
+     end
+ end
+ 
++class Newline
++    def to_s
++        &quot;__NEWLINE__&quot;
++    end
++end
++
+ class AttributedObject
+     def initialize
+         @attributes = []
+
+Modified: tools/MaterialParser/MaterialParser.rb
+===================================================================
+--- tools/MaterialParser/MaterialParser.rb	2007-04-26 20:39:34 UTC (rev 3345)
++++ tools/MaterialParser/MaterialParser.rb	2007-04-26 20:59:54 UTC (rev 3346)
+@@ -1,6 +1,6 @@
+ require &quot;MaterialClasses.rb&quot;
+ 
+-NEWLINE = &quot;_NEWLINE_&quot;
++NEWLINE = Newline.new
+ 
+ class MaterialParser
+     attr_reader :materials
+@@ -12,7 +12,7 @@
+ 
+ 	def parseFile( filename )
+         parseMe = File.new( filename ).read
+-        parseString( parseMe, filename )
++        return parseString( parseMe, filename )
+ 	end
+ 
+     def addMaterial( mat )
+@@ -40,11 +40,9 @@
+             # Whitespaces und Kommentare werden ignoriert
+             token(/^\s*\/\/*.*$/)
+             token(/\s*\n/) { ::NEWLINE }
+-            token(/[\s\n]+/)   
+-            # Integer
+-            token(/\b[-+]?\d+\b/) {|m| m.to_i }
+-            # Float
+-            token(/\b\d+(\.\d+)?\b/) {|m| m.to_f }            
++            token(/[\s\n]+/)  
++            # Float/Integer
++            token(/\b[-+]?\d+(\.\d+)?\b/) {|m| m.to_f }   
+             # Wortzeichen
+             token(/[^\s:]+/) {|m| m.to_s }
+             # Einzelne Zeichen
+@@ -105,15 +103,19 @@
+                 match('point_size', :int, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('point_size_attenuation', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('lighting', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('scene_blend', :string, :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('scene_blend', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('shading', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('ambient', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('emissive', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('diffuse', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('specular', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('cull_hardware', :string, ::NEWLINE) {|n,*a| save_attr(pa,n,a) }
+                 match('cull_software', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('depth_func', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('fog_override', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('fog_override', :string, :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('fog_override', :string, :string, :float, :float, :float, :float, :float, :float, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+ 
+                 match( ::NEWLINE )
+                 match(:pass, :pass ) 
+@@ -121,7 +123,7 @@
+ 
+             rule :texture_unit do                 
+                 match('texture', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+-                match('texture_alias', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('texture_alias', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+                 match('tex_coord_set', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
+                 match('scale', :float, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+                 match('scroll_anim', :float, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+@@ -134,54 +136,64 @@
+                 match('colour_op_ex', :string, :string, :string, :float, :float, :float, ::NEWLINE  ) {|n,*a| save_attr(tu,n,a) } 
+                 match('colour_op_ex', :string, :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
+                 match('alpha_op_ex', :string, :string, :string, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
++                match('alpha_op_ex', :string, :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
+ 
+                 match( ::NEWLINE )
+                 match(:texture_unit, :texture_unit ) 
+             end
+ 
+             rule :vertex_program_ref do
+-                match('param_named_auto', :string, :string, :int ) {|n,*a| save_attr(vpr,n,a) }
+-                match('param_named_auto', :string, :string ) {|n,*a| save_attr(vpr,n,a) }
+-                
++                match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(vpr,n,a) }
++                match('param_named_auto', :string, :params, ::NEWLINE ) {|n,*a| save_attr(vpr,n,a) }
++
+                 match( ::NEWLINE )
+                 match(:vertex_program_ref, :vertex_program_ref ) 
+             end
+              
+             rule :shadow_caster_vertex_program_ref do
+-                match('param_named_auto', :string, :string, :int ) {|n,*a| save_attr(scvpr,n,a) }
+-                match('param_named_auto', :string, :string ) {|n,*a| save_attr(scvpr,n,a) }
+-                
++                match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(scvpr,n,a) }
++                match('param_named_auto', :string, :params, ::NEWLINE ) {|n,*a| save_attr(scvpr,n,a) }
++
+                 match( ::NEWLINE )
+                 match(:shadow_caster_vertex_program_ref, :shadow_caster_vertex_program_ref ) 
+             end
+ 
+             rule :fragment_program_ref do
+-                match('param_named', :string, :string, :float ) {|n,*a| save_attr(fpr,n,a) }
+-                match('param_named', :string, :string, :int ) {|n,*a| save_attr(fpr,n,a) }
+-                
++                match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(fpr,n,a) }
++                match('param_named_auto', :string, :params, ::NEWLINE  ) {|n,*a| save_attr(fpr,n,a) }
++
+                 match( ::NEWLINE )
+                 match(:fragment_program_ref, :fragment_program_ref ) 
+             end
+ 
+-            rule :color do
+-                match(:float, :float, :float, :float )
+-                match(:float, :float, :float )
+-                match('vertexcolour')
++            rule :params do                 
++                match( 'float4', :float, :float, :float, :float ) {|*a| a.join(&quot; &quot;) }
++                match( 'float', :float ) {|*a| a.join(&quot; &quot;) }
++                match( :string, :int ) {|*a| a.join(&quot; &quot;) }
++                match( :string ) {|s| s }
+             end
+ 
+-            rule :string do
++            rule :color do 
++                match(:float, :float, :float, :float, :float ) {|*a| a.join(&quot; &quot;) }
++                match(:float, :float, :float, :float ) {|*a| a.join(&quot; &quot;) }
++                match(:float, :float, :float ) {|*a| a.join(&quot; &quot;) }
++                match('vertexcolour') 
++            end
++
++            rule :string do                
++                match(Float) {|f| String(f) }
++                match(Integer) {|i| String(i) }
+                 match(String)
+-                match(Float) {|f| return String(f) }
+-                match(Integer) {|i| return String(i) }
+             end
+ 
+             rule :float do
+                 match(Float)
+-                match(Integer) {|i| return Float(i) }
++                match(Integer) {|i| Float(i) }
+             end
+ 
+             rule :int do
+                 match(Integer)
++                match(Float) {|f| Integer(f) }
+             end
+ 
+             rule :newlines do 
+@@ -190,6 +202,6 @@
+             end
+         end
+ 
+-        parser.parse( string )
++        return parser.parse( string )
+     end
+ end
+\ No newline at end of file
+
+Modified: tools/MaterialParser/Materializer.rb
+===================================================================
+--- tools/MaterialParser/Materializer.rb	2007-04-26 20:39:34 UTC (rev 3345)
++++ tools/MaterialParser/Materializer.rb	2007-04-26 20:59:54 UTC (rev 3346)
+@@ -12,6 +12,8 @@
+ Dir.chdir( basePath )
+ materialFiles = Dir['**/*.material']
+ 
++print &quot;Found #{materialFiles.size} different material-files.\n&quot;
++
+ # Load all material files and parse them
+ materialFiles.each { |filename|
+     begin 
+@@ -20,6 +22,8 @@
+         print error.to_s
+         print &quot;\n&quot;
+         print basePath+filename+&quot;:0:&quot;+error.to_s
++        print &quot;\n&quot;
++        break
+     end
+ }
+ 
+@@ -29,7 +33,7 @@
+ # Collect some infos...
+ numfiles = 0
+ materials.each {|m| numfiles+=1 unless not m.firstinfile }
+-print &quot;Found #{materials.size} different materials in #{numfiles} files.\n\n&quot;
++print &quot;Parsed #{materials.size} different materials in #{numfiles} files.\n\n&quot;
+ 
+ # Save the materials
+ materials.each {|m| 
+
+Modified: tools/MaterialParser/RdParser.rb
+===================================================================
+--- tools/MaterialParser/RdParser.rb	2007-04-26 20:39:34 UTC (rev 3345)
++++ tools/MaterialParser/RdParser.rb	2007-04-26 20:59:54 UTC (rev 3346)
+@@ -28,7 +28,8 @@
+      @expected = []
+      result = @start.parse
+      if @pos != @tokens.size
+-       raise &quot;Parse error. expected: '#{@expected.join(', ')}', found '#{@tokens[@max_pos]}'&quot;
++        tem = &quot;History [ &quot; + @tokens.slice( @max_pos-5, 5 ).join(&quot;, &quot;) + &quot; ] &quot;;
++        raise &quot;Parse error. expected: '#{@expected.join(', ')}', found '#{@tokens[@max_pos]}'. #{tem}&quot;
+      end
+      return result
+    end
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000416.html">[Dsa-hl-svn] r3345 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000418.html">[Dsa-hl-svn] r3347 - in modules: combattest/materials	regressiontest/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#417">[ date ]</a>
+              <a href="thread.html#417">[ thread ]</a>
+              <a href="subject.html#417">[ subject ]</a>
+              <a href="author.html#417">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

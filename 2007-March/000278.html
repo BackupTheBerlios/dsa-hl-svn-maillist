@@ -1,0 +1,244 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3207 - rl/trunk/engine/core/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3207%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703301206.l2UC6HUR022660%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000277.html">
+   <LINK REL="Next"  HREF="000279.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3207 - rl/trunk/engine/core/include</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3207%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703301206.l2UC6HUR022660%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3207 - rl/trunk/engine/core/include">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar 30 14:06:17 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000277.html">[Dsa-hl-svn] r3206 - rl/trunk/engine/core/include
+</A></li>
+        <LI>Next message: <A HREF="000279.html">[Dsa-hl-svn] r3208 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#278">[ date ]</a>
+              <a href="thread.html#278">[ thread ]</a>
+              <a href="subject.html#278">[ subject ]</a>
+              <a href="author.html#278">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-03-30 14:06:16 +0200 (Fri, 30 Mar 2007)
+New Revision: 3207
+
+Modified:
+   rl/trunk/engine/core/include/QuadTree.h
+Log:
+Inherited members of template classes must be fully qualified (at least 
+for gcc)
+
+
+Modified: rl/trunk/engine/core/include/QuadTree.h
+===================================================================
+--- rl/trunk/engine/core/include/QuadTree.h	2007-03-30 10:57:56 UTC (rev 3206)
++++ rl/trunk/engine/core/include/QuadTree.h	2007-03-30 12:06:16 UTC (rev 3207)
+@@ -416,7 +416,7 @@
+ 	 */
+ 	inline bool isUInsideLoose(Ogre::Real u)
+ 	{ 
+-		return (mVertexTL.x - mLooseness &lt;= u &amp;&amp; u &lt;= mVertexBR.x + mLooseness);
++		return (TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL.x - mLooseness &lt;= u &amp;&amp; u &lt;= TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR.x + mLooseness);
+ 	}
+ 	/** tests if the given v value is inside the quad.
+ 	 * Since this is a 2D test, the name refers to v coordinate
+@@ -425,7 +425,7 @@
+ 	 */
+ 	inline bool isVInsideLoose(Ogre::Real v) 
+ 	{
+-		return (mVertexTL.y - mLooseness &lt;= v &amp;&amp; v &lt;= mVertexBR.y + mLooseness);
++		return (TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL.y - mLooseness &lt;= v &amp;&amp; v &lt;= TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR.y + mLooseness);
+ 	}
+ 
+    	/** inserts the specified data.
+@@ -504,13 +504,15 @@
+ template &lt;class TData, class TNode&gt;
+ void TLooseQuadTreeNode&lt;TData,TNode&gt;::insert(TData data)
+ {
+-	if (mSubDivided)
++	if (TQuadTreeBasicNode&lt;TData, TNode&gt;::mSubDivided)
+ 	{
+ 		// try to add the data to any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+-			if (mNodes[i])
+-				mNodes[i]-&gt;insert(data);
++			if (TQuadTreeOgreNode&lt;TData, TNode&gt;::mNodes[i] != NULL)
++            {
++				TQuadTreeOgreNode&lt;TData, TNode&gt;::mNodes[i]-&gt;insert(data);
++            }
+ 		}
+ 	}
+ 	else
+@@ -523,10 +525,10 @@
+ 			 (isVInsideLoose(nrb.x) &amp;&amp; (isUInsideLoose(flb.z) || isUInsideLoose(nrb.z))) )
+ 		{
+ 			// if at least one is in the loose quad, store the data
+-			mData.push_back(data);
++			TQuadTreeOgreNode&lt;TData, TNode&gt;::mData.push_back(data);
+ 		}
+ 		// split if maximum number of elements is reached ...
+-		if (mData.size() == mMaxData) 
++		if (TQuadTreeOgreNode&lt;TData, TNode&gt;::mData.size() == mMaxData) 
+ 		{
+ 			split();
+ 		}
+@@ -540,73 +542,77 @@
+     if (mMaxDepth == 0)
+         return; // last level reached, prevent subdivision
+ 
+-	Ogre::Real halfWidth = mWidth/2.0f;
++	Ogre::Real halfWidth = TQuadTreeOgreNode&lt;TData, TNode&gt;::mWidth/2.0f;
+ 	Ogre::Vector2 center (getVertex(TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_LEFT) + Ogre::Vector2(halfWidth, halfWidth));
+ 	// create 4 subnodes
+-	mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_LEFT] = 
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_LEFT] = 
+ 		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
+-		          mVertexTL, center, halfWidth);
+-	mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_LEFT] = 
++		          TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL, center, halfWidth);
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_LEFT] = 
+ 		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
+-		          Ogre::Vector2(mVertexTL.x, center.y),
+-				  Ogre::Vector2(center.x, mVertexBR.y), halfWidth);
+-	mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_RIGHT] =
++		          Ogre::Vector2(TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL.x, center.y),
++				  Ogre::Vector2(center.x, TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR.y), halfWidth);
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_RIGHT] =
+ 		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f, 
+-				  center, mVertexBR, halfWidth);
+-	mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_RIGHT] =
++				  center, TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR, halfWidth);
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_RIGHT] =
+ 		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
+-				  Ogre::Vector2(center.x, mVertexTL.y),
+-				  Ogre::Vector2(mVertexBR.x, center.y), halfWidth);
++				  Ogre::Vector2(center.x, TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL.y),
++				  Ogre::Vector2(TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR.x, center.y), halfWidth);
+ 
+ 	// distribute the data accordingly between the subnodes
+ 	Ogre::AxisAlignedBox aab;
+-	for (typename std::vector&lt;TData&gt;::iterator it = mData.begin();
+-		it != mData.end(); it++)
++	for (typename std::vector&lt;TData&gt;::iterator it = TQuadTreeBasicNode&lt;TData, TNode&gt;::mData.begin();
++		it != TQuadTreeBasicNode&lt;TData, TNode&gt;::mData.end(); it++)
+ 	{
+ 		insert((*it));
+ 	}
+ 	// simply erase the data here ...
+-	mData.clear();
+-	mData.resize(1);
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mData.clear();
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mData.resize(1);
+ 
+ 	// remember that it's subdivided
+-	mSubDivided = true;
++	TQuadTreeBasicNode&lt;TData, TNode&gt;::mSubDivided = true;
+ }
+ 
+ template &lt;class TData, class TNode&gt;
+ void TLooseQuadTreeNode&lt;TData,TNode&gt;::remove()
+ {
+-	if (mSubDivided)
++	if (TQuadTreeBasicNode&lt;TData, TNode&gt;::mSubDivided)
+ 	{
+ 		// try to remove the data of any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+-			if (mNodes[i]) 
++			if (TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i] != NULL) 
+ 			{
+-				mNodes[i]-&gt;remove();
+-				delete mNodes[i];
+-				mNodes[i] = NULL;
++				TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i]-&gt;remove();
++				delete TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i];
++				TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i] = NULL;
+ 			}
+ 		}
+ 	}
+ 	else 
+-		mSubDivided = false;
++    {
++		TQuadTreeBasicNode&lt;TData, TNode&gt;::mSubDivided = false;
++    }
+ }
+ 
+ template &lt;class TData, class TNode&gt;
+ TLooseQuadTreeNode&lt;TData, TNode&gt;* TLooseQuadTreeNode&lt;TData,TNode&gt;::find(const Ogre::Vector3&amp; position)
+ {
+ 	TLooseQuadTree&lt;TData, TNode&gt;* result = NULL;
+-	if (mSubDivided)
++	if (TQuadTreeBasicNode&lt;TData, TNode&gt;::mSubDivided)
+ 	{
+ 		// try to search for the data in any of the subnodes
+ 		for (int i=0; i&lt;4; i++)
+ 		{
+-			if (mNodes[i])
++			if (TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i])
+ 			{
+-				result = mNodes[i].find(position);
+-				if (result)
++				result = TQuadTreeBasicNode&lt;TData, TNode&gt;::mNodes[i].find(position);
++				if (result != NULL)
++                {
+ 					break;
++                }
+ 			}
+ 		}
+ 	}
+@@ -629,10 +635,10 @@
+ 	switch (location)
+ 	{
+ 	case TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_LEFT:
+-		mVertexTL = vertex;
++		TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexTL = vertex;
+ 		break;
+ 	case TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_RIGHT:
+-		mVertexBR = vertex;
++		TQuadTreeOgreNode&lt;TData, TNode&gt;::mVertexBR = vertex;
+ 		break;
+ 	case TQuadTreeBasicNode&lt;TData,TNode&gt;::BOTTOM_LEFT:
+ 	case TQuadTreeBasicNode&lt;TData,TNode&gt;::TOP_RIGHT:
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000277.html">[Dsa-hl-svn] r3206 - rl/trunk/engine/core/include
+</A></li>
+	<LI>Next message: <A HREF="000279.html">[Dsa-hl-svn] r3208 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#278">[ date ]</a>
+              <a href="thread.html#278">[ thread ]</a>
+              <a href="subject.html#278">[ subject ]</a>
+              <a href="author.html#278">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

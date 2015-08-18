@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3348 - in rl/trunk/engine: core/include core/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3348%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200704262131.l3QLVSBY003137%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000418.html">
+   <LINK REL="Next"  HREF="000420.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3348 - in rl/trunk/engine: core/include core/src	script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3348%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200704262131.l3QLVSBY003137%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3348 - in rl/trunk/engine: core/include core/src	script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 26 23:31:28 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000418.html">[Dsa-hl-svn] r3347 - in modules: combattest/materials	regressiontest/materials
+</A></li>
+        <LI>Next message: <A HREF="000420.html">[Dsa-hl-svn] r3349 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#419">[ date ]</a>
+              <a href="thread.html#419">[ thread ]</a>
+              <a href="subject.html#419">[ subject ]</a>
+              <a href="author.html#419">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-26 23:31:13 +0200 (Thu, 26 Apr 2007)
+New Revision: 3348
+
+Modified:
+   rl/trunk/engine/core/include/GameEventManager.h
+   rl/trunk/engine/core/include/Zone.h
+   rl/trunk/engine/core/src/Zone.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+Correctly destroy zones in dtor of ZoneManager
+
+Modified: rl/trunk/engine/core/include/GameEventManager.h
+===================================================================
+--- rl/trunk/engine/core/include/GameEventManager.h	2007-04-26 21:02:57 UTC (rev 3347)
++++ rl/trunk/engine/core/include/GameEventManager.h	2007-04-26 21:31:13 UTC (rev 3348)
+@@ -85,9 +85,9 @@
+ 
+     virtual const Ogre::String&amp; getName() const;
+ 
+-private:
+ 	void removeQueuedDeletionSources();
+ 
++private:
+     GameAreaEventSourceList mAreaEventSources;
+ 	GameAreaEventSourceList mQueuedDeletionSources;
+ };
+
+Modified: rl/trunk/engine/core/include/Zone.h
+===================================================================
+--- rl/trunk/engine/core/include/Zone.h	2007-04-26 21:02:57 UTC (rev 3347)
++++ rl/trunk/engine/core/include/Zone.h	2007-04-26 21:31:13 UTC (rev 3348)
+@@ -22,25 +22,29 @@
+ 
+ namespace rl {
+ 
++	class Actor;
+ 	class LightObject;
+ 
+ 	///@todo: Inheritance is wrong, Zone should be a GameAreaEventSource, ZoneManager a GameAreaListener
+ 	class _RlCoreExport Zone : public GameAreaListener
+ 	{
+ 	public:
+-		Zone();
++		Zone(Actor* actor);
+ 
+ 		void addLight(Actor* light);
+         void addSound(const Ogre::String&amp; name);
+ 		std::vector&lt;Actor*&gt; getLights() const;
+         std::vector&lt;Ogre::String&gt; getSounds() const;
+ 
++		Actor* getActor() const;
++
+ 		virtual void areaLeft(GameAreaEvent *anEvent);
+ 	    virtual void areaEntered(GameAreaEvent *anEvent);
+ 
+ 	private:
+ 		std::vector&lt;Actor*&gt; mLights;
+ 		std::vector&lt;Ogre::String&gt; mSounds;
++		Actor* mActor;
+ 	};
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/Zone.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Zone.cpp	2007-04-26 21:02:57 UTC (rev 3347)
++++ rl/trunk/engine/core/src/Zone.cpp	2007-04-26 21:31:13 UTC (rev 3348)
+@@ -24,11 +24,17 @@
+ namespace rl 
+ {
+ 
+-	Zone::Zone()
+-		: GameAreaListener()
++	Zone::Zone(Actor* actor)
++	 : GameAreaListener(),
++	   mActor(actor)
+ 	{
+ 	}
+ 
++	Actor* Zone::getActor() const
++	{
++		return mActor;
++	}
++
+ 	void Zone::areaLeft(GameAreaEvent *anEvent)
+ 	{
+ 		ZoneManager::getSingleton().areaLeft(this);
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-04-26 21:02:57 UTC (rev 3347)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-04-26 21:31:13 UTC (rev 3348)
+@@ -29,7 +29,7 @@
+ 		: Ogre::Singleton&lt;ZoneManager&gt;()
+ 	{
+ 		// the default zone is active when no other Zone is active
+-		mDefaultZone = new Zone();
++		mDefaultZone = new Zone(NULL);
+ 		mActiveZones.push_front(mDefaultZone); 
+ 	}
+ 
+@@ -37,8 +37,10 @@
+ 	{
+ 		for (std::map&lt;const Ogre::String, Zone*&gt;::iterator it = mZones.begin(); it != mZones.end(); ++it)
+ 		{
+-			delete (*it).second;
++			Zone* curZone = (*it).second;
++			GameEventManager::getSingleton().removeAreaListener(curZone);
+ 		}
++		GameEventManager::getSingleton().removeQueuedDeletionSources();
+ 		delete mDefaultZone;
+ 	}
+ 
+@@ -63,11 +65,11 @@
+ 
+     Zone* ZoneManager::createZone(const Ogre::String&amp; name, const Ogre::Vector3&amp; position, const Ogre::Real radius, unsigned long queryflags)
+ 	{
+-		Zone* lz = new Zone();
+-		mZones[name] = lz;
+ 
+ 		Actor* kugelDings = ActorManager::getSingleton().createEmptyActor(&quot;Light zone center&quot;);
+ 		kugelDings-&gt;placeIntoScene(position);
++		Zone* lz = new Zone(kugelDings);
++		mZones[name] = lz;
+ 		GameEventManager::getSingleton().addSphereAreaListener(kugelDings, radius, lz, queryflags);
+ 
+ 		return lz;
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-04-26 21:02:57 UTC (rev 3347)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-04-26 21:31:13 UTC (rev 3348)
+@@ -854,6 +854,8 @@
+ 
+ class Zone
+ {
++private:
++	Zone(Actor* actor);
+ public:
+ 	void addLight(Actor* light);
+ 	void addSound(const Ogre::String&amp; sound);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000418.html">[Dsa-hl-svn] r3347 - in modules: combattest/materials	regressiontest/materials
+</A></li>
+	<LI>Next message: <A HREF="000420.html">[Dsa-hl-svn] r3349 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#419">[ date ]</a>
+              <a href="thread.html#419">[ thread ]</a>
+              <a href="subject.html#419">[ subject ]</a>
+              <a href="author.html#419">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

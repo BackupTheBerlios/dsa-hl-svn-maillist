@@ -1,0 +1,1312 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4835 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4835%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200903152254.n2FMsc2A007982%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001891.html">
+   <LINK REL="Next"  HREF="001893.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4835 - rl/trunk/engine/ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4835%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200903152254.n2FMsc2A007982%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4835 - rl/trunk/engine/ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 15 23:54:38 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001891.html">[Dsa-hl-svn] r4834 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/ai/include engine/ai/src engine/common/src	engine/rules/include engine/rules/src engine/script/swig	engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001893.html">[Dsa-hl-svn] r4836 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1892">[ date ]</a>
+              <a href="thread.html#1892">[ thread ]</a>
+              <a href="subject.html#1892">[ subject ]</a>
+              <a href="author.html#1892">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2009-03-15 23:54:37 +0100 (Sun, 15 Mar 2009)
+New Revision: 4835
+
+Modified:
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+ 
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2009-03-15 22:21:28 UTC (rev 4834)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2009-03-15 22:54:37 UTC (rev 4835)
+@@ -1,608 +1,608 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot;
+-
+-#include &quot;CombatControlState.h&quot;
+-
+-#include &quot;Actor.h&quot;
+-#include &quot;CameraObject.h&quot;
+-#include &quot;Combat.h&quot;
+-#include &quot;CombatGui.h&quot;
+-#include &quot;CombatManager.h&quot;
+-#include &quot;CommandMapper.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;Creature.h&quot;
+-#include &quot;CreatureController.h&quot;
+-#include &quot;CreatureControllerManager.h&quot;
+-#include &quot;InputManager.h&quot;
+-#include &quot;MeshObject.h&quot;
+-#include &quot;PhysicalThing.h&quot;
+-#include &quot;RulesMessages.h&quot;
+-#include &quot;Selector.h&quot;
+-#include &quot;UiMessages.h&quot;
+-#include &quot;World.h&quot;
+-
+-using namespace Ogre;
+-
+-namespace rl {
+-    CombatControlState::CombatControlState(CommandMapper* cmdMapper,
+-        Actor* camera, Creature* character)
+-        : ControlState(cmdMapper, camera, character, CST_COMBAT),
+-          Combatant(CombatManager::getSingleton().startCombat(),
+-			CreatureControllerManager::getSingleton().getCreatureController(character)),
+-		  mAttackedOpponent(NULL),
+-		  mParriedOpponent(NULL),
+-          mCombatManager(CombatManager::getSingletonPtr()),
+-		  mCombatGui(NULL),
+-          mEnemySelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+-            QUERYFLAG_CREATURE),
+-          mCamera(NULL),
+-		  mState(ROUND_EXECUTION),
+-          mCameraYaw(0),
+-          mCameraPitch(60), // the same value as in resetCamera
+-          mMovementState(0),
+-          mCameraLinearSpringK(100.0f),
+-          mCameraLinearDampingK(Math::NEG_INFINITY),
+-          mViewMode(VM_COMBAT_CENTERED),
+-          mCameraFocusedCombatant(NULL),
+-          mCameraTransitionLookAtActive(false),
+-          mCameraTransitionPositionActive(false),
+-          mCameraMaxDistance(30.0f),
+-          mCameraCombatCenteredMinDistance(5.0f),
+-          mCameraThirdPersonMinDistance(1.0f),
+-          mCameraSwitchDist(30.0f),
+-          mCameraSwitchTransitionDist(0.8f)
+-    {
+-        CreatureSelectionFilter* filter = new CreatureSelectionFilter();
+-        filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
+-        mEnemySelector.setFilter(filter);
+-
+-        // Message handlers
+-		mCombatIoAttackOpponentConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoAttackOpponent&gt;(
+-			    boost::bind(&amp;CombatControlState::userRequestAttackOpponent, this, _1));
+-		mCombatIoParryOpponentConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoParryOpponent&gt;(
+-			    boost::bind(&amp;CombatControlState::userRequestParryOpponent, this, _1));
+-		mCombatIoEndTurnRequestedConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoEndTurnRequested&gt;(
+-			    boost::bind(&amp;CombatControlState::userRequestEndTurn, this));
+-		mEnemyLeftCombatConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatOpponentLeft&gt;(
+-			    boost::bind(&amp;CombatControlState::enemyLeftCombat, this, _1));
+-		mCombatEndConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatEnded&gt;(
+-			    boost::bind(&amp;CombatControlState::combatEnded, this, _1));
+-
+-        mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
+-		mCombatGui = new CombatGui(mCombat, mCamera);
+-
+-
+-        // calculate camera spring-damping system coefficients
+-        Real relationCoefficient = 0.8f;
+-        mCameraLinearDampingK = relationCoefficient * 2.0 * Math::Sqrt(mCameraLinearSpringK);
+-    }
+-
+-	CombatControlState::~CombatControlState()
+-    {
+-		delete mCombatGui;
+-        delete mEnemySelector.getFilter();
+-		CombatManager::getSingleton().stopCombat();
+-    }
+-
+-    void CombatControlState::resume()
+-    {
+-        // control camera
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setMaterialID(
+-        PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;));
+-        mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(Vector3::ZERO);
+-        
+-        // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
+-        OgreNewt::MaterialPair* mat_pair = NULL;
+-        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+-        mat_pair-&gt;setContactCallback(this);
+-        mat_pair-&gt;setDefaultCollidable(1);
+-        mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
+-        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+-        mat_pair-&gt;setContactCallback(this);
+-        mat_pair-&gt;setDefaultCollidable(1);
+-        mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
+-        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+-        mat_pair-&gt;setContactCallback(this);
+-        mat_pair-&gt;setDefaultCollidable(1);
+-        mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
+-
+-       
+-
+-
+-        ///\todo Richtig machen, nur tempor&#228;r Ani hier setzen.
+-        static_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject())
+-            -&gt;startAnimation(&quot;kampf_schwerter_idle&quot;);
+-
+-        // Set reference to character
+-        mEnemySelector.setCheckVisibility(true, mCharacter);
+-        mEnemySelector.track(mCharacter);
+-        mEnemySelector.setRadius(10.0);
+-
+-        mEnemySelector.updateSelection();
+-        const Selector::GameObjectVector&amp; enemies = mEnemySelector.getAllSelectedObjects();
+-        if (!enemies.empty())
+-        {
+-            for (size_t i = 0; i &lt; enemies.size(); ++i)
+-            {
+-                mCombat-&gt;addOpponent(static_cast&lt;Creature*&gt;(enemies[i]));
+-            }
+-        }
+-        else
+-        {
+-            // Oops. Nothing to fight. Pop self.
+-            InputManager::getSingleton().popControlState();
+-            return;
+-        }
+-
+-		mCombatGui-&gt;show();
+-
+-        // We want to play too..
+-        mCombat-&gt;addAlly(this);
+-
+-        mCombat-&gt;start();
+-
+-        // reset camera
+-        //resetCamera(); // if you don't call this here, the camera should smoothly move to the new position -&gt; looks nicer
+-        // perhaps this should be handled differently!
+-        mMovementState = 0;
+-        // calculate some buffered values, so they are initialized:
+-        mCameraTransitionPositionActive = false;
+-        mCameraTransitionLookAtActive = false;
+-        mCameraFocusedCombatant = this;
+-        mCameraYaw = Degree(0);
+-        mCameraPitch = Degree(50);
+-        mCameraDistance = 30.0f; // only used for third-person
+-        mCombatCenter = calculateCombatCenterPosition();
+-        mCombatRadius = calculateCombatRadius(mCombatCenter);
+-        calculateOptimalCameraPositionAndLookAt();
+- 
+-        // update CombatGui
+-        mCombatGui-&gt;update();
+-    }
+-
+-    void CombatControlState::pause()
+-    {
+-        mCombatGui-&gt;hide();
+-
+-
+-        // stop controlling camera actor
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+-        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-        // cam&lt;-&gt;Level collision back to default
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+-        // cam&lt;-&gt;Default collision back to default
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+-
+-        static_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject())-&gt;stopAllAnimations();
+-
+-        mCombat-&gt;pause();
+-    }
+-
+-    bool CombatControlState::keyPressed(const OIS::KeyEvent&amp; evt, bool handled)
+-    {
+-        bool retval = false;
+-        if( !handled )
+-        {
+-            int movement = mCommandMapper-&gt;getMovement(evt.key);
+-            mMovementState |= movement;
+-            
+-            if( movement != MOVE_NONE )
+-                retval = true;
+-        }
+-
+-        if( ControlState::keyPressed(evt, handled || retval) )
+-            retval = true;
+-
+-        return retval;
+-    }
+-     
+-    bool CombatControlState::keyReleased(const OIS::KeyEvent&amp; evt, bool handled)
+-    {
+-        bool retval = false;
+-        int movement = mCommandMapper-&gt;getMovement(evt.key);
+-        if( movement != MOVE_NONE )
+-        {
+-            mMovementState &amp;= (~movement);
+-            retval = true;
+-        }
+-
+-        if( ControlState::keyReleased(evt, handled || retval) )
+-            retval = true;
+-        return retval;
+-    }
+-
+-    void CombatControlState::run(Ogre::Real elapsedTime)
+-    {
+-        // updateCameraLookAt should be called before mCombatGui-&gt;update()!
+-
+-        // update camera look-at position
+-        updateCameraLookAt(elapsedTime);
+-
+-
+-        // update CombatGui
+-        mCombatGui-&gt;update();
+-
+-
+-        // slow down rotational movement, when radius grows
+-        if( mMovementState &amp; MOVE_RIGHT )
+-            mCameraYaw += Degree( 360.0/2.0 * elapsedTime / Math::Sqrt(mCameraDistance) );
+-        if( mMovementState &amp; MOVE_LEFT )
+-            mCameraYaw -= Degree( 360.0/2.0 * elapsedTime / Math::Sqrt(mCameraDistance) );
+-        if( mMovementState &amp; MOVE_FORWARD )
+-            mCameraDistance -= 5 * elapsedTime;
+-        if( mMovementState &amp; MOVE_BACKWARD )
+-            mCameraDistance += 5 * elapsedTime;
+-
+-        mCameraDistance = std::max( mCameraDistance, mCameraThirdPersonMinDistance);
+-        mCameraDistance = std::min( mCameraDistance, mCameraMaxDistance);
+-
+-        // switch view mode smoothly if nearer:
+-        if( mViewMode == VM_COMBAT_CENTERED )
+-        {
+-            if( mMovementState &amp; MOVE_FORWARD )
+-            {
+-                mViewMode = VM_THIRD_PERSON;
+-            }
+-        }
+-        else // VM_THIRD_PERSON
+-        {
+-            if( mCameraDistance &gt;= mCameraSwitchDist - 0.05f &amp;&amp; mMovementState &amp; MOVE_BACKWARD )
+-            {
+-                mViewMode = VM_COMBAT_CENTERED;
+-            }
+-        }
+-    }
+-
+-    void CombatControlState::resetCamera(void)
+-    {
+-        mCombatCenter = calculateCombatCenterPosition();
+-        mCombatRadius = calculateCombatRadius(mCombatCenter);
+-        mCameraTransitionPositionActive = false;
+-        mCameraTransitionLookAtActive = false;
+-        mCameraYaw = Degree(0);
+-        mCameraPitch = Degree(50);
+-        if( mViewMode == VM_THIRD_PERSON )
+-            mCameraDistance = 2.0f; // only used for third-person
+-        calculateOptimalCameraPositionAndLookAt();
+-        mCameraActor-&gt;setPosition(mCameraOptPos);
+-        SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
+-        cameraNode-&gt;lookAt(mCameraLookAt, Node::TS_WORLD);
+-    }
+-
+-    void CombatControlState::updateCameraLookAt(Real elapsedTime)
+-    {
+-        SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
+-        cameraNode-&gt;lookAt(mCameraLookAt, Node::TS_WORLD);
+-    }
+-
+-    Vector3 CombatControlState::calculateCombatCenterPosition()
+-    {
+-        // get the center of all persons (allies and opponents)
+-        int n = 0;
+-        Vector3 pos = Vector3::ZERO;
+-
+-        const Combat::CombatantSet &amp;allies (mCombat-&gt;getAllPlayerAllies() );
+-        for(Combat::CombatantSet::const_iterator it = allies.begin(); it != allies.end(); it++)
+-        {
+-            pos += (*it)-&gt;getCreature()-&gt;getPosition();
+-            n++;
+-        }
+-
+-        const Combat::CombatantSet &amp;opponents (mCombat-&gt;getAllPlayerOpponents());
+-        for(Combat::CombatantSet::const_iterator it = opponents.begin(); it != opponents.end(); it++)
+-        {
+-            pos += (*it)-&gt;getCreature()-&gt;getPosition();
+-            n++;
+-        }
+-
+-        if( n &gt; 0 )
+-            pos /= n;
+-        else
+-        {
+-            pos = mCharacter-&gt;getPosition();
+-        }
+-
+-        return pos;
+-    }
+-
+-    Real CombatControlState::calculateCombatRadius(Vector3 center)
+-    {
+-        // get the greatest distance from center from all persons
+-        Real distance = 0;
+-        const Combat::CombatantSet &amp;allies (mCombat-&gt;getAllPlayerAllies() );
+-        for(Combat::CombatantSet::const_iterator it = allies.begin(); it != allies.end(); it++)
+-        {
+-            distance = std::max( ( (*it)-&gt;getCreature()-&gt;getPosition() - center ).length(), distance );
+-        }
+-        const Combat::CombatantSet &amp;opponents = mCombat-&gt;getAllPlayerOpponents();
+-        for(Combat::CombatantSet::const_iterator it = opponents.begin(); it != opponents.end(); it++)
+-        {
+-            distance = std::max( ( (*it)-&gt;getCreature()-&gt;getPosition() - center ).length(), distance );
+-        }
+-        return distance;
+-    }
+-    
+-    void CombatControlState::calculateOptimalCameraPositionAndLookAt()
+-    {
+-        // some variables:
+-        Vector3 playerPos = mCharacter-&gt;getPosition();
+-        mCombatCenter = calculateCombatCenterPosition();
+-        mCombatRadius = calculateCombatRadius(mCombatCenter);
+-
+-
+-
+-        // calculate camera-distance for VM_COMBAT_CENTERED (needed for third-person view, too)
+-        Real combatCenteredDistance = mCombatRadius + 2; // this is camera-distance from center projected to the plane!
+-            
+-        // put camera on the line player-center far enough to see all persons
+-        // if player is &quot;exactly&quot; in the center, use player orientation as fallback orientation
+-        // + rotation from mCameraYaw
+-        Vector3 diff = playerPos - mCombatCenter;
+-        diff.y = 0;
+-        Quaternion combatCenteredCamYaw;
+-        combatCenteredCamYaw.FromAngleAxis(mCameraYaw, Vector3::UNIT_Y);
+-        if( diff.squaredLength() &lt; 0.01 )
+-        {
+-            diff = mCharacterActor-&gt;getOrientation()*Vector3::UNIT_Z;
+-        }
+-        diff.y = 0;
+-        diff.normalise();
+-        diff = combatCenteredCamYaw*diff;
+-        diff.y = Math::Tan(mCameraPitch.valueRadians());
+-
+-        Real cosPitch = Math::Cos(mCameraPitch.valueRadians());
+-        combatCenteredDistance = std::max( combatCenteredDistance,  mCameraCombatCenteredMinDistance*cosPitch );
+-        combatCenteredDistance = std::min( combatCenteredDistance,  mCameraMaxDistance*cosPitch );
+- 
+-
+-
+-
+-
+-        // TODO
+-        // Bewegung wirkt zu eckig... evt hilft es lookat und position separat zu berechnen
+-        // und dabei das lookat schneller auf den anvisierten combatant zu setzen...
+-        // ideal scheint mir eine &quot;runde&quot; bewegung, a la kamerafahrt!
+-
+-
+-        Vector3 center;
+-        Vector3 dist;
+-        if( mViewMode == VM_THIRD_PERSON &amp;&amp; mCameraFocusedCombatant )
+-        {
+-            center = mCameraFocusedCombatant-&gt;getPosition();
+-            // if mCameraDistance is near the one needed for combatCentered,
+-            // interpolate the center (between center of third-person-view
+-            // and center of combat-centered-view)
+-            Real interpolateDist = std::max(0.0f, combatCenteredDistance - mCameraDistance*cosPitch) / cosPitch;
+-            if( interpolateDist &lt;  mCameraSwitchTransitionDist*mCameraSwitchDist )
+-            {
+-                center += (mCombatCenter - center)*(1 - interpolateDist/(mCameraSwitchTransitionDist*mCameraSwitchDist));
+-            }
+-            dist = mCameraDistance*cosPitch;
+-        }
+-        else // assume VM_COMBAT_CENTERED
+-        {
+-            center = mCombatCenter;
+-            // update camera-distance variable
+-            mCameraDistance = (combatCenteredDistance*diff).length();
+-            dist = combatCenteredDistance;
+-        }
+-
+-        mCameraSwitchDist = (combatCenteredDistance*diff).length();
+-        mCameraOptPos = center + dist*diff;
+-        mCameraLookAt = center + 1.4*Vector3::UNIT_Y;
+-    }
+-
+-    void CombatControlState::OnApplyForceAndTorque(PhysicalThing* thing, float timestep)
+-    {
+-        Vector3 camPos;
+-        Quaternion camOri;
+-        mCamBody-&gt;getPositionOrientation(camPos, camOri);
+-
+-        calculateOptimalCameraPositionAndLookAt();
+-
+-        // handle transition
+-        if( mCameraTransitionPositionActive )
+-        {
+-            Vector3 diff = mCameraOptPos - mCameraTransitionPosition;
+-            Real dist = diff.length();
+-            Vector3 dir = diff/dist;
+-            mCameraTransitionPosition += dir*std::min(dist, 0.5f*timestep);
+-            if( (mCameraTransitionPosition - mCameraOptPos).squaredLength() &lt; 0.02 )
+-                mCameraTransitionPositionActive = false;
+-            mCameraOptPos = mCameraTransitionPosition;
+-        }
+-        if( mCameraTransitionLookAtActive )
+-        {
+-            Vector3 diff = mCameraLookAt - mCameraTransitionLookAt;
+-            Real dist = diff.length();
+-            Vector3 dir = diff/dist;
+-            mCameraTransitionLookAt += dir * std::min(dist,0.5f*timestep);
+-            if( (mCameraLookAt-mCameraTransitionLookAt).squaredLength() &lt; 0.02 )
+-                mCameraTransitionLookAtActive = false;
+-            mCameraLookAt = mCameraTransitionLookAt;
+-        }
+-
+-
+-        Vector3 diff = camPos - mCameraOptPos;
+-        Vector3 cameraVelocity;
+-        cameraVelocity = mCamBody-&gt;getVelocity();
+-        // spring velocity
+-        Vector3 springAcc = -mCameraLinearSpringK*diff - mCameraLinearDampingK * cameraVelocity;
+-                                            
+-        // get the camera mass
+-        Real mass;
+-        Vector3 inertia;
+-        mCamBody-&gt;getMassMatrix(mass, inertia);
+-                                                
+-        mCamBody-&gt;setForce(springAcc * mass);
+-    }
+-
+-    void CombatControlState::setViewMode(ViewMode mode)
+-    {
+-        if(mode != mViewMode)
+-        {
+-            mViewMode = mode;
+-            mCameraTransitionPosition = mCameraActor-&gt;getPosition();
+-            mCameraTransitionLookAt = mCameraLookAt;
+-            mCameraTransitionLookAtActive = true;
+-            mCameraTransitionPositionActive = true;
+-        }
+-    }
+-
+-    void CombatControlState::toggleViewMode()
+-    {
+-        if( mViewMode == VM_COMBAT_CENTERED )
+-            setViewMode(VM_THIRD_PERSON);
+-        else
+-            setViewMode(VM_COMBAT_CENTERED);
+-    }
+-
+-    CombatControlState::ViewMode CombatControlState::getViewMode()
+-    {
+-        return mViewMode;
+-    }
+-
+-    void CombatControlState::setCameraFocusedCombatant(Combatant* combatant)
+-    {
+-        if( combatant != mCameraFocusedCombatant )
+-        {
+-            if( mViewMode == VM_THIRD_PERSON )
+-            {
+-                mCameraTransitionPosition = mCameraActor-&gt;getPosition();
+-                mCameraTransitionLookAt = mCameraLookAt;
+-                mCameraTransitionLookAtActive = true;
+-                mCameraTransitionPositionActive = true;
+-            }
+-        }
+-        mCameraFocusedCombatant = combatant;
+-    }
+-
+-    int CombatControlState::onAABBOverlap(OgreNewt::Body* body0, OgreNewt::Body* body1, int threadIndex)
+-    {
+-        // TODO handle camera collisions here
+-        return 0;
+-    }
+-   
+-    void CombatControlState::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadIndex)
+-    {
+-        // TODO handle camera collisions here
+-    }
+-
+-    Ogre::String CombatControlState::getCombatantTypeName() const
+-    {
+-        return &quot;CombatControlState&quot;;
+-    }
+-
+-    void CombatControlState::requestCombatantAction()
+-    {
+-        // Change state to allow user to choose actions for next round.
+-		mState = REQUEST_USER_INPUT;
+-		mCombatGui-&gt;enableUserInput(true);
+-    }
+-
+-	bool CombatControlState::userRequestAttackOpponent(Combatant* opponent)
+-	{
+-		mAttackedOpponent = opponent;
+-		return true;
+-	}
+-
+-	bool CombatControlState::userRequestParryOpponent(Combatant* opponent)
+-	{
+-		mParriedOpponent = opponent;
+-		return true;
+-	}
+-
+-	bool CombatControlState::userRequestEndTurn()
+-	{
+-		// Only handle, if we accept user input now.
+-		if (mState != REQUEST_USER_INPUT)
+-		{
+-			return true;
+-		}
+-
+-		// Do we want to attack someone?
+-		if (mAttackedOpponent)
+-		{
+-			// Are we in weapon range to opponent
+-			if (mCombat-&gt;canAttack(this, mAttackedOpponent))
+-			{
+-				// Ok, we can attack
+-				mCombat-&gt;registerAttacke(this, mAttackedOpponent);
+-			}
+-			else
+-			{
+-				// We can't attack from here, so go to opponent.
+-				mCombat-&gt;registerFolgen(this, mAttackedOpponent);
+-			}
+-		}
+-		if (mParriedOpponent)
+-		{
+-			mCombat-&gt;registerParade(this);
+-		}
+-
+-		mCombat-&gt;registerCombatantRoundDone(this);
+-
+-		mState = ROUND_EXECUTION;
+-
+-		return true;
+-	}
+-
+-	bool CombatControlState::enemyLeftCombat(Combatant* opponent)
+-	{
+-		// Make sure we don't have any dangling pointers on invalid Combatants.
+-
+-		if (opponent == mAttackedOpponent)
+-		{
+-			mAttackedOpponent = NULL;
+-		}
+-		if (opponent == mParriedOpponent)
+-		{
+-			mParriedOpponent = NULL;
+-		}
+-		return true;
+-	}
+-
+-    bool CombatControlState::combatEnded(bool alliesWon)
+-    {
+-        ///@todo some feedback, Abenteuerpunkte, anything? 
+-        InputManager::getSingleton().popControlState();
+-        return true;
+-    }
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot;
++
++#include &quot;CombatControlState.h&quot;
++
++#include &quot;Actor.h&quot;
++#include &quot;CameraObject.h&quot;
++#include &quot;Combat.h&quot;
++#include &quot;CombatGui.h&quot;
++#include &quot;CombatManager.h&quot;
++#include &quot;CommandMapper.h&quot;
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;CreatureController.h&quot;
++#include &quot;CreatureControllerManager.h&quot;
++#include &quot;InputManager.h&quot;
++#include &quot;MeshObject.h&quot;
++#include &quot;PhysicalThing.h&quot;
++#include &quot;RulesMessages.h&quot;
++#include &quot;Selector.h&quot;
++#include &quot;UiMessages.h&quot;
++#include &quot;World.h&quot;
++
++using namespace Ogre;
++
++namespace rl {
++    CombatControlState::CombatControlState(CommandMapper* cmdMapper,
++        Actor* camera, Creature* character)
++        : ControlState(cmdMapper, camera, character, CST_COMBAT),
++          Combatant(CombatManager::getSingleton().startCombat(),
++			CreatureControllerManager::getSingleton().getCreatureController(character)),
++		  mAttackedOpponent(NULL),
++		  mParriedOpponent(NULL),
++          mCombatManager(CombatManager::getSingletonPtr()),
++		  mCombatGui(NULL),
++          mEnemySelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
++            QUERYFLAG_CREATURE),
++          mCamera(NULL),
++		  mState(ROUND_EXECUTION),
++          mCameraYaw(0),
++          mCameraPitch(60), // the same value as in resetCamera
++          mMovementState(0),
++          mCameraLinearSpringK(100.0f),
++          mCameraLinearDampingK(Math::NEG_INFINITY),
++          mViewMode(VM_COMBAT_CENTERED),
++          mCameraFocusedCombatant(NULL),
++          mCameraTransitionLookAtActive(false),
++          mCameraTransitionPositionActive(false),
++          mCameraMaxDistance(30.0f),
++          mCameraCombatCenteredMinDistance(5.0f),
++          mCameraThirdPersonMinDistance(1.0f),
++          mCameraSwitchDist(30.0f),
++          mCameraSwitchTransitionDist(0.8f)
++    {
++        CreatureSelectionFilter* filter = new CreatureSelectionFilter();
++        filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
++        mEnemySelector.setFilter(filter);
++
++        // Message handlers
++		mCombatIoAttackOpponentConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoAttackOpponent&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestAttackOpponent, this, _1));
++		mCombatIoParryOpponentConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoParryOpponent&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestParryOpponent, this, _1));
++		mCombatIoEndTurnRequestedConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoEndTurnRequested&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestEndTurn, this));
++		mEnemyLeftCombatConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatOpponentLeft&gt;(
++			    boost::bind(&amp;CombatControlState::enemyLeftCombat, this, _1));
++		mCombatEndConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatEnded&gt;(
++			    boost::bind(&amp;CombatControlState::combatEnded, this, _1));
++
++        mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
++		mCombatGui = new CombatGui(mCombat, mCamera);
++
++
++        // calculate camera spring-damping system coefficients
++        Real relationCoefficient = 0.8f;
++        mCameraLinearDampingK = relationCoefficient * 2.0 * Math::Sqrt(mCameraLinearSpringK);
++    }
++
++	CombatControlState::~CombatControlState()
++    {
++		delete mCombatGui;
++        delete mEnemySelector.getFilter();
++		CombatManager::getSingleton().stopCombat();
++    }
++
++    void CombatControlState::resume()
++    {
++        // control camera
++        mCameraActor-&gt;getPhysicalThing()-&gt;setMaterialID(
++        PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;));
++        mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
++        mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(Vector3::ZERO);
++        
++        // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
++        OgreNewt::MaterialPair* mat_pair = NULL;
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
++        mat_pair-&gt;setDefaultFriction(0,1);
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
++        mat_pair-&gt;setDefaultFriction(0,1);
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
++        mat_pair-&gt;setDefaultFriction(0,1);
++
++       
++
++
++        ///\todo Richtig machen, nur tempor&#226;&#128;&#176;r Ani hier setzen.
++        static_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject())
++            -&gt;startAnimation(&quot;kampf_schwerter_idle&quot;);
++
++        // Set reference to character
++        mEnemySelector.setCheckVisibility(true, mCharacter);
++        mEnemySelector.track(mCharacter);
++        mEnemySelector.setRadius(10.0);
++
++        mEnemySelector.updateSelection();
++        const GameObjectList&amp; enemies = mEnemySelector.getAllSelectedObjects();
++        if (!enemies.empty())
++        {
++            for (GameObjectList::const_iterator it = enemies.begin(); it != enemies.end(); ++it)
++            {
++                mCombat-&gt;addOpponent(static_cast&lt;Creature*&gt;(*it));
++            }
++        }
++        else
++        {
++            // Oops. Nothing to fight. Pop self.
++            InputManager::getSingleton().popControlState();
++            return;
++        }
++
++		mCombatGui-&gt;show();
++
++        // We want to play too..
++        mCombat-&gt;addAlly(this);
++
++        mCombat-&gt;start();
++
++        // reset camera
++        //resetCamera(); // if you don't call this here, the camera should smoothly move to the new position -&gt; looks nicer
++        // perhaps this should be handled differently!
++        mMovementState = 0;
++        // calculate some buffered values, so they are initialized:
++        mCameraTransitionPositionActive = false;
++        mCameraTransitionLookAtActive = false;
++        mCameraFocusedCombatant = this;
++        mCameraYaw = Degree(0);
++        mCameraPitch = Degree(50);
++        mCameraDistance = 30.0f; // only used for third-person
++        mCombatCenter = calculateCombatCenterPosition();
++        mCombatRadius = calculateCombatRadius(mCombatCenter);
++        calculateOptimalCameraPositionAndLookAt();
++ 
++        // update CombatGui
++        mCombatGui-&gt;update();
++    }
++
++    void CombatControlState::pause()
++    {
++        mCombatGui-&gt;hide();
++
++
++        // stop controlling camera actor
++        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
++        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
++        // cam&lt;-&gt;Level collision back to default
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
++        // cam&lt;-&gt;Default collision back to default
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++
++        static_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject())-&gt;stopAllAnimations();
++
++        mCombat-&gt;pause();
++    }
++
++    bool CombatControlState::keyPressed(const OIS::KeyEvent&amp; evt, bool handled)
++    {
++        bool retval = false;
++        if( !handled )
++        {
++            int movement = mCommandMapper-&gt;getMovement(evt.key);
++            mMovementState |= movement;
++            
++            if( movement != MOVE_NONE )
++                retval = true;
++        }
++
++        if( ControlState::keyPressed(evt, handled || retval) )
++            retval = true;
++
++        return retval;
++    }
++     
++    bool CombatControlState::keyReleased(const OIS::KeyEvent&amp; evt, bool handled)
++    {
++        bool retval = false;
++        int movement = mCommandMapper-&gt;getMovement(evt.key);
++        if( movement != MOVE_NONE )
++        {
++            mMovementState &amp;= (~movement);
++            retval = true;
++        }
++
++        if( ControlState::keyReleased(evt, handled || retval) )
++            retval = true;
++        return retval;
++    }
++
++    void CombatControlState::run(Ogre::Real elapsedTime)
++    {
++        // updateCameraLookAt should be called before mCombatGui-&gt;update()!
++
++        // update camera look-at position
++        updateCameraLookAt(elapsedTime);
++
++
++        // update CombatGui
++        mCombatGui-&gt;update();
++
++
++        // slow down rotational movement, when radius grows
++        if( mMovementState &amp; MOVE_RIGHT )
++            mCameraYaw += Degree( 360.0/2.0 * elapsedTime / Math::Sqrt(mCameraDistance) );
++        if( mMovementState &amp; MOVE_LEFT )
++            mCameraYaw -= Degree( 360.0/2.0 * elapsedTime / Math::Sqrt(mCameraDistance) );
++        if( mMovementState &amp; MOVE_FORWARD )
++            mCameraDistance -= 5 * elapsedTime;
++        if( mMovementState &amp; MOVE_BACKWARD )
++            mCameraDistance += 5 * elapsedTime;
++
++        mCameraDistance = std::max( mCameraDistance, mCameraThirdPersonMinDistance);
++        mCameraDistance = std::min( mCameraDistance, mCameraMaxDistance);
++
++        // switch view mode smoothly if nearer:
++        if( mViewMode == VM_COMBAT_CENTERED )
++        {
++            if( mMovementState &amp; MOVE_FORWARD )
++            {
++                mViewMode = VM_THIRD_PERSON;
++            }
++        }
++        else // VM_THIRD_PERSON
++        {
++            if( mCameraDistance &gt;= mCameraSwitchDist - 0.05f &amp;&amp; mMovementState &amp; MOVE_BACKWARD )
++            {
++                mViewMode = VM_COMBAT_CENTERED;
++            }
++        }
++    }
++
++    void CombatControlState::resetCamera(void)
++    {
++        mCombatCenter = calculateCombatCenterPosition();
++        mCombatRadius = calculateCombatRadius(mCombatCenter);
++        mCameraTransitionPositionActive = false;
++        mCameraTransitionLookAtActive = false;
++        mCameraYaw = Degree(0);
++        mCameraPitch = Degree(50);
++        if( mViewMode == VM_THIRD_PERSON )
++            mCameraDistance = 2.0f; // only used for third-person
++        calculateOptimalCameraPositionAndLookAt();
++        mCameraActor-&gt;setPosition(mCameraOptPos);
++        SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
++        cameraNode-&gt;lookAt(mCameraLookAt, Node::TS_WORLD);
++    }
++
++    void CombatControlState::updateCameraLookAt(Real elapsedTime)
++    {
++        SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
++        cameraNode-&gt;lookAt(mCameraLookAt, Node::TS_WORLD);
++    }
++
++    Vector3 CombatControlState::calculateCombatCenterPosition()
++    {
++        // get the center of all persons (allies and opponents)
++        int n = 0;
++        Vector3 pos = Vector3::ZERO;
++
++        const Combat::CombatantSet &amp;allies (mCombat-&gt;getAllPlayerAllies() );
++        for(Combat::CombatantSet::const_iterator it = allies.begin(); it != allies.end(); it++)
++        {
++            pos += (*it)-&gt;getCreature()-&gt;getPosition();
++            n++;
++        }
++
++        const Combat::CombatantSet &amp;opponents (mCombat-&gt;getAllPlayerOpponents());
++        for(Combat::CombatantSet::const_iterator it = opponents.begin(); it != opponents.end(); it++)
++        {
++            pos += (*it)-&gt;getCreature()-&gt;getPosition();
++            n++;
++        }
++
++        if( n &gt; 0 )
++            pos /= n;
++        else
++        {
++            pos = mCharacter-&gt;getPosition();
++        }
++
++        return pos;
++    }
++
++    Real CombatControlState::calculateCombatRadius(Vector3 center)
++    {
++        // get the greatest distance from center from all persons
++        Real distance = 0;
++        const Combat::CombatantSet &amp;allies (mCombat-&gt;getAllPlayerAllies() );
++        for(Combat::CombatantSet::const_iterator it = allies.begin(); it != allies.end(); it++)
++        {
++            distance = std::max( ( (*it)-&gt;getCreature()-&gt;getPosition() - center ).length(), distance );
++        }
++        const Combat::CombatantSet &amp;opponents = mCombat-&gt;getAllPlayerOpponents();
++        for(Combat::CombatantSet::const_iterator it = opponents.begin(); it != opponents.end(); it++)
++        {
++            distance = std::max( ( (*it)-&gt;getCreature()-&gt;getPosition() - center ).length(), distance );
++        }
++        return distance;
++    }
++    
++    void CombatControlState::calculateOptimalCameraPositionAndLookAt()
++    {
++        // some variables:
++        Vector3 playerPos = mCharacter-&gt;getPosition();
++        mCombatCenter = calculateCombatCenterPosition();
++        mCombatRadius = calculateCombatRadius(mCombatCenter);
++
++
++
++        // calculate camera-distance for VM_COMBAT_CENTERED (needed for third-person view, too)
++        Real combatCenteredDistance = mCombatRadius + 2; // this is camera-distance from center projected to the plane!
++            
++        // put camera on the line player-center far enough to see all persons
++        // if player is &quot;exactly&quot; in the center, use player orientation as fallback orientation
++        // + rotation from mCameraYaw
++        Vector3 diff = playerPos - mCombatCenter;
++        diff.y = 0;
++        Quaternion combatCenteredCamYaw;
++        combatCenteredCamYaw.FromAngleAxis(mCameraYaw, Vector3::UNIT_Y);
++        if( diff.squaredLength() &lt; 0.01 )
++        {
++            diff = mCharacterActor-&gt;getOrientation()*Vector3::UNIT_Z;
++        }
++        diff.y = 0;
++        diff.normalise();
++        diff = combatCenteredCamYaw*diff;
++        diff.y = Math::Tan(mCameraPitch.valueRadians());
++
++        Real cosPitch = Math::Cos(mCameraPitch.valueRadians());
++        combatCenteredDistance = std::max( combatCenteredDistance,  mCameraCombatCenteredMinDistance*cosPitch );
++        combatCenteredDistance = std::min( combatCenteredDistance,  mCameraMaxDistance*cosPitch );
++ 
++
++
++
++
++        // TODO
++        // Bewegung wirkt zu eckig... evt hilft es lookat und position separat zu berechnen
++        // und dabei das lookat schneller auf den anvisierten combatant zu setzen...
++        // ideal scheint mir eine &quot;runde&quot; bewegung, a la kamerafahrt!
++
++
++        Vector3 center;
++        Vector3 dist;
++        if( mViewMode == VM_THIRD_PERSON &amp;&amp; mCameraFocusedCombatant )
++        {
++            center = mCameraFocusedCombatant-&gt;getPosition();
++            // if mCameraDistance is near the one needed for combatCentered,
++            // interpolate the center (between center of third-person-view
++            // and center of combat-centered-view)
++            Real interpolateDist = std::max(0.0f, combatCenteredDistance - mCameraDistance*cosPitch) / cosPitch;
++            if( interpolateDist &lt;  mCameraSwitchTransitionDist*mCameraSwitchDist )
++            {
++                center += (mCombatCenter - center)*(1 - interpolateDist/(mCameraSwitchTransitionDist*mCameraSwitchDist));
++            }
++            dist = mCameraDistance*cosPitch;
++        }
++        else // assume VM_COMBAT_CENTERED
++        {
++            center = mCombatCenter;
++            // update camera-distance variable
++            mCameraDistance = (combatCenteredDistance*diff).length();
++            dist = combatCenteredDistance;
++        }
++
++        mCameraSwitchDist = (combatCenteredDistance*diff).length();
++        mCameraOptPos = center + dist*diff;
++        mCameraLookAt = center + 1.4*Vector3::UNIT_Y;
++    }
++
++    void CombatControlState::OnApplyForceAndTorque(PhysicalThing* thing, float timestep)
++    {
++        Vector3 camPos;
++        Quaternion camOri;
++        mCamBody-&gt;getPositionOrientation(camPos, camOri);
++
++        calculateOptimalCameraPositionAndLookAt();
++
++        // handle transition
++        if( mCameraTransitionPositionActive )
++        {
++            Vector3 diff = mCameraOptPos - mCameraTransitionPosition;
++            Real dist = diff.length();
++            Vector3 dir = diff/dist;
++            mCameraTransitionPosition += dir*std::min(dist, 0.5f*timestep);
++            if( (mCameraTransitionPosition - mCameraOptPos).squaredLength() &lt; 0.02 )
++                mCameraTransitionPositionActive = false;
++            mCameraOptPos = mCameraTransitionPosition;
++        }
++        if( mCameraTransitionLookAtActive )
++        {
++            Vector3 diff = mCameraLookAt - mCameraTransitionLookAt;
++            Real dist = diff.length();
++            Vector3 dir = diff/dist;
++            mCameraTransitionLookAt += dir * std::min(dist,0.5f*timestep);
++            if( (mCameraLookAt-mCameraTransitionLookAt).squaredLength() &lt; 0.02 )
++                mCameraTransitionLookAtActive = false;
++            mCameraLookAt = mCameraTransitionLookAt;
++        }
++
++
++        Vector3 diff = camPos - mCameraOptPos;
++        Vector3 cameraVelocity;
++        cameraVelocity = mCamBody-&gt;getVelocity();
++        // spring velocity
++        Vector3 springAcc = -mCameraLinearSpringK*diff - mCameraLinearDampingK * cameraVelocity;
++                                            
++        // get the camera mass
++        Real mass;
++        Vector3 inertia;
++        mCamBody-&gt;getMassMatrix(mass, inertia);
++                                                
++        mCamBody-&gt;setForce(springAcc * mass);
++    }
++
++    void CombatControlState::setViewMode(ViewMode mode)
++    {
++        if(mode != mViewMode)
++        {
++            mViewMode = mode;
++            mCameraTransitionPosition = mCameraActor-&gt;getPosition();
++            mCameraTransitionLookAt = mCameraLookAt;
++            mCameraTransitionLookAtActive = true;
++            mCameraTransitionPositionActive = true;
++        }
++    }
++
++    void CombatControlState::toggleViewMode()
++    {
++        if( mViewMode == VM_COMBAT_CENTERED )
++            setViewMode(VM_THIRD_PERSON);
++        else
++            setViewMode(VM_COMBAT_CENTERED);
++    }
++
++    CombatControlState::ViewMode CombatControlState::getViewMode()
++    {
++        return mViewMode;
++    }
++
++    void CombatControlState::setCameraFocusedCombatant(Combatant* combatant)
++    {
++        if( combatant != mCameraFocusedCombatant )
++        {
++            if( mViewMode == VM_THIRD_PERSON )
++            {
++                mCameraTransitionPosition = mCameraActor-&gt;getPosition();
++                mCameraTransitionLookAt = mCameraLookAt;
++                mCameraTransitionLookAtActive = true;
++                mCameraTransitionPositionActive = true;
++            }
++        }
++        mCameraFocusedCombatant = combatant;
++    }
++
++    int CombatControlState::onAABBOverlap(OgreNewt::Body* body0, OgreNewt::Body* body1, int threadIndex)
++    {
++        // TODO handle camera collisions here
++        return 0;
++    }
++   
++    void CombatControlState::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadIndex)
++    {
++        // TODO handle camera collisions here
++    }
++
++    Ogre::String CombatControlState::getCombatantTypeName() const
++    {
++        return &quot;CombatControlState&quot;;
++    }
++
++    void CombatControlState::requestCombatantAction()
++    {
++        // Change state to allow user to choose actions for next round.
++		mState = REQUEST_USER_INPUT;
++		mCombatGui-&gt;enableUserInput(true);
++    }
++
++	bool CombatControlState::userRequestAttackOpponent(Combatant* opponent)
++	{
++		mAttackedOpponent = opponent;
++		return true;
++	}
++
++	bool CombatControlState::userRequestParryOpponent(Combatant* opponent)
++	{
++		mParriedOpponent = opponent;
++		return true;
++	}
++
++	bool CombatControlState::userRequestEndTurn()
++	{
++		// Only handle, if we accept user input now.
++		if (mState != REQUEST_USER_INPUT)
++		{
++			return true;
++		}
++
++		// Do we want to attack someone?
++		if (mAttackedOpponent)
++		{
++			// Are we in weapon range to opponent
++			if (mCombat-&gt;canAttack(this, mAttackedOpponent))
++			{
++				// Ok, we can attack
++				mCombat-&gt;registerAttacke(this, mAttackedOpponent);
++			}
++			else
++			{
++				// We can't attack from here, so go to opponent.
++				mCombat-&gt;registerFolgen(this, mAttackedOpponent);
++			}
++		}
++		if (mParriedOpponent)
++		{
++			mCombat-&gt;registerParade(this);
++		}
++
++		mCombat-&gt;registerCombatantRoundDone(this);
++
++		mState = ROUND_EXECUTION;
++
++		return true;
++	}
++
++	bool CombatControlState::enemyLeftCombat(Combatant* opponent)
++	{
++		// Make sure we don't have any dangling pointers on invalid Combatants.
++
++		if (opponent == mAttackedOpponent)
++		{
++			mAttackedOpponent = NULL;
++		}
++		if (opponent == mParriedOpponent)
++		{
++			mParriedOpponent = NULL;
++		}
++		return true;
++	}
++
++    bool CombatControlState::combatEnded(bool alliesWon)
++    {
++        ///@todo some feedback, Abenteuerpunkte, anything? 
++        InputManager::getSingleton().popControlState();
++        return true;
++    }
++}
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-03-15 22:21:28 UTC (rev 4834)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-03-15 22:54:37 UTC (rev 4835)
+@@ -1120,10 +1120,10 @@
+     {
+         mCombatSelector.updateSelection();
+ 
+-        const Selector::GameObjectVector&amp; gov = mCombatSelector.getAllSelectedObjects();
+-        for (size_t i = 0, end = gov.size(); i &lt; end; ++i)
++        const GameObjectList&amp; gov = mCombatSelector.getAllSelectedObjects();
++        for (GameObjectList::const_iterator it = gov.begin(), end = gov.end(); it != end; ++it)
+         {
+-            Creature* creature = dynamic_cast&lt;Creature*&gt;(gov.at(i));
++            Creature* creature = dynamic_cast&lt;Creature*&gt;(*it);
+             if (creature &amp;&amp;
+ 				creature-&gt;getAlignment() == Creature::ALIGNMENT_ENEMY &amp;&amp;
+ 				(creature-&gt;getLifeState() &amp; Effect::LS_NO_COMBAT) == 0)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001891.html">[Dsa-hl-svn] r4834 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/ai/include engine/ai/src engine/common/src	engine/rules/include engine/rules/src engine/script/swig	engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001893.html">[Dsa-hl-svn] r4836 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1892">[ date ]</a>
+              <a href="thread.html#1892">[ thread ]</a>
+              <a href="subject.html#1892">[ subject ]</a>
+              <a href="author.html#1892">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

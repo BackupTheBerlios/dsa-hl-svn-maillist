@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4307 - in rl/trunk/engine: rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4307%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/src&In-Reply-To=%3C200803222333.m2MNXn7Q006181%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001377.html">
+   <LINK REL="Next"  HREF="001379.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4307 - in rl/trunk/engine: rules/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4307%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/src&In-Reply-To=%3C200803222333.m2MNXn7Q006181%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4307 - in rl/trunk/engine: rules/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 23 00:33:49 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001377.html">[Dsa-hl-svn] r4306 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001379.html">[Dsa-hl-svn] r4308 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1378">[ date ]</a>
+              <a href="thread.html#1378">[ thread ]</a>
+              <a href="subject.html#1378">[ subject ]</a>
+              <a href="author.html#1378">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-23 00:33:44 +0100 (Sun, 23 Mar 2008)
+New Revision: 4307
+
+Modified:
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+Log:
+Bugfixes and improvements in the falling-movement
+
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-22 19:49:32 UTC (rev 4306)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-22 23:33:44 UTC (rev 4307)
+@@ -57,14 +57,31 @@
+         virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_NONE;}
+         virtual void activate()
+         {
++	    mVel = 0;
+         }
+         virtual void deactivate()
+         {
+             std::ostringstream oss;
+             oss &lt;&lt; &quot;Fallen v: &quot; &lt;&lt; mVel &lt;&lt; &quot;   ermittelte Hoehe: &quot; &lt;&lt; mVel*mVel/(2* fabs(PhysicsManager::getSingleton().getGravity().y));
+-            LOG_MESSAGE(Logger::RULES, oss.str());
+             int h = int(mVel*mVel/(2* fabs(PhysicsManager::getSingleton().getGravity().y)));
++	    oss &lt;&lt; &quot;    verwendete Hoehe: &quot; &lt;&lt; h &lt;&lt; &quot;m&quot;;
+ 
++	    if( h &lt; 4 &amp;&amp; h &gt; 0 ) // nicht in den Regeln, aber angenehmer, bei gelunger GE-Probe noch aufgefangen
++	    {
++		int probe = mMovingCreature-&gt;getCreature()-&gt;doEigenschaftsprobe(&quot;GE&quot;, h-6);
++		if( probe == RESULT_PATZER )
++		{
++		    h++;
++		    oss &lt;&lt; &quot;    GE-Patzer!&quot;;
++		}
++		else if( probe &gt;= 0 )
++		{
++		    h = 0;
++		    oss &lt;&lt; &quot;    Nochmal geschickt gelandet!&quot;;
++		}
++	    }
++
++
+             if( h &gt; 0 )
+             {
+ 
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2008-03-22 19:49:32 UTC (rev 4306)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2008-03-22 23:33:44 UTC (rev 4307)
+@@ -112,8 +112,8 @@
+             pl.insert(std::make_pair(std::string(&quot;w32_keyboard&quot;), std::string(&quot;DISCL_EXCLUSIVE&quot;)));
+             pl.insert(std::make_pair(std::string(&quot;w32_keyboard&quot;), std::string(&quot;DISCL_FOREGROUND&quot;)));
+         #elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX &amp; defined DEBUG
+-            pl.insert(std::make_pair(std::string(&quot;x11_mouse_grab&quot;), std::string(&quot;false&quot;)));
+-            pl.insert(std::make_pair(std::string(&quot;x11_keyboard_grab&quot;), std::string(&quot;false&quot;)));
++//            pl.insert(std::make_pair(std::string(&quot;x11_mouse_grab&quot;), std::string(&quot;false&quot;)));
++//           pl.insert(std::make_pair(std::string(&quot;x11_keyboard_grab&quot;), std::string(&quot;false&quot;)));
+         #endif
+ 
+         std::ostringstream windowHndStr;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001377.html">[Dsa-hl-svn] r4306 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001379.html">[Dsa-hl-svn] r4308 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1378">[ date ]</a>
+              <a href="thread.html#1378">[ thread ]</a>
+              <a href="subject.html#1378">[ subject ]</a>
+              <a href="author.html#1378">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

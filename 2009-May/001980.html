@@ -1,0 +1,1267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4924 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4924%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200905171449.n4HEnoUV013423%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001979.html">
+   <LINK REL="Next"  HREF="001981.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4924 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4924%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200905171449.n4HEnoUV013423%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4924 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun May 17 16:49:50 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001979.html">[Dsa-hl-svn] r4923 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001981.html">[Dsa-hl-svn] r4925 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1980">[ date ]</a>
+              <a href="thread.html#1980">[ thread ]</a>
+              <a href="subject.html#1980">[ subject ]</a>
+              <a href="author.html#1980">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-05-17 16:49:49 +0200 (Sun, 17 May 2009)
+New Revision: 4924
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+Log:
+- fix when starting the editor the first time
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-05-13 15:45:09 UTC (rev 4923)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-05-17 14:49:49 UTC (rev 4924)
+@@ -1,594 +1,597 @@
+-#################################################
+-# This source file is part of Rastullahs Lockenwickler.
+-# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-#
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2 of the License, or
+-# (at your option) any later version.
+-#
+-# This program is distributed in the hope that it will be useful,
+-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-#
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
+-#################################################
+-
+-import os
+-import sys
+-import platform
+-import subprocess
+-
+-sys.path.insert(0,'..')
+-import PythonOgreConfig
+-
+-from random import randint
+-
+-from PyQt4 import QtGui, QtCore
+-from PreferencesDialog import *
+-from ObjectPropertyWin import *
+-from ModelSelectionDialog import *
+-from MaterialSelectionDialog import *
+-from GameObjectClassView import *
+-from ConsoleWindow import *
+-from ModuleManager import ModuleManager
+-from ModuleExplorer import *
+-from NewModuleWizard import *
+-from MovePivot import *
+-from PivotRenderQueueListener import *
+-from ModuleDirectoryView import *
+-from TriggerManager import *
+-from MyTerrainManager import MyTerrainManager
+-
+-import OgreMainWindow
+-import ogre.renderer.OGRE as og
+-
+-class Lockenwickler(QtGui.QMainWindow):
+-    def __init__(self, parent=None):
+-        QtGui.QWidget.__init__(self, parent)
+-
+-#        pixmap = QPixmap(&quot;media/icons/lockenwickler_provisorium.png&quot;)
+-#        splash = QSplashScreen(pixmap, Qt.WindowStaysOnTopHint)
+-#        splash.setMask(pixmap.mask())
+-#        splash.showMessage(&quot;Starting...&quot;)
+-#        splash.show() 
+-
+-        self.setupUi()
+-
+-        self.consoleWindow = ConsoleWindow(False,  self)
+-
+-        self.setupOgre()
+-
+-        self.prefDialog = PreferencesDialog(self)
+-        self.objectPropertyWin = ObjectPropertyWin(self.OgreMainWinSceneMgr, self.gocManager, self)
+-        self.moduleExplorerWin = ModuleExplorer(self)
+-        self.modelSelectionDialog = ModelSelectionDialog(self.ogreRoot, self)
+-        self.materialSelectionDialog = MaterialSelectionDialog(self.ogreRoot, self)
+-        self.moduleManager.modelSelectionDialog = self.modelSelectionDialog
+-        self.moduleManager.materialSelectionDialog = self.materialSelectionDialog
+-        self.moduleDirectoryViewWin = ModuleDirectoryView(self)
+-        
+-        triggerManager = TriggerManager()
+-        
+-        self.gameObjectClassView = GameObjectClassView(self.moduleManager.gocManager)
+-
+-        self.createDockWindows()
+-
+-        self.mainTimer = QtCore.QTimer(self)
+-        self.mainTimer.connect(self.mainTimer, QtCore.SIGNAL(&quot;timeout()&quot;), self.update)
+-        self.mainTimer.start(5)
+-
+-        settings = QtCore.QSettings()
+-        self.restoreGeometry(settings.value(&quot;MainWindow/Geometry&quot;).toByteArray())
+-        self.restoreState(settings.value(&quot;MainWindow/DockWindows&quot;).toByteArray())
+-        if not self.prefDialog.setCfgPath(settings.value(&quot;Preferences/moduleCfgPath&quot;).toString()):
+-            self.prefDialog.show()
+-            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
+-        else:
+-            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
+-            
+-        self.prefDialog.setExternalEditorPath(str(settings.value(&quot;Preferences/externalEditorPath&quot;).toString()))
+-        
+-        self.moduleDirectoryViewWin.modulesPath = self.prefDialog.moduleCfgPath.replace(&quot;modules.cfg&quot;, &quot;&quot;)
+-        
+-        self.moduleManager.setModuleExplorer(self.moduleExplorerWin)
+-        self.moduleManager.setModuleDirView(self.moduleDirectoryViewWin)
+-        self.moduleManager.setPropertyWindow(self.objectPropertyWin)
+-        self.moduleManager.setContextMenuCallback(self.onContextMenuCallback)
+-        
+-        self.setWindowIcon(QIcon(&quot;media/icons/lockenwickler_provisorium_small.png&quot;))
+-        self.setWindowTitle(&quot;Rastullahs Lockenwickler&quot;)
+-        
+-        self.editorSetupFinished = False
+-        
+-#        splash.finish(self)
+-
+-    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
+-        action = QtGui.QAction(text, self)
+-        if icon is not None:
+-            action.setIcon(QtGui.QIcon(&quot;media/icons/%s&quot; % icon))
+-        if shortcut is not None:
+-            action.setShortcut(shortcut)
+-        if tip is not None:
+-            action.setToolTip(tip)
+-            action.setStatusTip(tip)
+-        if slot is not None:
+-            self.connect(action, QtCore.SIGNAL(signal), slot)
+-
+-        action.setCheckable(checkable)
+-
+-        return action
+-
+-    def addActions(self, target, actions):
+-        for act in actions:
+-            if act is None:
+-               target.addSeparator()
+-            else:
+-                target.addAction(act)
+-
+-    def setupUi(self):
+-        self.setObjectName(&quot;MainWindow&quot;)
+-
+-        self.centralwidget = QtGui.QWidget(self)
+-        self.centralwidget.setObjectName(&quot;centralwidget&quot;)
+-
+-        self.hboxlayout = QtGui.QHBoxLayout(self.centralwidget)
+-        self.hboxlayout.setContentsMargins(0, 0, 0, 0)
+-        self.hboxlayout.setObjectName(&quot;hboxlayout&quot;)
+-
+-        self.gridlayout = QtGui.QGridLayout()
+-        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
+-        self.gridlayout.setContentsMargins(0, 0, 0, 0)
+-        
+-        self.menubar = QtGui.QMenuBar(self)
+-        self.menubar.setObjectName(&quot;menubar&quot;)
+-
+-        self.menuFile = QtGui.QMenu(self.menubar)
+-        self.menuFile.setObjectName(&quot;menuFile&quot;)
+-
+-        self.menuEdit = QtGui.QMenu(self.menubar)
+-        self.menuEdit.setObjectName(&quot;menuEdit&quot;)
+-
+-        self.menuView = QtGui.QMenu(self.menubar)
+-        self.menuView.setObjectName(&quot;menuView&quot;)
+-        self.setMenuBar(self.menubar)
+-
+-
+-        self.statusbar = QtGui.QStatusBar(self)
+-        self.statusbar.setObjectName(&quot;statusbar&quot;)
+-        self.setStatusBar(self.statusbar)
+-
+-#####################################
+-        self.actionNeu =self.createAction(&quot;&amp;New Module&quot;,  self.actionNewSlot,  QKeySequence.New,  &quot;filenew.png&quot;,  &quot;New Module&quot;)
+-        self.actionNeu.setObjectName(&quot;actionNeu&quot;)
+-
+-        self.actionOpen = self.createAction(&quot;&amp;Open Module&quot;,  self.actionOpenSlot,  QKeySequence.Open,  &quot;fileopen.png&quot;,  &quot;Open Module&quot;)
+-        self.actionOpen.setObjectName(&quot;actionOpen&quot;)
+-        
+-        self.actionSave = self.createAction(&quot;&amp;Save&quot;,  self.actionSaveSlot,  QKeySequence.Save,  &quot;filesave.png&quot;,  &quot;Save Module&quot;)
+-        self.actionSave.setObjectName(&quot;actionSave&quot;)
+-        
+-        self.actionRunModule = self.createAction(&quot;&amp;Save and Run&quot;,  self.actionRunModuleSlot,  &quot;Alt+R&quot;,  &quot;fileexport.png&quot;,  &quot;Save And Run Module&quot;)
+-        self.actionRunModule.setObjectName(&quot;actionRunModule&quot;)
+-
+-        self.actionClose = self.createAction(&quot;Quit&quot;,  self.actionQuitSlot,  &quot;Alt+Q&quot;,  &quot;exit.png&quot;,  &quot;Quit&quot;)
+-        self.actionClose.setObjectName(&quot;actionQuit&quot;)
+-#####################################
+-
+-
+-#####################################
+-        self.actionDelete = self.createAction(&quot;Delete&quot;,  self.actionDeleteSlot,  QKeySequence.Delete,  &quot;editdelete.png&quot;,  &quot;Delete&quot;)
+-        self.actionDelete.setObjectName(&quot;actionDelete&quot;)
+-
+-        self.actionCopy = self.createAction(&quot;Copy&quot;,  self.actionCopySlot,  QKeySequence.Copy,  &quot;editcopy.png&quot;,  &quot;Copy&quot;)
+-        self.actionCopy.setObjectName(&quot;actionCopy&quot;)
+-
+-        self.actionCut = self.createAction(&quot;Cut&quot;,  self.actionCutSlot,  QKeySequence.Cut,  &quot;editcut.png&quot;,  &quot;Cut&quot;)
+-        self.actionCut.setObjectName(&quot;actionCut&quot;)
+-
+-        self.actionPaste = self.createAction(&quot;Paste&quot;,  self.actionPasteSlot,  QKeySequence.Paste,  &quot;editpaste.png&quot;,  &quot;Paste&quot;)
+-        self.actionPaste.setObjectName(&quot;actionPaste&quot;)
+-
+-        self.actionSelect = self.createAction(&quot;&amp;Select&quot;,  self.actionSelectSlot,  &quot;Space&quot;,  &quot;cursor.png&quot;,  &quot;Move selected object&quot;)
+-        self.actionSelect.setObjectName(&quot;actionSelect&quot;)
+-
+-        self.actionMove = self.createAction(&quot;&amp;Move&quot;,  self.actionMoveSlot,  &quot;g&quot;,  &quot;move.png&quot;,  &quot;Move selected object&quot;)
+-        self.actionMove.setObjectName(&quot;actionMove&quot;)
+-
+-        self.actionRotate = self.createAction(&quot;&amp;Rotate&quot;,  self.actionRotateSlot,  &quot;r&quot;,  &quot;rotate.png&quot;,  &quot;Rotate selected object&quot;)
+-        self.actionRotate.setObjectName(&quot;actionRotate&quot;)
+-
+-        self.actionScale = self.createAction(&quot;&amp;Scale&quot;,  self.actionScaleSlot,  &quot;x&quot;,  &quot;resizecol.png&quot;,  &quot;Scale selected object&quot;)
+-        self.actionScale.setObjectName(&quot;actionScale&quot;)
+-
+-        self.actionOneClickEntityPlacement = self.createAction(&quot;&amp;OneClickEntityPlacement&quot;,  self.actionOneClickEntityPlacementSlot,  &quot;&quot;,  &quot;resizecol.png&quot;,  &quot;Add an Entity just by a click&quot;)
+-        self.actionOneClickEntityPlacement.setObjectName(&quot;actionOneClickEntityPlacement&quot;)
+-        self.actionOneClickEntityPlacement.setCheckable(True)
+-
+-#####################################
+-#####################################
+-        self.actionSceneExplorer = self.createAction(&quot;&amp;Scene Exlporer&quot;,  self.toggleModuleExplorer,  &quot;Alt+E&quot;,  &quot;view_tree.png&quot;,  &quot;Module Explorer&quot;,  False)
+-        self.actionSceneExplorer.setObjectName(&quot;actionSceneExplorer&quot;)
+-        
+-        self.actionModuleDirView = self.createAction(&quot;&amp;Directory Explorer&quot;,  self.toggleModuleDirView,  &quot;Alt+D&quot;,  &quot;view_tree.png&quot;,  &quot;Module Directory Explorer&quot;,  False)
+-        self.actionModuleDirView.setObjectName(&quot;actionDirectoryExplorer&quot;)
+-        
+-        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  None,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
+-        self.actionPreferences.setObjectName(&quot;actionPreferences&quot;)
+-
+-        self.actionProperty_Window = self.createAction(&quot;Pr&amp;operty Window&quot;,  self.togglePropertyWindow,  &quot;Alt+P&quot;,  &quot;unsortedlist1.png&quot;,  &quot;Property Window&quot;)
+-        self.actionProperty_Window.setObjectName(&quot;actionProperty_Window&quot;)
+-
+-        self.actionObject_Selection = self.createAction(&quot;&amp;Model Preview Window&quot;,  self.toggleModelPreviewWindow,  &quot;Alt+O&quot;,  &quot;tux.png&quot;,  &quot;Model Preview&quot;)
+-        self.actionObject_Selection.setObjectName(&quot;actionObject_Selection&quot;)
+-        
+-        self.actionMaterial_Selection = self.createAction(&quot;Material &amp;Preview Window&quot;,  self.toggleMaterialPreviewWindow,  &quot;Alt+M&quot;,  &quot;colors.png&quot;,  &quot;Material Preview&quot;)
+-        self.actionMaterial_Selection.setObjectName(&quot;actionMaterial_Selection&quot;)
+-
+-        self.actionGameObjectClass_Selection = self.createAction(&quot;&amp;Game Object Class Preview Window&quot;,  self.toggleGameObjectViewWindow,  &quot;Ctrl+G&quot;,  &quot;multirow.png&quot;,  &quot;GameObjectClass Preview&quot;)
+-        self.actionGameObjectClass_Selection.setObjectName(&quot;actionObject_Selection&quot;)
+-
+-        self.actionConsole_Window = self.createAction(&quot;&amp;Console Window&quot;,  self.toggleConsoleWindow,  &quot;Alt+C&quot;,  &quot;console.png&quot;,  &quot;Console Window&quot;)
+-        self.actionConsole_Window.setObjectName(&quot;actionConsole_Window&quot;)
+-        
+-        self.actionTerrainTools_Window = self.createAction(&quot;&amp;Terrain Tools&quot;,  self.toggleTerrainToolsWindow,  &quot;Alt+T&quot;,  &quot;terrain_small.png&quot;,  &quot;Console Window&quot;)
+-        self.actionTerrainTools_Window.setObjectName(&quot;actionTerrainTools_Window&quot;)
+-        
+-        self.actionToggleViewportGrid = self.createAction(&quot;&amp;Toggle Grid&quot;,  self.toggleViewportGrid,  &quot;Alt+G&quot;,  &quot;console.png&quot;,  &quot;Toggle Viewport Grid&quot;)
+-        self.actionToggleViewportGrid.setObjectName(&quot;actionToggleViewportGrid&quot;)
+-
+-#####################################
+-#####################################
+-
+-
+-        self.menuFile.addAction(self.actionNeu)
+-        self.menuFile.addAction(self.actionOpen)
+-        self.menuFile.addAction(self.actionSave)
+-        self.menuFile.addAction(self.actionRunModule)
+-        self.menuFile.addAction(self.actionClose)
+-
+-        self.menuEdit.addAction(self.actionSelect)
+-        self.menuEdit.addAction(self.actionMove)
+-        self.menuEdit.addAction(self.actionRotate)
+-        self.menuEdit.addAction(self.actionScale)
+-        self.menuEdit.addSeparator()
+-        self.menuEdit.addAction(self.actionDelete)
+-        self.menuEdit.addAction(self.actionCopy)
+-        self.menuEdit.addAction(self.actionCut)
+-        self.menuEdit.addAction(self.actionPaste)
+-        self.menuEdit.addSeparator()
+-        self.menuEdit.addAction(self.actionOneClickEntityPlacement)
+-        
+-
+-        self.menuView.addAction(self.actionSceneExplorer)
+-        self.menuView.addAction(self.actionModuleDirView)
+-        self.menuView.addAction(self.actionPreferences)
+-        self.menuView.addAction(self.actionProperty_Window)
+-        self.menuView.addAction(self.actionObject_Selection)
+-        self.menuView.addAction(self.actionMaterial_Selection)
+-        self.menuView.addAction(self.actionGameObjectClass_Selection)
+-        self.menuView.addAction(self.actionConsole_Window)
+-        self.menuView.addAction(self.actionTerrainTools_Window)
+-        self.menuView.addAction(self.actionToggleViewportGrid)
+-        
+-        self.menubar.addAction(self.menuFile.menuAction())
+-        self.menubar.addAction(self.menuEdit.menuAction())
+-        self.menubar.addAction(self.menuView.menuAction())
+-
+-        self.retranslateUi()
+-        QtCore.QMetaObject.connectSlotsByName(self)
+-
+-    def retranslateUi(self):
+-        self.setWindowTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;MainWindow&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuFile.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;File&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuEdit.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Edit&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuView.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;View&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionNeu.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;New Module&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionMove.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Move&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionRotate.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Rotate&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionSceneExplorer.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Module Explorer&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionPreferences.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Preferences&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionProperty_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Property Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionObject_Selection.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Object Selection&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionClose.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Quit&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionConsole_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Console Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-
+-    def setupOgre(self, pluginCfgPath=&quot;./Plugins.cfg&quot;, ogreCfgPath=&quot;./ogre.cfg&quot;, logPath=&quot;./ogre.log&quot;):
+-        if platform.system() == &quot;Windows&quot;:
+-            pluginCfgPath=&quot;./Plugins-windows.cfg&quot;
+-        else:
+-            pluginCfgPath=&quot;./Plugins-linux.cfg&quot;
+-
+-        root = og.Root(pluginCfgPath, ogreCfgPath, logPath)
+-        self.ogreRoot = root
+-
+-        if  not self.ogreRoot.restoreConfig() and not self.ogreRoot.showConfigDialog():
+-            sys.exit('Quit from Config Dialog')
+-
+-        root.initialise(False)
+-
+-        self.pivotRenderQueueListener = PivotRenderQueueListener()
+-        self.OgreMainWinSceneMgr = self.ogreRoot.createSceneManager(og.ST_GENERIC, &quot;OgreMainWinSceneMgr&quot;)
+-        self.OgreMainWinSceneMgr.ambientLight = og.ColourValue(4, 4, 4)
+-        self.OgreMainWinSceneMgr.addRenderQueueListener(self.pivotRenderQueueListener)
+-        
+-        self.moduleName = &quot;&quot;
+-        self.myTerrainManager = MyTerrainManager(self.OgreMainWinSceneMgr)
+-        self.moduleManager = ModuleManager(self.ogreRoot,  self.OgreMainWinSceneMgr)
+-        self.moduleManager.myTerrainManager = self.myTerrainManager
+-        self.gocManager = self.moduleManager.gocManager
+-        
+-        self.ogreMainWindow = OgreMainWindow.OgreMainWindow(self.moduleManager,  root,  self.OgreMainWinSceneMgr,  self)
+-        self.gridlayout.addWidget(self.ogreMainWindow,0,0,1,1)
+-        self.hboxlayout.addLayout(self.gridlayout)
+-        self.setCentralWidget(self.centralwidget)
+-        
+-        self.myTerrainManager.ogreMainWindow = self.ogreMainWindow
+-        
+-        oglog = og.LogManager.getSingleton().getDefaultLog()
+-        oglog.addListener(self.consoleWindow.lockenLog)
+-
+-    def finishEditorSetup(self):
+-        if not self.editorSetupFinished:
+-            og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
+-            og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+-
+-            self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
+-            self.moduleManager.pivot.hide()
+-            self.editorSetupFinished = True
+-        
+-    def update(self):
+-        self.ogreRoot.renderOneFrame()
+-        if platform.system() == &quot;Linux&quot;:
+-            self.ogreMainWindow.updateRenderWindow()
+-            self.modelSelectionDialog.updateRenderWindow()
+-            self.materialSelectionDialog.updateRenderWindow()
+-
+-    def actionOpenSlot(self):
+-        self.finishEditorSetup()
+-        self.moduleManager.openLoadModuleDialog()
+-
+-    def actionNewSlot(self):
+-        newModuleWiz = NewModuleWizard(self.moduleManager, self)
+-        newModuleWiz.exec_()
+-        return
+-        
+-    def actionSaveSlot(self):
+-        self.moduleManager.save()
+-        
+-    def actionRunModuleSlot(self):
+-        self.moduleManager.save()
+-        if platform.system() == &quot;Windows&quot;:
+-            workingDir = self.prefDialog.moduleCfgPath.replace(&quot;/modules/modules.cfg&quot;, &quot;&quot;)
+-            executable = os.path.join(workingDir, &quot;Rastullah.exe&quot;)
+-            executable = executable.replace(&quot;/&quot;,  &quot;\\&quot;)
+-            if os.path.isfile(executable):
+-                subprocess.Popen([executable, &quot;--module&quot;, self.moduleManager.mainModule.name], 0, None, None, None, None, None, False, False, workingDir)
+-
+-        
+-    def actionQuitSlot(self):
+-        self.close()
+-
+-    def actionDeleteSlot(self):
+-        self.moduleManager.deleteObjects()
+-
+-    def actionCopySlot(self):
+-        self.moduleManager.copyObjects()
+-
+-    def actionCutSlot(self):
+-        self.moduleManager.cutObjects()
+-
+-    def actionPasteSlot(self):
+-        self.moduleManager.pasteObjects(self.ogreMainWindow.getCameraToViewportRay())
+-
+-    def actionSelectSlot(self):
+-        self.moduleManager.pivot.hide()
+-
+-    def actionMoveSlot(self):
+-        self.moduleManager.pivot.setMoveMode()
+-
+-    def actionRotateSlot(self):
+-        self.moduleManager.pivot.setRotateMode()
+-
+-    def actionScaleSlot(self):
+-        self.moduleManager.pivot.setScaleMode()
+-
+-    def actionOneClickEntityPlacementSlot(self):
+-        self.moduleManager.setOneClickEntityPlacement(self.actionOneClickEntityPlacement.isChecked())
+-
+-    def togglePreferencesWindow(self):
+-        if self.prefDialog.isHidden():
+-            self.prefDialog.show()
+-        else:
+-            self.prefDialog.hide()
+-
+-    def toggleModelPreviewWindow(self):
+-        if self.modelSelectionDock.isHidden():
+-            self.modelSelectionDock.show()
+-        else:
+-            self.modelSelectionDock.hide()
+-    
+-    def toggleMaterialPreviewWindow(self):
+-        if self.materialSelectionDock.isHidden():
+-            self.materialSelectionDock.show()
+-        else:
+-            self.materialSelectionDock.hide()
+-
+-    def toggleGameObjectViewWindow(self):
+-        if self.gameObjectClassViewDock.isHidden():
+-            self.gameObjectClassViewDock.show()
+-        else:
+-            self.gameObjectClassViewDock.hide()
+-
+-    def toggleModuleExplorer(self):
+-        if self.moduleExplorerDock.isHidden():
+-            self.moduleExplorerDock.show()
+-        else:
+-            self.moduleExplorerDock.hide()
+-            
+-    def toggleModuleDirView(self):
+-        if self.moduleDirectoryViewDock.isHidden():
+-            self.moduleDirectoryViewDock.show()
+-        else:
+-            self.moduleDirectoryViewDock.hide()
+-
+-    def togglePropertyWindow(self):
+-        if self.propertyDock.isHidden():
+-            self.propertyDock.show()
+-        else:
+-            self.propertyDock.hide()
+-
+-    def toggleConsoleWindow(self):
+-        if self.consoleDock.isHidden():
+-            self.consoleDock.show()
+-        else:
+-            self.consoleDock.hide()
+-            
+-    def toggleTerrainToolsWindow(self):
+-        if self.myTerrainManagerDock.isHidden():
+-            self.myTerrainManagerDock.show()
+-        else:
+-            self.myTerrainManagerDock.hide()
+-
+-    def toggleViewportGrid(self):
+-        self.ogreMainWindow.toggleViewportGrid()
+-
+-    def createDockWindows(self):
+-        self.modelSelectionDock = QtGui.QDockWidget(self.tr(&quot;Models&quot;), self)
+-        self.modelSelectionDock.setObjectName(&quot;ModelSelectionDockWindow&quot;)
+-        self.modelSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.modelSelectionDock.setWidget(self.modelSelectionDialog)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.modelSelectionDock)
+-        
+-        self.materialSelectionDock = QtGui.QDockWidget(self.tr(&quot;Materials&quot;), self)
+-        self.materialSelectionDock.setObjectName(&quot;MaterialSelectionDockWindow&quot;)
+-        self.materialSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.materialSelectionDock.setWidget(self.materialSelectionDialog)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.materialSelectionDock)
+-        self.tabifyDockWidget(self.modelSelectionDock, self.materialSelectionDock)
+-        
+-        self.gameObjectClassViewDock = QtGui.QDockWidget(self.tr(&quot;GameObjectClasses&quot;), self)
+-        self.gameObjectClassViewDock.setObjectName(&quot;GameObjectClassView&quot;)
+-        self.gameObjectClassViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.gameObjectClassViewDock.setWidget(self.gameObjectClassView)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.gameObjectClassViewDock)        
+-        self.tabifyDockWidget(self.modelSelectionDock, self.gameObjectClassViewDock)
+-        
+-        self.propertyDock = QtGui.QDockWidget(self.tr(&quot;Properties&quot;), self)
+-        self.propertyDock.setObjectName(&quot;PropertyDockWindow&quot;)
+-        self.propertyDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.propertyDock.setWidget(self.objectPropertyWin)
+-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.propertyDock)
+-
+-        self.moduleExplorerDock = QtGui.QDockWidget(self.tr(&quot;Module Explorer&quot;), self)
+-        self.moduleExplorerDock.setObjectName(&quot;ModuleExplorerDockWindow&quot;)
+-        self.moduleExplorerDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.moduleExplorerDock.setWidget(self.moduleExplorerWin)
+-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleExplorerDock)
+-        self.tabifyDockWidget(self.moduleExplorerDock, self.propertyDock)
+-        
+-        self.moduleDirectoryViewDock = QtGui.QDockWidget(self.tr(&quot;Module Directory View&quot;), self)
+-        self.moduleDirectoryViewDock.setObjectName(&quot;ModuleDirectoryViewDockWindow&quot;)
+-        self.moduleDirectoryViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.TopDockWidgetArea | QtCore.Qt.BottomDockWidgetArea)
+-        self.moduleDirectoryViewDock.setWidget(self.moduleDirectoryViewWin)
+-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleDirectoryViewDock)
+-        
+-        self.myTerrainManagerDock = self.myTerrainManager.getDockWidget(self)
+-        
+-        self.consoleDock = QtGui.QDockWidget(self.tr(&quot;Console&quot;), self)
+-        self.consoleDock.setObjectName(&quot;ConsoleDockWindow&quot;)
+-        self.consoleDock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea | QtCore.Qt.TopDockWidgetArea)
+-        self.consoleDock.setWidget(self.consoleWindow)
+-        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.consoleDock)
+-
+-        self.fileToolBar = self.addToolBar(&quot;File Toolbar&quot;)
+-        self.fileToolBar.setObjectName(&quot;FileToolBar&quot;)
+-        self.fileToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
+-        self.fileToolBar.addAction(self.actionNeu)
+-        self.fileToolBar.addAction(self.actionOpen)
+-        self.fileToolBar.addAction(self.actionSave)
+-        self.fileToolBar.addAction(self.actionRunModule)
+-        self.fileToolBar.addAction(self.actionClose)
+-        self.addToolBar(QtCore.Qt.TopToolBarArea, self.fileToolBar)
+-
+-        self.moveToolBar = self.addToolBar(&quot;Transformation Bar&quot;)
+-        self.moveToolBar.setObjectName(&quot;TransformationBar&quot;)
+-        self.moveToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
+-        self.moveToolBar.addAction(self.actionSelect)
+-        self.moveToolBar.addAction(self.actionMove)
+-        self.moveToolBar.addAction(self.actionRotate)
+-        self.moveToolBar.addAction(self.actionScale)
+-        self.addToolBar(QtCore.Qt.TopToolBarArea, self.moveToolBar)
+-
+-    def keyPressEvent(self,  event):
+-        if not event.isAutoRepeat():
+-            self.ogreMainWindow.keyPressEvent(event)
+-
+-    def keyReleaseEvent(self,  event):
+-        if not event.isAutoRepeat():
+-            self.ogreMainWindow.keyReleaseEvent(event)
+-        pass
+-
+-    def onContextMenuCallback(self, actions, menus):
+-        menu = QMenu(&quot;My Menu!!&quot;)
+-        menu.addAction(self.actionDelete)
+-        menu.addAction(self.actionCopy)
+-        menu.addAction(self.actionCut)
+-        menu.addAction(self.actionPaste)
+-        menu.addSeparator()
+-        
+-        for m in menus:
+-            menu.addMenu(m)
+-        for a in actions:
+-            menu.addAction(a)
+-
+-        menu.exec_(QCursor.pos())
+-
+-    def connectActionButtons(self):
+-        pass
+-
+-    def saveOnClose(self):
+-#        reply = QtGui.QMessageBox.question(self,  &quot;Rastullahs Lockenwickler - Unsaved Chages&quot;,  &quot;Save unsaved changes?&quot;,  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No|QtGui.QMessageBox.Cancel)
+-#        if reply == QtGui.QMessageBox.Cancel:
+-#            return False
+-#        if reply == QtGui.QMessageBox.Yes:
+-#            print&quot;&quot;
+-#            #TODO: implement save here
+-        return True
+-
+-    def closeEvent(self,  event):
+-        if self.saveOnClose():
+-            settings = QtCore.QSettings()
+-            settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
+-            settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
+-            settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
+-            settings.setValue(&quot;Preferences/externalEditorPath&quot;,  QtCore.QVariant(self.prefDialog.externalTextAppLineEdit.text()))
+-            #self.ogreRoot.shutdown()
+-        else:
+-            event.ignore()
+-
+-if __name__ == &quot;__main__&quot;:
+-#    # Import Psyco if available
+-#    try:
+-#        import psyco
+-#        psyco.full(0.02)
+-#        #psyco.log()
+-#        #psyco.profile()
+-#    except ImportError:
+-#        pass
+-    
+-    app = QtGui.QApplication(sys.argv)
+-    app.setOrganizationName(&quot;Team Pantheon&quot;)
+-    app.setOrganizationDomain(&quot;rastullahs-lockenpracht.de/team&quot;)
+-    app.setApplicationName(&quot;Lockenwickler&quot;)
+-
+-    form = Lockenwickler()
+-    form.show()
+-
+-    app.exec_()
+-    
+-    sys.exit(0)
+-
++#################################################
++# This source file is part of Rastullahs Lockenwickler.
++# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++#  but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
++#################################################
++
++import os
++import sys
++import platform
++import subprocess
++
++sys.path.insert(0,'..')
++import PythonOgreConfig
++
++from random import randint
++
++from PyQt4 import QtGui, QtCore
++from PreferencesDialog import *
++from ObjectPropertyWin import *
++from ModelSelectionDialog import *
++from MaterialSelectionDialog import *
++from GameObjectClassView import *
++from ConsoleWindow import *
++from ModuleManager import ModuleManager
++from ModuleExplorer import *
++from NewModuleWizard import *
++from MovePivot import *
++from PivotRenderQueueListener import *
++from ModuleDirectoryView import *
++from TriggerManager import *
++from MyTerrainManager import MyTerrainManager
++
++import OgreMainWindow
++import ogre.renderer.OGRE as og
++
++class Lockenwickler(QtGui.QMainWindow):
++    def __init__(self, parent=None):
++        QtGui.QWidget.__init__(self, parent)
++
++#        pixmap = QPixmap(&quot;media/icons/lockenwickler_provisorium.png&quot;)
++#        splash = QSplashScreen(pixmap, Qt.WindowStaysOnTopHint)
++#        splash.setMask(pixmap.mask())
++#        splash.showMessage(&quot;Starting...&quot;)
++#        splash.show() 
++
++        self.setupUi()
++
++        self.consoleWindow = ConsoleWindow(False,  self)
++
++        self.setupOgre()
++
++        self.prefDialog = PreferencesDialog(self)
++        self.objectPropertyWin = ObjectPropertyWin(self.OgreMainWinSceneMgr, self.gocManager, self)
++        self.moduleExplorerWin = ModuleExplorer(self)
++        self.modelSelectionDialog = ModelSelectionDialog(self.ogreRoot, self)
++        self.materialSelectionDialog = MaterialSelectionDialog(self.ogreRoot, self)
++        self.moduleManager.modelSelectionDialog = self.modelSelectionDialog
++        self.moduleManager.materialSelectionDialog = self.materialSelectionDialog
++        self.moduleDirectoryViewWin = ModuleDirectoryView(self)
++        
++        triggerManager = TriggerManager()
++        
++        self.gameObjectClassView = GameObjectClassView(self.moduleManager.gocManager)
++
++        self.createDockWindows()
++
++        self.mainTimer = QtCore.QTimer(self)
++        self.mainTimer.connect(self.mainTimer, QtCore.SIGNAL(&quot;timeout()&quot;), self.update)
++        self.mainTimer.start(5)
++
++        settings = QtCore.QSettings()
++        self.restoreGeometry(settings.value(&quot;MainWindow/Geometry&quot;).toByteArray())
++        self.restoreState(settings.value(&quot;MainWindow/DockWindows&quot;).toByteArray())
++        if not self.prefDialog.setCfgPath(settings.value(&quot;Preferences/moduleCfgPath&quot;).toString()):
++            self.prefDialog.show()
++            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
++
++        else:
++            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
++            
++        self.prefDialog.setExternalEditorPath(str(settings.value(&quot;Preferences/externalEditorPath&quot;).toString()))
++        
++        if self.prefDialog.moduleCfgPath is not None:
++            self.moduleDirectoryViewWin.modulesPath = self.prefDialog.moduleCfgPath.replace(&quot;modules.cfg&quot;, &quot;&quot;)
++
++        
++        self.moduleManager.setModuleExplorer(self.moduleExplorerWin)
++        self.moduleManager.setModuleDirView(self.moduleDirectoryViewWin)
++        self.moduleManager.setPropertyWindow(self.objectPropertyWin)
++        self.moduleManager.setContextMenuCallback(self.onContextMenuCallback)
++        
++        self.setWindowIcon(QIcon(&quot;media/icons/lockenwickler_provisorium_small.png&quot;))
++        self.setWindowTitle(&quot;Rastullahs Lockenwickler&quot;)
++        
++        self.editorSetupFinished = False
++        
++#        splash.finish(self)
++
++    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
++        action = QtGui.QAction(text, self)
++        if icon is not None:
++            action.setIcon(QtGui.QIcon(&quot;media/icons/%s&quot; % icon))
++        if shortcut is not None:
++            action.setShortcut(shortcut)
++        if tip is not None:
++            action.setToolTip(tip)
++            action.setStatusTip(tip)
++        if slot is not None:
++            self.connect(action, QtCore.SIGNAL(signal), slot)
++
++        action.setCheckable(checkable)
++
++        return action
++
++    def addActions(self, target, actions):
++        for act in actions:
++            if act is None:
++               target.addSeparator()
++            else:
++                target.addAction(act)
++
++    def setupUi(self):
++        self.setObjectName(&quot;MainWindow&quot;)
++
++        self.centralwidget = QtGui.QWidget(self)
++        self.centralwidget.setObjectName(&quot;centralwidget&quot;)
++
++        self.hboxlayout = QtGui.QHBoxLayout(self.centralwidget)
++        self.hboxlayout.setContentsMargins(0, 0, 0, 0)
++        self.hboxlayout.setObjectName(&quot;hboxlayout&quot;)
++
++        self.gridlayout = QtGui.QGridLayout()
++        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
++        self.gridlayout.setContentsMargins(0, 0, 0, 0)
++        
++        self.menubar = QtGui.QMenuBar(self)
++        self.menubar.setObjectName(&quot;menubar&quot;)
++
++        self.menuFile = QtGui.QMenu(self.menubar)
++        self.menuFile.setObjectName(&quot;menuFile&quot;)
++
++        self.menuEdit = QtGui.QMenu(self.menubar)
++        self.menuEdit.setObjectName(&quot;menuEdit&quot;)
++
++        self.menuView = QtGui.QMenu(self.menubar)
++        self.menuView.setObjectName(&quot;menuView&quot;)
++        self.setMenuBar(self.menubar)
++
++
++        self.statusbar = QtGui.QStatusBar(self)
++        self.statusbar.setObjectName(&quot;statusbar&quot;)
++        self.setStatusBar(self.statusbar)
++
++#####################################
++        self.actionNeu =self.createAction(&quot;&amp;New Module&quot;,  self.actionNewSlot,  QKeySequence.New,  &quot;filenew.png&quot;,  &quot;New Module&quot;)
++        self.actionNeu.setObjectName(&quot;actionNeu&quot;)
++
++        self.actionOpen = self.createAction(&quot;&amp;Open Module&quot;,  self.actionOpenSlot,  QKeySequence.Open,  &quot;fileopen.png&quot;,  &quot;Open Module&quot;)
++        self.actionOpen.setObjectName(&quot;actionOpen&quot;)
++        
++        self.actionSave = self.createAction(&quot;&amp;Save&quot;,  self.actionSaveSlot,  QKeySequence.Save,  &quot;filesave.png&quot;,  &quot;Save Module&quot;)
++        self.actionSave.setObjectName(&quot;actionSave&quot;)
++        
++        self.actionRunModule = self.createAction(&quot;&amp;Save and Run&quot;,  self.actionRunModuleSlot,  &quot;Alt+R&quot;,  &quot;fileexport.png&quot;,  &quot;Save And Run Module&quot;)
++        self.actionRunModule.setObjectName(&quot;actionRunModule&quot;)
++
++        self.actionClose = self.createAction(&quot;Quit&quot;,  self.actionQuitSlot,  &quot;Alt+Q&quot;,  &quot;exit.png&quot;,  &quot;Quit&quot;)
++        self.actionClose.setObjectName(&quot;actionQuit&quot;)
++#####################################
++
++
++#####################################
++        self.actionDelete = self.createAction(&quot;Delete&quot;,  self.actionDeleteSlot,  QKeySequence.Delete,  &quot;editdelete.png&quot;,  &quot;Delete&quot;)
++        self.actionDelete.setObjectName(&quot;actionDelete&quot;)
++
++        self.actionCopy = self.createAction(&quot;Copy&quot;,  self.actionCopySlot,  QKeySequence.Copy,  &quot;editcopy.png&quot;,  &quot;Copy&quot;)
++        self.actionCopy.setObjectName(&quot;actionCopy&quot;)
++
++        self.actionCut = self.createAction(&quot;Cut&quot;,  self.actionCutSlot,  QKeySequence.Cut,  &quot;editcut.png&quot;,  &quot;Cut&quot;)
++        self.actionCut.setObjectName(&quot;actionCut&quot;)
++
++        self.actionPaste = self.createAction(&quot;Paste&quot;,  self.actionPasteSlot,  QKeySequence.Paste,  &quot;editpaste.png&quot;,  &quot;Paste&quot;)
++        self.actionPaste.setObjectName(&quot;actionPaste&quot;)
++
++        self.actionSelect = self.createAction(&quot;&amp;Select&quot;,  self.actionSelectSlot,  &quot;Space&quot;,  &quot;cursor.png&quot;,  &quot;Move selected object&quot;)
++        self.actionSelect.setObjectName(&quot;actionSelect&quot;)
++
++        self.actionMove = self.createAction(&quot;&amp;Move&quot;,  self.actionMoveSlot,  &quot;g&quot;,  &quot;move.png&quot;,  &quot;Move selected object&quot;)
++        self.actionMove.setObjectName(&quot;actionMove&quot;)
++
++        self.actionRotate = self.createAction(&quot;&amp;Rotate&quot;,  self.actionRotateSlot,  &quot;r&quot;,  &quot;rotate.png&quot;,  &quot;Rotate selected object&quot;)
++        self.actionRotate.setObjectName(&quot;actionRotate&quot;)
++
++        self.actionScale = self.createAction(&quot;&amp;Scale&quot;,  self.actionScaleSlot,  &quot;x&quot;,  &quot;resizecol.png&quot;,  &quot;Scale selected object&quot;)
++        self.actionScale.setObjectName(&quot;actionScale&quot;)
++
++        self.actionOneClickEntityPlacement = self.createAction(&quot;&amp;OneClickEntityPlacement&quot;,  self.actionOneClickEntityPlacementSlot,  &quot;&quot;,  &quot;resizecol.png&quot;,  &quot;Add an Entity just by a click&quot;)
++        self.actionOneClickEntityPlacement.setObjectName(&quot;actionOneClickEntityPlacement&quot;)
++        self.actionOneClickEntityPlacement.setCheckable(True)
++
++#####################################
++#####################################
++        self.actionSceneExplorer = self.createAction(&quot;&amp;Scene Exlporer&quot;,  self.toggleModuleExplorer,  &quot;Alt+E&quot;,  &quot;view_tree.png&quot;,  &quot;Module Explorer&quot;,  False)
++        self.actionSceneExplorer.setObjectName(&quot;actionSceneExplorer&quot;)
++        
++        self.actionModuleDirView = self.createAction(&quot;&amp;Directory Explorer&quot;,  self.toggleModuleDirView,  &quot;Alt+D&quot;,  &quot;view_tree.png&quot;,  &quot;Module Directory Explorer&quot;,  False)
++        self.actionModuleDirView.setObjectName(&quot;actionDirectoryExplorer&quot;)
++        
++        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  None,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
++        self.actionPreferences.setObjectName(&quot;actionPreferences&quot;)
++
++        self.actionProperty_Window = self.createAction(&quot;Pr&amp;operty Window&quot;,  self.togglePropertyWindow,  &quot;Alt+P&quot;,  &quot;unsortedlist1.png&quot;,  &quot;Property Window&quot;)
++        self.actionProperty_Window.setObjectName(&quot;actionProperty_Window&quot;)
++
++        self.actionObject_Selection = self.createAction(&quot;&amp;Model Preview Window&quot;,  self.toggleModelPreviewWindow,  &quot;Alt+O&quot;,  &quot;tux.png&quot;,  &quot;Model Preview&quot;)
++        self.actionObject_Selection.setObjectName(&quot;actionObject_Selection&quot;)
++        
++        self.actionMaterial_Selection = self.createAction(&quot;Material &amp;Preview Window&quot;,  self.toggleMaterialPreviewWindow,  &quot;Alt+M&quot;,  &quot;colors.png&quot;,  &quot;Material Preview&quot;)
++        self.actionMaterial_Selection.setObjectName(&quot;actionMaterial_Selection&quot;)
++
++        self.actionGameObjectClass_Selection = self.createAction(&quot;&amp;Game Object Class Preview Window&quot;,  self.toggleGameObjectViewWindow,  &quot;Ctrl+G&quot;,  &quot;multirow.png&quot;,  &quot;GameObjectClass Preview&quot;)
++        self.actionGameObjectClass_Selection.setObjectName(&quot;actionObject_Selection&quot;)
++
++        self.actionConsole_Window = self.createAction(&quot;&amp;Console Window&quot;,  self.toggleConsoleWindow,  &quot;Alt+C&quot;,  &quot;console.png&quot;,  &quot;Console Window&quot;)
++        self.actionConsole_Window.setObjectName(&quot;actionConsole_Window&quot;)
++        
++        self.actionTerrainTools_Window = self.createAction(&quot;&amp;Terrain Tools&quot;,  self.toggleTerrainToolsWindow,  &quot;Alt+T&quot;,  &quot;terrain_small.png&quot;,  &quot;Console Window&quot;)
++        self.actionTerrainTools_Window.setObjectName(&quot;actionTerrainTools_Window&quot;)
++        
++        self.actionToggleViewportGrid = self.createAction(&quot;&amp;Toggle Grid&quot;,  self.toggleViewportGrid,  &quot;Alt+G&quot;,  &quot;console.png&quot;,  &quot;Toggle Viewport Grid&quot;)
++        self.actionToggleViewportGrid.setObjectName(&quot;actionToggleViewportGrid&quot;)
++
++#####################################
++#####################################
++
++
++        self.menuFile.addAction(self.actionNeu)
++        self.menuFile.addAction(self.actionOpen)
++        self.menuFile.addAction(self.actionSave)
++        self.menuFile.addAction(self.actionRunModule)
++        self.menuFile.addAction(self.actionClose)
++
++        self.menuEdit.addAction(self.actionSelect)
++        self.menuEdit.addAction(self.actionMove)
++        self.menuEdit.addAction(self.actionRotate)
++        self.menuEdit.addAction(self.actionScale)
++        self.menuEdit.addSeparator()
++        self.menuEdit.addAction(self.actionDelete)
++        self.menuEdit.addAction(self.actionCopy)
++        self.menuEdit.addAction(self.actionCut)
++        self.menuEdit.addAction(self.actionPaste)
++        self.menuEdit.addSeparator()
++        self.menuEdit.addAction(self.actionOneClickEntityPlacement)
++        
++
++        self.menuView.addAction(self.actionSceneExplorer)
++        self.menuView.addAction(self.actionModuleDirView)
++        self.menuView.addAction(self.actionPreferences)
++        self.menuView.addAction(self.actionProperty_Window)
++        self.menuView.addAction(self.actionObject_Selection)
++        self.menuView.addAction(self.actionMaterial_Selection)
++        self.menuView.addAction(self.actionGameObjectClass_Selection)
++        self.menuView.addAction(self.actionConsole_Window)
++        self.menuView.addAction(self.actionTerrainTools_Window)
++        self.menuView.addAction(self.actionToggleViewportGrid)
++        
++        self.menubar.addAction(self.menuFile.menuAction())
++        self.menubar.addAction(self.menuEdit.menuAction())
++        self.menubar.addAction(self.menuView.menuAction())
++
++        self.retranslateUi()
++        QtCore.QMetaObject.connectSlotsByName(self)
++
++    def retranslateUi(self):
++        self.setWindowTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;MainWindow&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuFile.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;File&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuEdit.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Edit&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuView.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;View&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionNeu.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;New Module&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionMove.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Move&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionRotate.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Rotate&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionSceneExplorer.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Module Explorer&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionPreferences.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Preferences&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionProperty_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Property Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionObject_Selection.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Object Selection&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionClose.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Quit&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionConsole_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Console Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
++
++    def setupOgre(self, pluginCfgPath=&quot;./Plugins.cfg&quot;, ogreCfgPath=&quot;./ogre.cfg&quot;, logPath=&quot;./ogre.log&quot;):
++        if platform.system() == &quot;Windows&quot;:
++            pluginCfgPath=&quot;./Plugins-windows.cfg&quot;
++        else:
++            pluginCfgPath=&quot;./Plugins-linux.cfg&quot;
++
++        root = og.Root(pluginCfgPath, ogreCfgPath, logPath)
++        self.ogreRoot = root
++
++        if  not self.ogreRoot.restoreConfig() and not self.ogreRoot.showConfigDialog():
++            sys.exit('Quit from Config Dialog')
++
++        root.initialise(False)
++
++        self.pivotRenderQueueListener = PivotRenderQueueListener()
++        self.OgreMainWinSceneMgr = self.ogreRoot.createSceneManager(og.ST_GENERIC, &quot;OgreMainWinSceneMgr&quot;)
++        self.OgreMainWinSceneMgr.ambientLight = og.ColourValue(4, 4, 4)
++        self.OgreMainWinSceneMgr.addRenderQueueListener(self.pivotRenderQueueListener)
++        
++        self.moduleName = &quot;&quot;
++        self.myTerrainManager = MyTerrainManager(self.OgreMainWinSceneMgr)
++        self.moduleManager = ModuleManager(self.ogreRoot,  self.OgreMainWinSceneMgr)
++        self.moduleManager.myTerrainManager = self.myTerrainManager
++        self.gocManager = self.moduleManager.gocManager
++        
++        self.ogreMainWindow = OgreMainWindow.OgreMainWindow(self.moduleManager,  root,  self.OgreMainWinSceneMgr,  self)
++        self.gridlayout.addWidget(self.ogreMainWindow,0,0,1,1)
++        self.hboxlayout.addLayout(self.gridlayout)
++        self.setCentralWidget(self.centralwidget)
++        
++        self.myTerrainManager.ogreMainWindow = self.ogreMainWindow
++        
++        oglog = og.LogManager.getSingleton().getDefaultLog()
++        oglog.addListener(self.consoleWindow.lockenLog)
++
++    def finishEditorSetup(self):
++        if not self.editorSetupFinished:
++            og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
++            og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
++
++            self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
++            self.moduleManager.pivot.hide()
++            self.editorSetupFinished = True
++        
++    def update(self):
++        self.ogreRoot.renderOneFrame()
++        if platform.system() == &quot;Linux&quot;:
++            self.ogreMainWindow.updateRenderWindow()
++            self.modelSelectionDialog.updateRenderWindow()
++            self.materialSelectionDialog.updateRenderWindow()
++
++    def actionOpenSlot(self):
++        self.finishEditorSetup()
++        self.moduleManager.openLoadModuleDialog()
++
++    def actionNewSlot(self):
++        newModuleWiz = NewModuleWizard(self.moduleManager, self)
++        newModuleWiz.exec_()
++        return
++        
++    def actionSaveSlot(self):
++        self.moduleManager.save()
++        
++    def actionRunModuleSlot(self):
++        self.moduleManager.save()
++        if platform.system() == &quot;Windows&quot;:
++            workingDir = self.prefDialog.moduleCfgPath.replace(&quot;/modules/modules.cfg&quot;, &quot;&quot;)
++            executable = os.path.join(workingDir, &quot;Rastullah.exe&quot;)
++            executable = executable.replace(&quot;/&quot;,  &quot;\\&quot;)
++            if os.path.isfile(executable):
++                subprocess.Popen([executable, &quot;--module&quot;, self.moduleManager.mainModule.name], 0, None, None, None, None, None, False, False, workingDir)
++
++        
++    def actionQuitSlot(self):
++        self.close()
++
++    def actionDeleteSlot(self):
++        self.moduleManager.deleteObjects()
++
++    def actionCopySlot(self):
++        self.moduleManager.copyObjects()
++
++    def actionCutSlot(self):
++        self.moduleManager.cutObjects()
++
++    def actionPasteSlot(self):
++        self.moduleManager.pasteObjects(self.ogreMainWindow.getCameraToViewportRay())
++
++    def actionSelectSlot(self):
++        self.moduleManager.pivot.hide()
++
++    def actionMoveSlot(self):
++        self.moduleManager.pivot.setMoveMode()
++
++    def actionRotateSlot(self):
++        self.moduleManager.pivot.setRotateMode()
++
++    def actionScaleSlot(self):
++        self.moduleManager.pivot.setScaleMode()
++
++    def actionOneClickEntityPlacementSlot(self):
++        self.moduleManager.setOneClickEntityPlacement(self.actionOneClickEntityPlacement.isChecked())
++
++    def togglePreferencesWindow(self):
++        if self.prefDialog.isHidden():
++            self.prefDialog.show()
++        else:
++            self.prefDialog.hide()
++
++    def toggleModelPreviewWindow(self):
++        if self.modelSelectionDock.isHidden():
++            self.modelSelectionDock.show()
++        else:
++            self.modelSelectionDock.hide()
++    
++    def toggleMaterialPreviewWindow(self):
++        if self.materialSelectionDock.isHidden():
++            self.materialSelectionDock.show()
++        else:
++            self.materialSelectionDock.hide()
++
++    def toggleGameObjectViewWindow(self):
++        if self.gameObjectClassViewDock.isHidden():
++            self.gameObjectClassViewDock.show()
++        else:
++            self.gameObjectClassViewDock.hide()
++
++    def toggleModuleExplorer(self):
++        if self.moduleExplorerDock.isHidden():
++            self.moduleExplorerDock.show()
++        else:
++            self.moduleExplorerDock.hide()
++            
++    def toggleModuleDirView(self):
++        if self.moduleDirectoryViewDock.isHidden():
++            self.moduleDirectoryViewDock.show()
++        else:
++            self.moduleDirectoryViewDock.hide()
++
++    def togglePropertyWindow(self):
++        if self.propertyDock.isHidden():
++            self.propertyDock.show()
++        else:
++            self.propertyDock.hide()
++
++    def toggleConsoleWindow(self):
++        if self.consoleDock.isHidden():
++            self.consoleDock.show()
++        else:
++            self.consoleDock.hide()
++            
++    def toggleTerrainToolsWindow(self):
++        if self.myTerrainManagerDock.isHidden():
++            self.myTerrainManagerDock.show()
++        else:
++            self.myTerrainManagerDock.hide()
++
++    def toggleViewportGrid(self):
++        self.ogreMainWindow.toggleViewportGrid()
++
++    def createDockWindows(self):
++        self.modelSelectionDock = QtGui.QDockWidget(self.tr(&quot;Models&quot;), self)
++        self.modelSelectionDock.setObjectName(&quot;ModelSelectionDockWindow&quot;)
++        self.modelSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.modelSelectionDock.setWidget(self.modelSelectionDialog)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.modelSelectionDock)
++        
++        self.materialSelectionDock = QtGui.QDockWidget(self.tr(&quot;Materials&quot;), self)
++        self.materialSelectionDock.setObjectName(&quot;MaterialSelectionDockWindow&quot;)
++        self.materialSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.materialSelectionDock.setWidget(self.materialSelectionDialog)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.materialSelectionDock)
++        self.tabifyDockWidget(self.modelSelectionDock, self.materialSelectionDock)
++        
++        self.gameObjectClassViewDock = QtGui.QDockWidget(self.tr(&quot;GameObjectClasses&quot;), self)
++        self.gameObjectClassViewDock.setObjectName(&quot;GameObjectClassView&quot;)
++        self.gameObjectClassViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.gameObjectClassViewDock.setWidget(self.gameObjectClassView)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.gameObjectClassViewDock)        
++        self.tabifyDockWidget(self.modelSelectionDock, self.gameObjectClassViewDock)
++        
++        self.propertyDock = QtGui.QDockWidget(self.tr(&quot;Properties&quot;), self)
++        self.propertyDock.setObjectName(&quot;PropertyDockWindow&quot;)
++        self.propertyDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.propertyDock.setWidget(self.objectPropertyWin)
++        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.propertyDock)
++
++        self.moduleExplorerDock = QtGui.QDockWidget(self.tr(&quot;Module Explorer&quot;), self)
++        self.moduleExplorerDock.setObjectName(&quot;ModuleExplorerDockWindow&quot;)
++        self.moduleExplorerDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.moduleExplorerDock.setWidget(self.moduleExplorerWin)
++        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleExplorerDock)
++        self.tabifyDockWidget(self.moduleExplorerDock, self.propertyDock)
++        
++        self.moduleDirectoryViewDock = QtGui.QDockWidget(self.tr(&quot;Module Directory View&quot;), self)
++        self.moduleDirectoryViewDock.setObjectName(&quot;ModuleDirectoryViewDockWindow&quot;)
++        self.moduleDirectoryViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.TopDockWidgetArea | QtCore.Qt.BottomDockWidgetArea)
++        self.moduleDirectoryViewDock.setWidget(self.moduleDirectoryViewWin)
++        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleDirectoryViewDock)
++        
++        self.myTerrainManagerDock = self.myTerrainManager.getDockWidget(self)
++        
++        self.consoleDock = QtGui.QDockWidget(self.tr(&quot;Console&quot;), self)
++        self.consoleDock.setObjectName(&quot;ConsoleDockWindow&quot;)
++        self.consoleDock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea | QtCore.Qt.TopDockWidgetArea)
++        self.consoleDock.setWidget(self.consoleWindow)
++        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.consoleDock)
++
++        self.fileToolBar = self.addToolBar(&quot;File Toolbar&quot;)
++        self.fileToolBar.setObjectName(&quot;FileToolBar&quot;)
++        self.fileToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
++        self.fileToolBar.addAction(self.actionNeu)
++        self.fileToolBar.addAction(self.actionOpen)
++        self.fileToolBar.addAction(self.actionSave)
++        self.fileToolBar.addAction(self.actionRunModule)
++        self.fileToolBar.addAction(self.actionClose)
++        self.addToolBar(QtCore.Qt.TopToolBarArea, self.fileToolBar)
++
++        self.moveToolBar = self.addToolBar(&quot;Transformation Bar&quot;)
++        self.moveToolBar.setObjectName(&quot;TransformationBar&quot;)
++        self.moveToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
++        self.moveToolBar.addAction(self.actionSelect)
++        self.moveToolBar.addAction(self.actionMove)
++        self.moveToolBar.addAction(self.actionRotate)
++        self.moveToolBar.addAction(self.actionScale)
++        self.addToolBar(QtCore.Qt.TopToolBarArea, self.moveToolBar)
++
++    def keyPressEvent(self,  event):
++        if not event.isAutoRepeat():
++            self.ogreMainWindow.keyPressEvent(event)
++
++    def keyReleaseEvent(self,  event):
++        if not event.isAutoRepeat():
++            self.ogreMainWindow.keyReleaseEvent(event)
++        pass
++
++    def onContextMenuCallback(self, actions, menus):
++        menu = QMenu(&quot;My Menu!!&quot;)
++        menu.addAction(self.actionDelete)
++        menu.addAction(self.actionCopy)
++        menu.addAction(self.actionCut)
++        menu.addAction(self.actionPaste)
++        menu.addSeparator()
++        
++        for m in menus:
++            menu.addMenu(m)
++        for a in actions:
++            menu.addAction(a)
++
++        menu.exec_(QCursor.pos())
++
++    def connectActionButtons(self):
++        pass
++
++    def saveOnClose(self):
++#        reply = QtGui.QMessageBox.question(self,  &quot;Rastullahs Lockenwickler - Unsaved Chages&quot;,  &quot;Save unsaved changes?&quot;,  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No|QtGui.QMessageBox.Cancel)
++#        if reply == QtGui.QMessageBox.Cancel:
++#            return False
++#        if reply == QtGui.QMessageBox.Yes:
++#            print&quot;&quot;
++#            #TODO: implement save here
++        return True
++
++    def closeEvent(self,  event):
++        if self.saveOnClose():
++            settings = QtCore.QSettings()
++            settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
++            settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
++            settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
++            settings.setValue(&quot;Preferences/externalEditorPath&quot;,  QtCore.QVariant(self.prefDialog.externalTextAppLineEdit.text()))
++            #self.ogreRoot.shutdown()
++        else:
++            event.ignore()
++
++if __name__ == &quot;__main__&quot;:
++#    # Import Psyco if available
++#    try:
++#        import psyco
++#        psyco.full(0.02)
++#        #psyco.log()
++#        #psyco.profile()
++#    except ImportError:
++#        pass
++    
++    app = QtGui.QApplication(sys.argv)
++    app.setOrganizationName(&quot;Team Pantheon&quot;)
++    app.setOrganizationDomain(&quot;rastullahs-lockenpracht.de/team&quot;)
++    app.setApplicationName(&quot;Lockenwickler&quot;)
++
++    form = Lockenwickler()
++    form.show()
++
++    app.exec_()
++    
++    sys.exit(0)
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001979.html">[Dsa-hl-svn] r4923 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001981.html">[Dsa-hl-svn] r4925 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1980">[ date ]</a>
+              <a href="thread.html#1980">[ thread ]</a>
+              <a href="subject.html#1980">[ subject ]</a>
+              <a href="author.html#1980">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

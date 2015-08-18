@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4399 - rl/trunk/engine/common/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4399%20-%20rl/trunk/engine/common/include&In-Reply-To=%3C200806060902.m5692fgG031192%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001469.html">
+   <LINK REL="Next"  HREF="001471.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4399 - rl/trunk/engine/common/include</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4399%20-%20rl/trunk/engine/common/include&In-Reply-To=%3C200806060902.m5692fgG031192%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4399 - rl/trunk/engine/common/include">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Jun  6 11:02:41 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001469.html">[Dsa-hl-svn] r4398 - in modules/regressiontest: maps models
+</A></li>
+        <LI>Next message: <A HREF="001471.html">[Dsa-hl-svn] r4400 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1470">[ date ]</a>
+              <a href="thread.html#1470">[ thread ]</a>
+              <a href="subject.html#1470">[ subject ]</a>
+              <a href="author.html#1470">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-06-06 11:02:40 +0200 (Fri, 06 Jun 2008)
+New Revision: 4399
+
+Modified:
+   rl/trunk/engine/common/include/Exception.h
+Log:
+Changed exception to hold the what() message in a member variable: Fixes std::exception messages throw in ruby-exported methods
+
+
+Modified: rl/trunk/engine/common/include/Exception.h
+===================================================================
+--- rl/trunk/engine/common/include/Exception.h	2008-06-06 09:00:04 UTC (rev 4398)
++++ rl/trunk/engine/common/include/Exception.h	2008-06-06 09:02:40 UTC (rev 4399)
+@@ -104,21 +104,35 @@
+       std::string mMessage;
+       std::string mFile;
+       std::string mFunction;
++      std::string mWhat;
+       int mLine;
+ 
+    public:
+       Exception(const char* message,
+          const std::string&amp; file, const std::string&amp; function, int line)
+          : mMessage(message), mFile(file), mFunction(function), mLine(line), 
+-         std::exception() {}
++         mWhat(&quot;&quot;),
++         std::exception()
++      {
++          update();
++      }
+       Exception(const std::string&amp; message,
+          const std::string&amp; file, const std::string&amp; function, int line)
+          : mMessage(message), mFile(file), mFunction(function), mLine(line), 
+-         std::exception() {}
++         mWhat(&quot;&quot;),
++         std::exception()
++      {
++          update();
++      }
+       Exception(const CeGuiString&amp; message,
+          const std::string&amp; file, const std::string&amp; function, int line)
+-         : mMessage(message.c_str()), mFile(file), mFunction(function), mLine(line), 
+-         std::exception() {}
++         : mMessage(message.c_str()), mFile(file), mFunction(function), mLine(line),
++         mWhat(&quot;&quot;),
++         std::exception()
++      {
++          update();
++      }
++
+       
+       Exception(const Exception&amp; rhs) 
+           :
+@@ -126,7 +140,11 @@
+          mFile(rhs.mFile),
+          mFunction(rhs.mFunction),
+          mLine(rhs.mLine),
+-         std::exception() {}
++         mWhat(&quot;&quot;),
++         std::exception() 
++      {
++          update();
++      }
+ 
+       virtual ~Exception() throw() {}
+ 
+@@ -137,6 +155,7 @@
+             mFile = rhs.mFile;
+             mFunction = rhs.mFunction;
+             mLine = rhs.mLine;
++            update();
+          }
+          return *this;
+       }      
+@@ -147,22 +166,22 @@
+       virtual std::string getType() const { return &quot;Exception&quot;; }
+       virtual int getLine() const { return mLine; }
+ 
+-	  const char* what() const throw() { return toString().c_str(); }
++	  const char* what() const throw() { return mWhat.c_str(); }
+ 
+-      virtual std::string toString() const
++      void update()
+       {
+          std::stringstream lineStream;
+ 
+          lineStream 
+-             &lt;&lt; &quot;In Datei &quot; 
++             &lt;&lt; &quot;In file &quot; 
+              &lt;&lt; getFile().c_str() 
+-             &lt;&lt; &quot;,  Zeile &quot; &lt;&lt; getLine()
+-             &lt;&lt; &quot;, Funktion &quot; &lt;&lt; getFunction().c_str()
+-             &lt;&lt; &quot;\ntrat folgende Ausnahme vom Typ &quot; &lt;&lt; getType().c_str() 
+-             &lt;&lt; &quot; auf\n-----------------------------------------------------------------------\n&quot;
++             &lt;&lt; &quot;,  line &quot; &lt;&lt; getLine()
++             &lt;&lt; &quot;, function &quot; &lt;&lt; getFunction().c_str()
++             &lt;&lt; &quot;\nan exception of type &quot; &lt;&lt; getType().c_str() 
++             &lt;&lt; &quot; was raised.\n-----------------------------------------------------------------------\n&quot;
+              &lt;&lt; getMessage().c_str();
+ 
+-         return lineStream.str();
++         mWhat = lineStream.str();
+       }
+    };
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001469.html">[Dsa-hl-svn] r4398 - in modules/regressiontest: maps models
+</A></li>
+	<LI>Next message: <A HREF="001471.html">[Dsa-hl-svn] r4400 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1470">[ date ]</a>
+              <a href="thread.html#1470">[ thread ]</a>
+              <a href="subject.html#1470">[ subject ]</a>
+              <a href="author.html#1470">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,403 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3844 - tools/MaterialParser
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3844%20-%20tools/MaterialParser&In-Reply-To=%3C200709092026.l89KQLN8031194%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000914.html">
+   <LINK REL="Next"  HREF="000916.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3844 - tools/MaterialParser</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3844%20-%20tools/MaterialParser&In-Reply-To=%3C200709092026.l89KQLN8031194%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3844 - tools/MaterialParser">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep  9 22:26:21 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000914.html">[Dsa-hl-svn] r3843 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000916.html">[Dsa-hl-svn] r3845 - in rl/trunk: . engine/ai/src engine/common/src	engine/core/src engine/rules/include engine/rules/src	engine/script/src engine/startup/src engine/ui/src	plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#915">[ date ]</a>
+              <a href="thread.html#915">[ thread ]</a>
+              <a href="subject.html#915">[ subject ]</a>
+              <a href="author.html#915">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-09-09 22:26:15 +0200 (Sun, 09 Sep 2007)
+New Revision: 3844
+
+Modified:
+   tools/MaterialParser/MaterialClasses.rb
+   tools/MaterialParser/MaterialParser.rb
+   tools/MaterialParser/Materializer.rb
+Log:
+Just a test commit (but also some old bug fixes)
+
+Modified: tools/MaterialParser/MaterialClasses.rb
+===================================================================
+--- tools/MaterialParser/MaterialClasses.rb	2007-09-09 19:26:04 UTC (rev 3843)
++++ tools/MaterialParser/MaterialClasses.rb	2007-09-09 20:26:15 UTC (rev 3844)
+@@ -17,19 +17,21 @@
+ end
+ 
+ class AttributedObject
++    attr_reader :attributes
++
+     def initialize
+         @attributes = []
+     end
+ 
+     def addAttribute( name, attributes )
+         attributes.pop
+-        @attributes.push( Attribute.new( name, attributes ) )
++        @attributes.push( Attribute.new( name, attributes ) )     
+     end
+ 
+     def getAttributes( name )
+         rets = []
+         @attributes.each { |att| 
+-            ret.push( att ) unless name != att.name
++            rets.push( att ) unless name != att.name
+         }
+         return rets
+     end
+@@ -99,14 +101,15 @@
+ end
+ 
+ class Pass &lt; AttributedObject
+-    attr_reader :tus, :vprs, :scvprs, :fprs, :name
+-    attr_writer :tus, :vprs, :scvprs, :fprs, :name
++    attr_reader :tus, :vprs, :scvprs, :srvprs, :fprs, :name
++    attr_writer :tus, :vprs, :scvprs, :srvprs, :fprs, :name
+ 
+     def initialize( )
+         super()
+         @tus = []
+         @vprs = []
+         @scvprs = []
++        @srvprs = []
+         @fprs = []
+         @name = nil
+     end
+@@ -121,6 +124,7 @@
+         @tus.each { |su| temparr &lt;&lt; su.to_s.gsub(/^/, TAB ) }
+         @vprs.each { |su| temparr &lt;&lt; su.to_s.gsub(/^/, TAB ) }
+         @scvprs.each { |su| temparr &lt;&lt; su.to_s.gsub(/^/, TAB ) }
++        @srvprs.each { |su| temparr &lt;&lt; su.to_s.gsub(/^/, TAB ) }
+         @fprs.each { |su| temparr &lt;&lt; su.to_s.gsub(/^/, TAB ) }
+         temparr &lt;&lt; &quot;}\n&quot;
+ 
+@@ -194,6 +198,28 @@
+     end
+ end
+ 
++class ShadowReceiverVertexProgramRef &lt; AttributedObject
++    attr_reader :name
++    attr_writer :name
++
++    def initialize( )
++        super()
++        @name = nil
++    end
++
++    def to_s
++        temparr = []
++        
++        temparr &lt;&lt; &quot;shadow_receiver_vertex_program_ref&quot;
++        temparr &lt;&lt; &quot; &quot; &lt;&lt; @name unless @name.nil?
++        temparr &lt;&lt; &quot;\n{\n&quot;
++        temparr &lt;&lt; super()
++        temparr &lt;&lt; &quot;}\n&quot;
++
++        temparr.join
++    end
++end
++
+ class FragmentProgramRef &lt; AttributedObject
+     attr_reader :name
+     attr_writer :name
+
+Modified: tools/MaterialParser/MaterialParser.rb
+===================================================================
+--- tools/MaterialParser/MaterialParser.rb	2007-09-09 19:26:04 UTC (rev 3843)
++++ tools/MaterialParser/MaterialParser.rb	2007-09-09 20:26:15 UTC (rev 3844)
+@@ -4,10 +4,12 @@
+ 
+ class MaterialParser
+     attr_reader :materials
++    attr_reader :loose_strings
+     include Enumerable
+ 
+ 	def initialize
+-        @materials = []     
++        @materials = []    
++        @loose_strings = Hash.new
+ 	end
+ 
+ 	def parseFile( filename )
+@@ -19,6 +21,15 @@
+         @materials.push( mat )
+     end
+ 
++    def addLooseString( filename, string)
++        temp = @loose_strings[filename];
++        temp = string if ( temp == nil )
++        
++        p string;
++
++        @loose_strings[filename] = temp;
++    end
++
+     def each
+         @materials.each do
+             yield
+@@ -34,6 +45,7 @@
+         tu = TextureUnit.new
+         vpr = VertexProgramRef.new
+         scvpr = ShadowCasterVertexProgramRef.new
++        srvpr = ShadowReceiverVertexProgramRef.new
+         fpr = FragmentProgramRef.new
+ 
+         parser = RDParser.new do
+@@ -52,15 +64,19 @@
+                 ao.addAttribute( name, attr ); 
+             end
+ 
+-            start :skript do
+-                match('material', :string, :newlines, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat);mat = Material.new( filename, false ) }
++            start :skript do 
++                match('material', :string, :newlines, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat); mat = Material.new( filename, false ) }
+                 match('material', :string, ':', :string, :newlines, '{', :material, '}' ) {|_,n,_,b| mat.name = n; mat.basename = b; mp.addMaterial(mat); mat = Material.new( filename, false ) }
++                
++                match('vertex_program', :string, :string, :newlines, '{', :shader_def, '}' )
++                match('fragment_program', :string, :string, :newlines, '{', :shader_def, '}' )
+ 
+                 match( ::NEWLINE )
++
+                 match(:skript, :skript ) 
+             end
+ 
+-            rule :material do
++            rule :material do 
+                 match('technique', :string, :newlines, '{', :technique, '}' ) {|_,n| tec.name = n; mat.techniques.push( tec ); tec = Technique.new; }
+                 match('technique', :newlines, '{', :technique, '}' ) { mat.techniques.push( tec ); tec = Technique.new; } 
+ 
+@@ -73,7 +89,7 @@
+                 match(:material, :material ) 
+             end
+ 
+-            rule :technique do
++            rule :technique do 
+                 match('pass', :string, :newlines, '{', :pass, '}' ) {|_,n| pa.name = n; tec.passes.push( pa ); pa = Pass.new; }
+                 match('pass', :newlines, '{', :pass, '}' ) { tec.passes.push( pa ); pa = Pass.new; } 
+ 
+@@ -84,7 +100,7 @@
+                 match(:technique, :technique ) 
+             end
+ 
+-            rule :pass do
++            rule :pass do 
+                 match('texture_unit', :string, :newlines, '{', :texture_unit, '}' ) {|_,n| tu.name = n; pa.tus.push( tu ); tu = TextureUnit.new; }
+                 match('texture_unit', :newlines, '{', :texture_unit, '}' ) { pa.tus.push( tu ); tu = TextureUnit.new; } 
+ 
+@@ -94,10 +110,15 @@
+                 match('shadow_caster_vertex_program_ref', :string, :newlines, '{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
+                 match('shadow_caster_vertex_program_ref', :newlines,'{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
+ 
++                match('shadow_receiver_vertex_program_ref', :string, :newlines, '{', :shadow_caster_vertex_program_ref, '}' ) { pa.srvprs.push( srvpr ); srvpr = ShadowReceiverVertexProgramRef.new; } 
++                match('shadow_receiver_vertex_program_ref', :newlines,'{', :shadow_caster_vertex_program_ref, '}' ) { pa.srvprs.push( srvpr ); srvpr = ShadowReceiverVertexProgramRef.new; } 
++
++
+                 match('fragment_program_ref', :string, :newlines, '{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
+                 match('fragment_program_ref', :newlines,'{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
+ 
+                 match('alpha_rejection', :string, :int, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('receive_shadows', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('depth_write', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('point_sprites', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+                 match('point_size', :int, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+@@ -121,7 +142,8 @@
+                 match(:pass, :pass ) 
+             end
+ 
+-            rule :texture_unit do                 
++            rule :texture_unit do    
++                match('texture', :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+                 match('texture', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+                 match('texture_alias', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
+                 match('tex_coord_set', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
+@@ -142,7 +164,7 @@
+                 match(:texture_unit, :texture_unit ) 
+             end
+ 
+-            rule :vertex_program_ref do
++            rule :vertex_program_ref do 
+                 match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(vpr,n,a) }
+                 match('param_named_auto', :string, :params, ::NEWLINE ) {|n,*a| save_attr(vpr,n,a) }
+ 
+@@ -150,15 +172,23 @@
+                 match(:vertex_program_ref, :vertex_program_ref ) 
+             end
+              
+-            rule :shadow_caster_vertex_program_ref do
++            rule :shadow_caster_vertex_program_ref do 
+                 match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(scvpr,n,a) }
+                 match('param_named_auto', :string, :params, ::NEWLINE ) {|n,*a| save_attr(scvpr,n,a) }
+ 
+                 match( ::NEWLINE )
+                 match(:shadow_caster_vertex_program_ref, :shadow_caster_vertex_program_ref ) 
+             end
++             
++            rule :shadow_receiver_vertex_program_ref do 
++                match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(srvpr,n,a) }
++                match('param_named_auto', :string, :params, ::NEWLINE ) {|n,*a| save_attr(srvpr,n,a) }
+ 
+-            rule :fragment_program_ref do
++                match( ::NEWLINE )
++                match(:shadow_receiver_vertex_program_ref, :shadow_receiver_vertex_program_ref ) 
++            end
++
++            rule :fragment_program_ref do 
+                 match('param_named', :string, :params, ::NEWLINE ) {|n,*a| save_attr(fpr,n,a) }
+                 match('param_named_auto', :string, :params, ::NEWLINE  ) {|n,*a| save_attr(fpr,n,a) }
+ 
+@@ -166,7 +196,7 @@
+                 match(:fragment_program_ref, :fragment_program_ref ) 
+             end
+ 
+-            rule :params do                 
++            rule :params do              
+                 match( 'float4', :float, :float, :float, :float ) {|*a| a.join(&quot; &quot;) }
+                 match( 'float', :float ) {|*a| a.join(&quot; &quot;) }
+                 match( :string, :int ) {|*a| a.join(&quot; &quot;) }
+@@ -180,6 +210,15 @@
+                 match('vertexcolour') 
+             end
+ 
++            rule :shader_def do 
++                match( &quot;source&quot;, :string, ::NEWLINE ) 
++	            match( &quot;target&quot;, :string, ::NEWLINE ) 
++	            match( &quot;entry_point&quot;, :string, ::NEWLINE ) 
++
++                match( ::NEWLINE )
++                match(:shader_def, :shader_def ) 
++            end
++
+             rule :string do                
+                 match(Float) {|f| String(f) }
+                 match(Integer) {|i| String(i) }
+
+Modified: tools/MaterialParser/Materializer.rb
+===================================================================
+--- tools/MaterialParser/Materializer.rb	2007-09-09 19:26:04 UTC (rev 3843)
++++ tools/MaterialParser/Materializer.rb	2007-09-09 20:26:15 UTC (rev 3844)
+@@ -10,10 +10,12 @@
+ 
+ # Change Dir and search for all material files
+ Dir.chdir( basePath )
+-materialFiles = Dir['**/*.material']
++materialFiles = Dir['**/*.{material,program}']
+ 
+ print &quot;Found #{materialFiles.size} different material-files.\n&quot;
+ 
++skipped = 0;
++
+ # Load all material files and parse them
+ materialFiles.each { |filename|
+     begin 
+@@ -23,7 +25,7 @@
+         print &quot;\n&quot;
+         print basePath+filename+&quot;:0:&quot;+error.to_s
+         print &quot;\n&quot;
+-        break
++        skipped += 1;
+     end
+ }
+ 
+@@ -33,12 +35,41 @@
+ # Collect some infos...
+ numfiles = 0
+ materials.each {|m| numfiles+=1 unless not m.firstinfile }
+-print &quot;Parsed #{materials.size} different materials in #{numfiles} files.\n\n&quot;
++print &quot;Parsed #{materials.size} different materials in #{numfiles} files (skipped #{skipped}).\n\n&quot;
+ 
++
++# Collect all 'simple' materials containing just 
++#  - One Technique, - One Pass, - One Texture-Unit AND - One texture
++#  - NO Basematerial
++#  - NO additional attributes
++working = []
++materials.each {|m| 
++    if  m.basename.nil? and
++        m.techniques.size == 1 and 
++        m.techniques.first.attributes.empty? and
++        m.techniques.first.passes.size == 1 and 
++        m.techniques.first.passes.first.attributes.empty? and
++        m.techniques.first.passes.first.tus.size == 1 and
++        m.techniques.first.passes.first.vprs.empty? and
++        m.techniques.first.passes.first.scvprs.empty? and
++        m.techniques.first.passes.first.fprs.empty? and
++        m.techniques.first.passes.first.tus.first.getAttributes( &quot;texture&quot; ).size == 1
++        working &lt;&lt; m
++    end
++}
++
++print &quot;Filtered &quot; + working.size.to_s + &quot; materials.&quot;
++
++#working.each{ |m| print m.to_s }
++
++exit
++
+ # Save the materials
++numfiles = 0
+ materials.each {|m| 
+     if( m.firstinfile )
+         modes = File::CREAT|File::TRUNC|File::WRONLY  
++        numfiles = numfiles +1
+     else
+         modes = File::CREAT|File::APPEND|File::WRONLY
+     end
+@@ -46,3 +77,4 @@
+     f &lt;&lt; m.to_s
+     f.close
+ }
++print &quot;Saved #{materials.size} different materials in #{numfiles} files.\n\n&quot;
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000914.html">[Dsa-hl-svn] r3843 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000916.html">[Dsa-hl-svn] r3845 - in rl/trunk: . engine/ai/src engine/common/src	engine/core/src engine/rules/include engine/rules/src	engine/script/src engine/startup/src engine/ui/src	plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#915">[ date ]</a>
+              <a href="thread.html#915">[ thread ]</a>
+              <a href="subject.html#915">[ subject ]</a>
+              <a href="author.html#915">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

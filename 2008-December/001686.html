@@ -1,0 +1,511 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4629 - in rl/trunk: . cmake engine/ai engine/ai/src	engine/common engine/common/include engine/common/src	engine/core engine/core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4629%20-%20in%20rl/trunk%3A%20.%20cmake%20engine/ai%20engine/ai/src%0A%09engine/common%20engine/common/include%20engine/common/src%0A%09engine/core%20engine/core/src&In-Reply-To=%3C200812032312.mB3NC6oH010355%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001685.html">
+   <LINK REL="Next"  HREF="001687.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4629 - in rl/trunk: . cmake engine/ai engine/ai/src	engine/common engine/common/include engine/common/src	engine/core engine/core/src</H1>
+    <B>chrber at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4629%20-%20in%20rl/trunk%3A%20.%20cmake%20engine/ai%20engine/ai/src%0A%09engine/common%20engine/common/include%20engine/common/src%0A%09engine/core%20engine/core/src&In-Reply-To=%3C200812032312.mB3NC6oH010355%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4629 - in rl/trunk: . cmake engine/ai engine/ai/src	engine/common engine/common/include engine/common/src	engine/core engine/core/src">chrber at mail.berlios.de
+       </A><BR>
+    <I>Thu Dec  4 00:12:06 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001685.html">[Dsa-hl-svn] r4628 - in rl/trunk/engine/ui: . include src
+</A></li>
+        <LI>Next message: <A HREF="001687.html">[Dsa-hl-svn] r4630 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/ai/include engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1686">[ date ]</a>
+              <a href="thread.html#1686">[ thread ]</a>
+              <a href="subject.html#1686">[ subject ]</a>
+              <a href="author.html#1686">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: chrber
+Date: 2008-12-04 00:12:01 +0100 (Thu, 04 Dec 2008)
+New Revision: 4629
+
+Added:
+   rl/trunk/cmake/FindOgreNewt.cmake
+   rl/trunk/engine/ai/CMakeLists.txt
+   rl/trunk/engine/common/CMakeLists.txt
+   rl/trunk/engine/core/CMakeLists.txt
+Modified:
+   rl/trunk/CMakeLists.txt
+   rl/trunk/cmake/FindOGRE.cmake
+   rl/trunk/engine/ai/src/DialogLoader.cpp
+   rl/trunk/engine/common/include/WriteableDataStream.h
+   rl/trunk/engine/common/src/WriteableDataStreamFormatTarget.cpp
+   rl/trunk/engine/core/src/ContentLoader.cpp
+Log:
+Added check routine for OgreNewt
+Added building of ai, common and core (core does not build =&gt; check for meshmagick missing)
+Added extracting of plugindir variable from Ogre's pkg-config file
+Added moduledir directive to preprocesser defines
+Added missing newlines at end of file
+Converted one file to unix line endings
+
+
+Modified: rl/trunk/CMakeLists.txt
+===================================================================
+--- rl/trunk/CMakeLists.txt	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/CMakeLists.txt	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -3,11 +3,16 @@
+ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+ 
+ # Cmake handles escaping of preprocessor directives
+-CMAKE_POLICY(SET CMP0005 NEW)
++CMAKE_POLICY(SET CMP0005 OLD)
+ 
+ # Include required cmake macros
+ INCLUDE(FeatureSummary)
+ 
++# Version information
++SET(RL_MAJOR_VERSION 0)
++SET(RL_MINOR_VERSION 3)
++SET(RL_PATCH_VERSION 0)
++
+ # Add directory with RL's own macro definitions
+ # (checked before ${CMAKE_ROOT}/Modules)
+ SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+@@ -21,7 +26,9 @@
+ SET(RL_UI_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/ui/include INTERNAL)
+ 
+ # Check for required components
++FIND_PACKAGE(PkgConfig)
+ FIND_PACKAGE(OGRE 1.6 REQUIRED)
++FIND_PACKAGE(OgreNewt REQUIRED)
+ FIND_PACKAGE(CEGUI REQUIRED)
+ FIND_PACKAGE(Boost 1.34 REQUIRED filesystem)
+ FIND_PACKAGE(SWIG REQUIRED)
+@@ -39,8 +46,7 @@
+ SET(ENABLE_OPENAL &quot;Enable OpenAL sound support (unsupported)&quot; OFF)
+ 
+ # Handle options
+-SET(DATADIR ${DATAROOTDIR}/${DATADIRNAME})
+-ADD_DEFINITIONS(-DDATADIR=${DATADIR})
++ADD_DEFINITIONS(-DRL_MODULEDIR=\\&quot;${DATAROOTDIR}/${DATADIRNAME}/modules\\&quot;)
+ 
+ # Include subdirectories
+ ADD_SUBDIRECTORY(engine)
+
+Modified: rl/trunk/cmake/FindOGRE.cmake
+===================================================================
+--- rl/trunk/cmake/FindOGRE.cmake	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/cmake/FindOGRE.cmake	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -47,6 +47,9 @@
+ 	CACHE STRING &quot;&quot;
+ )
+ 
++# Allow to set Ogre plugin path manually
++SET(OGRE_PLUGINDIR &quot;&quot; CACHE STRING &quot;Ogre plugin directory&quot;)
++
+ #Search for the headers and libraries
+ IF (WIN32) #Windows
+ 	MESSAGE(STATUS &quot;Looking for OGRE&quot;)
+@@ -57,6 +60,10 @@
+ 	IF(PKG_CONFIG_FOUND)
+ 		CMAKE_MINIMUM_REQUIRED(VERSION 2.4.7)
+ 		PKG_SEARCH_MODULE(OGRE OGRE)
++		IF(NOT PKGCONFIG_FAILED)
++			_PKGCONFIG_INVOKE(OGRE &quot;OGRE&quot; PLUGINDIR &quot;&quot; --variable=plugindir)
++			ADD_DEFINITIONS(-DOGRE_PLUGINDIR=\\&quot;${OGRE_PLUGINDIR}\\&quot;)
++		ENDIF(NOT PKGCONFIG_FAILED)
+ 		SET(OGRE_INCLUDE_DIRS ${OGRE_INCLUDE_DIRS})
+ 		SET(OGRE_LIBRARY_DIRS ${OGRE_LIBDIR})
+ 		SET(OGRE_LIBRARIES ${OGRE_LIBRARIES} CACHE STRING &quot;&quot;)
+
+Added: rl/trunk/cmake/FindOgreNewt.cmake
+===================================================================
+--- rl/trunk/cmake/FindOgreNewt.cmake	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/cmake/FindOgreNewt.cmake	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -0,0 +1,22 @@
++# Find OgreNewt (Newton physic library bindings for OGRE)
++#
++# This module defines
++# OGRENEWT_FOUND
++# OGRENEWT_INCLUDE_DIR
++# OGRENEWT_LIBRARY
++#
++# Redistribution and use is allowed according to the terms of the BSD license.
++# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
++
++# On a new cmake run, we do not need to be verbose
++IF(OGRENEWT_INCLUDE_DIRS AND OGRENEWT_LIBRARY)
++	SET(OGRENEWT_FOUND_QUIETLY TRUE)
++ENDIF(OGRENEWT_INCLUDE_DIRS AND OGRENEWT_LIBRARY)
++
++IF(WIN32)
++
++ELSE(WIN32)
++	IF(PKG_CONFIG_FOUND)
++		PKG_SEARCH_MODULE(OGRENEWT OgreNewt)
++	ENDIF(PKG_CONFIG_FOUND)
++ENDIF(WIN32)
+\ No newline at end of file
+
+Added: rl/trunk/engine/ai/CMakeLists.txt
+===================================================================
+--- rl/trunk/engine/ai/CMakeLists.txt	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/ai/CMakeLists.txt	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -0,0 +1,53 @@
++INCLUDE_DIRECTORIES(
++${CMAKE_CURRENT_SOURCE_DIR}/include
++${RL_COMMON_INCLUDE_DIR}
++${RL_CORE_INCLUDE_DIR}
++${RL_RULES_INCLUDE_DIR}
++${OGRE_INCLUDE_DIRS}
++${CEGUI_INCLUDE_DIRS}
++${OGRENEWT_INCLUDE_DIRS})
++
++SET(RlAi_LIB_SRCS
++src/Agent.cpp
++src/AgentCombatState.cpp
++src/AgentDialogState.cpp
++src/AgentManager.cpp
++src/AgentSteeringState.cpp
++src/AiSubsystem.cpp
++src/AiWorld.cpp
++src/AStarCosts.cpp
++src/AStar.cpp
++src/AStarHeuristic.cpp
++src/AStarNodePool.cpp
++src/AStarWayPointNode.cpp
++src/CreatureWalkPathJob.cpp
++src/Dialog.cpp
++src/DialogCondition.cpp
++src/DialogElement.cpp
++src/DialogImplication.cpp
++src/DialogLoader.cpp
++src/DialogManager.cpp
++src/DialogOption.cpp
++src/DialogParagraph.cpp
++src/DialogResponse.cpp
++src/DialogVariable.cpp
++src/FuzzyState.cpp
++src/FuzzyStateMachine.cpp
++src/Landmark.cpp
++src/LandmarkPath.cpp
++src/PhysicalObstacle.cpp
++src/SimpleVehicle.cpp
++src/SteeringVehicle.cpp
++src/WalkPathBehaviour.cpp
++src/WayPointNode.cpp
++src/WayPointGraph.cpp
++src/WayPointGraphManager.cpp)
++
++ADD_LIBRARY(RlAi SHARED ${RlAi_LIB_SRCS})
++
++TARGET_LINK_LIBRARIES(RlAi ${OGRE_LIBRARIES} ${CEGUI_LIBRARIES} ${OGRENEWT_LIBRARIES})
++
++SET_TARGET_PROPERTIES(RlAi PROPERTIES
++	VERSION ${RL_MAJOR_VERSION}.${RL_MINOR_VERSION}.${RL_PATCH_VERSION}
++	SOVERSION ${RL_MAJOR_VERSION}
++	DEFINE_SYMBOL RLAI_EXPORTS)
+\ No newline at end of file
+
+Modified: rl/trunk/engine/ai/src/DialogLoader.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogLoader.cpp	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/ai/src/DialogLoader.cpp	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -751,4 +751,5 @@
+         }
+     }
+ 
+-}
+\ No newline at end of file
++}
++
+
+Added: rl/trunk/engine/common/CMakeLists.txt
+===================================================================
+--- rl/trunk/engine/common/CMakeLists.txt	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/common/CMakeLists.txt	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -0,0 +1,33 @@
++INCLUDE_DIRECTORIES(
++${CMAKE_CURRENT_SOURCE_DIR}/include
++${OGRE_INCLUDE_DIRS}
++${CEGUI_INCLUDE_DIRS})
++
++SET(RlCommon_LIB_SRCS
++src/ConfigFile.cpp
++src/EventObject.cpp
++src/EventSource.cpp
++src/GameTask.cpp
++src/Logger.cpp
++src/MathUtil.cpp
++src/OgreXercesInput.cpp
++src/Properties.cpp
++src/Property.cpp
++src/ScriptWrapper.cpp
++src/WriteableDataStream.cpp
++src/WriteableDataStreamFormatTarget.cpp
++src/WriteableFileSystemArchiv.cpp
++src/XmlProcessor.cpp
++src/XmlPropertyReader.cpp
++src/XmlPropertyWriter.cpp
++src/XmlResource.cpp
++src/XmlResourceManager.cpp)
++
++ADD_LIBRARY(RlCommon SHARED ${RlCommon_LIB_SRCS})
++
++TARGET_LINK_LIBRARIES(RlCommon ${OGRE_LIBRARIES} ${CEGUI_LIBRARIES})
++
++SET_TARGET_PROPERTIES(RlCommon PROPERTIES
++	VERSION ${RL_MAJOR_VERSION}.${RL_MINOR_VERSION}.${RL_PATCH_VERSION}
++	SOVERSION ${RL_MAJOR_VERSION}
++	DEFINE_SYMBOL RLCOMMON_EXPORTS)
+\ No newline at end of file
+
+Modified: rl/trunk/engine/common/include/WriteableDataStream.h
+===================================================================
+--- rl/trunk/engine/common/include/WriteableDataStream.h	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/common/include/WriteableDataStream.h	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -71,4 +71,5 @@
+     };
+ 
+     typedef Ogre::SharedPtr&lt;WriteableFileStreamDataStream&gt; WriteableFileStreamDataStreamPtr;
+-}
+\ No newline at end of file
++}
++
+
+Modified: rl/trunk/engine/common/src/WriteableDataStreamFormatTarget.cpp
+===================================================================
+--- rl/trunk/engine/common/src/WriteableDataStreamFormatTarget.cpp	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/common/src/WriteableDataStreamFormatTarget.cpp	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -34,4 +34,5 @@
+     {
+         mStream-&gt;flush();
+     }
+-}
+\ No newline at end of file
++}
++
+
+Added: rl/trunk/engine/core/CMakeLists.txt
+===================================================================
+--- rl/trunk/engine/core/CMakeLists.txt	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/core/CMakeLists.txt	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -0,0 +1,94 @@
++INCLUDE_DIRECTORIES(
++${CMAKE_CURRENT_SOURCE_DIR}/include
++${RL_COMMON_INCLUDE_DIR}
++${OGRE_INCLUDE_DIRS}
++${CEGUI_INCLUDE_DIRS}
++${OGRENEWT_INCLUDE_DIRS})
++
++SET(RlCore_LIB_SRCS
++src/Actor.cpp
++src/ActorControlledObject.cpp
++src/ActorManager.cpp
++src/AnimationManager.cpp
++src/BaseAnimation.cpp
++src/BoxPrimitive.cpp
++src/CameraObject.cpp
++src/ConfigurationManager.cpp
++src/ContentLoader.cpp
++src/ContentModule.cpp
++src/CoreSubsystem.cpp
++src/DebugVisualisable.cpp
++src/DebugVisualsManager.cpp
++src/DotSceneLoader.cpp
++src/DotSceneOctreeWorld.cpp
++src/FadeAnimation.cpp
++src/GameAreaEvent.cpp
++src/GameAreaEventSource.cpp
++src/GameAreaListener.cpp
++src/GameAreaTypes.cpp
++src/GameEventManager.cpp
++src/GameLoop.cpp
++src/Job.cpp
++src/JobQueue.cpp
++src/JobScheduler.cpp
++src/LightObject.cpp
++src/LightFadeJob.cpp
++src/LineSetPrimitive.cpp
++src/ListenerObject.cpp
++src/ListenerMovable.cpp
++src/LinearSoundFadeFunctor.cpp
++src/MergeableMeshObject.cpp
++src/MeshAnimation.cpp
++src/MeshObject.cpp
++src/MessagePump.cpp
++src/MovableText.cpp
++src/ParticleSystemObject.cpp
++src/PhysicsContactListener.cpp
++src/PhysicalThing.cpp
++src/PhysicsGenericContactCallback.cpp
++src/PhysicsManager.cpp
++src/PhysicsMaterialRaycast.cpp
++src/PlayAnimationJob.cpp
++src/PlaySoundJob.cpp
++src/PolynomicSoundFadeFunctor.cpp
++src/PrimitiveObject.cpp
++src/RubyInterpreter.cpp
++src/SaveAble.cpp
++src/SaveAbleCollection.cpp
++src/SaveAbleFactory.cpp
++src/SaveAbleManager.cpp
++src/SaveGameFile.cpp
++src/SaveGameFileReader.cpp
++src/SaveGameFileWriter.cpp
++src/SaveGameManager.cpp
++src/SceneQuery.cpp
++src/SoundManager.cpp
++src/SoundObject.cpp
++src/SoundDriver.cpp
++src/Sound.cpp
++src/SoundEvents.cpp
++src/SoundResource.cpp
++src/SoundFadeJob.cpp
++src/SoundFadeFunctor.cpp
++src/SoundStitching.cpp
++src/SoundStitchingObject.cpp
++src/StartAnimationJob.cpp
++src/TimeSource.cpp
++src/Trigger.cpp
++src/TrackAnimation.cpp
++src/World.cpp
++src/Zone.cpp
++src/ZoneManager.cpp
++src/nulldriver/NullDriver.cpp
++src/nulldriver/NullListener.cpp
++src/nulldriver/NullSound.cpp
++src/nulldriver/NullSoundStitching.cpp)
++
++ADD_LIBRARY(RlCore SHARED ${RlCore_LIB_SRCS})
++
++#TARGET_LINK_LIBRARIES(RlCore ${OGRE_LIBRARIES} ${CEGUI_LIBRARIES})
++
++SET_TARGET_PROPERTIES(RlCore PROPERTIES
++	VERSION ${RL_MAJOR_VERSION}.${RL_MINOR_VERSION}.${RL_PATCH_VERSION}
++	SOVERSION ${RL_MAJOR_VERSION}
++	DEFINE_SYMBOL RLCORE_EXPORTS)
+\ No newline at end of file
+
+Modified: rl/trunk/engine/core/src/ContentLoader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentLoader.cpp	2008-12-03 06:52:41 UTC (rev 4628)
++++ rl/trunk/engine/core/src/ContentLoader.cpp	2008-12-03 23:12:01 UTC (rev 4629)
+@@ -1,33 +1,33 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-
+-#include &quot;stdinc.h&quot;
+-
+-#include &quot;ContentLoader.h&quot;
+-
+-namespace rl
+-{
+-    ContentLoader::ContentLoader(const Ogre::String&amp; resourceGroup)
+-    {
+-    }
+-
+-    ContentLoader::~ContentLoader()
+-    {
+-    }
+-
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#include &quot;stdinc.h&quot;
++
++#include &quot;ContentLoader.h&quot;
++
++namespace rl
++{
++    ContentLoader::ContentLoader(const Ogre::String&amp; resourceGroup)
++    {
++    }
++
++    ContentLoader::~ContentLoader()
++    {
++    }
++
+     const Property ContentLoader::getProperty(const CeGuiString&amp; key) const
+     {
+         LOG_WARNING(Logger::CORE, key + &quot; is not a property of this ContentLoader&quot;);
+@@ -38,9 +38,10 @@
+     {
+     }
+ 
+-    PropertyKeys ContentLoader::getAllPropertyKeys() const
+-    {
+-        PropertyKeys keys;
+-        return keys;
+-    }
+-}
+\ No newline at end of file
++    PropertyKeys ContentLoader::getAllPropertyKeys() const
++    {
++        PropertyKeys keys;
++        return keys;
++    }
++}
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001685.html">[Dsa-hl-svn] r4628 - in rl/trunk/engine/ui: . include src
+</A></li>
+	<LI>Next message: <A HREF="001687.html">[Dsa-hl-svn] r4630 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/ai/include engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1686">[ date ]</a>
+              <a href="thread.html#1686">[ thread ]</a>
+              <a href="subject.html#1686">[ subject ]</a>
+              <a href="author.html#1686">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,827 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4101 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4101%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803031125.m23BPEBj020101%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001171.html">
+   <LINK REL="Next"  HREF="001173.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4101 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4101%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803031125.m23BPEBj020101%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4101 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  3 12:25:14 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001171.html">[Dsa-hl-svn] r4100 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001173.html">[Dsa-hl-svn] r4102 - in modules/regressiontest/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1172">[ date ]</a>
+              <a href="thread.html#1172">[ thread ]</a>
+              <a href="subject.html#1172">[ subject ]</a>
+              <a href="author.html#1172">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-03 12:25:12 +0100 (Mon, 03 Mar 2008)
+New Revision: 4101
+
+Modified:
+   rl/trunk/engine/core/include/Job.h
+   rl/trunk/engine/core/include/JobQueue.h
+   rl/trunk/engine/core/include/JobScheduler.h
+   rl/trunk/engine/core/src/Job.cpp
+   rl/trunk/engine/core/src/JobQueue.cpp
+   rl/trunk/engine/core/src/JobScheduler.cpp
+Log:
+Split job class in AbstractJob and Job since JobQueue and JobSequence are not real jobs
+
+Modified: rl/trunk/engine/core/include/Job.h
+===================================================================
+--- rl/trunk/engine/core/include/Job.h	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/include/Job.h	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -24,15 +24,7 @@
+ 
+ namespace rl
+ {
+-    /** A Job is an independent executional entity, that encapsules a singe specific task
+-     *  of some finite duration.
+-     *  If you want some task to be executed every frame over the length of the game,
+-     *  use GameTask instead.&lt;br&gt;
+-     *  A Job is registered with the JobScheduler using JobScheduler#addJob.
+-     *  The JobScheduler calles Job#execute till the Job has finished, or the JobScheduler
+-     *  decides to discard the Job, if allowed.
+-     */
+-    class _RlCoreExport Job : public PropertyHolder
++    class _RlCoreExport AbstractJob : public PropertyHolder
+     {
+     public:
+         enum JobPersistenceType
+@@ -41,6 +33,7 @@
+             PERSISTENT,                 // the job stores data in (and loads from) a savegamefile, the job is deleted (not discarded) before a new game is loaded
+             FINISH_WHEN_GAME_LOADED     // the job is discarded if it is discardable or deleted, when a new game is loaded
+         };
++
+         /**
+          * Constructor.
+          *
+@@ -53,48 +46,112 @@
+          *         Job, after execution is finished. This should usually be the case, but
+          *         sometimes it is sensible to pool a number of Jobs for reuse.
+          */
+-        Job(bool isDiscardable, bool destroyWhenDone, 
+-            TimeSource::TimeSourceType type = TimeSource::REALTIME_CONTINUOUS, JobPersistenceType persistence = NOT_PERSISTENT);
+-        virtual ~Job();
++        AbstractJob(bool isDiscardable, 
++            bool destroyWhenDone);
+ 
++        virtual ~AbstractJob();
++
++        bool execute(Time time);
++
+         /**
+          * This is the function in which the job is supposed to do whatever it is supposed to do.
+          * This function is called by the JobScheduler at most once per frame. The frequency depends
+          * on the Job's priority given with JobScheduler#addJob.
+-         * @param time the frame-time time, since the last call of this function.
++         * @param time the time source time, since the last call of this function.
+          * @return true, when the job is done, false else. If false is returned. The Job will be
+          * rescheduled for another execution.
+          */
+         virtual bool execute(Ogre::Real time) = 0;
+ 
++        /// Returns the Persistence-Type of this job
++        virtual JobPersistenceType getPersistenceType() const = 0;
++
++        virtual TimeSource::TimeSourceType getTimeSource() const = 0;
++
+         /// Returns whether the job can be removed from the queue by the scheduler,
+-        virtual bool isDiscardable();
++        virtual bool isDiscardable() const;
+ 
++        /// Returns true, if the Job shall be deleted, if the Job is finished. Returns false else.
++        virtual bool destroyWhenDone() const;
++
+         /// Finish whatever the Job is doing. It won't get a chance to continue.
+         /// Overloaded functions must *not* call this implementation.
+         virtual void discard();
+ 
+-        /// Returns true, if the Job shall be deleted, if the Job is finished. Returns false else.
+-        virtual bool destroyWhenDone();
++        /// derived from PropertyHolder
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        /// derived from PropertyHolder
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        /// derived from PropertyHolder
++        virtual PropertyRecord* getAllProperties() const;
+ 
++        /// returns the name of the class
++        virtual const Ogre::String getClassName() const = 0;
++    
++    protected:
++        bool mIsDiscardable;
++        bool mDestroyWhenDone;
++
++    };
++
++
++    /** A Job is an independent executional entity, that encapsules a singe specific task
++     *  of some finite duration.
++     *  If you want some task to be executed every frame over the length of the game,
++     *  use GameTask instead.&lt;br&gt;
++     *  A Job is registered with the JobScheduler using JobScheduler#addJob.
++     *  The JobScheduler calles Job#execute till the Job has finished, or the JobScheduler
++     *  decides to discard the Job, if allowed.
++     *
++     *  This class provides default implementations for most of AbstractJob's methods
++     */
++    class _RlCoreExport Job : public AbstractJob
++    {
++    public:
++        /**
++         * Constructor.
++         *
++         *  @param isDiscardable Set this true, if the Job's goal can be reached in a single
++         *         step. For instance if a Job is supposed to slowly close a window by fading
++         *         its alpha to 0, then it is discardable, and Job#discard will just finish
++         *         the process by closing the window.
++         *
++         *  @param destroyWhenDone Set this to true, when the JobScheduler shall delete the
++         *         Job, after execution is finished. This should usually be the case, but
++         *         sometimes it is sensible to pool a number of Jobs for reuse.
++         */
++        Job(bool isDiscardable, 
++            bool destroyWhenDone, 
++            TimeSource::TimeSourceType type = TimeSource::REALTIME_CONTINUOUS, 
++            JobPersistenceType persistence = NOT_PERSISTENT);
++        virtual ~Job();
++
++        /**
++         * This is the function in which the job is supposed to do whatever it is supposed to do.
++         * This function is called by the JobScheduler at most once per frame. The frequency depends
++         * on the Job's priority given with JobScheduler#addJob.zz
++         * @param time the time source time, since the last call of this function.
++         * @return true, when the job is done, false else. If false is returned. The Job will be
++         * rescheduled for another execution.
++         */
++        virtual bool execute(Ogre::Real time) = 0;
++
+         /// Returns the Persistence-Type of this job
+         JobPersistenceType getPersistenceType() const;
+ 
+         TimeSource::TimeSourceType getTimeSource() const;
+ 
+         /// derived from PropertyHolder
+-        virtual const Property getProperty(const Ogre::String&amp; key) const;
+-        /// derived from PropertyHolder
+-        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+-        /// derived from PropertyHolder
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        /// derived from PropertyHolder
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        /// derived from PropertyHolder
+         virtual PropertyRecord* getAllProperties() const;
+ 
+         /// returns the name of the class
+         virtual const Ogre::String getClassName() const;
+ 
+     protected:
+-        bool mIsDiscardable;
+-        bool mDestroyWhenDone;
+         JobPersistenceType mPersistence;
+         TimeSource::TimeSourceType mTimeSource;
+     };
+
+Modified: rl/trunk/engine/core/include/JobQueue.h
+===================================================================
+--- rl/trunk/engine/core/include/JobQueue.h	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/include/JobQueue.h	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -23,30 +23,40 @@
+ namespace rl
+ {
+ 
+-    class _RlCoreExport JobQueue : public Job
++    class _RlCoreExport JobQueue : public AbstractJob
+     {
+     public:
+         JobQueue();
+         ~JobQueue();
+ 
+-        void add(Job* job);
++        void add(AbstractJob* job);
+         virtual bool execute(Ogre::Real elapsedTime);
++        virtual JobPersistenceType getPersistenceType() const;
++        virtual TimeSource::TimeSourceType getTimeSource() const;
++        virtual const Ogre::String getClassName() const;
+ 
+     private:
+-        std::list&lt;Job*&gt; mQueue;
++        std::list&lt;AbstractJob*&gt; mQueue;
++        TimeSource::TimeSourceType mTimeSource;
+     };
+ 
+-    class _RlCoreExport JobSet : public Job
++    class _RlCoreExport JobSet : public AbstractJob
+     {
+     public:
+         JobSet();
+         ~JobSet();
+ 
+-        void add(Job* job);
++        void add(AbstractJob* job);
+         virtual bool execute(Ogre::Real elapsedTime);
++        virtual JobPersistenceType getPersistenceType() const;
++        virtual TimeSource::TimeSourceType getTimeSource() const;
++        virtual const Ogre::String getClassName() const;
+ 
+     private:
+-        std::set&lt;Job*&gt; mSet;
++        std::set&lt;AbstractJob*&gt; mSet;
++        TimeSource::TimeSourceType mTimeSource;
++
++        void update();
+     };
+ 
+ }
+
+Modified: rl/trunk/engine/core/include/JobScheduler.h
+===================================================================
+--- rl/trunk/engine/core/include/JobScheduler.h	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/include/JobScheduler.h	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -18,15 +18,17 @@
+ #define __RL_JOB_SCHEDULER_H__
+ 
+ #include &quot;CorePrerequisites.h&quot;
+-#include &quot;GameTask.h&quot;
+-#include &quot;SaveGameManager.h&quot;
+ 
+ #include &lt;deque&gt;
+ #include &lt;functional&gt;
+ 
++#include &quot;GameTask.h&quot;
++#include &quot;SaveGameManager.h&quot;
++#include &quot;TimeSource.h&quot;
++
+ namespace rl
+ {
+-    class Job;
++    class AbstractJob;
+     class JobListener;
+ 
+     /**
+@@ -72,7 +74,7 @@
+          *         looses its validity to the JobScheduler itself though. If a job is saved and reloaded
+          *         from a SaveGameFile, a new ticket will be assigned!
+          */
+-        unsigned long addJob(Job* job, JobPriority priority=JP_NORMAL, Ogre::Real delay=0.0f,
++        unsigned long addJob(AbstractJob* job, JobPriority priority=JP_NORMAL, Ogre::Real delay=0.0f,
+             Ogre::Real maxRuntime=Ogre::Math::POS_INFINITY, JobListener* listener=NULL);
+ 
+         /**
+@@ -98,21 +100,23 @@
+         virtual void readData(SaveGameFileReader* reader);
+         virtual int getPriority() const;  // this should probably be one of the last things to load, so the job can access various things (gameobjects etc)
+ 
+-        typedef Job*(*JobCreateFunction)(void);
++        typedef AbstractJob*(*JobCreateFunction)(void);
+         static void registerJobClass(const Ogre::String &amp;name, JobCreateFunction);
+     private:
+         /// A JobEntry encapsules a Job for the Scheduler, it contains the Job itself and
+         /// various administrional data.
+         struct JobEntry
+         {
+-            Job* job;                     ///&lt; The Job to be executed.
++            AbstractJob* job;             ///&lt; The Job to be executed.
+             JobListener* listener;        ///&lt; attached JobListener or NULL else.
+             unsigned long ticket;         ///&lt; ticket to identify the Job.
+             JobPriority priority;         ///&lt; priority it runs with.
+             unsigned short tokens;        ///&lt; number of accumulated tokens.
+             unsigned long start;          ///&lt; when to execute the Job for the first time.
+             unsigned long end;            ///&lt; when to discard the Job, if not then finished.
+-            Ogre::Real timeSinceLastCall; ///&lt; frame time, since the last call of Job#execute.
++            Time timeLastCall;            ///&lt; time (of the job's time source) of the last call of Job#execute.
++            TimeSource::TimeSourceType timeSourceLastCall;
++            
+             bool called;                  ///&lt; false, if the Job has not been called yet.
+             bool markedToRemove;          ///&lt; only true, if removeJob with the ticket of this job is called
+         };
+
+Modified: rl/trunk/engine/core/src/Job.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Job.cpp	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/src/Job.cpp	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -20,45 +20,43 @@
+ 
+ namespace rl
+ {
+-    Job::Job(bool isDiscardable, bool destroyWhenDone, TimeSource::TimeSourceType timesource, JobPersistenceType persistence)
++    AbstractJob::AbstractJob(bool isDiscardable, bool destroyWhenDone)
+         : mIsDiscardable(isDiscardable), 
+-        mDestroyWhenDone(destroyWhenDone),
+-        mTimeSource(timesource),
+-        mPersistence(persistence)
++        mDestroyWhenDone(destroyWhenDone)
+     {
+     }
+ 
+-    Job::~Job()
++    AbstractJob::~AbstractJob()
+     {
+     }
+ 
+-    bool Job::isDiscardable()
++    bool AbstractJob::execute(Time time)
+     {
++        float ftime = static_cast&lt;float&gt;(time) / 1000.0F;
++        if (ftime &lt; 0)
++        {
++            ftime = 0;
++        }
++        return execute(ftime);
++    }
++
++    bool AbstractJob::isDiscardable() const
++    {
+         return mIsDiscardable;
+     }
+ 
+-    bool Job::destroyWhenDone()
++    bool AbstractJob::destroyWhenDone() const
+     {
+         return mDestroyWhenDone;
+     }
+ 
+-    void Job::discard()
++    void AbstractJob::discard()
+     {
+         RlFail(&quot;Discarded non discardable Job.&quot;);
+     }
+ 
+-    TimeSource::TimeSourceType Job::getTimeSource() const
++    const Property AbstractJob::getProperty(const Ogre::String&amp; key) const
+     {
+-        return mTimeSource;
+-    }
+-
+-    Job::JobPersistenceType Job::getPersistenceType() const
+-    {
+-        return mPersistence;
+-    }
+-
+-    const Property Job::getProperty(const Ogre::String&amp; key) const
+-    {
+         Property prop;
+         if( key == &quot;discardable&quot; )
+         {
+@@ -68,10 +66,6 @@
+         {
+             prop.setValue(mDestroyWhenDone);
+         }
+-        else if( key == &quot;timesource&quot; )
+-        {
+-            prop.setValue((int)mTimeSource);
+-        }
+         else
+         {
+             Throw(IllegalArgumentException, key + &quot; is not a property of this Job!&quot;);
+@@ -80,7 +74,7 @@
+         return prop;
+     }
+ 
+-    void Job::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    void AbstractJob::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+     {
+         try
+         {
+@@ -92,10 +86,6 @@
+             {
+                 mDestroyWhenDone = value.toBool();
+             }
+-            else if( key == &quot;timesource&quot; )
+-            {
+-                mTimeSource = (TimeSource::TimeSourceType)value.toInt();
+-            }
+             else
+             {
+                 LOG_WARNING(
+@@ -111,11 +101,71 @@
+         }
+     }
+ 
+-    PropertyRecord* Job::getAllProperties() const
++    PropertyRecord* AbstractJob::getAllProperties() const
+     {
+         PropertyRecord* ps = new PropertyRecord();
+         ps-&gt;setProperty(&quot;discardable&quot;, Property(mIsDiscardable));
+         ps-&gt;setProperty(&quot;destroywhendone&quot;, Property(mDestroyWhenDone));
++
++        return ps;
++    }
++
++    Job::Job(bool isDiscardable, bool destroyWhenDone, TimeSource::TimeSourceType timesource, JobPersistenceType persistence)
++        : AbstractJob(isDiscardable, destroyWhenDone),
++        mTimeSource(timesource),
++        mPersistence(persistence)
++    {
++    }
++
++    Job::~Job()
++    {
++    }
++
++    TimeSource::TimeSourceType Job::getTimeSource() const
++    {
++        return mTimeSource;
++    }
++
++    Job::JobPersistenceType Job::getPersistenceType() const
++    {
++        return mPersistence;
++    }
++
++    const Property Job::getProperty(const Ogre::String&amp; key) const
++    {
++        Property prop;
++        if( key == &quot;timesource&quot; )
++        {
++            prop.setValue((int)mTimeSource);
++        }
++         
++        return AbstractJob::getProperty(key);
++    }
++
++    void Job::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    {
++        try
++        {
++            if( key == &quot;timesource&quot; )
++            {
++                mTimeSource = (TimeSource::TimeSourceType)value.toInt();
++            }
++            else
++            {
++                AbstractJob::setProperty(key, value);
++            }
++        }
++        catch (WrongFormatException ex)
++        {
++            LOG_ERROR(
++                Logger::RULES,
++                &quot;property &quot; + key + &quot; has the wrong format&quot;);
++        }
++    }
++
++    PropertyRecord* Job::getAllProperties() const
++    {
++        PropertyRecord* ps = AbstractJob::getAllProperties();
+         ps-&gt;setProperty(&quot;timesource&quot;, Property((int)mTimeSource));
+ 
+         return ps;
+
+Modified: rl/trunk/engine/core/src/JobQueue.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobQueue.cpp	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/src/JobQueue.cpp	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -21,7 +21,8 @@
+ {
+ 
+ JobQueue::JobQueue()
+-: Job(false, true)
++: AbstractJob(false, true),
++    mTimeSource(TimeSource::REALTIME_CONTINUOUS)
+ {
+ }
+ 
+@@ -29,14 +30,19 @@
+ {
+ }
+ 
+-void JobQueue::add(Job* job)
++void JobQueue::add(AbstractJob* job)
+ {
++    if (mQueue.empty())
++    {
++        mTimeSource = job-&gt;getTimeSource();
++    }
++
+     mQueue.push_back(job);
+ }
+ 
+ bool JobQueue::execute(Ogre::Real elapsedTime)
+ {
+-    Job* cur = *mQueue.begin();
++    AbstractJob* cur = *mQueue.begin();
+     bool finished = cur-&gt;execute(elapsedTime);
+     if (finished)
+     {
+@@ -49,6 +55,15 @@
+         {
+             delete cur;
+         }
++
++        if (mQueue.empty())
++        {
++            mTimeSource = TimeSource::REALTIME_CONTINUOUS;
++        }
++        else
++        {
++            mTimeSource = (*mQueue.begin())-&gt;getTimeSource();
++        }
+     }
+ 
+     if (mQueue.empty())
+@@ -61,8 +76,24 @@
+     }
+ }
+ 
++AbstractJob::JobPersistenceType JobQueue::getPersistenceType() const
++{
++    return AbstractJob::PERSISTENT; ///@todo is this correct?
++}
++
++TimeSource::TimeSourceType JobQueue::getTimeSource() const 
++{
++    return mTimeSource;
++}
++
++const Ogre::String JobQueue::getClassName() const 
++{
++    return &quot;JobQueue&quot;;
++}
++
+ JobSet::JobSet()
+-: Job(false, true)
++: AbstractJob(false, true),
++    mTimeSource(TimeSource::REALTIME_CONTINUOUS)
+ {
+ }
+ 
+@@ -70,19 +101,20 @@
+ {
+ }
+ 
+-void JobSet::add(Job* job)
++void JobSet::add(AbstractJob* job)
+ {
+     mSet.insert(job);
++    update();
+ }
+ 
+ bool JobSet::execute(Ogre::Real elapsedTime)
+ {
+-    std::set&lt;Job*&gt; toDelete;
++    std::set&lt;AbstractJob*&gt; toDelete;
+ 
+-    for (std::set&lt;Job*&gt;::iterator it = mSet.begin(); 
++    for (std::set&lt;AbstractJob*&gt;::iterator it = mSet.begin(); 
+         it != mSet.end(); ++it)
+     {
+-        Job* cur = *it;
++        AbstractJob* cur = *it;
+         bool finished = cur-&gt;execute(elapsedTime);
+         if (finished)
+         {
+@@ -90,10 +122,10 @@
+         }
+     }
+ 
+-    for (std::set&lt;Job*&gt;::iterator it = toDelete.begin(); 
++    for (std::set&lt;AbstractJob*&gt;::iterator it = toDelete.begin(); 
+         it != toDelete.end(); ++it)
+     {
+-        Job* cur = *it;
++        AbstractJob* cur = *it;
+         mSet.erase(cur);
+         if (cur-&gt;isDiscardable())
+         {
+@@ -105,6 +137,11 @@
+         }
+     }
+ 
++    if (!toDelete.empty()) 
++    {
++        update();
++    }
++
+     if (mSet.empty())
+     {
+         return true;
+@@ -115,4 +152,41 @@
+     }
+ }
+ 
++void JobSet::update()
++{
++    mTimeSource = TimeSource::REALTIME_CONTINUOUS;
++
++    for (std::set&lt;AbstractJob*&gt;::iterator it = mSet.begin(); 
++        it != mSet.end(); ++it)
++    {
++        AbstractJob* cur = *it;
++        if (cur-&gt;getTimeSource() == TimeSource::GAMETIME)
++        {
++            mTimeSource = TimeSource::GAMETIME;
++        }
++        else if (cur-&gt;getTimeSource() == TimeSource::REALTIME_INTERRUPTABLE
++            &amp;&amp; mTimeSource == TimeSource::REALTIME_CONTINUOUS)
++        {
++            mTimeSource = TimeSource::REALTIME_INTERRUPTABLE;
++        }
++    }
+ }
++
++
++AbstractJob::JobPersistenceType JobSet::getPersistenceType() const
++{
++    return AbstractJob::PERSISTENT; ///@todo is this correct?
++}
++
++TimeSource::TimeSourceType JobSet::getTimeSource() const 
++{
++    return mTimeSource;
++}
++
++const Ogre::String JobSet::getClassName() const 
++{
++    return &quot;JobSet&quot;;
++}
++
++
++}
+
+Modified: rl/trunk/engine/core/src/JobScheduler.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobScheduler.cpp	2008-03-03 10:57:39 UTC (rev 4100)
++++ rl/trunk/engine/core/src/JobScheduler.cpp	2008-03-03 11:25:12 UTC (rev 4101)
+@@ -40,7 +40,7 @@
+     {
+     }
+ 
+-    unsigned long JobScheduler::addJob(Job* job, JobPriority priority, Real delay, Real maxRuntime,
++    unsigned long JobScheduler::addJob(AbstractJob* job, JobPriority priority, Real delay, Real maxRuntime,
+         JobListener* listener)
+     {
+         unsigned long ticket = ++mTicketCounter;
+@@ -50,7 +50,7 @@
+         unsigned long start = clock + delay*1000;
+         unsigned long end = maxRuntime &gt;= Math::POS_INFINITY ?
+             0xffffffff : static_cast&lt;unsigned long&gt;(start + maxRuntime*1000);
+-        JobEntry entry = {job, listener, ticket, priority, priority, start, end, 0.0f, false, false};
++        JobEntry entry = {job, listener, ticket, priority, priority, start, end, start, job-&gt;getTimeSource(), false, false};
+         mJobQueue.push_back(entry);
+         return ticket;
+     }
+@@ -70,9 +70,14 @@
+         {
+             JobEntry entry = *it;
+ 
+-            TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(
+-                entry.job-&gt;getTimeSource());
++            TimeSource::TimeSourceType tst = entry.job-&gt;getTimeSource();
++            TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(tst);
+             Time clock = ts-&gt;getClock();
++            if (tst != entry.timeSourceLastCall) // time source has changed, e.g. in a job queue
++            {
++                entry.timeLastCall = clock;
++                entry.timeSourceLastCall = tst;
++            }
+ 
+             if (entry.markedToRemove)
+             {
+@@ -94,7 +99,7 @@
+                 {
+                     // Yes, pay run fee and execute.
+                     entry.tokens = 0;
+-                    bool runAgain = !entry.job-&gt;execute(entry.timeSinceLastCall + time);
++                    bool runAgain = !entry.job-&gt;execute(clock - entry.timeLastCall);
+ 
+                     if (!entry.called)
+                     {
+@@ -110,7 +115,7 @@
+                     {
+                         // Job is not done, reset token count and requeue.
+                         entry.tokens = entry.priority;
+-                        entry.timeSinceLastCall = 0.0f;
++                        entry.timeLastCall = clock;
+                         notDone.push_back(entry);
+                     }
+                     else
+@@ -132,7 +137,6 @@
+                 {
+                     // No, increase token count
+                     entry.tokens += entry.priority;
+-                    entry.timeSinceLastCall += time;
+                     notDone.push_back(entry);
+                 }
+             }
+@@ -200,7 +204,7 @@
+                 writer-&gt;setAttributeValueAsInteger(jobNode, &quot;tokens&quot;, iter-&gt;tokens);
+                 writer-&gt;setAttributeValueAsInteger(jobNode, &quot;start&quot;, iter-&gt;start);
+                 writer-&gt;setAttributeValueAsInteger(jobNode, &quot;end&quot;, iter-&gt;end);
+-                writer-&gt;setAttributeValueAsReal(jobNode, &quot;timeSinceLastCall&quot;, iter-&gt;timeSinceLastCall);
++                writer-&gt;setAttributeValueAsInt64(jobNode, &quot;timeLastCall&quot;, iter-&gt;timeLastCall);
+                 writer-&gt;setAttributeValueAsBool(jobNode, &quot;called&quot;, iter-&gt;called);
+                 writer-&gt;setAttributeValueAsStdString(jobNode, &quot;classname&quot;, iter-&gt;job-&gt;getClassName());
+ 
+@@ -240,37 +244,37 @@
+         if(rootNodeList-&gt;getLength())
+         {
+             DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
+-            if(xmlJobs-&gt;getLength())
++            if (xmlJobs-&gt;getLength())
+             {
+-                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
++                for (XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
+                 {
+                     DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
+-                    if(xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    if (xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+                     {
+                         DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
+                         JobPriority priority;
+                         unsigned short tokens;
+                         int start, end;
+-                        Real timeSinceLastCall;
++                        Time timeLastCall;
+                         bool called;
+                         priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
+                         tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
+                         start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
+                         end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
+-                        timeSinceLastCall = reader-&gt;getAttributeValueAsReal(xmlJob, &quot;timeSinceLastCall&quot;);
++                        timeLastCall = reader-&gt;getAttributeValueAsInt64(xmlJob, &quot;timeLastCall&quot;);
+                         called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
+ 
+                         Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
+ 
+                         JobCreationMap::iterator it = mJobCreationMap.find(className);
+-                        if( it == mJobCreationMap.end() )
++                        if (it == mJobCreationMap.end())
+                         {
+                             LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
+                             continue;
+                         }
+ 
+-                        Job* job = it-&gt;second();
+-                        if( job == NULL )
++                        AbstractJob* job = it-&gt;second();
++                        if (job == NULL)
+                         {
+                             LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
+                             continue;
+@@ -282,7 +286,7 @@
+                         unsigned long ticket = ++mTicketCounter;
+                         TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(job-&gt;getTimeSource());
+                         unsigned long clock = ts-&gt;getClock();
+-                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeSinceLastCall, called, false};
++                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeLastCall, TimeSource::UNKNOWN, called, false};
+                         mJobQueue.push_back(entry);
+                     }
+                 }
+@@ -299,7 +303,7 @@
+ 
+     CeGuiString JobScheduler::getXmlNodeIdentifier() const
+     {
+-        static const CeGuiString name = &quot;jobsceduler&quot;;
++        static const CeGuiString name = &quot;jobscheduler&quot;;
+         return name;
+     }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001171.html">[Dsa-hl-svn] r4100 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001173.html">[Dsa-hl-svn] r4102 - in modules/regressiontest/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1172">[ date ]</a>
+              <a href="thread.html#1172">[ thread ]</a>
+              <a href="subject.html#1172">[ subject ]</a>
+              <a href="author.html#1172">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,315 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3146 - in rl/trunk/engine: ai/include ai/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3146%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200703071929.l27JTO2h023929%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000216.html">
+   <LINK REL="Next"  HREF="000218.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3146 - in rl/trunk/engine: ai/include ai/src	script/swig</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3146%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200703071929.l27JTO2h023929%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3146 - in rl/trunk/engine: ai/include ai/src	script/swig">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  7 20:29:24 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000216.html">[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src
+</A></li>
+        <LI>Next message: <A HREF="000218.html">[Dsa-hl-svn] r3147 - in modules/aitest/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#217">[ date ]</a>
+              <a href="thread.html#217">[ thread ]</a>
+              <a href="subject.html#217">[ subject ]</a>
+              <a href="author.html#217">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-07 20:29:16 +0100 (Wed, 07 Mar 2007)
+New Revision: 3146
+
+Modified:
+   rl/trunk/engine/ai/include/AStar.h
+   rl/trunk/engine/ai/include/AStarCosts.h
+   rl/trunk/engine/ai/src/AStar.cpp
+   rl/trunk/engine/ai/src/AStarCosts.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+a* works now properly
+
+Modified: rl/trunk/engine/ai/include/AStar.h
+===================================================================
+--- rl/trunk/engine/ai/include/AStar.h	2007-03-07 16:59:04 UTC (rev 3145)
++++ rl/trunk/engine/ai/include/AStar.h	2007-03-07 19:29:16 UTC (rev 3146)
+@@ -37,6 +37,21 @@
+ 	class AStarStatistics
+ 	{
+ 	public:
++        /** default constructor
++         */
++        AStarStatistics();
++
++        /** resets all variables to zero
++         */
++        void reset();
++
++        int mNodesSearched;
++        int mNodesAdded;
++        int mNodesRemoved;
++        int mNodesVisited;
++        int mNodesLeft;
++        int mPathLength;
++        int mPathCost;
+ 	};
+ 
+ 	/** Stores a waypointgraph and is capable of loading and saving it.
+@@ -50,6 +65,18 @@
+ 		//! defines the resultpath as a list of points in world space
+ 		typedef std::vector&lt; Ogre::Vector3 &gt; AStarPath;
+ 
++        /** The constructor of AStar
++		 * AStar needs several things to find a path: 
++		 * a heuristic to calculate the cost for the still not travelled part of the path.
++		 * some sort of map to travel in.
++		 * A start and and end point.
++         * This is a convenience constructor so that there is no need to do
++         * a search right from the start, but can be done sometime later.
++		 * @param Costs encapsulates cost and heuristic for distance calculations.
++		 * @param WPGraph contains the map of WayPoints to examine for a path.
++         */
++        AStar( const AStarCosts* Costs, const WayPointGraph* WPGraph );
++
+ 		/** The constructor of AStar
+ 		 * AStar needs several things to find a path: 
+ 		 * a heuristic to calculate the cost for the still not travelled part of the path.
+
+Modified: rl/trunk/engine/ai/include/AStarCosts.h
+===================================================================
+--- rl/trunk/engine/ai/include/AStarCosts.h	2007-03-07 16:59:04 UTC (rev 3145)
++++ rl/trunk/engine/ai/include/AStarCosts.h	2007-03-07 19:29:16 UTC (rev 3146)
+@@ -34,7 +34,7 @@
+ 		/** default constructor
+ 		 * @param Heuristic to use for calculating heuritic values
+ 		 */
+-		AStarCosts(const AStarHeuristic* Heuristic);
++		AStarCosts(const AStarHeuristic* Heuristic, float TieBreakFactor = 1.0f);
+ 		/** explicit virtual destructor
+ 		 */
+ 		virtual ~AStarCosts();
+@@ -58,7 +58,10 @@
+ 			const AStarWayPointNode* wp2) const = 0;
+ 
+ 	protected:
++        //! stores the heuristic used to estimate the distance to the goal
+ 		const AStarHeuristic* mHeuristic;
++        //! a tie break factor that is multiplied with the heuritics result
++        float mTieBreakFactor;
+ 	};
+ 	
+ 	/* An implementation of the abstract interface of AStarCosts.
+@@ -73,7 +76,7 @@
+ 		/** default constructor
+ 		 * @param Heuristic to use for calculating heuritic values
+ 		 */
+-		AStarCostsDefault(const AStarHeuristic* Heuristic);
++		AStarCostsDefault(const AStarHeuristic* Heuristic, float TieBreakFactor = 1.0f);
+ 		/** explicit virtual destructor
+ 		 */
+ 		virtual ~AStarCostsDefault();
+
+Modified: rl/trunk/engine/ai/src/AStar.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AStar.cpp	2007-03-07 16:59:04 UTC (rev 3145)
++++ rl/trunk/engine/ai/src/AStar.cpp	2007-03-07 19:29:16 UTC (rev 3146)
+@@ -29,6 +29,39 @@
+ 
+ namespace rl {
+ 
++AStarStatistics::AStarStatistics()
++: mNodesSearched(0),
++  mNodesAdded(0),
++  mNodesRemoved(0),
++  mNodesVisited(0),
++  mNodesLeft(0),
++  mPathLength(0),
++  mPathCost(0)
++{
++}
++
++void AStarStatistics::reset()
++{
++  mNodesSearched = 0;
++  mNodesAdded = 0;
++  mNodesRemoved = 0;
++  mNodesVisited = 0;
++  mNodesLeft = 0;
++  mPathLength = 0;
++  mPathCost = 0;
++}
++
++AStar::AStar( const AStarCosts* Costs, const WayPointGraph* WPGraph )
++    : mCosts(Costs),
++	mWPGraph(WPGraph),
++	mStartPos(0,0,0),
++	mEndPos(0,0,0),
++	mANStart(NULL),
++	mANEnd(NULL),
++    mDebugAstar(false)
++{
++}
++
+ AStar::AStar( const AStarCosts* Costs, const WayPointGraph* WPGraph,
+ 			const Ogre::Vector3&amp; StartPos, const Ogre::Vector3&amp; EndPos )
+ 	: mCosts(Costs),
+@@ -61,6 +94,8 @@
+ 	{
+ 		delete (*it);
+ 	}
++    mOpen.clear();
++    mClosed.clear();
+ }
+ 
+ void AStar::initialise()
+@@ -73,9 +108,6 @@
+ 	// first find 'real' start and end positions by searching for the corresponding waypoints
+ 	mANStart = new AStarWayPointNode( mWPGraph-&gt;getNearestWayPoint(mStartPos) );
+ 	mANEnd = new AStarWayPointNode( mWPGraph-&gt;getNearestWayPoint(mEndPos) );
+-
+-    mOpen.clear();
+-    mClosed.clear();
+ }
+ 
+ void AStar::searchFromTo(AStarPath&amp; resultPath, const Ogre::Vector3&amp; StartPos,
+@@ -128,7 +160,10 @@
+ 
+ 		// check if goal reached
+         if ( Node-&gt;EqualPosition(mANEnd) ) {
+-			// create result
++			// remember new 'end'
++            delete mANEnd;
++            mANEnd = Node;
++            // create result
+             for (; Node; Node = Node-&gt;getParent())
+ 			{
+ 				resultPath.push_back(Node-&gt;getWP()-&gt;getPosition());
+
+Modified: rl/trunk/engine/ai/src/AStarCosts.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AStarCosts.cpp	2007-03-07 16:59:04 UTC (rev 3145)
++++ rl/trunk/engine/ai/src/AStarCosts.cpp	2007-03-07 19:29:16 UTC (rev 3146)
+@@ -19,8 +19,9 @@
+ 
+ namespace rl {
+ 
+-AStarCosts::AStarCosts(const AStarHeuristic* Heuristic)
+-: mHeuristic(Heuristic)
++AStarCosts::AStarCosts(const AStarHeuristic* Heuristic, float TieBreakFactor)
++: mHeuristic(Heuristic),
++  mTieBreakFactor(TieBreakFactor)
+ {
+ }
+ 
+@@ -28,14 +29,16 @@
+ {
+ }
+ 
+-float AStarCosts::calcHeuristic(const WayPointGraph* WPGraph, const AStarWayPointNode* wp1,
+-			const AStarWayPointNode* wp2) const
++float AStarCosts::calcHeuristic(const WayPointGraph* WPGraph, 
++                                const AStarWayPointNode* wp1,
++                                const AStarWayPointNode* wp2) const
+ {
+-	return mHeuristic-&gt;calcDistance(wp1-&gt;getWP()-&gt;getPosition(), wp2-&gt;getWP()-&gt;getPosition());
++	return mTieBreakFactor *
++        mHeuristic-&gt;calcDistance(wp1-&gt;getWP()-&gt;getPosition(), wp2-&gt;getWP()-&gt;getPosition());
+ }
+ 
+-AStarCostsDefault::AStarCostsDefault(const AStarHeuristic* Heuristic)
+-: AStarCosts(Heuristic)
++AStarCostsDefault::AStarCostsDefault(const AStarHeuristic* Heuristic, float TieBreakFactor)
++: AStarCosts(Heuristic, TieBreakFactor)
+ {
+ }
+ 
+@@ -44,8 +47,8 @@
+ }
+ 
+ float AStarCostsDefault::calcCost(const WayPointGraph* WPGraph,
+-										  const AStarWayPointNode* wp1,
+-										  const AStarWayPointNode* wp2) const
++                                  const AStarWayPointNode* wp1,
++                                  const AStarWayPointNode* wp2) const
+ {
+ 	return mEuclid.calcDistance(wp1-&gt;getWP()-&gt;getPosition(), wp2-&gt;getWP()-&gt;getPosition());
+ }
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-03-07 16:59:04 UTC (rev 3145)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-03-07 19:29:16 UTC (rev 3146)
+@@ -171,7 +171,7 @@
+ 	class AStarCosts
+ 	{
+ 	public:
+-		AStarCosts(const rl::AStarHeuristic* Heuristic);	
++		AStarCosts(const rl::AStarHeuristic* Heuristic, float TieBreakFactor);	
+ 		virtual ~AStarCosts();
+ 		virtual float calcCost(const rl::WayPointGraph* WPGraph, const rl::AStarWayPointNode* wp1,
+ 			const rl::AStarWayPointNode* wp2) const = 0;
+@@ -180,7 +180,7 @@
+ 	class AStarCostsDefault : public AStarCosts
+ 	{
+ 	public:
+-		AStarCostsDefault(const rl::AStarHeuristic* Heuristic);	
++		AStarCostsDefault(const rl::AStarHeuristic* Heuristic, float TieBreakFactor);	
+ 		~AStarCostsDefault();
+ 		virtual float calcCost(const rl::WayPointGraph* WPGraph, const rl::AStarWayPointNode* wp1,
+ 			const rl::AStarWayPointNode* wp2) const;
+@@ -189,8 +189,9 @@
+ 	class AStar
+ 	{
+ 	public:
+-		AStar( const rl::AStarCosts* Costs, const rl::WayPointGraph* WPGraph,
+-			const Ogre::Vector3&amp; StartPos, const Ogre::Vector3&amp; EndPos );
++		AStar( const rl::AStarCosts* Costs, const rl::WayPointGraph* WPGraph);
++		//AStar( const rl::AStarCosts* Costs, const rl::WayPointGraph* WPGraph,
++		//	const Ogre::Vector3&amp; StartPos, const Ogre::Vector3&amp; EndPos );
+ 		virtual ~AStar();
+ 		
+ 		void search(std::vector&lt;Ogre::Vector3&gt;&amp; resultPath);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000216.html">[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src
+</A></li>
+	<LI>Next message: <A HREF="000218.html">[Dsa-hl-svn] r3147 - in modules/aitest/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#217">[ date ]</a>
+              <a href="thread.html#217">[ thread ]</a>
+              <a href="subject.html#217">[ subject ]</a>
+              <a href="author.html#217">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

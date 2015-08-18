@@ -1,0 +1,562 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3948 - in rl/trunk/engine: core/src rules/include	rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3948%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/include%0A%09rules/src&In-Reply-To=%3C200710241743.l9OHh4De012474%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001018.html">
+   <LINK REL="Next"  HREF="001020.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3948 - in rl/trunk/engine: core/src rules/include	rules/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3948%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/include%0A%09rules/src&In-Reply-To=%3C200710241743.l9OHh4De012474%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3948 - in rl/trunk/engine: core/src rules/include	rules/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Oct 24 19:43:04 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001018.html">[Dsa-hl-svn] r3947 - in modules/kanalisation: . scripts
+</A></li>
+        <LI>Next message: <A HREF="001020.html">[Dsa-hl-svn] r3949 - modules
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1019">[ date ]</a>
+              <a href="thread.html#1019">[ thread ]</a>
+              <a href="subject.html#1019">[ subject ]</a>
+              <a href="author.html#1019">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-10-24 19:41:54 +0200 (Wed, 24 Oct 2007)
+New Revision: 3948
+
+Modified:
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+Log:
+-added missing function in PhysicalThing
+-added friction -&gt; creatures controlled by creaturecontrollers don't slide away any more on inclined ground
+-added simple step-recognition
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-10-24 12:37:27 UTC (rev 3947)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-10-24 17:41:54 UTC (rev 3948)
+@@ -105,6 +105,11 @@
+         mBody-&gt;setVelocity(vel);
+     }
+ 
++    Vector3 PhysicalThing::getVelocity()
++    {
++        return mBody-&gt;getVelocity();
++    }
++
+     Actor *PhysicalThing::getActor(void) const
+     {
+         return mActor;
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2007-10-24 12:37:27 UTC (rev 3947)
++++ rl/trunk/engine/rules/include/CreatureController.h	2007-10-24 17:41:54 UTC (rev 3948)
+@@ -44,14 +44,6 @@
+     {
+     public:
+         static const Ogre::String PROPERTY_CREATUREID;
+-
+-        /** Constructor.
+-		 * @param creature the creature of the bot/char
+-		 * @param actor the actor of the bot/char
+-		 */
+-        CreatureController(Creature *character);
+-        ~CreatureController();
+-
+         /**
+          * This function is not intented to be called directly
+          * @retval true, if this CreatureController still needs to be called every frame
+@@ -89,7 +81,8 @@
+             MT_WEITSPRUNG,
+             // these movements are only for internal purposes and should not be used directly
+             // instead use one of the movements above
+-            MT_DREHEN
++            MT_DREHEN,
++            MT_STUFENERKENNUNG
+         } MovementType;
+ 
+         /// The generalization of the place (in the air, on the floor, in the water...)
+@@ -166,8 +159,15 @@
+         typedef std::map&lt;MovementType, AbstractMovement*&gt; MovementMap;
+         MovementMap mMovementMap;
+ 
+-        // in order to copy the contactcallback members correctly;
++        // in order to copy the contactcallback members correctly and to create and destroy the creature
+         friend class CreatureControllerManager;
++        /** Constructor.
++         * @param creature the creature of the bot/char
++         * @param actor the actor of the bot/char
++         */
++        CreatureController(Creature *character);
++        ~CreatureController();
++
+     private:
+         // only used in setAnimation
+         Ogre::String mLastAnimationName;
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-24 12:37:27 UTC (rev 3947)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-24 17:41:54 UTC (rev 3948)
+@@ -26,6 +26,7 @@
+ #include &quot;PhysicalThing.h&quot;
+ #include &quot;TimeSource.h&quot;
+ #include &quot;GameObjectManager.h&quot;
++#include &quot;PhysicsMaterialRaycast.h&quot;
+ 
+ 
+ 
+@@ -41,18 +42,25 @@
+     class Stehen : public AbstractMovement
+     {
+     public:
+-        Stehen(CreatureController *creature) : AbstractMovement(creature), mVelocity(Vector3::ZERO), mRotationMovement(NULL) {}
++        Stehen(CreatureController *creature) : 
++            AbstractMovement(creature), 
++            mVelocity(Vector3::ZERO), 
++            mRotationMovement(NULL), 
++            mStepRecognitionMovement(NULL)
++            {}
+         virtual CreatureController::MovementType getId() const {return CreatureController::MT_STEHEN;}
+         virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_NONE;}
+         virtual void activate()
+         {
+             AbstractMovement::activate();
+             getRotationMovement()-&gt;activate();
++            getStepRecognitionMovement()-&gt;activate();
+         }
+         virtual void deactivate()
+         {
+             AbstractMovement::deactivate();
+             getRotationMovement()-&gt;deactivate();
++            getStepRecognitionMovement()-&gt;deactivate();
+         }
+         virtual bool calculateBaseVelocity(Real &amp;velocity)
+         {
+@@ -76,11 +84,18 @@
+             body-&gt;getMassMatrix(mass, inertia);
+ 
+             Vector3 vel = mMovingCreature-&gt;getVelocity();
++            vel.y = 0;
+             Real delay = 0.05;//(2 * PhysicsManager::getSingleton().getMaxTimestep());
+-            if(vel.squaredLength() &gt; mVelocity.squaredLength())
+-                delay *= 1.5;
+-            force = mass * (mVelocity - vel) / delay;
++            //if(vel.squaredLength() &gt; mVelocity.squaredLength())
++            //    delay *= 1.5;
++            Vector3 diff = (mVelocity - vel);
++            force = mass * diff / delay;
++            // additional remove movement in wrong direction
++            force += mass * (mVelocity.normalisedCopy() * vel.length() - vel) / delay; // do we need this, does this improve the movement behaviour
++            // (changing direction during slow movement makes char slide sideways)
+             force.y = 0;
++
++            getStepRecognitionMovement()-&gt;calculateForceAndTorque(force, torque, timestep);
+         }
+         virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
+@@ -90,9 +105,14 @@
+             mVelocity = direction * velocity;
+             applyAuChanges(elapsedTime);
+             setAnimation(elapsedTime);
++            bool ret = false;
+             if( getRotationMovement()-&gt;isPossible() )
+-                return getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
+-            return false;
++                if( getRotationMovement()-&gt;run(elapsedTime, direction, rotation) )
++                    ret = true;
++            if( getStepRecognitionMovement()-&gt;isPossible() )
++                if (getStepRecognitionMovement()-&gt;run(elapsedTime, direction, rotation) )
++                    ret = true;
++            return ret;
+         }
+         virtual void setAnimation(Ogre::Real elapsedTime)
+         {
+@@ -124,6 +144,7 @@
+     protected:
+         Ogre::Vector3 mVelocity;
+         mutable AbstractMovement *mRotationMovement;
++        mutable AbstractMovement *mStepRecognitionMovement;
+         virtual AbstractMovement* getRotationMovement() const
+         {
+             if( mRotationMovement == NULL)
+@@ -136,6 +157,18 @@
+             }
+             return mRotationMovement;
+         }
++        virtual AbstractMovement* getStepRecognitionMovement() const
++        {
++            if( mStepRecognitionMovement == NULL )
++            {
++                mStepRecognitionMovement = mMovingCreature-&gt;getMovementFromId(CreatureController::MT_STUFENERKENNUNG);
++            }
++            if( mStepRecognitionMovement == NULL )
++            {
++                Throw(NullPointerException, &quot;Konnte Movement mit der Id MT_STUFENERKENNUNG nicht finden.&quot;);
++            }
++            return mStepRecognitionMovement;
++        }
+     };
+ 
+     class Drehen : public AbstractMovement
+@@ -1112,22 +1145,223 @@
+     };
+ 
+ 
++    class StepRecognition : public AbstractMovement
++    {
++    public:
++        StepRecognition(CreatureController *creature) : 
++            AbstractMovement(creature), 
++            mMoveToNextTarget(false)
++        {
++            mLinearSpringK = 600.0f;
++            Real relationCoefficient = 1.0f;
++            mLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mLinearSpringK);
++        }
++        virtual CreatureController::MovementType getId() const {return CreatureController::MT_STUFENERKENNUNG;}
++        virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_NONE;}
++        virtual void activate()
++        {
++            AbstractMovement::activate();
++            mMoveToNextTarget = false;
++        }
++        virtual void deactivate()
++        {
++            AbstractMovement::deactivate();
++        }
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = 0.0f;
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return
++                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_DEAD | Effect::STATUS_UNCONSCIOUS | Effect::STATUS_SLEEPING));
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
++        {
++            // move to nextTarget
++            if( mMoveToNextTarget )
++            {
++                Real mass;
++                Vector3 inertia;
++                OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++                body-&gt;getMassMatrix(mass, inertia);
+ 
++                Vector3 pos = mMovingCreature-&gt;getCreature()-&gt;getPosition();
++                Vector3 diff = mNextTarget - pos;
+ 
++                Vector3 vel = body-&gt;getVelocity();
+ 
++                force.y = mass*( mLinearSpringK*diff.y - mLinearDampingK*vel.y );
++std::ostringstream oss;
++oss &lt;&lt; &quot;Testing Step-Recognition: Step force: &quot; &lt;&lt; force.y;
++LOG_MESSAGE(Logger::RULES, oss.str());
++            }
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            if( !mMoveToNextTarget ) // check if we need to move up for a step
++            {
++                // raycast in the direction we should move to
++                Vector3 globalDir = mMovingCreature-&gt;getCreature()-&gt;getOrientation() * direction; // the direction in global space
++                if( globalDir == Vector3::ZERO )
++                    return true;
+ 
++                Vector3 vel = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;getVelocity();
++                vel.y = 0;
++                Real raylen = vel.length() / 3;  // use longer ray, if higher velocity
+ 
+ 
++                // raycasts
++                PhysicsMaterialRaycast::MaterialVector materialVector;
++                materialVector.push_back(PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;)); // should we perhaps only use level here?
++                materialVector.push_back(PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+ 
++                Vector3 start = mMovingCreature-&gt;getCreature()-&gt;getPosition() + Vector3::UNIT_Y * 0.1f;
++                globalDir.y = 0;
++                globalDir.normalise();
++                Vector3 end = start + globalDir*raylen;
+ 
++                bool foundbody = false;
++                Real foundDistance = 0;
+ 
++                RaycastInfo info;
++                do
++                {
++                    info = 
++                        mRaycast.execute(
++                            PhysicsManager::getSingleton()._getNewtonWorld(),
++                            &amp;materialVector,
++                            start, end);
+ 
++                    // do we need to check bodies left and right of this ray? (step width?)
+ 
+ 
++                    // already found nearer body
++                    if( foundbody )
++                    {
++                        if( info.mBody &amp;&amp; (info.mDistance &gt;= foundDistance + 0.19) || // step deep enough
++                            !info.mBody )
++                        {
++                            // found a step
++                            mMoveToNextTarget = true;
++                            mNextTarget = start + globalDir*raylen*foundDistance + 0.1 * globalDir;
++std::ostringstream oss;
++oss &lt;&lt; &quot;Testing Step-Recognition: Next Step: &quot; &lt;&lt; mNextTarget;
++LOG_MESSAGE(Logger::RULES, oss.str());
++                            break;
++                        }
++                    }
+ 
++                    if( info.mBody )
++                    {
++                        foundbody = true;
++                        foundDistance = info.mDistance;
++                    }
+ 
+ 
++                    start += Vector3::UNIT_Y * 0.05f;
++                    end += Vector3::UNIT_Y * 0.05f;
++                }
++                while( info.mBody &amp;&amp; (start - mMovingCreature-&gt;getCreature()-&gt;getPosition()).y &lt;= 0.5 );
++            }
+ 
++
++            // check if the target is still needed
++            // perform check also to verify found step
++            if( mMoveToNextTarget )
++            {
++                Vector3 diffToTarget = mNextTarget - mMovingCreature-&gt;getCreature()-&gt;getPosition();
++                diffToTarget.y = 0;
++                
++                // different direction
++                Vector3 globalDir = mMovingCreature-&gt;getCreature()-&gt;getOrientation() * direction; // the direction in global space
++                if( globalDir == Vector3::ZERO )
++                {
++                    mMoveToNextTarget = false;
++LOG_MESSAGE(Logger::RULES, &quot;Testing Step-Recognition: Step direction null&quot;);
++                    return false;
++                }
++
++                // target reached
++                if( diffToTarget.squaredLength() &lt; 0.01 )
++                {
++                    mMoveToNextTarget = false;
++LOG_MESSAGE(Logger::RULES, &quot;Testing Step-Recognition: Step reached&quot;);
++                    return false;
++                }
++
++                // different direction
++                if( !diffToTarget.directionEquals(globalDir, Degree(5)) )
++                {
++                    mMoveToNextTarget = false;
++LOG_MESSAGE(Logger::RULES, &quot;Testing Step-Recognition: Step direction wrong&quot;);
++                    return false;
++                }
++            }
++
++            return mMoveToNextTarget;
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction = Vector3::ZERO;
++            return oldDirection == Vector3::ZERO;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            Vector3 oldRotation(rotation);
++            rotation = Vector3::ZERO;
++            return oldRotation == Vector3::ZERO;
++        }
++    protected:
++        bool mMoveToNextTarget;
++        Vector3 mNextTarget;
++        Real mLastSquaredDistance;
++        Real mLinearSpringK, mLinearDampingK;
++        PhysicsMaterialRaycast mRaycast;
++    };
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
+     CreatureController::CreatureController(Creature *creature) :
+         mCreature(creature),
+         mAbstractLocation(AL_AIRBORNE),
+@@ -1191,6 +1425,9 @@
+         movementPair.first = MT_WEITSPRUNG;
+         movementPair.second = new Weitsprung (this);
+         mMovementMap.insert(movementPair);
++        movementPair.first = MT_STUFENERKENNUNG;
++        movementPair.second = new StepRecognition (this);
++        mMovementMap.insert(movementPair);
+ 
+         mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
+                 boost::bind(&amp;CreatureController::refetchCreature, this));
+@@ -1404,17 +1641,46 @@
+         //Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
+         Real stepHeight = point.y - charPos.y;
+ 
+-        if( stepHeight &lt; 0.5f )
++        if( stepHeight &lt; 0.4f )
+             isFloorCollision = true;
+ 
+         if ( isFloorCollision )
+         {
+             setAbstractLocation(AL_FLOOR);
+-            if(stepHeight &gt; 0.1f)
+-                setContactNormalAcceleration(10);
+-            setContactElasticity(0.0f);
++            if(stepHeight &gt; 0.05f) // experimantal value, 
++                                   // too low means the creature glides upwards on inclined planes, 
++                                   // too high means the creature stops if moving slowly onto a step because of the friction
++            {
++                //setContactNormalAcceleration(5);
++                rotateTangentDirections(charOri*mDirection + Vector3::UNIT_Y);
++                setContactTangentAcceleration(5,0);
++                setContactFrictionState(1,0);
++                setContactFrictionState(1,1);
++            }
++            else
++            {
++                setContactFrictionState(1,0);
++                setContactFrictionState(1,1);
++            }
++            //setContactTangentAcceleration(5);
++            //setContactElasticity(0.0f);
+             mLastFloorContact = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock();
+         }
++        else
++        {
++            Vector3 vel; // prevent going upwards if running against small things
++            vel = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;getVelocity();
++            if( vel.y &gt;= 0 )
++            {
++                setContactFrictionState(1,0);
++                setContactFrictionState(1,1);    
++            }
++            else
++            {
++                setContactFrictionState(0,0);
++                setContactFrictionState(0,1);
++            }
++        }
+ 
+         if(mMovement != NULL)
+         {
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-24 12:37:27 UTC (rev 3947)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-24 17:41:54 UTC (rev 3948)
+@@ -47,14 +47,24 @@
+         physicsManager-&gt;createMaterialPair(char_mat, def_mat)-&gt;setContactCallback(this);
+         physicsManager-&gt;createMaterialPair(char_mat, level_mat)-&gt;setContactCallback(this);
+         
+-        physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultFriction(0,0);
+-        physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0,0);
++        physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultFriction(0.8f,0.4f);
++        physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0.8f,0.4f);
++        physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultElasticity(0.0f);
++        physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultElasticity(0.0f);
++        physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultSoftness(1.0f);
++        physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultSoftness(1.0f);
+ 
+         physicsManager-&gt;getNewtonDebugger()-&gt;setMaterialColor(char_mat, Ogre::ColourValue::Red);
+     }
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+     {
++        // delete all creaturecontrollers
++        for( ControllerMap::iterator it = mControllers.begin(); it != mControllers.end(); it++ )
++        {
++            delete it-&gt;second;
++        }
++
+         PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
+         const OgreNewt::MaterialID *char_mat = physicsManager-&gt;getMaterialID(&quot;character&quot;);
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001018.html">[Dsa-hl-svn] r3947 - in modules/kanalisation: . scripts
+</A></li>
+	<LI>Next message: <A HREF="001020.html">[Dsa-hl-svn] r3949 - modules
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1019">[ date ]</a>
+              <a href="thread.html#1019">[ thread ]</a>
+              <a href="subject.html#1019">[ subject ]</a>
+              <a href="author.html#1019">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

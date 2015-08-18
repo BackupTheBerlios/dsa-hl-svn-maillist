@@ -1,0 +1,325 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4910 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4910%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904261110.n3QBASqw002189%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001966.html">
+   <LINK REL="Next"  HREF="001968.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4910 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4910%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904261110.n3QBASqw002189%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4910 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Apr 26 13:10:28 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001966.html">[Dsa-hl-svn] r4909 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001968.html">[Dsa-hl-svn] r4911 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1967">[ date ]</a>
+              <a href="thread.html#1967">[ thread ]</a>
+              <a href="subject.html#1967">[ subject ]</a>
+              <a href="author.html#1967">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-04-26 13:10:24 +0200 (Sun, 26 Apr 2009)
+New Revision: 4910
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/TriggerManager.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- loading and saving of triggers works
+- minor bugfixes
+
+Modified: rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py	2009-04-23 14:42:02 UTC (rev 4909)
++++ rl/trunk/editors/Lockenwickler/src/AddTriggerDialog.py	2009-04-26 11:10:24 UTC (rev 4910)
+@@ -4,10 +4,9 @@
+ Module implementing AddTriggerDialog.
+ &quot;&quot;&quot;
+ 
+-from PyQt4.QtGui import QDialog
+-from PyQt4.QtCore import pyqtSignature
++from PyQt4.QtCore import *
++from PyQt4.QtGui import *
+ 
+-
+ from Ui_AddTriggerDialog import Ui_Dialog
+ 
+ class AddTriggerDialog(QDialog, Ui_Dialog):
+@@ -22,6 +21,8 @@
+         for trigger in triggerClassNames:
+             self.comboBox.addItem(trigger)
+         
++        self.connect(self, SIGNAL(&quot;accepted()&quot;), self.onAccepted)
++        
+     @pyqtSignature(&quot;QString&quot;)
+     def on_lineEdit_textChanged(self, p0):
+         for trigger in self.triggerManager.triggerInstances:
+@@ -35,13 +36,12 @@
+             
+     @pyqtSignature(&quot;&quot;)
+     def on_pushButton_clicked(self):
+-        if self.trigger.addProperty():
++        if self.trigger.manualAddProperty():
+             self.updateProperties()
+         
+-    def accept(self):
++    def onAccepted(self):
+         self.trigger.name = str(self.lineEdit.text())
+         self.trigger.className = str(self.comboBox.currentText())
+-        self.close()
+         
+     def updateProperties(self):
+         self.listView.clear()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-23 14:42:02 UTC (rev 4909)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-26 11:10:24 UTC (rev 4910)
+@@ -36,7 +36,7 @@
+             i += 1
+ 
+ class ExplorerOptionsDlg(QDialog):
+-    def __init__(self, lights, gameObjects, entities, zones, zonelights, parent = None):
++    def __init__(self, lights, gameObjects, entities, zones, zonelights, zonetriggers, parent = None):
+         super(ExplorerOptionsDlg, self).__init__(parent)
+         
+         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+@@ -62,6 +62,10 @@
+         self.zoneslightsCheckBox.setChecked(zonelights)        
+         layout.addWidget(self.zoneslightsCheckBox)
+         
++        self.zonesTriggersCheckBox = QCheckBox(&quot;Show Zonetriggers&quot;)
++        self.zonesTriggersCheckBox.setChecked(zoneTriggers)        
++        layout.addWidget(self.zonesTriggersCheckBox)
++        
+         layout.addWidget(buttonBox)
+         layout.setContentsMargins(2, 2, 2, 2)
+         self.setLayout(layout)
+@@ -178,6 +182,7 @@
+ 
+ class ModuleExplorer(QWidget):
+     LIGHT_IN_ZONE = 99
++    TRIGGER_IN_ZONE = 100
+     
+     def __init__(self, parent=None):
+         QWidget.__init__(self, parent)
+@@ -206,6 +211,7 @@
+         
+         self.showLights = True
+         self.showZoneLights = True
++        self.showZoneTriggers = True
+         self.showGameObjects = True
+         self.showEntities = True
+         self.showZones = True
+@@ -280,8 +286,16 @@
+         
+         #end remove all the things from the list we actually don't want to be selected
+         for item in selItems:
++            print str(item.text(0))
++            print str(item.parent().text(0))
++            
+             if str(item.text(0)).startswith(&quot;Scene: &quot;) or str(item.text(0)).startswith(&quot;Map: &quot;) or str(item.text(0)).startswith(&quot;Zone: &quot;):
+                 selItems.remove(item)
++            elif item.data(0, Qt.UserRole).toInt()[0] == ModuleExplorer.LIGHT_IN_ZONE or item.data(0, Qt.UserRole).toInt()[0] == ModuleExplorer.TRIGGER_IN_ZONE:
++                selItems.remove(item)
++            elif item.text(0) == &quot;Lights&quot; and item.text(0) == &quot;Triggers&quot;:
++                if str(item.parent().text(0)).startswith(&quot;Zone: &quot;):
++                    selItems.remove(item)
+         
+         for item in selItems:
+             parentName =  str(item.text(0))
+@@ -379,10 +393,11 @@
+     
+     def onAddTriggerToZone(self):
+         zoneName = str(self.sceneTreeView.currentItem().text(0)).replace(&quot;Zone: &quot;, &quot;&quot;)
+-        self.moduleManager.zoneManager.getZone(zoneName).addTrigger()
++        self.moduleManager.zoneManager.getZone(zoneName).manualAddTrigger()
++        self.updateView()
+         
+     def onOptions(self):
+-        dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self.showZoneLights, self)
++        dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self.showZoneLights, self.showZoneTriggers, self)
+         if dlg.exec_():
+             self.showLights = dlg.lightCheckBox.isChecked()
+             self.showGameObjects = dlg.gameObjectsCheckBox.isChecked()
+@@ -545,6 +560,15 @@
+                     childItem2.setText(0, lightName)
+                     childItem2.setData(0, Qt.UserRole, QVariant(ModuleExplorer.LIGHT_IN_ZONE))
+                     
++            if self.showZoneTriggers:
++                triggersItem = QTreeWidgetItem(childItem)
++                triggersItem.setText(0, &quot;Triggers&quot;)
++                
++                for trigger in zone.triggerList:
++                    childItem2 = QTreeWidgetItem(triggersItem)
++                    childItem2.setText(0, trigger.name)
++                    childItem2.setData(0, Qt.UserRole, QVariant(ModuleExplorer.TRIGGER_IN_ZONE))
++                    
+     def setCurrentModule(self, module):
+         self.module = module
+         self.updateView()
+
+Modified: rl/trunk/editors/Lockenwickler/src/TriggerManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/TriggerManager.py	2009-04-23 14:42:02 UTC (rev 4909)
++++ rl/trunk/editors/Lockenwickler/src/TriggerManager.py	2009-04-26 11:10:24 UTC (rev 4910)
+@@ -33,12 +33,16 @@
+         self.data = data
+ 
+ class Trigger():
+-    def __init__(self):
+-        self.className = &quot;&quot;
+-        self.name = &quot;&quot;
++    def __init__(self, name = &quot;&quot;, className = &quot;&quot;):
++        self.name = name
++        self.className = className
+         self.properties = []
+         
+-    def addProperty(self):
++    def addProperty(self, name, type, data):
++        prop = TriggerProperty(name,  type, data)
++        self.properties.append(prop)
++        
++    def manualAddProperty(self):
+         editor = GOGenericEditor(&quot;&quot;, &quot;STRING&quot;, &quot;&quot;, QApplication.focusWidget())
+         if editor.exec_():
+             name = str(editor.nameEditBox.text())
+@@ -68,10 +72,18 @@
+         
+     def addDirectory(self, dir):
+         self.directories.append(dir)
+-        
+         self.update()
+     
+-    def createTrigger(self):
++    def createTrigger(self, name, classname, properties):
++        trigger = Trigger(name, classname)
++        for prop in properties:
++            name = prop.attrib[&quot;name&quot;]
++            type = prop.attrib[&quot;type&quot;]
++            data = prop.attrib[&quot;data&quot;]
++            trigger.addProperty(name, type, data)
++        return trigger
++        
++    def manualCreateTrigger(self):
+         trigger = Trigger()
+         
+         dlg = AddTriggerDialog(trigger, TriggerManager.availableTriggers, self, QApplication.focusWidget())
+@@ -81,6 +93,13 @@
+         
+         return False
+     
++    def getTrigger(self, name):
++        for trigger in self.triggerInstances:
++            if trigger.name == name:
++                return trigger
++        
++        return None
++    
+     def update(self):
+         TriggerManager.availableTriggers = []
+         
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-23 14:42:02 UTC (rev 4909)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-26 11:10:24 UTC (rev 4910)
+@@ -141,8 +141,14 @@
+                 self.areaList.remove(a)
+                 del a
+     
+-    def addTrigger(self):
+-        trigger = TriggerManager.instance.createTrigger()
++    def addTrigger(self, trigger):
++        if trigger is not None:
++            self.triggerList.append(trigger)
++            
++    def manualAddTrigger(self):
++        trigger = TriggerManager.instance.manualCreateTrigger()
++        if trigger is not False:
++            self.triggerList.append(trigger)
+     
+     def hide(self):
+         self.sceneManager.getRootSceneNode().removeChild(self.zoneNode)
+@@ -238,6 +244,16 @@
+                 name = light.attrib[&quot;name&quot;]
+                 z.lightList.append(name)
+                 
++            triggerNodes = zone.getiterator(&quot;trigger&quot;)
++            for trigger in triggerNodes:
++                name = trigger.attrib[&quot;name&quot;]
++                classname = trigger.attrib[&quot;classname&quot;]
++                properties = trigger.getiterator(&quot;property&quot;)
++                
++                trigger = TriggerManager.instance.createTrigger(name, classname, properties)
++                
++                z.addTrigger(name)
++                
+             soundNodes = zone.getiterator(&quot;sound&quot;)
+             for sound in soundNodes:
+                 name = sound.attrib[&quot;name&quot;]
+@@ -284,6 +300,19 @@
+             for lightName in zone.lightList:
+                 lightElem = xml.SubElement(zoneElem, &quot;light&quot;)
+                 lightElem.attrib[&quot;name&quot;] = str(lightName)
++                
++            for triggerName in zone.triggerList:
++                trigger = TriggerManager.instance.getTrigger(triggerName)
++                
++                triggerElem = xml.SubElement(zoneElem, &quot;trigger&quot;)
++                triggerElem.attrib[&quot;name&quot;] = str(trigger.name)
++                triggerElem.attrib[&quot;classname&quot;] = str(trigger.name)
++                
++                for prop in trigger.properties:
++                    propElem = xml.SubElement(triggerElen, &quot;property&quot;)
++                    triggerElem.attrib[&quot;name&quot;] = str(trigger.name)
++                    triggerElem.attrib[&quot;type&quot;] = str(trigger.type)
++                    triggerElem.attrib[&quot;data&quot;] = str(trigger.data)
+             
+             for soundName in zone.soundList:
+                 soundElem = xml.SubElement(zoneElem, &quot;sound&quot;)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001966.html">[Dsa-hl-svn] r4909 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001968.html">[Dsa-hl-svn] r4911 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1967">[ date ]</a>
+              <a href="thread.html#1967">[ thread ]</a>
+              <a href="subject.html#1967">[ subject ]</a>
+              <a href="author.html#1967">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

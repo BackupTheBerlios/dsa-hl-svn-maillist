@@ -1,0 +1,306 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4715 - in dependencies/OgreNewt_ngt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4715%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200901211956.n0LJuURa032391%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001771.html">
+   <LINK REL="Next"  HREF="001773.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4715 - in dependencies/OgreNewt_ngt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4715%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200901211956.n0LJuURa032391%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4715 - in dependencies/OgreNewt_ngt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Jan 21 20:56:30 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001771.html">[Dsa-hl-svn] r4714 - in rl/branches/newton20: .	Mac/Rastullah.xcodeproj Mac/tools engine/core/include	engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001773.html">[Dsa-hl-svn] r4716 - in rl/trunk: . engine/ai engine/core	engine/core/include engine/core/include/fmod4driver	engine/core/src engine/core/src/fmod4driver engine/ui/include	engine/ui/src tools
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1772">[ date ]</a>
+              <a href="thread.html#1772">[ thread ]</a>
+              <a href="subject.html#1772">[ subject ]</a>
+              <a href="author.html#1772">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-01-21 20:56:28 +0100 (Wed, 21 Jan 2009)
+New Revision: 4715
+
+Modified:
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_Collision.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp
+Log:
+-commented out some code for trigger-bodies
+-added NewtonAddCollisionReference when creating collisions (so newton doesn't delete them until the OgreNewt::Collision gets deleted!)
+
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2009-01-21 19:52:59 UTC (rev 4714)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2009-01-21 19:56:28 UTC (rev 4715)
+@@ -98,7 +98,10 @@
+                 if a collision is marked as a trigger-volume, there's no calculation of contacts, so
+                 this acts like an accurate aabb test
+         */
+-        void setAsTriggerVolume(bool trigger) { NewtonCollisionSetAsTriggerVolume(m_col, (int)trigger); }
++        //! TODO:
++        // this doesn't work correctly yet, because the userdata pointer in the collision callback can't be accessed with a trigger
++        // volume in the current beta!
++        void setAsTriggerVolume(bool trigger) { /*NewtonCollisionSetAsTriggerVolume(m_col, (int)trigger);*/ }
+ };
+ 
+ //typedef Ogre::SharedPtr&lt;Collision&gt; CollisionPtr;
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_Collision.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_Collision.cpp	2009-01-21 19:52:59 UTC (rev 4714)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_Collision.cpp	2009-01-21 19:56:28 UTC (rev 4715)
+@@ -8,7 +8,7 @@
+ {
+ 
+ 	
+-Collision::Collision( const World* world )
++Collision::Collision( const World* world ) : m_col(NULL)
+ {
+ 	m_world = world;
+ }
+@@ -27,9 +27,12 @@
+ 	float matrix[16];
+ 	OgreNewt::Converters::QuatPosToMatrix( orient, pos, matrix );
+ 
+-	NewtonCollisionCalculateAABB( m_col, matrix, &amp;min.x, &amp;max.x );
++    if( m_col )
++    {
++    	NewtonCollisionCalculateAABB( m_col, matrix, &amp;min.x, &amp;max.x );
+ 
+-	box = Ogre::AxisAlignedBox(min, max);
++	    box = Ogre::AxisAlignedBox(min, max);
++    }
+ 	return box;
+ }
+ 
+@@ -48,6 +51,7 @@
+ ConvexModifierCollision::ConvexModifierCollision(const World* world, const Collision* col) : Collision(world)
+ {
+ 	m_col = NewtonCreateConvexHullModifier( world-&gt;getNewtonWorld(), col-&gt;getNewtonCollision() );
++    NewtonAddCollisionReference(m_col);
+ }
+ 
+ ConvexModifierCollision::~ConvexModifierCollision()
+@@ -59,7 +63,8 @@
+ 	float matrix[16];
+ 	OgreNewt::Converters::Matrix4ToMatrix( mat, matrix );
+ 
+-	NewtonConvexHullModifierSetMatrix( m_col, matrix );	
++    if( m_col )
++    	NewtonConvexHullModifierSetMatrix( m_col, matrix );	
+ }
+ 
+ Ogre::Matrix4 ConvexModifierCollision::getScalarMatrix() const
+@@ -67,9 +72,12 @@
+ 	float matrix[16];
+ 	Ogre::Matrix4 mat;
+ 	
+-	NewtonConvexHullModifierGetMatrix( m_col, matrix );
++    if( m_col )
++    {
++    	NewtonConvexHullModifierGetMatrix( m_col, matrix );
+ 
+-	OgreNewt::Converters::MatrixToMatrix4( matrix, mat );
++    	OgreNewt::Converters::MatrixToMatrix4( matrix, mat );
++    }
+ 
+ 	return mat;
+ }
+@@ -77,3 +85,4 @@
+ 
+ 
+ }	// end NAMESPACE OgreNewt
++
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp	2009-01-21 19:52:59 UTC (rev 4714)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp	2009-01-21 19:56:28 UTC (rev 4715)
+@@ -13,6 +13,8 @@
+ 		Null::Null(const OgreNewt::World *world) : Collision( world )
+ 		{
+ 			m_col = NewtonCreateNull( m_world-&gt;getNewtonWorld() );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -24,6 +26,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateBox( m_world-&gt;getNewtonWorld(), (float)size.x, (float)size.y, (float)size.z, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -36,6 +40,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateSphere( m_world-&gt;getNewtonWorld(), (float)size.x, (float)size.y, (float)size.z, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -48,6 +54,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateCylinder( m_world-&gt;getNewtonWorld(), (float)radius, (float)height, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -60,6 +68,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateCapsule( m_world-&gt;getNewtonWorld(), (float)radius, (float)height, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -72,6 +82,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateCone( m_world-&gt;getNewtonWorld(), (float)radius, (float)height, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 		// OgreNewt::CollisionPrimitives::ChamferCylinder
+@@ -83,6 +95,8 @@
+ 			OgreNewt::Converters::QuatPosToMatrix( orient, pos, &amp;matrix[0] );
+ 
+ 			m_col = NewtonCreateChamferCylinder( m_world-&gt;getNewtonWorld(), (float)radius, (float)height, &amp;matrix[0] );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -204,6 +218,8 @@
+ 			//okay, let's try making the ConvexHull!
+ 			m_col = NewtonCreateConvexHull( m_world-&gt;getNewtonWorld(), (int)total_verts, (float*)&amp;vertices[0].x, sizeof(Ogre::Vector3), 0.001f, &amp;matrix[0] );
+ 
++            NewtonAddCollisionReference(m_col);
++
+ 			delete []vertices;
+ 
+ 		}
+@@ -218,6 +234,8 @@
+ 			//make the collision primitive.
+ 			m_col = NewtonCreateConvexHull( m_world-&gt;getNewtonWorld(), vertcount, (float*)&amp;verts[0].x, sizeof(Ogre::Vector3), 0.001f, &amp;matrix[0]);
+ 
++            NewtonAddCollisionReference(m_col);
++
+ 		}
+ 
+ 
+@@ -481,6 +499,8 @@
+ 		void TreeCollision::finish( bool optimize)
+ 		{
+ 			NewtonTreeCollisionEndBuild( m_col, optimize );
++
++            NewtonAddCollisionReference(m_col);
+ 		}
+ 
+ 
+@@ -677,6 +697,8 @@
+ 
+ 			m_col = NewtonCreateCompoundCollision( world-&gt;getNewtonWorld(), num, array );
+ 
++            NewtonAddCollisionReference(m_col);
++
+ 			delete[] array;
+ 
+ 		}
+@@ -714,6 +736,8 @@
+ 			//make the collision primitive.
+ 			m_col = NewtonCreateConvexHull( m_world-&gt;getNewtonWorld(), 5, vertices, sizeof(float)*3, 0.001f, &amp;matrix[0]);
+ 
++            NewtonAddCollisionReference(m_col);
++
+ 			delete []vertices;
+ 
+ 		}
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp	2009-01-21 19:52:59 UTC (rev 4714)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_ContactCallback.cpp	2009-01-21 19:56:28 UTC (rev 4715)
+@@ -1,6 +1,7 @@
+ #include &lt;OgreNewt_ContactCallback.h&gt;
+ #include &lt;OgreNewt_Body.h&gt;
+ 
++
+ namespace OgreNewt
+ {
+ 
+@@ -31,6 +32,20 @@
+ 
+ void _CDECL ContactCallback::contactProcess(const NewtonJoint *contactJoint, float timeStep, int threadIndex )
+ {
++/*    // pruefe ob nur TriggerVolume - funktioniert mit aktuellem newton noch nicht
++    if( NewtonCollisionIsTriggerVolume(NewtonBodyGetCollision(NewtonJointGetBody1(contactJoint))) ||
++        NewtonCollisionIsTriggerVolume(NewtonBodyGetCollision(NewtonJointGetBody1(contactJoint))) )
++    {
++	    ContactCallback *me = (ContactCallback*)NewtonJointGetUserData(contactJoint);
++        me-&gt;m_material = NULL;
++        me-&gt;m_body0 = (OgreNewt::Body*)NewtonBodyGetUserData( NewtonJointGetBody0(contactJoint) );
++    	me-&gt;m_body1 = (OgreNewt::Body*)NewtonBodyGetUserData( NewtonJointGetBody1(contactJoint) );
++        me-&gt;contactProcess( (Ogre::Real)timeStep, threadIndex );
++
++        return;
++    }
++*/
++bool test = false;
+         for (void* contact = NewtonContactJointGetFirstContact (contactJoint); contact; contact = NewtonContactJointGetNextContact (contactJoint, contact))
+         {
+ 	        ContactCallback *me;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001771.html">[Dsa-hl-svn] r4714 - in rl/branches/newton20: .	Mac/Rastullah.xcodeproj Mac/tools engine/core/include	engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001773.html">[Dsa-hl-svn] r4716 - in rl/trunk: . engine/ai engine/core	engine/core/include engine/core/include/fmod4driver	engine/core/src engine/core/src/fmod4driver engine/ui/include	engine/ui/src tools
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1772">[ date ]</a>
+              <a href="thread.html#1772">[ thread ]</a>
+              <a href="subject.html#1772">[ subject ]</a>
+              <a href="author.html#1772">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

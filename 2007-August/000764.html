@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3693 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3693%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708132016.l7DKGkvv032125%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000763.html">
+   <LINK REL="Next"  HREF="000765.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3693 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3693%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708132016.l7DKGkvv032125%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3693 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Aug 13 22:16:46 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000763.html">[Dsa-hl-svn] r3692 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="000765.html">[Dsa-hl-svn] r3694 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#764">[ date ]</a>
+              <a href="thread.html#764">[ thread ]</a>
+              <a href="subject.html#764">[ subject ]</a>
+              <a href="author.html#764">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-13 22:16:36 +0200 (Mon, 13 Aug 2007)
+New Revision: 3693
+
+Modified:
+   rl/trunk/engine/ui/include/WindowFactory.h
+   rl/trunk/engine/ui/src/CharacterSheetWindow.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/WindowFactory.cpp
+Log:
+CharacterSheetWindow and InventoryWindow can be closed without errors
+
+Modified: rl/trunk/engine/ui/include/WindowFactory.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowFactory.h	2007-08-13 17:30:50 UTC (rev 3692)
++++ rl/trunk/engine/ui/include/WindowFactory.h	2007-08-13 20:16:36 UTC (rev 3693)
+@@ -101,6 +101,7 @@
+         void toggleCharacterStateWindow();
+         void toggleInGameGlobalMenu();
+         void toggleInventoryWindow();
++        void notifyInventoryWindowDestroyed();
+ 
+         CombatWindow* getCombatWindow();
+ 
+
+Modified: rl/trunk/engine/ui/src/CharacterSheetWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CharacterSheetWindow.cpp	2007-08-13 17:30:50 UTC (rev 3692)
++++ rl/trunk/engine/ui/src/CharacterSheetWindow.cpp	2007-08-13 20:16:36 UTC (rev 3693)
+@@ -51,7 +51,7 @@
+ 	mRasse = getWindow(&quot;CharacterSheet/CharacterSheet/Rasse&quot;);
+ 	mProfession = getWindow(&quot;CharacterSheet/CharacterSheet/Profession&quot;);
+ 
+-	bindDestroyWindowToXButton();
++	bindHideWindowToXButton();
+ 
+ 	/*for (int i=0; i&lt;EIGENSCHAFT_COUNT; i++)
+ 		mEigenschaft[i] =
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-13 17:30:50 UTC (rev 3692)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-13 20:16:36 UTC (rev 3693)
+@@ -21,6 +21,7 @@
+ #include &lt;CEGUIImageset.h&gt;
+ #include &lt;CEGUIImagesetManager.h&gt;
+ #include &lt;CEGUIWindowManager.h&gt;
++#include &lt;elements/CEGUIFrameWindow.h&gt;
+ 
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
+@@ -49,6 +50,8 @@
+ 
+         //mSquareSize = ...;
+ 		mWorldBackground = getWindow(&quot;InventoryWindow/Background&quot;);
++        getWindow(&quot;InventoryWindow&quot;)-&gt;subscribeEvent(FrameWindow::EventCloseClicked,
++			boost::bind(&amp;InventoryWindow::destroyWindow, this));
+ 
+         createSlotWindows(inventory);
+         initInventoryWindow(inventory);
+@@ -60,6 +63,7 @@
+     {
+ 		mWorldBackground-&gt;removeAllEvents();
+ 		delete mMouseSelector;
++        WindowFactory::getSingleton().notifyInventoryWindowDestroyed();
+     }
+ 
+     void InventoryWindow::createSlotWindows(Inventory* inventory)
+
+Modified: rl/trunk/engine/ui/src/WindowFactory.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFactory.cpp	2007-08-13 17:30:50 UTC (rev 3692)
++++ rl/trunk/engine/ui/src/WindowFactory.cpp	2007-08-13 20:16:36 UTC (rev 3693)
+@@ -210,7 +210,12 @@
+         }
+     }
+ 
++    void WindowFactory::notifyInventoryWindowDestroyed()
++    {
++        mInventoryWindow = NULL;
++    }
+ 
++
+     void WindowFactory::showCharacterSheet()
+     {
+         if (mCharacterSheet-&gt;isVisible())
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000763.html">[Dsa-hl-svn] r3692 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="000765.html">[Dsa-hl-svn] r3694 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#764">[ date ]</a>
+              <a href="thread.html#764">[ thread ]</a>
+              <a href="subject.html#764">[ subject ]</a>
+              <a href="author.html#764">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

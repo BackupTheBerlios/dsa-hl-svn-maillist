@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4548 - in rl/branches/persistence/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4548%20-%20in%20rl/branches/persistence/rules%3A%20include%20src&In-Reply-To=%3C200810121527.m9CFRi6E016358%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001604.html">
+   <LINK REL="Next"  HREF="001606.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4548 - in rl/branches/persistence/rules: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4548%20-%20in%20rl/branches/persistence/rules%3A%20include%20src&In-Reply-To=%3C200810121527.m9CFRi6E016358%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4548 - in rl/branches/persistence/rules: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Oct 12 17:27:44 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001604.html">[Dsa-hl-svn] r4547 - in rl/branches/persistence: rules/include	rules/src script/src script/swig
+</A></li>
+        <LI>Next message: <A HREF="001606.html">[Dsa-hl-svn] r4549 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1605">[ date ]</a>
+              <a href="thread.html#1605">[ thread ]</a>
+              <a href="subject.html#1605">[ subject ]</a>
+              <a href="author.html#1605">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-10-12 17:27:38 +0200 (Sun, 12 Oct 2008)
+New Revision: 4548
+
+Modified:
+   rl/branches/persistence/rules/include/QuestBook.h
+   rl/branches/persistence/rules/src/QuestBook.cpp
+Log:
+QuestBook will be a SaveAbleFactory
+
+Modified: rl/branches/persistence/rules/include/QuestBook.h
+===================================================================
+--- rl/branches/persistence/rules/include/QuestBook.h	2008-10-12 15:17:01 UTC (rev 4547)
++++ rl/branches/persistence/rules/include/QuestBook.h	2008-10-12 15:27:38 UTC (rev 4548)
+@@ -27,7 +27,7 @@
+ #include &quot;Quest.h&quot;
+ #include &quot;QuestEvent.h&quot;
+ #include &quot;QuestListener.h&quot;
+-#include &quot;SaveGameData.h&quot;
++#include &quot;SaveAbleFactory.h&quot;
+ #include &quot;XmlProcessor.h&quot;
+ 
+ #include &lt;vector&gt;
+@@ -39,8 +39,8 @@
+     public Ogre::ScriptLoader,
+     public EventSource, 
+     public PropertyHolder, 
+-    public SaveGameData,
+-    public XmlProcessor
++    public XmlProcessor,
++	public SaveAbleFactory
+ {
+ public:
+     static const Ogre::String PROPERTY_QUESTS;
+@@ -59,10 +59,17 @@
+ 
+ 	/**
+ 	 * Fuegt einen Quest hinzu
+-	 * @param quest der Qubquest
++	 * @param quest der Subquest
+ 	 */
+ 	void addQuest(Quest* quest);
+ 
++	/** TODO
++	 *Inheritated from SaveAbleFactory
++	 *@param params Params needed for creation
++	 *@return SaveAble which has been created
++	 */
++	SaveAblePtr createSaveAble(PropertyRecordPtr params);
++
+     /**
+      *  Adds a journal entry to the quest book.
+      */
+@@ -84,14 +91,6 @@
+     void setQuestsProperty(PropertyArray array, Quest* rootQuest);
+     virtual PropertyKeys getAllPropertyKeys() const;
+ 
+-    /// Override from SaveGameData
+-    /// Manages saving and loading from the SaveGameFile
+-
+-    virtual CeGuiString getXmlNodeIdentifier() const;
+-    virtual void writeData(SaveGameFileWriter* writer);
+-    virtual void readData(SaveGameFileReader* reader);
+-    virtual int getPriority() const;
+-
+     //loading quests from xml
+     virtual const Ogre::StringVector &amp;getScriptPatterns(void) const;
+     virtual void parseScript(Ogre::DataStreamPtr &amp;,const Ogre::String &amp;);
+
+Modified: rl/branches/persistence/rules/src/QuestBook.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/QuestBook.cpp	2008-10-12 15:17:01 UTC (rev 4547)
++++ rl/branches/persistence/rules/src/QuestBook.cpp	2008-10-12 15:27:38 UTC (rev 4548)
+@@ -36,12 +36,10 @@
+     {
+         mScriptPatterns.push_back(&quot;*.quests&quot;);
+         createRoot();
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     QuestBook::~QuestBook()
+     {
+-        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+ 	    delete mRootQuest;
+         for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
+             it != mJournalEntries.end(); it++ )
+@@ -86,6 +84,10 @@
+ 	    mRootQuest-&gt;addSubquest(quest);
+     }
+ 
++	SaveAblePtr QuestBook::createSaveAble(PropertyRecordPtr params)
++	{
++	}
++
+     void QuestBook::_fireQuestBookChanged(Quest *quest, int reason)
+     {
+ 	    QuestEvent* evt = new QuestEvent(this, reason);
+@@ -305,28 +307,6 @@
+         return quests;
+     }
+ 
+-    CeGuiString QuestBook::getXmlNodeIdentifier() const
+-    {
+-        return &quot;questbook&quot;;
+-    }
+-
+-    void QuestBook::writeData(SaveGameFileWriter *writer)
+-    {
+-        LOG_MESSAGE(Logger::RULES, &quot;Saving questbook&quot;);
+-
+-        PropertyRecordPtr set = getAllProperties();
+-        writer-&gt;writeEachProperty(this, set-&gt;toPropertyMap());
+-    }
+-
+-    void QuestBook::readData(SaveGameFileReader* reader)
+-    {
+-        LOG_MESSAGE(Logger::RULES, &quot;Loading questbook&quot;);
+-
+-        clear();
+-        PropertyRecordPtr properties = reader-&gt;getAllPropertiesAsRecord(this);
+-        setProperties(properties);
+-    }
+-
+     void QuestBook::clear()
+     {
+         delete mRootQuest;
+@@ -342,11 +322,6 @@
+         createRoot();
+     }
+ 
+-    int QuestBook::getPriority() const
+-    {
+-        return 101;
+-    }
+-
+     const Ogre::StringVector &amp;QuestBook::getScriptPatterns(void) const
+     {
+         return mScriptPatterns;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001604.html">[Dsa-hl-svn] r4547 - in rl/branches/persistence: rules/include	rules/src script/src script/swig
+</A></li>
+	<LI>Next message: <A HREF="001606.html">[Dsa-hl-svn] r4549 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1605">[ date ]</a>
+              <a href="thread.html#1605">[ thread ]</a>
+              <a href="subject.html#1605">[ subject ]</a>
+              <a href="author.html#1605">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

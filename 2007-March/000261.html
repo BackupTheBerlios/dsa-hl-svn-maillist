@@ -1,0 +1,274 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3190 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3190%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703212108.l2LL8MiW004920%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000260.html">
+   <LINK REL="Next"  HREF="000262.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3190 - in rl/trunk/engine/core: include src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3190%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703212108.l2LL8MiW004920%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3190 - in rl/trunk/engine/core: include src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar 21 22:08:22 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000260.html">[Dsa-hl-svn] r3189 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000262.html">[Dsa-hl-svn] r3191 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#261">[ date ]</a>
+              <a href="thread.html#261">[ thread ]</a>
+              <a href="subject.html#261">[ subject ]</a>
+              <a href="author.html#261">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-21 22:08:05 +0100 (Wed, 21 Mar 2007)
+New Revision: 3190
+
+Modified:
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+Log:
+better handling and creation of collison primitives by caching collision primitives of meshs
+
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2007-03-20 23:36:11 UTC (rev 3189)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2007-03-21 21:08:05 UTC (rev 3190)
+@@ -229,6 +229,7 @@
+ 			const Ogre::String animName = &quot;&quot;,
+ 			Ogre::Vector3* offset = NULL, 
+ 			Ogre::Quaternion* orientation = NULL) const;
++            
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-20 23:36:11 UTC (rev 3189)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-21 21:08:05 UTC (rev 3190)
+@@ -347,7 +347,7 @@
+ 					entity = tempMesh-&gt;getEntity();
+ 				}
+ 
+-				// calculate the convex hull of the animated mesh
++				// create the collision primitive of the animated mesh
+  				coll = PhysicsManager::getSingleton().createCollision(entity, animName, mGeometryType);
+ 
+ 				// cleanup the temporary mesh
+@@ -373,6 +373,7 @@
+         }
+     }
+ 
++    
+ 	OgreNewt::CollisionPtr PhysicalThing::createCollision(
+ 		const AxisAlignedBox&amp; aabb, Vector3* inertiaCoefficients,
+ 		const String animName, Vector3* offset, Quaternion* orientation ) const
+@@ -384,16 +385,16 @@
+ 
+         CollisionPtr rval;
+ 
+-		/* inertiaCoefficients could be calculated like OgreNewt::MomentOfInertia 
+-			or even better is to use it ? */
++		// inertiaCoefficients could be calculated like OgreNewt::MomentOfInertia 
++		//	or even better is to use it ? 
+ 
+-		/* differentiate between the different collision primitives, because they all
+-		   need different offset and probably different orientation values.
+-		   Newton SDK is really nifty and helps here, because we can shift the origin
+-		   of the coordinate system of the primitiv we create into any position we
+-		   desire. Actually this is the bottom middle of our mesh - as the meshes are
+-		   always constructed like that.
+-	    */
++		// differentiate between the different collision primitives, because they all
++		//   need different offset and probably different orientation values.
++		//   Newton SDK is really nifty and helps here, because we can shift the origin
++		//   of the coordinate system of the primitiv we create into any position we
++		//   desire. Actually this is the bottom middle of our mesh - as the meshes are
++		//   always constructed like that.
++	    
+ 		if (mGeometryType == PhysicsManager::GT_BOX)
+         {
+ 			// set offset/orientation when they are null
+@@ -607,18 +608,44 @@
+ 	{
+ 		if (mBody == NULL) 
+ 		{
+-            const AxisAlignedBox&amp; aabb = mPhysicalObject-&gt;getDefaultSize();
+-                        
+-            Vector3 inertiaCoefficients;
+-			OgreNewt::CollisionPtr coll = createCollision(aabb, &amp;inertiaCoefficients);
++            OgreNewt::CollisionPtr coll;
++            Vector3 inertia;
+ 
++            // there is a difference between a meshobject and a 'normal' object
++            // because a meshobject has got an entity and therefore a direct name
++            // which is used to determine it's collision primitive cache hash
++            // value (in order to avoid duplication)
++
++            if (mPhysicalObject-&gt;isMeshObject())
++            {
++                Entity* entity = dynamic_cast&lt;MeshObject*&gt;(mPhysicalObject)-&gt;getEntity();
++                coll = PhysicsManager::getSingleton().createCollision(
++                    entity,
++                    &quot;&quot;,
++                    mGeometryType,
++                    NULL,
++                    NULL,
++                    mMass,
++                    &amp;inertia);
++            }
++            else
++            {
++                coll = PhysicsManager::getSingleton().getCollisionFactory()-&gt;createCollisionFromAABB(
++                    aabb,
++                    mGeometryType,
++                    NULL,
++                    NULL,
++                    mMass,
++                    &amp;inertia);
++            }
++
+ 			OgreNewt::Body* body = new OgreNewt::Body(
+                 PhysicsManager::getSingleton()._getNewtonWorld(), coll);
+ 
+ 			Ogre::Real mass = mMass;
+ 			if (mass &gt; 0.0 &amp;&amp; mGeometryType != PhysicsManager::GT_MESH)
+             {
+-                body-&gt;setMassMatrix(mass, mass*inertiaCoefficients);
++                body-&gt;setMassMatrix(mass, inertia);
+             }
+ 
+ 			body-&gt;setCustomForceAndTorqueCallback(PhysicsManager::genericForceCallback);
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-20 23:36:11 UTC (rev 3189)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-21 21:08:05 UTC (rev 3190)
+@@ -652,9 +652,9 @@
+ 			if (inertia != NULL)
+ 			{
+ 				*inertia = Vector3(
+-				size.x*size.x/6.0f * Mass,
+-				size.y*size.y/6.0f * Mass,
+-				size.z*size.z/6.0f * Mass);
++				size.x*size.x/6.0f,
++				size.y*size.y/6.0f,
++				size.z*size.z/6.0f) * Mass;
+ 			}
+         }
+         else if (geomType == PhysicsManager::GT_MESH)
+@@ -687,7 +687,7 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::createBox(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+-            const Ogre::Real Mass,
++            const Ogre::Real mass,
+             Ogre::Vector3* inertia)
+     {
+         // offset of the collision primitiv
+@@ -701,7 +701,7 @@
+ 		if (! orientation)
+ 			orientation = &amp;object_orientation;
+         if (inertia)
+-            *inertia = OgreNewt::MomentOfInertia::CalcBoxSolid(Mass, aabb.getSize());
++            *inertia = OgreNewt::MomentOfInertia::CalcBoxSolid(mass, aabb.getSize());
+ 
+ 		// a box collision primitiv has got it's coordinate system at it's center, so we need to shift it
+ 		return CollisionPtr(new OgreNewt::CollisionPrimitives::Box(
+@@ -712,7 +712,7 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::createPyramid(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+-            const Ogre::Real Mass,
++            const Ogre::Real mass,
+             Ogre::Vector3* inertia)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+@@ -727,7 +727,7 @@
+ 		if (! orientation)
+ 			orientation = &amp;object_orientation;
+         if (inertia)
+-            *inertia = Ogre::Vector3(size.x*Mass,size.y/2.0f*Mass, size.z*Mass);
++            *inertia = Ogre::Vector3(size.x,size.y/2.0f, size.z) * mass;
+ 
+         return CollisionPtr(new OgreNewt::CollisionPrimitives::Pyramid(
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+@@ -766,7 +766,7 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::createEllipsoid(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+-            const Ogre::Real Mass,
++            const Ogre::Real mass,
+             Ogre::Vector3* inertia)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+@@ -785,7 +785,7 @@
+ 		if (! orientation)
+ 			orientation = &amp;object_orientation;
+         if (inertia)
+-            *inertia = Vector3(s.x*s.x, s.y*s.y, s.z*s.z);
++            *inertia = Vector3(s.x*s.x, s.y*s.y, s.z*s.z) * mass;
+ 
+         // an ellipsoid primitiv has got its coordinate system at its center, so shift it with radius
+         return CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+@@ -796,7 +796,7 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::createCapsule(const Ogre::AxisAlignedBox&amp; aabb,
+             Ogre::Vector3* offset,
+             Ogre::Quaternion* orientation,
+-            const Ogre::Real Mass,
++            const Ogre::Real mass,
+             Ogre::Vector3* inertia)
+     {
+         Ogre::Vector3 size = aabb.getSize();
+@@ -815,7 +815,7 @@
+ 			orientation = &amp;object_orientation;
+         if (inertia) {
+             double sradius = radius*radius;
+-			*inertia = Vector3(sradius, size.y*size.y, sradius);
++			*inertia = Vector3(sradius, size.y*size.y, sradius) * mass;
+         }
+ 
+ 		// an capsule primitiv has got its coordinate system at its center, so shift it with radius
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000260.html">[Dsa-hl-svn] r3189 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000262.html">[Dsa-hl-svn] r3191 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#261">[ date ]</a>
+              <a href="thread.html#261">[ thread ]</a>
+              <a href="subject.html#261">[ subject ]</a>
+              <a href="author.html#261">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,240 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3735 - in rl/trunk/engine/core: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3735%20-%20in%20rl/trunk/engine/core%3A%20.%20include%20src&In-Reply-To=%3C200708231953.l7NJrp9q030188%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000805.html">
+   <LINK REL="Next"  HREF="000807.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3735 - in rl/trunk/engine/core: . include src</H1>
+    <B>josch at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3735%20-%20in%20rl/trunk/engine/core%3A%20.%20include%20src&In-Reply-To=%3C200708231953.l7NJrp9q030188%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3735 - in rl/trunk/engine/core: . include src">josch at mail.berlios.de
+       </A><BR>
+    <I>Thu Aug 23 21:53:51 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000805.html">[Dsa-hl-svn] r3734 - in modules: common/scripts	regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="000807.html">[Dsa-hl-svn] r3736 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#806">[ date ]</a>
+              <a href="thread.html#806">[ thread ]</a>
+              <a href="subject.html#806">[ subject ]</a>
+              <a href="author.html#806">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: josch
+Date: 2007-08-23 21:53:33 +0200 (Thu, 23 Aug 2007)
+New Revision: 3735
+
+Added:
+   rl/trunk/engine/core/include/PolynomicSoundFadeFunctor.h
+   rl/trunk/engine/core/src/PolynomicSoundFadeFunctor.cpp
+Modified:
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/Makefile.am
+   rl/trunk/engine/core/src/Makefile.am
+Log:
+Added PolynomicSoundFadeFunctor. This fade functor takes an vector of interpolation points and then calculates the polynom parameters with the Newton method.
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-08-22 22:24:36 UTC (rev 3734)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-08-23 19:53:33 UTC (rev 3735)
+@@ -817,6 +817,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\PolynomicSoundFadeFunctor.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\PrimitiveObject.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/include/Makefile.am	2007-08-22 22:24:36 UTC (rev 3734)
++++ rl/trunk/engine/core/include/Makefile.am	2007-08-23 19:53:33 UTC (rev 3735)
+@@ -50,6 +50,7 @@
+ 	PhysicsMaterialRaycast.h \
+ 	PlayAnimationJob.h \
+ 	PlaySoundJob.h \
++	PolynomicSoundFadeFunctor.h \
+ 	PrimitiveObject.h \
+ 	QuadTree.h \
+ 	RubyInterpreter.h \
+
+Added: rl/trunk/engine/core/include/PolynomicSoundFadeFunctor.h
+===================================================================
+--- rl/trunk/engine/core/include/PolynomicSoundFadeFunctor.h	2007-08-22 22:24:36 UTC (rev 3734)
++++ rl/trunk/engine/core/include/PolynomicSoundFadeFunctor.h	2007-08-23 19:53:33 UTC (rev 3735)
+@@ -0,0 +1,45 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __RL_POLYNOMIC_SOUND_FADE_FUNCTOR_H__
++#define __RL_POLYNOMIC_SOUND_FADE_FUNCTOR_H__
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;SoundFadeFunctor.h&quot;
++#include &lt;vector&gt;
++
++
++namespace rl {
++//    class SoundObject;
++	typedef std::vector&lt; std::pair&lt;Ogre::Real, Ogre::Real&gt; &gt; InterpolationPoints;
++	typedef std::vector&lt;Ogre::Real&gt; Parameters;
++
++    class _RlCoreExport PolynomicSoundFadeFunctor : public SoundFadeFunctor
++    {
++    public:
++        PolynomicSoundFadeFunctor(Ogre::Real duration, InterpolationPoints *points);
++		~PolynomicSoundFadeFunctor();
++
++        virtual Ogre::Real operator()(Ogre::Real time);
++
++    private:
++        // Interpolation points
++        InterpolationPoints *mPoints;
++		Parameters *mParameters;
++    };
++}
++
++#endif
+
+Modified: rl/trunk/engine/core/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/src/Makefile.am	2007-08-22 22:24:36 UTC (rev 3734)
++++ rl/trunk/engine/core/src/Makefile.am	2007-08-23 19:53:33 UTC (rev 3735)
+@@ -49,6 +49,7 @@
+ 	PhysicsMaterialRaycast.cpp \
+ 	PlayAnimationJob.cpp \
+ 	PlaySoundJob.cpp \
++	PolynomicSoundFadeFunctor.cpp \
+ 	PrimitiveObject.cpp \
+ 	RubyInterpreter.cpp \
+ 	SceneQuery.cpp \
+
+Added: rl/trunk/engine/core/src/PolynomicSoundFadeFunctor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PolynomicSoundFadeFunctor.cpp	2007-08-22 22:24:36 UTC (rev 3734)
++++ rl/trunk/engine/core/src/PolynomicSoundFadeFunctor.cpp	2007-08-23 19:53:33 UTC (rev 3735)
+@@ -0,0 +1,66 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;PolynomicSoundFadeFunctor.h&quot;
++
++
++namespace rl
++{
++    PolynomicSoundFadeFunctor::PolynomicSoundFadeFunctor(Ogre::Real duration, InterpolationPoints *points) :
++        SoundFadeFunctor(duration),
++        mPoints(points),
++		mParameters(NULL)
++    {
++		mParameters = new Parameters(points-&gt;size());
++		int n = points-&gt;size() - 1;
++		for(int i = 0; i &lt; n; i++)
++		{
++			(*mParameters)[i] = (*mPoints)[i].second;
++		}
++		for(int k = 1; k &lt;= n; k++)
++		{
++			for(int i = n; i &gt;= k; i--)
++			{
++				(*mParameters)[i] = 1.0f * ((*mParameters)[i] - (*mParameters)[i - 1]) / ((*mPoints)[i].first - (*mPoints)[i - k].first);
++			}
++		}
++    }
++
++	PolynomicSoundFadeFunctor::~PolynomicSoundFadeFunctor()
++	{
++		if (mPoints != NULL)
++		{
++			delete mPoints;
++		}
++		if (mParameters != NULL)
++		{
++			delete mParameters;
++		}
++	}
++
++    Ogre::Real PolynomicSoundFadeFunctor::operator()(Ogre::Real time)
++    {
++        int n = mPoints-&gt;size() - 1;
++		Ogre::Real p = (*mPoints)[n].first;
++		for(int k = n - 1; k &gt;= 0; k--)
++		{
++			p *= (time - (*mPoints)[k].first) + (*mParameters)[k];
++		}
++		return p;
++    }
++
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000805.html">[Dsa-hl-svn] r3734 - in modules: common/scripts	regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="000807.html">[Dsa-hl-svn] r3736 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#806">[ date ]</a>
+              <a href="thread.html#806">[ thread ]</a>
+              <a href="subject.html#806">[ subject ]</a>
+              <a href="author.html#806">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

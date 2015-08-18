@@ -1,0 +1,969 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4237 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4237%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200803080101.m28118DD024381%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001307.html">
+   <LINK REL="Next"  HREF="001309.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4237 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src	ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4237%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200803080101.m28118DD024381%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4237 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src	ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 02:01:08 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001307.html">[Dsa-hl-svn] r4236 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="001309.html">[Dsa-hl-svn] r4238 - modules/combattest/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1308">[ date ]</a>
+              <a href="thread.html#1308">[ thread ]</a>
+              <a href="subject.html#1308">[ subject ]</a>
+              <a href="author.html#1308">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-08 02:01:02 +0100 (Sat, 08 Mar 2008)
+New Revision: 4237
+
+Modified:
+   rl/trunk/engine/ai/include/AgentCombatState.h
+   rl/trunk/engine/ai/src/AgentCombatState.cpp
+   rl/trunk/engine/core/include/Actor.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/include/Combatant.h
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/src/Armor.cpp
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/rules/src/Combatant.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Weapon.cpp
+   rl/trunk/engine/ui/include/CombatControlState.h
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+Log:
+WIP on combat. Semi usable.
+
+Modified: rl/trunk/engine/ai/include/AgentCombatState.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentCombatState.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/ai/include/AgentCombatState.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -35,7 +35,6 @@
+         virtual ~AgentCombatState();
+ 
+         virtual void requestCombatantAction();
+-		virtual void executeAction(Kampfaktion* action);
+ 
+         virtual Ogre::String getCombatantTypeName() const;
+ 
+
+Modified: rl/trunk/engine/ai/src/AgentCombatState.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentCombatState.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/ai/src/AgentCombatState.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -50,28 +50,24 @@
+ 		{
+ 			Combatant* target = *allies.begin();
+ 			// Are we in weapon range to opponent
+-			AttackeAktion* attacke = dynamic_cast&lt;AttackeAktion*&gt;(
+-				CombatManager::getSingleton().getKampfaktion(&quot;Attacke&quot;));
+-			if (getPosition().distance(target-&gt;getPosition())
+-				&lt;= attacke-&gt;getMaximumTargetDistance(this))
++			if (target)
+ 			{
+-				// Ok, we can attack
+-				mCombat-&gt;registerCombatantAction(this, attacke, target);
++				// Are we in weapon range to opponent
++				if (mCombat-&gt;canAttack(this, target))
++				{
++					// Ok, we can attack
++					mCombat-&gt;registerAttacke(this, target);
++				}
++				else
++				{
++					// We can't attack from here, so go to opponent.
++					mCombat-&gt;registerFolgen(this, target);
++				}
+ 			}
+-			else
+-			{
+-				// We can't attack from here, so go to opponent.
+-				Kampfaktion* folgen = CombatManager::getSingleton().getKampfaktion(&quot;Folgen&quot;);
+-				mCombat-&gt;registerCombatantAction(this, folgen, target);
+-			}
+ 		}
+ 		mCombat-&gt;registerCombatantRoundDone(this);
+     }
+ 
+-	void AgentCombatState::executeAction(Kampfaktion* action)
+-	{
+-	}
+-
+ 	void AgentCombatState::update(const float elapsedTime)
+     {
+         mAgent-&gt;updateVehicle(0, elapsedTime);
+
+Modified: rl/trunk/engine/core/include/Actor.h
+===================================================================
+--- rl/trunk/engine/core/include/Actor.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/core/include/Actor.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -157,6 +157,9 @@
+         /// Gibt die Orientierung des Aktors relativ zur Welt zur&#252;ck
+         const Ogre::Quaternion&amp; getWorldOrientation(void) const;
+ 
++        /// Gibt die bounding box in world space zur&#252;ck.
++        Ogre::AxisAlignedBox getWorldBoundingBox() const;
++
+         /// Setzt die Orientierung des Aktors
+         void setOrientation(const Ogre::Quaternion&amp; orientation);
+ 
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/core/src/Actor.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -364,6 +364,49 @@
+         }
+     }
+ 
++    Ogre::AxisAlignedBox Actor::getWorldBoundingBox(void) const
++	{
++		PhysicalObject* po = dynamic_cast&lt;PhysicalObject*&gt;(mActorControlledObject);
++		AxisAlignedBox box;
++		if (po)
++		{
++			box = po-&gt;getDefaultSize();
++		}
++		else
++		{
++			return AxisAlignedBox();
++		}
++
++		Matrix4 m;
++
++        if (mSceneNode)
++        {
++			m = mSceneNode-&gt;_getFullTransform();
++        }
++        else if (mBone)
++        {
++			m = mBone-&gt;_getFullTransform();
++        }
++        else
++        {
++			return AxisAlignedBox();
++        }
++
++		Vector3 min = m * box.getMinimum();
++		Vector3 max = m * box.getMaximum();
++
++		Vector3 nmin, nmax;
++		nmin.x = std::min(min.x, max.x);
++		nmin.y = std::min(min.y, max.y);
++		nmin.z = std::min(min.z, max.z);
++
++		nmax.x = std::max(min.x, max.x);
++		nmax.y = std::max(min.y, max.y);
++		nmax.z = std::max(min.z, max.z);
++
++        return AxisAlignedBox(nmin, nmax);
++	}
++
+     const Quaternion&amp; Actor::getWorldOrientation(void) const
+     {
+         if (mSceneNode)
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+ 	ProjectType=&quot;Visual C++&quot;
+-	Version=&quot;8,00&quot;
++	Version=&quot;8.00&quot;
+ 	Name=&quot;RlRules&quot;
+ 	ProjectGUID=&quot;{1D1D45B2-A9C3-4D10-93EC-22AE4AA5C070}&quot;
+ 	RootNamespace=&quot;RlRules&quot;
+@@ -371,6 +371,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\GoToJob.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\Inventory.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -609,6 +613,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\GoToJob.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\Inventory.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/include/Combat.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -18,6 +18,8 @@
+ #define __RL_COMBAT_H__
+ 
+ #include &quot;RulesPrerequisites.h&quot;
++
++#include &quot;JobListener.h&quot;
+ #include &quot;Kampfaktion.h&quot;
+ 
+ #include &lt;set&gt;
+@@ -27,8 +29,9 @@
+ namespace rl
+ {
+     class Combatant;
++	class JobSet;
+ 
+-    class _RlRulesExport Combat
++	class _RlRulesExport Combat : public JobListener
+     {
+     public:
+         typedef std::set&lt;Combatant*&gt; CombatantSet;
+@@ -51,23 +54,32 @@
+         // Called by combatants in response to a request by the Combat object.
+         // With calling one of these functions combatants register their actions for this round.
+ 
+-        void registerCombatantAction(Combatant*, Kampfaktion* ka);
+-        void registerCombatantAction(Combatant*, Kampfaktion* ka, Combatant* target);
+-		void registerCombatantAction(Combatant*, Kampfaktion* ka, const Ogre::Vector3&amp; target);
+-		void registerCombatantRoundDone(Combatant*);
++		void registerAttacke(Combatant* actor, Combatant* target);
++        void registerParade(Combatant* actor);
++        void registerAusweichen(Combatant* actor);
++		void registerBewegen(Combatant* actor, const Ogre::Vector3&amp; targetPos);
++		void registerFolgen(Combatant* actor, Combatant* target);
++		void registerCombatantRoundDone(Combatant* actor);
+ 
+-        void actionExecuted(Combatant*, Kampfaktion*);
++		bool canAttack(Combatant* actor, Combatant* target) const;
+ 
++		// JobListener overrides
++
++        virtual void jobFinished(unsigned long ticket);
++
+     private:
++		typedef enum {ATTACKE, BEWEGEN, FOLGEN} Aktion;
++		typedef enum {PARADE, AUSWEICHEN} Reaktion;
+ 		struct ActionEntry
+ 		{
+-			Kampfaktion* kampfaktion;
++			Aktion aktion;
+ 			Combatant* actor;
+ 			Combatant* target;
+ 			Ogre::Vector3 targetPos;
+ 		};
+ 		typedef std::vector&lt;ActionEntry&gt; ActionEntryVector;
+ 		typedef std::map&lt;Combatant*, ActionEntryVector&gt; CombatantActionsMap;
++		typedef std::map&lt;Combatant*, Reaktion&gt; CombatantReactionsMap;
+         typedef std::vector&lt;std::pair&lt;int, Combatant*&gt; &gt; CombatantQueue;
+ 
+         CombatantSet mOpponents;
+@@ -75,14 +87,20 @@
+         /// Combatants in order of their initiative for the current round.
+         CombatantQueue mCombatantQueue;
+         CombatantActionsMap mCombatantActions;
++		CombatantReactionsMap mCombatantReactions;
+ 		// Combatants who have registered all their actions for this round
+ 		CombatantSet mFinishedCombatants;
++		unsigned long mAnimationSequenceTicket;
+ 
+         unsigned short mCurrentRound;
+ 
+         void beginRound();
+         void executeRound();
+         void endRound();
++
++		void doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target);
++
++		Ogre::Real getMaximumAttackeDistance(Combatant* actor) const;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/include/Combatant.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combatant.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/include/Combatant.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -25,6 +25,8 @@
+     class Creature;
+     class CreatureController;
+ 	class Kampfaktion;
++	class JobSet;
++	class Weapon;
+ 
+     /// Base class of combat participiants. This defines the interface Combat uses
+ 	/// to communicate with Combatants. Be it AI bots or actual users.
+@@ -41,11 +43,6 @@
+         /// it can be done synchronously or asynchronously.
+         virtual void requestCombatantAction() = 0;
+ 
+-        /// This function is called by the Combat the Combatantant is taking part in,
+-        /// in order to request it to execute the registered action.
+-		/// When done, Combatant is supposed to call Combat#actionExecuted.
+-		virtual void executeAction(Kampfaktion* aktion) = 0;
+-
+         /// Type name used by factory
+ 		virtual Ogre::String getCombatantTypeName() const = 0;
+ 
+@@ -57,9 +54,45 @@
+ 		CeGuiString getName() const;
+ 		Ogre::Vector3 getPosition() const;
+ 
++		Weapon* getActiveWeapon() const;
++
++        /**
++        *  Fuehrt eine Attacke aus. Die Funktion wird von einem Angriffsmanoever 
++        *  aufgerufen.
++        *  @retval RESULT_ERFOLG Eine erfolgreiche Attacke.
++        *  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Attacke.
++        *  @retval RESULT_GLUECKLICH Eine gute Attacke.
++        *  @retval RESULT_PATZER Ein bestaetigter Attackepatzer.
++        **/
++        int rollAttacke();
++
++        /**
++        *  Fuehrt eine Parade aus. Die Funktion wird von einem Parademanoever 
++              *  aufgerufen.
++        *  @param guteParade Versucht eine gute Parade (bei einem gluecklichen Treffer)
++        *  @retval RESULT_ERFOLG Eine erfolgreiche Parade.
++        *  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Parade.
++        *  @retval RESULT_GLUECKLICH Eine gute Parade.
++        *  @retval RESULT_PATZER Ein bestaetigter Paradepatzer.
++        *  @throws InvalidArgumentException Kampftechnik nicht in 
++        *   \c mKampftechniken gefunden.
++        **/
++		int rollParade(bool gluecklich);
++
++		void doAttacke(JobSet* jobSet, Combatant* target, int attackeResult, bool parade,
++			int paradeResult = 0);
++		void doParade(JobSet* jobSet, Combatant* target, int paradeResult);
++		void doBewegen(JobSet* jobSet, const Ogre::Vector3&amp; targetPos);
++		void doFolgen(JobSet* jobSet, Combatant* target);
++		void doGetroffen(JobSet* jobSet);
++
+     protected:
+         Combat* mCombat;
+         CreatureController* mController;
++
++		/// Converts canonic animation to actual animation name inside the skeleton
++		/// According to the mapping defined in Creature gof.
++		Ogre::String getMeshAnimationName(const Ogre::String animationName);
+     };
+ 
+     class _RlRulesExport CombatantFactory
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/include/CreatureController.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -108,7 +108,9 @@
+          * The movement doesn't change until another movement is set, so it is not necessary to call this function 
+          * every frame. Only the rotation is resettet to zero every new frame!
+          * @param type the id of the movement
+-         * @param direction if the direction isn't possible (see AbstractMovement::isDirectionPossible), only a &quot;part&quot; of the direction is applied
++         * @param direction This is the movement direction in local space.
++		 *                  If the direction isn't possible (see AbstractMovement::isDirectionPossible),
++		 *                  only a &quot;part&quot; of the direction is applied.
+          * @param rotation like above
+          * @retval false signifies that the change to this movement was not possible (possibly because the present movement forbade it)
+          */
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -142,6 +142,7 @@
+         void setOrientation(const Ogre::Quaternion&amp; orientation);
+         const Ogre::Quaternion&amp; getOrientation() const;
+         const Ogre::Vector3&amp; getPosition() const;
++        Ogre::AxisAlignedBox getWorldBoundingBox() const;
+ 
+         /// Soll der Aktor &#252;berhaupt leuchten?
+         bool isHighlightingEnabled();
+
+Modified: rl/trunk/engine/rules/src/Armor.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Armor.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/src/Armor.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -38,6 +38,7 @@
+         mRsEffect(NULL)
+ 	{
+         mQueryFlags |= QUERYFLAG_ARMOR;
++		mItemType = ITEMTYPE_ARMOR;
+ 	}
+ 
+ 	Armor::~Armor(void)
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -20,8 +20,14 @@
+ #include &quot;Combatant.h&quot;
+ #include &quot;CreatureController.h&quot;
+ #include &quot;GameEventLog.h&quot;
++#include &quot;Inventory.h&quot;
++#include &quot;Job.h&quot;
++#include &quot;JobQueue.h&quot;
++#include &quot;JobScheduler.h&quot;
++#include &quot;MathUtil.h&quot;
+ #include &quot;MessagePump.h&quot;
+ #include &quot;RulesMessages.h&quot;
++#include &quot;Weapon.h&quot;
+ 
+ 
+ using namespace boost;
+@@ -37,7 +43,7 @@
+         bool operator()(const std::pair&lt;int, Combatant*&gt;&amp; c1,
+             const std::pair&lt;int, Combatant*&gt;&amp; c2) const
+         {
+-            return c1.first &lt; c2.first;
++            return c1.first &gt; c2.first;
+         }
+     };
+ 
+@@ -46,7 +52,8 @@
+           mAllies(),
+           mCombatantQueue(),
+           mCombatantActions(),
+-          mCurrentRound(0)
++          mCurrentRound(0),
++		  mAnimationSequenceTicket(0)
+     {
+     }
+ 
+@@ -112,57 +119,42 @@
+     {
+     }
+ 
+-    void Combat::beginRound()
+-    {
+-        // Increment round counter
+-        mCurrentRound++;
+-        mCombatantActions.clear();
+-
+-		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
+-			GET_COMBAT);
+-		// Show ini for this round.
+-        for (CombatantQueue::iterator it = mCombatantQueue.begin();
+-			it != mCombatantQueue.end(); ++it)
+-        {
+-			CeGuiString evt = it-&gt;second-&gt;getCreatureController()-&gt;getCreature()-&gt;getName();
+-			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
+-			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
+-        }
+-
+-
+-        // Request actions from combatants
+-        for (CombatantQueue::iterator it = mCombatantQueue.begin();
+-            it != mCombatantQueue.end(); ++it)
+-        {
+-            it-&gt;second-&gt;requestCombatantAction();
+-        }
+-    }
+-
+-    void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka)
++	void Combat::registerAttacke(Combatant* actor, Combatant* target)
+ 	{
+ 		ActionEntry entry;
+-		entry.kampfaktion = ka;
++		entry.aktion = ATTACKE;
+ 		entry.actor = actor;
++		entry.target = target;
+ 
+ 		mCombatantActions[actor].push_back(entry);
+ 	}
+ 
+-    void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka, Combatant* target)
++	void Combat::registerParade(Combatant* actor)
+ 	{
++		mCombatantReactions[actor] = PARADE;
++	}
++
++	void Combat::registerAusweichen(Combatant* actor)
++	{
++		mCombatantReactions[actor] = AUSWEICHEN;
++	}
++
++	void Combat::registerBewegen(Combatant* actor, const Ogre::Vector3&amp; targetPos)
++	{
+ 		ActionEntry entry;
+-		entry.kampfaktion = ka;
++		entry.aktion = BEWEGEN;
+ 		entry.actor = actor;
+-		entry.target = target;
++		entry.targetPos = targetPos;
+ 
+ 		mCombatantActions[actor].push_back(entry);
+ 	}
+ 
+-	void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka, const Ogre::Vector3&amp; targetPos)
++	void Combat::registerFolgen(Combatant* actor, Combatant* target)
+ 	{
+ 		ActionEntry entry;
+-		entry.kampfaktion = ka;
++		entry.aktion = FOLGEN;
+ 		entry.actor = actor;
+-		entry.targetPos = targetPos;
++		entry.target = target;
+ 
+ 		mCombatantActions[actor].push_back(entry);
+ 	}
+@@ -177,12 +169,110 @@
+         }
+ 	}
+ 
+-    void Combat::actionExecuted(Combatant*, Kampfaktion*)
++	bool Combat::canAttack(Combatant* actor, Combatant* target) const
+ 	{
++		// Does the actor have a weapon readied?
++		if (actor-&gt;getActiveWeapon() == NULL)
++		{
++			return false;
++		}
++		// Is target in weapon range?
++		Real distance = MathUtil::distance(target-&gt;getCreature()-&gt;getWorldBoundingBox(),
++			actor-&gt;getCreature()-&gt;getWorldBoundingBox());
++		if (distance &gt; getMaximumAttackeDistance(actor))
++		{
++			return false;
++		}
++		return true;
+ 	}
+ 
++	Ogre::Real Combat::getMaximumAttackeDistance(Combatant* actor) const
++	{
++		std::vector&lt;Weapon*&gt; weapons = actor-&gt;getCreature()-&gt;getInventory()-&gt;getReadiedWeapons();
++		Real distance = 0.0f;
++		for (size_t i = 0; i &lt; weapons.size(); ++i)
++		{
++			distance = std::max(weapons[i]-&gt;getMaximumDistance(), distance);
++		}
++		return distance;
++	}
++
++    void Combat::beginRound()
++    {
++        // Increment round counter
++        mCurrentRound++;
++
++        mCombatantActions.clear();
++		mCombatantReactions.clear();
++		mFinishedCombatants.clear();
++
++		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
++			GET_COMBAT);
++		// Show ini for this round.
++        for (CombatantQueue::iterator it = mCombatantQueue.begin();
++			it != mCombatantQueue.end(); ++it)
++        {
++			CeGuiString evt = it-&gt;second-&gt;getCreatureController()-&gt;getCreature()-&gt;getName();
++			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
++			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
++        }
++
++        // Request actions from combatants
++        for (CombatantQueue::iterator it = mCombatantQueue.begin();
++            it != mCombatantQueue.end(); ++it)
++        {
++            it-&gt;second-&gt;requestCombatantAction();
++        }
++    }
++
+     void Combat::executeRound()
+ 	{
++		// Auf gehts!
++
++		// Prepare JobQueue for animations.
++		JobQueue* jobQueue = new JobQueue();
++
++		for (size_t actionIndex = 0; actionIndex &lt; 3; ++actionIndex)
++		{
++			JobSet* jobSet = new JobSet();
++
++			for (CombatantQueue::iterator it = mCombatantQueue.begin();
++				it != mCombatantQueue.end(); ++it)
++			{
++				Combatant* combatant = it-&gt;second;
++				// Is there an action registed for combatant?
++				CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
++				if (actionsIt != mCombatantActions.end())
++				{
++					// Do we have an action for this pass ?
++					if (actionIndex &lt; actionsIt-&gt;second.size())
++					{
++						// Yes we do.
++
++						ActionEntry entry = actionsIt-&gt;second[actionIndex];
++						if (entry.aktion == ATTACKE)
++						{
++							// Check whether possible
++							if (canAttack(combatant, entry.target))
++							{
++								doAttacke(jobSet, combatant, entry.target);
++							}
++						}
++						else if (entry.aktion == BEWEGEN)
++						{
++							combatant-&gt;doBewegen(jobSet, entry.targetPos);
++						}
++						else if (entry.aktion == FOLGEN)
++						{
++							combatant-&gt;doFolgen(jobSet, entry.target);
++						}
++					}
++				}
++			}
++			jobQueue-&gt;add(jobSet);
++		}
++		mAnimationSequenceTicket = JobScheduler::getSingleton().addJob(jobQueue,
++			JobScheduler::JP_NORMAL, 0.0f, Ogre::Math::POS_INFINITY, this);
+ 	}
+ 
+     void Combat::endRound()
+@@ -191,5 +281,49 @@
+         // 
+ 
+         // Refill combatant queue with combatants that are still alive.
++		beginRound();
+     }
++
++	void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
++	{
++		// Make an attack roll.
++		int aresult = actor-&gt;rollAttacke();
++		if (aresult &gt;= RESULT_ERFOLG)
++		{
++			// Ok, succeeded
++			// Has target registered a reaction?
++			CombatantReactionsMap::iterator it = mCombatantReactions.find(target);
++			if (it != mCombatantReactions.end())
++			{
++				// Yes, there is a reaction
++				if (it-&gt;second == PARADE)
++				{
++					int presult = target-&gt;rollParade(aresult &gt;= RESULT_GLUECKLICH);
++					target-&gt;doParade(jobSet, actor, presult);
++					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
++				}
++				else if (it-&gt;second == AUSWEICHEN)
++				{
++					// Faellt aus wegen is nich.
++				}
++			}
++			else
++			{
++				actor-&gt;doAttacke(jobSet, target, aresult, false);
++			}
++		}
++		else
++		{
++			actor-&gt;doAttacke(jobSet, target, aresult, false);
++			target-&gt;doGetroffen(jobSet);
++		}
++	}
++
++    void Combat::jobFinished(unsigned long ticket)
++	{
++		if (ticket == mAnimationSequenceTicket)
++		{
++			endRound();
++		}
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/Combatant.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combatant.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/src/Combatant.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -19,12 +19,21 @@
+ 
+ #include &quot;Combat.h&quot;
+ #include &quot;CreatureController.h&quot;
++#include &quot;GoToJob.h&quot;
++#include &quot;Inventory.h&quot;
++#include &quot;Job.h&quot;
++#include &quot;JobQueue.h&quot;
++#include &quot;PlayAnimationJob.h&quot;
++#include &quot;Weapon.h&quot;
+ 
++using namespace Ogre;
++
+ namespace rl
+ {
+     Combatant::Combatant(Combat* combat, CreatureController* controller)
+         : mCombat(combat), mController(controller)
+     {
++		mController-&gt;setMovement(CreatureController::MT_STEHEN, Vector3::ZERO, Vector3::ZERO);
+     }
+ 
+     Combatant::~Combatant()
+@@ -50,4 +59,121 @@
+ 	{
+ 		return getCreature()-&gt;getPosition();
+ 	}
++
++	Weapon* Combatant::getActiveWeapon() const
++	{
++		std::vector&lt;Weapon*&gt; weapons = getCreature()-&gt;getInventory()-&gt;getReadiedWeapons();
++		if (weapons.empty())
++		{
++			return NULL;
++		}
++		else
++		{
++			return weapons[0];
++		}
++	}
++
++	int Combatant::rollAttacke()
++	{
++		Weapon* weapon = getActiveWeapon();
++		return getCreature()-&gt;doAttacke(weapon-&gt;getKampftechnik(), 0);
++	}
++
++	int Combatant::rollParade(bool gluecklich)
++	{
++		Weapon* weapon = getActiveWeapon();
++		return getCreature()-&gt;doParade(weapon-&gt;getKampftechnik(), 0, gluecklich);
++	}
++
++	void Combatant::doAttacke(JobSet* jobSet, Combatant* target, int attackeResult, bool parade,
++		int paradeResult)
++	{
++		// For the start, we just turn this to face target manually here.
++		Vector3 pos = getCreature()-&gt;getPosition();
++		pos.y = 0;
++		Vector3 targetPos = target-&gt;getCreature()-&gt;getPosition();
++		targetPos.y = 0;
++
++		getCreature()-&gt;setOrientation(Vector3::NEGATIVE_UNIT_Z.getRotationTo(targetPos - pos));
++
++		// Determine animation to be played according to outcome.
++		Ogre::String ani;
++		if (attackeResult &gt;= RESULT_ERFOLG)
++		{
++			if (parade)
++			{
++				if (paradeResult &gt;= RESULT_ERFOLG)
++				{
++					ani = &quot;kampf_attacke_pariert&quot;;
++				}
++				else
++				{
++					ani = &quot;kampf_attacke_treffer_nicht_pariert&quot;;
++				}
++			}
++			else
++			{
++				ani = &quot;kampf_attacke_treffer&quot;;
++			}
++		}
++		else
++		{
++			ani = &quot;kampf_attacke_misserfolg&quot;;
++		}
++
++		// Get real animation name
++		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(ani);
++		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first, 3.0f);
++	}
++
++	void Combatant::doParade(JobSet* jobSet, Combatant* target, int paradeResult)
++	{
++		// For the start, we just turn this to face target manually here.
++		Vector3 pos = getCreature()-&gt;getPosition();
++		pos.y = 0;
++		Vector3 targetPos = target-&gt;getCreature()-&gt;getPosition();
++		targetPos.y = 0;
++
++		getCreature()-&gt;setOrientation(Vector3::NEGATIVE_UNIT_Z.getRotationTo(targetPos - pos));
++
++		// Determine animation to be played according to outcome.
++		Ogre::String ani;
++		if (paradeResult &gt;= RESULT_ERFOLG)
++		{
++			ani = &quot;kampf_parade_erfolg&quot;;
++		}
++		else
++		{
++			ani = &quot;kampf_parade_misserfolg&quot;;
++		}
++
++		// Get real animation name
++		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(ani);
++		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first, 3.0f);
++	}
++
++	void Combatant::doGetroffen(JobSet* jobSet)
++	{
++		// Get real animation name
++		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(&quot;kampf_getroffen&quot;);
++		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first, 3.0f);
++	}
++
++	void Combatant::doBewegen(JobSet* jobSet, const Ogre::Vector3&amp; targetPos)
++	{
++		Job* job = new GoToJob(getCreature(), targetPos, 3.0f);
++		jobSet-&gt;add(job);
++	}
++
++	void Combatant::doFolgen(JobSet* jobSet, Combatant* target)
++	{
++		Job* job = new GoToJob(getCreature(), target-&gt;getCreature(), 3.0f);
++		jobSet-&gt;add(job);
++	}
++
++	Ogre::String Combatant::getMeshAnimationName(const Ogre::String animationName)
++	{
++		///@todo implement
++		return animationName;
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -374,6 +374,15 @@
+         return mPosition;
+     }
+ 
++	Ogre::AxisAlignedBox GameObject::getWorldBoundingBox() const
++	{
++        if (mActor != NULL)
++        {
++            return mActor-&gt;getWorldBoundingBox();
++        }
++        return Ogre::AxisAlignedBox();
++	}
++
+     void GameObject::setOrientation(const Ogre::Quaternion&amp; orientation)
+     {
+         if (mActor != NULL)
+
+Modified: rl/trunk/engine/rules/src/Weapon.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Weapon.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/rules/src/Weapon.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -47,6 +47,7 @@
+         mKampftechnik(&quot;&quot;)
+ 	{
+         mQueryFlags |= QUERYFLAG_WEAPON;
++		mItemType = ITEMTYPE_WEAPON;
+ 	}
+ 
+ 	Weapon::~Weapon()
+
+Modified: rl/trunk/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatControlState.h	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/ui/include/CombatControlState.h	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -52,7 +52,6 @@
+ 
+         virtual Ogre::String getCombatantTypeName() const;
+         virtual void requestCombatantAction();
+-		virtual void executeAction(Kampfaktion* action);
+ 
+ 		// Event handlers
+ 
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-08 01:00:23 UTC (rev 4236)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-08 01:01:02 UTC (rev 4237)
+@@ -149,10 +149,6 @@
+ 		mCombatGui-&gt;enableUserInput(true);
+     }
+ 
+-	void CombatControlState::executeAction(Kampfaktion* action)
+-	{
+-	}
+-
+ 	bool CombatControlState::userRequestAttackOpponent(Combatant* opponent)
+ 	{
+ 		mAttackedOpponent = opponent;
+@@ -171,25 +167,20 @@
+ 		if (mAttackedOpponent)
+ 		{
+ 			// Are we in weapon range to opponent
+-			AttackeAktion* attacke = dynamic_cast&lt;AttackeAktion*&gt;(
+-				CombatManager::getSingleton().getKampfaktion(&quot;Attacke&quot;));
+-			if (getPosition().distance(mAttackedOpponent-&gt;getPosition())
+-				&lt;= attacke-&gt;getMaximumTargetDistance(this))
++			if (mCombat-&gt;canAttack(this, mAttackedOpponent))
+ 			{
+ 				// Ok, we can attack
+-				mCombat-&gt;registerCombatantAction(this, attacke, mAttackedOpponent);
++				mCombat-&gt;registerAttacke(this, mAttackedOpponent);
+ 			}
+ 			else
+ 			{
+ 				// We can't attack from here, so go to opponent.
+-				Kampfaktion* folgen = CombatManager::getSingleton().getKampfaktion(&quot;Folgen&quot;);
+-				mCombat-&gt;registerCombatantAction(this, folgen, mAttackedOpponent);
++				mCombat-&gt;registerFolgen(this, mAttackedOpponent);
+ 			}
+ 		}
+ 		if (mParriedOpponent)
+ 		{
+-			Kampfaktion* parade = CombatManager::getSingleton().getKampfaktion(&quot;Parade&quot;);
+-			mCombat-&gt;registerCombatantAction(this, parade, mAttackedOpponent);
++			mCombat-&gt;registerParade(this);
+ 		}
+ 
+ 		mCombat-&gt;registerCombatantRoundDone(this);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001307.html">[Dsa-hl-svn] r4236 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="001309.html">[Dsa-hl-svn] r4238 - modules/combattest/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1308">[ date ]</a>
+              <a href="thread.html#1308">[ thread ]</a>
+              <a href="subject.html#1308">[ subject ]</a>
+              <a href="author.html#1308">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

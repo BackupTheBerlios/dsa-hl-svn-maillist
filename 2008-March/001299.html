@@ -1,0 +1,791 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4228 - in rl/trunk/engine: ai ai/include ai/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4228%20-%20in%20rl/trunk/engine%3A%20ai%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200803072319.m27NJXkI029256%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001298.html">
+   <LINK REL="Next"  HREF="001300.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4228 - in rl/trunk/engine: ai ai/include ai/src	script/swig</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4228%20-%20in%20rl/trunk/engine%3A%20ai%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200803072319.m27NJXkI029256%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4228 - in rl/trunk/engine: ai ai/include ai/src	script/swig">iblis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 00:19:33 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001298.html">[Dsa-hl-svn] r4227 - in dependencies/opensteer: include/OpenSteer	src
+</A></li>
+        <LI>Next message: <A HREF="001300.html">[Dsa-hl-svn] r4229 - in modules/aitest: dsa scripts scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1299">[ date ]</a>
+              <a href="thread.html#1299">[ thread ]</a>
+              <a href="subject.html#1299">[ subject ]</a>
+              <a href="author.html#1299">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-08 00:19:32 +0100 (Sat, 08 Mar 2008)
+New Revision: 4228
+
+Added:
+   rl/trunk/engine/ai/include/WalkPathBehaviour.h
+   rl/trunk/engine/ai/src/WalkPathBehaviour.cpp
+Modified:
+   rl/trunk/engine/ai/RlAI2005.vcproj
+   rl/trunk/engine/ai/include/AgentManager.h
+   rl/trunk/engine/ai/include/Landmark.h
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/Agent.cpp
+   rl/trunk/engine/ai/src/AgentManager.cpp
+   rl/trunk/engine/ai/src/Landmark.cpp
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+   rl/trunk/engine/script/swig/RlAi.head.swig
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+added a WalkPathBehaviour that allows an Agent to walk on a path (calculated AStarPath or LandmarkPath) and additionally avoid other Agents while following the path (of course, this still needs some fine tuning)
+
+Modified: rl/trunk/engine/ai/RlAI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ai/RlAI2005.vcproj	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/RlAI2005.vcproj	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+ 	ProjectType=&quot;Visual C++&quot;
+-	Version=&quot;8.00&quot;
++	Version=&quot;8,00&quot;
+ 	Name=&quot;RlAI&quot;
+ 	ProjectGUID=&quot;{C3E78B89-587B-499A-BE7D-4FE8564F0CD7}&quot;
+ 	RootNamespace=&quot;RlAI&quot;
+@@ -431,6 +431,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\WalkPathBehaviour.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\WayPointGraph.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -585,6 +589,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\WalkPathBehaviour.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\WayPointGraph.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/ai/include/AgentManager.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentManager.h	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/include/AgentManager.h	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -21,7 +21,13 @@
+ #include &quot;GameTask.h&quot;
+ #include &quot;GameObjectStateListener.h&quot;
+ #include &quot;FuzzyState.h&quot;
++#include &quot;OpenSteer/Proximity.h&quot;
+ 
++namespace OpenSteer
++{
++    class AbstractVehicle;
++}
++
+ namespace rl
+ {
+ 	class Creature;
+@@ -30,6 +36,7 @@
+     class Agent;
+ 
+     typedef FuzzyState&lt;SteeringVehicle&gt; SteeringBehaviour;
++    typedef OpenSteer::AbstractProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityDatabase;
+ 
+     class _RlAiExport BehaviourFactory
+     {
+@@ -111,7 +118,7 @@
+ 
+         //! Factory to create behaviours with.
+         BehaviourFactory* mBehaviourFactory;
+-		
++        ProximityDatabase* mAgentProximityCheck;
+ 		//! List of registered agents (includes mPlayer)
+ 		AgentMap mAgents;
+ 		//! Agent representing the player
+
+Modified: rl/trunk/engine/ai/include/Landmark.h
+===================================================================
+--- rl/trunk/engine/ai/include/Landmark.h	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/include/Landmark.h	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -17,10 +17,11 @@
+ #define __Landmark_H__
+ 
+ #include &quot;AiPrerequisites.h&quot;
++#include &quot;DebugVisualisable.h&quot;
+ 
+ namespace rl
+ {
+-	class _RlAiExport Landmark
++	class _RlAiExport Landmark : public DebugVisualisable
+ 	{
+ 	public:
+ 		Landmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
+@@ -28,6 +29,10 @@
+ 		const Ogre::String&amp; getName() const;
+ 		const Ogre::Vector3&amp; getPosition() const;
+ 
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
++    protected:
++        virtual void doCreatePrimitive();
+ 	private:
+ 		Ogre::String mName;
+ 		Ogre::Vector3 mPosition;
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -40,7 +40,8 @@
+ 	 * according to behaviours.
+ 	 */
+ 	typedef OpenSteer::SteerLibraryMixin&lt;SimpleVehicle_1&gt; SimpleVehicle_2;
+-	
++    typedef OpenSteer::AbstractTokenForProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityToken;
++
+ 	class Actor;
+ 	class Agent;
+ 	class PhysicalThing;
+@@ -65,6 +66,7 @@
+ 		 */
+ 		virtual ~SteeringVehicle(void);
+ 
++        CreatureController* getCreatureController();
+ 		/**
+ 		 * Add a force to the current force of the vehicle
+ 		 * @param  force value as force vector
+@@ -155,7 +157,7 @@
+ 
+ 		/** returns the position of ?
+ 		 */
+-		Ogre::Vector3 getPosition();
++		//Ogre::Vector3 getPosition();
+ 
+ 		// inherited from AbstractVehicle
+ 
+@@ -258,6 +260,9 @@
+         // derived from debugvisualisable
+         virtual DebugVisualisableFlag getFlag() const;
+         virtual void updatePrimitive();
++
++        inline void setProximityToken(ProximityToken* token) { mProximityToken = token; }
++
+ 	protected:
+ 		/** initializes
+ 		 */
+@@ -265,7 +270,7 @@
+ 
+ 		/** retrieves the neighbours of this SteeringVehicle
+ 		 */
+-		OpenSteer::AVGroup getNeighbors() const;
++		OpenSteer::AVGroup getNeighbors(const float maxRadius) const;
+ 		/** retrieves the obstacles
+ 		 */
+ 		const OpenSteer::ObstacleGroup&amp; getObstacles() const;
+@@ -291,6 +296,8 @@
+ 		//! the yaw angle in radians
+ 		//Ogre::Radian mYaw;
+ 
++        ProximityToken* mProximityToken;
++
+         //! Creature object steered by this vehicle(and controlled by Agent).
+         Creature* mCreature;
+         int mCreatureId;
+
+Added: rl/trunk/engine/ai/include/WalkPathBehaviour.h
+===================================================================
+--- rl/trunk/engine/ai/include/WalkPathBehaviour.h	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/include/WalkPathBehaviour.h	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -0,0 +1,88 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#ifndef __RlAI_WalkPathBehaviour_H__
++#define __RlAI_WalkPathBehaviour_H__
++
++#include &quot;AiPrerequisites.h&quot;
++#include &quot;AgentManager.h&quot;
++#include &quot;OpenSteer/PolylineSegmentedPathwaySingleRadius.h&quot;
++//#include &quot;AgentState.h&quot;
++//#include &quot;SteeringMachine.h&quot;
++//#include &quot;SteeringVehicle.h&quot;
++//#include &lt;stack&gt;
++
++namespace rl
++{
++    class Landmark;
++    class LandmarkPath;
++    class WayPointGraph;
++
++	/** This behaviour lets an agent walk along a path while avoiding other &quot;passengers&quot;
++     * which are known by the AgentManager
++	 */
++    class _RlAiExport WalkPathBehaviour : public SteeringBehaviour
++	{
++	public:
++		/** Constructor by Creature object.
++		 * @param character Creature object
++		 */
++		WalkPathBehaviour();
++
++		/** explicit virtual destructor
++		 */
++		virtual ~WalkPathBehaviour(void);
++
++		/** returns a string describing the type of fuzzy state.
++		 * function is abstract.
++		 * @returns type name string for fuzzy state.
++		 */
++		virtual CeGuiString getType();
++		/** should initialize the fuzzy state.
++		 * function is abstract.
++		 */
++		virtual void init();
++		/** should activate the fuzzy state.
++		 * function is abstract.
++		 */
++		virtual void activate();
++		/** deactivates fuzzy state.
++		 * function is abstract.
++		 */
++		virtual void deactivate();
++		/** tells the fuzzy state to update for the elapsed time.
++		 * @param elapsedtime gives the elapsed time as a float
++		 */
++		virtual void update(const float elapsedTime);
++
++		/** calculates the activation value.
++		 * @returns float containing the calculated activation value.
++		 */
++		virtual float calculateActivation();
++
++        /** Calculates the path to a Landmark by applying the AStar search on
++         * the given WayPointGraph. 
++         * The Path is used during the update-calls of the behaviour
++         */
++        void calcPathToLandmark(Landmark* lm, const WayPointGraph* wps);
++
++        void setLandmarkPath(LandmarkPath* lmp);
++    private:
++        Landmark* mLandmark;
++        OpenSteer::PolylineSegmentedPathwaySingleRadius mPathway;
++        int mPathDirection;
++	};
++}
++#endif
+
+Modified: rl/trunk/engine/ai/src/Agent.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Agent.cpp	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/src/Agent.cpp	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -43,7 +43,9 @@
+ Agent::~Agent(void)
+ {
+ 	if (mCreature != NULL)
++    {
+ 		ScriptWrapper::getSingleton().disowned(mCreature);
++    }
+ }
+ 
+ void Agent::initialize()
+
+Modified: rl/trunk/engine/ai/src/AgentManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentManager.cpp	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/src/AgentManager.cpp	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -40,12 +40,24 @@
+     // Register self as CombatantFactory with the CombatManager, so that State is switched
+     // when agent is taking part in a combat.
+     CombatManager::getSingleton().registerCombatantFactory(&quot;default&quot;, this);
++    // initialize the proximity database that keeps track of the positions of all Agents.
++    // this is used to query all current neighbours of an Agent so that he can avoid them 
++    const Vector3 center;
++    const float div = 20.0f;
++    const Vector3 divisions (div, 1.0f, div);
++    const float diameter = 80.0f; //XXX need better way to get this
++    const Vector3 dimensions (diameter, diameter, diameter);
++    mAgentProximityCheck = new OpenSteer::LQProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt;(center, dimensions, divisions);
+ }
+ 
+ AgentManager::~AgentManager(void)
+ {
+     GameObjectManager::getSingleton().unregisterGameObjectStateListener(this);
+ 	removeAllAgents();
++    if(mAgentProximityCheck != NULL)
++    {
++        delete mAgentProximityCheck;
++    }
+ }
+ 
+ Agent* AgentManager::createAgent(Creature* character)
+@@ -77,6 +89,10 @@
+ 
+ void AgentManager::addAgent(Agent* agent)
+ {
++    RlAssert(agent, &quot;Agent is NULL&quot;);
++    // add the agent to the proximity database
++    agent-&gt;setProximityToken(mAgentProximityCheck-&gt;allocateToken(agent));
++    // add him to the internal agent list
+     mAgents.insert(std::make_pair(agent-&gt;getControlledCreature(), agent));
+     LOG_MESSAGE(Logger::AI, 
+         &quot;created AI Agent&quot;);
+
+Modified: rl/trunk/engine/ai/src/Landmark.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Landmark.cpp	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/src/Landmark.cpp	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -16,6 +16,9 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;Landmark.h&quot;
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;LineSetPrimitive.h&quot;
++#include &quot;World.h&quot;
+ 
+ namespace rl
+ {
+@@ -33,4 +36,29 @@
+     {
+         return mPosition;
+     }
++
++    DebugVisualisableFlag Landmark::getFlag() const
++    {
++        return DVF_WAYPOINT;
++    }
++    void Landmark::updatePrimitive()
++    {
++        if (mSceneNode-&gt;getParent() == NULL)
++        {
++		    CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;getSceneManager()-&gt;
++			    getRootSceneNode()-&gt;addChild(mSceneNode);
++		    //mCharacterActor-&gt;_getSceneNode()-&gt;addChild(mSceneNode);
++        }
++
++        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++
++	    lineSet-&gt;clear();
++		// draw the waypoint itself
++        lineSet-&gt;addLine(mPosition, mPosition + Ogre::Vector3(0,2,0), Ogre::ColourValue::Green);
++    }
++
++    void Landmark::doCreatePrimitive()
++    {
++	    mPrimitive = new LineSetPrimitive();
++    }
+ }
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -41,6 +41,7 @@
+ 	  mCurrentForce(Vector3::ZERO), 
+ 	  mCurrentVelocity(Vector3::ZERO),
+ 	  mForwardVector(Vector3::NEGATIVE_UNIT_Z),
++      mProximityToken(NULL),
+ 	  mCreature(creature),
+       mCreatureId(mCreature-&gt;getId()),
+       mController(NULL),
+@@ -57,6 +58,10 @@
+ 
+ SteeringVehicle::~SteeringVehicle()
+ {
++    if(mProximityToken != NULL)
++    {
++        delete mProximityToken;
++    }
+ }
+ 
+ void SteeringVehicle::resetLocalSpace()
+@@ -85,6 +90,12 @@
+ 	setMaxSpeed(1.0f);   // velocity is clipped to this magnitude
+ }
+ 
++
++CreatureController* SteeringVehicle::getCreatureController()
++{
++    return CreatureControllerManager::getSingleton().getCreatureController(mCreature);
++}
++
+ void SteeringVehicle::addForce(const Ogre::Vector3&amp; force)
+ {
+ 	mCurrentForce += force;
+@@ -96,9 +107,9 @@
+     // since physics schould by handled by movingcreature
+ 
+ 	OgreNewt::Body* body = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-
+-	setPosition(mCreature-&gt;getPosition());
+-
++    Vector3 pos = mCreature-&gt;getPosition();
++	setPosition(pos);
++    mProximityToken-&gt;updateForNewPosition(pos);
+     //  Get the velocity vector
+ 	mCurrentVelocity = body-&gt;getVelocity();
+ 	//  enforce speed limit
+@@ -209,7 +220,8 @@
+ 
+ Vector3 SteeringVehicle::calcAvoidNeighbors(const float minTimeToCollision)
+ {
+-	Vector3 steering = Vec3Utils::setYtoZero(steerToAvoidNeighbors(minTimeToCollision, getNeighbors()));
++    const float maxRadius = minTimeToCollision * getMaxSpeed() * 2;
++	Vector3 steering = Vec3Utils::setYtoZero(steerToAvoidNeighbors(minTimeToCollision, getNeighbors(maxRadius)));
+ 	return steering;
+ }
+ 		
+@@ -235,9 +247,13 @@
+ 	return true;
+ }
+ 
+-AVGroup SteeringVehicle::getNeighbors() const
++AVGroup SteeringVehicle::getNeighbors(const float maxRadius) const
+ {
+-	AVGroup group;
++	AVGroup neighbors;
++    if(mProximityToken != NULL)
++    {
++        mProximityToken-&gt;findNeighbors(getPosition(), maxRadius, neighbors);
++    }
+ 	//AgentManager::VehicleList list = AgentManager::getSingleton().getNeighbors(NULL);
+ 	//AgentManager::VehicleList::const_iterator itr = list.begin();
+ 	//for(; itr != list.end(); ++itr)
+@@ -247,7 +263,7 @@
+ 	//		group.push_back((*itr));
+ 	//	}
+ 	//}
+-	return group;
++	return neighbors;
+ }
+ 
+ float SteeringVehicle::calcDistance(const Vector3&amp; vec1, const Vector3&amp; vec2)
+@@ -255,12 +271,12 @@
+ 	Vector3 vec = vec1-vec2;
+ 	return vec.length();
+ }
+-
++/*
+ Vector3 SteeringVehicle::getPosition()
+ {
+ 	return mCreature-&gt;getPosition();
+ }
+-
++*/
+ float SteeringVehicle::getMass() const 
+ {
+     return mCreature-&gt;getMass();
+
+Added: rl/trunk/engine/ai/src/WalkPathBehaviour.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/WalkPathBehaviour.cpp	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/ai/src/WalkPathBehaviour.cpp	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -0,0 +1,161 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ *
++ * The WalkPathBehaviour was realised by using the Pedestrian example from 
++ * OpenSteer, Copyright (c) 2002-2005, Sony Computer Entertainment America
++ * Original author: Craig Reynolds &lt;<A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">craig_reynolds at playstation.sony.com</A>&gt;
++ */
++#include &quot;stdinc.h&quot;
++#include &quot;Exception.h&quot;
++#include &quot;WalkPathBehaviour.h&quot;
++#include &quot;SteeringVehicle.h&quot;
++#include &quot;Landmark.h&quot;
++#include &quot;LandmarkPath.h&quot;
++#include &quot;AStar.h&quot;
++#include &quot;OpenSteer/Vec3.h&quot;
++
++namespace rl
++{
++WalkPathBehaviour::WalkPathBehaviour()
++    : mPathDirection(-1)
++{
++    init();
++}
++
++WalkPathBehaviour::~WalkPathBehaviour()
++{
++}
++
++CeGuiString WalkPathBehaviour::getType()
++{
++    return &quot;WalkPath&quot;;
++}
++
++void WalkPathBehaviour::init()
++{
++    setActivationLevel(1.0);
++}
++
++void WalkPathBehaviour::activate()
++{
++    setActivationLevel(1.0);
++}
++
++void WalkPathBehaviour::deactivate()
++{
++    setActivationLevel(0.0);
++}
++
++void WalkPathBehaviour::calcPathToLandmark(Landmark* lm, const WayPointGraph* wps)
++{
++    RlAssert(lm != NULL, &quot;Landmark is NULL&quot;);
++    RlAssert(wps != NULL, &quot;WayPointGraph is NULL&quot;);
++    mLandmark = lm;
++    AStar::AStarPath pathway = AStar::search(wps,
++                                             mController-&gt;getPosition(), 
++                                             mLandmark-&gt;getPosition());
++
++    mPathway = OpenSteer::PolylineSegmentedPathwaySingleRadius(pathway, 
++                                                               2, // radius of points
++                                                               false); // cyclic pathway? 
++}
++
++void WalkPathBehaviour::setLandmarkPath(LandmarkPath* lmp)
++{
++    std::vector&lt;Vector3&gt; pathway;
++    LandmarkPath::LandmarkList list = lmp-&gt;getPoints();
++    LandmarkPath::LandmarkList::const_iterator itr = list.begin();
++    LandmarkPath::LandmarkList::const_iterator end = list.end();
++    for(; itr != end; ++itr)
++    {
++        pathway.push_back((*itr)-&gt;getPosition());
++    }
++    mPathway = OpenSteer::PolylineSegmentedPathwaySingleRadius(pathway, 
++                                                               2, // radius of points
++                                                               false); // cyclic pathway?
++
++}
++
++void WalkPathBehaviour::update(const float elapsedTime)
++{
++    // compute combined steering force: move forward, avoid obstacles
++    // or neighbors if needed, otherwise follow the path
++    
++    // move forward
++    Vector3 steeringForce = mController-&gt;getForward();
++
++    // determine if obstacle avoidance is required
++    Vector3 obstacleAvoidance;
++
++    const float minTimeToCollision = 6;
++    obstacleAvoidance = mController-&gt;calcAvoidObstacles(minTimeToCollision);
++
++    // if obstacle avoidance is needed, do it
++    if (obstacleAvoidance != Vector3::ZERO)
++    {
++        steeringForce += obstacleAvoidance;
++    }
++    else
++    {
++        // otherwise consider avoiding collisions with others
++        Vector3 collisionAvoidance;
++        const float caLeadTime = 10;
++
++        // avoid collision with all neighbors within maxRadius
++        // (radius is largest distance between vehicles traveling head-on
++        // where a collision is possible within caLeadTime seconds.)
++        const float maxRadius = caLeadTime * mController-&gt;getMaxSpeed() * 2;
++        collisionAvoidance = mController-&gt;calcAvoidNeighbors(caLeadTime) * 10;
++
++        // if collision avoidance is needed, do it
++        if (collisionAvoidance != Vector3::ZERO)
++        {
++            steeringForce += collisionAvoidance;
++        }
++        else
++        {
++            // add in wander component (according to user switch)
++            // if we want wander, we add it in as additional behaviour!
++            //if (gWanderSwitch)
++            //    steeringForce += mController-&gt;steerForWander (elapsedTime);
++
++            const float predictionTime = 3;
++            const Vector3 pathFollow = mController-&gt;steerToFollowPath(mPathDirection, predictionTime, mPathway);
++
++            // add in to steeringForce
++            steeringForce += pathFollow * 0.5;
++        }
++    }
++    float const pathRadius = mPathway.radius();
++                
++    if (mController-&gt;getPosition().distance(mPathway.point(mPathway.pointCount()-1)) &lt; pathRadius )
++    {
++        mPathDirection = -1;
++    }
++    if (mController-&gt;getPosition().distance(mPathway.point(0)) &lt; pathRadius )
++    {
++        mPathDirection = +1;
++    }
++    // add steering force constrained to global XZ &quot;ground&quot; plane
++    mController-&gt;addForce(OpenSteer::Vec3Utils::setYtoZero(steeringForce));
++}
++
++float WalkPathBehaviour::calculateActivation()
++{
++    setActivationLevel(1.0);
++    return getActivationLevel();
++}
++
++}
+
+Modified: rl/trunk/engine/script/swig/RlAi.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.head.swig	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/script/swig/RlAi.head.swig	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -24,6 +24,7 @@
+ #include &quot;AgentManager.h&quot;
+ #include &quot;Agent.h&quot;
+ #include &quot;AgentDialogState.h&quot;
++#include &quot;AgentSteeringState.h&quot;
+ #include &quot;AStar.h&quot;
+ #include &quot;AStarHeuristic.h&quot;
+ #include &quot;AStarCosts.h&quot;
+@@ -36,4 +37,5 @@
+ #include &quot;CreatureWalkPathJob.h&quot;
+ #include &quot;Dialog.h&quot;
+ #include &quot;DialogManager.h&quot;
++#include &quot;WalkPathBehaviour.h&quot;
+ %}
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2008-03-07 23:17:06 UTC (rev 4227)
++++ rl/trunk/engine/script/swig/RlAi.swig	2008-03-07 23:19:32 UTC (rev 4228)
+@@ -65,14 +65,21 @@
+ 		rl::SteeringBehaviour* getParent();
+ 		rl::SteeringVehicle* getController();
+ 	};
+-
++	
+ 	%feature(&quot;director&quot;) AgentState;
+     class AgentState
+     {
+     private:
+         AgentState(rl::Agent* agent);
+     };
+-
++    
++    
++    class AgentSteeringState : public rl::AgentState
++    {
++    public:
++        void addSteeringBehaviour(SteeringBehaviour* behaviour);
++    };
++   
+     class AgentDialogState : public rl::AgentState
+     {
+     public:
+@@ -259,6 +266,22 @@
+         rl::LandmarkPath::LandmarkList getPoints();
+ 	};
+ 	
++    class WalkPathBehaviour : public rl::SteeringBehaviour
++	{
++	public:
++	    WalkPathBehaviour();
++		virtual ~WalkPathBehaviour();
++		void calcPathToLandmark(rl::Landmark* lm, const rl::WayPointGraph* wps);
++		void setLandmarkPath(LandmarkPath* lmp);
++		virtual rl::CeGuiString getType();
++		virtual void init();
++		virtual void activate();
++		virtual void deactivate();
++		virtual void update(const float elapsedTime);
++
++		virtual float calculateActivation();
++	};
++	
+ 	class CreatureWalkPathJob : public Job
+     {
+     public:
+@@ -351,6 +374,13 @@
+         *ptr=pAgentDialogState;
+         return SWIGTYPE_p_rl__AgentDialogState;
+     }
++    
++    rl::AgentSteeringState *pAgentSteeringState = dynamic_cast&lt;rl::AgentSteeringState*&gt;(pAgentState);
++    if (pAgentSteeringState)
++    {
++        *ptr=pAgentSteeringState;
++        return SWIGTYPE_p_rl__AgentSteeringState;
++    }
+    
+     return 0;
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001298.html">[Dsa-hl-svn] r4227 - in dependencies/opensteer: include/OpenSteer	src
+</A></li>
+	<LI>Next message: <A HREF="001300.html">[Dsa-hl-svn] r4229 - in modules/aitest: dsa scripts scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1299">[ date ]</a>
+              <a href="thread.html#1299">[ thread ]</a>
+              <a href="subject.html#1299">[ subject ]</a>
+              <a href="author.html#1299">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

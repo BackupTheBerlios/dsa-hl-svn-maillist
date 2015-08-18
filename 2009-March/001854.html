@@ -1,0 +1,626 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4797 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4797%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903052021.n25KLrHS007000%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001853.html">
+   <LINK REL="Next"  HREF="001855.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4797 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4797%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903052021.n25KLrHS007000%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4797 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  5 21:21:53 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001853.html">[Dsa-hl-svn] r4796 - dependencies/opensteer/win32
+</A></li>
+        <LI>Next message: <A HREF="001855.html">[Dsa-hl-svn] r4798 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1854">[ date ]</a>
+              <a href="thread.html#1854">[ thread ]</a>
+              <a href="subject.html#1854">[ subject ]</a>
+              <a href="author.html#1854">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-05 21:21:50 +0100 (Thu, 05 Mar 2009)
+New Revision: 4797
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/NewModuleWizard.py
+Log:
+- game objects are saved
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-05 19:21:50 UTC (rev 4796)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-05 20:21:50 UTC (rev 4797)
+@@ -76,6 +76,22 @@
+         if level and (not elem.tail or not elem.tail.strip()):
+             elem.tail = i
+ 
++# creates unique names for new entities
++def createUniqueEntityName(sceneManager, name = None):
++    n = &quot;&quot;
++    if name is None:
++        n = &quot;dropMesh&quot; + str(ModuleManager.dropCount)
++    else:
++        n = name
++        
++    while sceneManager.hasEntity(n):
++        n = &quot;dropMesh&quot; + str(ModuleManager.dropCount)
++        ModuleManager.dropCount += 1
++        
++    return n
++        
++        
++
+ class Map():
+     def __init__(self, pathToFile, sceneManager, ogreRoot, gocManager, emptyMap = False):
+         self.pathToMapFile = pathToFile
+@@ -104,8 +120,10 @@
+                 return
+ 
+     def parseMapNodes(self, nodeElement):
++        nodes = nodeElement.getiterator(&quot;gameobject&quot;)
++        self.createGameObjects(nodes)
++        
+         nodes = nodeElement.getiterator(&quot;entity&quot;)
+-        
+         self.createEntites(nodes)
+ 
+         nodes = nodeElement.getiterator(&quot;light&quot;)
+@@ -114,9 +132,6 @@
+         nodes = nodeElement.getiterator(&quot;sound&quot;)
+         self.createSound(nodes)
+ 
+-        nodes = nodeElement.getiterator(&quot;gameobject&quot;)
+-        self.createGameObjects(nodes)
+-
+         nodes = nodeElement.getiterator(&quot;particlesystem&quot;)
+         self.createParticleSystems(nodes)
+ 
+@@ -128,6 +143,8 @@
+                 num = int(entityName.replace(&quot;dropMesh&quot;,  &quot;&quot;))
+                 if ModuleManager.dropCount &lt; num:
+                     ModuleManager.dropCount = num
++                elif ModuleManager.dropCount &lt; num:
++                    ModuleManager.dropCount = num + 1
+                     
+             meshFile = nodes.attrib[&quot;meshfile&quot;]
+             nodePosition = None
+@@ -153,7 +170,7 @@
+                     nodeScale = og.Vector3(scalex, scaley, scalez)
+ 
+             try:
+-                e = self.sceneManager.createEntity(entityName, meshFile)
++                e = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager,  entityName), meshFile)
+             except:
+                 print &quot;Warning: Meshfile &quot; + meshFile + &quot; could not be found.&quot;
+                 continue
+@@ -226,7 +243,13 @@
+     def createGameObjects(self, gameObjectNodes):
+         for g in gameObjectNodes:
+             classid = g.attrib[&quot;class&quot;]
++            
+             id = int(g.attrib[&quot;id&quot;])
++            if ModuleManager.dropCount &lt; id:
++                ModuleManager.dropCount = id
++            elif ModuleManager.dropCount &lt; num:
++                ModuleManager.dropCount = num + 1
++                
+             state = g.attrib[&quot;state&quot;]
+             nodePosition = None
+             nodeRotation = None
+@@ -254,7 +277,8 @@
+             go = self.gocManager.getGameObjectWithClassId(classid)
+             if go is not None:
+                 meshFile = go.getMeshFileName()
+-                ent = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(id), str(meshFile))
++                
++                ent = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), str(meshFile))
+                 dropNode = self.mapNode.createChild(&quot;gameobject_&quot; + &quot;dropNode&quot; + str(id))
+                 dropNode.attachObject(ent)
+ 
+@@ -304,11 +328,36 @@
+                     scaleElem.attrib[&quot;x&quot;] = str(n.getScale().x)
+                     scaleElem.attrib[&quot;y&quot;] = str(n.getScale().y)
+                     scaleElem.attrib[&quot;z&quot;] = str(n.getScale().z)
+-                
++                    
++                if n.name.startswith(&quot;gameobject_&quot;):
++                    goElem = xml.SubElement(nodesElem, &quot;gameobject&quot;)
++                    mname = n.name
++
++                    goElem.attrib[&quot;class&quot;] = str(n.getAttachedObject(0).getUserObject().gocName)
++                    goElem.attrib[&quot;state&quot;] = str(n.getAttachedObject(0).getUserObject().state)
++                    goElem.attrib[&quot;id&quot;] = str(n.getAttachedObject(0).getUserObject().inWorldId)
++                    
++                    posElem = xml.SubElement(goElem, &quot;position&quot;)
++                    posElem.attrib[&quot;x&quot;] = str(n.getPosition().x)
++                    posElem.attrib[&quot;y&quot;] = str(n.getPosition().y)
++                    posElem.attrib[&quot;z&quot;] = str(n.getPosition().z)
++                    
++                    rotElem = xml.SubElement(goElem, &quot;rotation&quot;)
++                    rotElem.attrib[&quot;qw&quot;] = str(n.getOrientation().w)
++                    rotElem.attrib[&quot;qx&quot;] = str(n.getOrientation().x)
++                    rotElem.attrib[&quot;qy&quot;] = str(n.getOrientation().y)
++                    rotElem.attrib[&quot;qz&quot;] = str(n.getOrientation().z)
++                    
++                    scaleElem = xml.SubElement(goElem, &quot;scale&quot;)
++                    scaleElem.attrib[&quot;x&quot;] = str(n.getScale().x)
++                    scaleElem.attrib[&quot;y&quot;] = str(n.getScale().y)
++                    scaleElem.attrib[&quot;z&quot;] = str(n.getScale().z)
++                    
+             i = i+1
+             
+         indent(root)
+         xml.ElementTree(root).write(self.pathToMapFile)
++        
+ # caused a linux crash
+ #        iter = self.mapNode.getChildIterator()
+ #        while iter.hasMoreElements():
+@@ -491,7 +540,7 @@
+                             
+ class ModuleManager():
+     dropCount = 0
+-        
++    
+     def __init__(self,  ogreRoot,  sceneManager):
+         self.sceneManager = sceneManager
+         self.ogreRoot = ogreRoot
+@@ -771,7 +820,7 @@
+                     meshFile = go.getMeshFileName()
+ 
+                     if go is not None:
+-                        newEntity = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(ModuleManager.dropCount), str(meshFile))
++                        newEntity = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), str(meshFile))
+                         newNode = self.currentMap.mapNode.createChild(&quot;gameObject_dropNode&quot; + str(ModuleManager.dropCount))
+                         newNode.attachObject(newEntity)
+                         newNode.setPosition(so.entity.getParentNode().getPosition())
+@@ -789,7 +838,7 @@
+                 nodeName = &quot;entity_dropNode&quot; + str(ModuleManager.dropCount)
+                 newNode = self.currentMap.mapNode.createChild(nodeName)
+ 
+-                entityName = &quot;dropMesh&quot; + str(ModuleManager.dropCount)
++                entityName = createUniqueEntityName(self.sceneManager)
+                 newEntity = self.sceneManager.createEntity(entityName, so.entity.getMesh().getName())
+ 
+                 newNode.attachObject(newEntity)
+@@ -866,11 +915,15 @@
+         self.mainModule.save()
+ 
+     def startDropGameObjectAction(self, classid, ray):
++        if self.currentMap is None:
++            print &quot;No map selected!&quot;
++            return
++            
+         go = self.gocManager.getGameObjectWithClassId(classid)
+ 
+         if go is not None:
+             meshFile = go.getMeshFileName()
+-            dropEntity = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(ModuleManager.dropCount), str(meshFile))
++            dropEntity = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), str(meshFile))
+             dropNode = self.currentMap.mapNode.createChild(&quot;gameobject_dropNode&quot; + str(ModuleManager.dropCount))
+             dropNode.attachObject(dropEntity)
+ 
+@@ -881,11 +934,15 @@
+                 dropNode.setPosition(ray.getPoint(50))
+ 
+             self.dropGO = GameObjectRepresentation(ModuleManager.dropCount, classid, dropNode, meshFile)
++            self.gameObjectRepresentationDict.append(self.dropGO)
+             dropEntity.setUserObject(self.dropGO)
+ 
+         ModuleManager.dropCount += 1
+ 
+     def moveDropGameObjectAction(self, ray):
++        if self.currentMap is None:
++            return
++        
+         result = og.Math.intersects(ray, self.dropCollisionPlane)
+         if result.first == True:
+             self.dropGO.setPosition(ray.getPoint(result.second))
+@@ -893,6 +950,7 @@
+             self.dropGO.setPosition(ray.getPoint(50))
+ 
+     def finishDropGameObjectAction(self, ray):
++        self.dropGO = None
+         return
+ 
+     def startDropModelAction(self, meshFile, ray):
+@@ -900,8 +958,7 @@
+             print &quot;No map selected!&quot;
+             return
+             
+-        self.dropEntity = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(ModuleManager.dropCount), meshFile)
+-
++        self.dropEntity = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), meshFile)
+         self.dropNode = self.currentMap.mapNode.createChild(&quot;entity_dropNode&quot; + str(ModuleManager.dropCount))
+         self.dropNode.attachObject(self.dropEntity)
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/NewModuleWizard.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/NewModuleWizard.py	2009-03-05 19:21:50 UTC (rev 4796)
++++ rl/trunk/editors/Lockenwickler/src/NewModuleWizard.py	2009-03-05 20:21:50 UTC (rev 4797)
+@@ -1,169 +1,172 @@
+-# -*- coding: utf-8 -*-
+-
+-&quot;&quot;&quot;
+-Module implementing NewModuleWizard.
+-&quot;&quot;&quot;
+-
+-import os
+-import glob
+-
+-from PyQt4.QtGui import QDialog
+-from PyQt4.QtCore import pyqtSignature
+-
+-from Ui_NewModuleWizard import Ui_Dialog
+-
+-class NewModuleWizard(QDialog, Ui_Dialog):
+-    &quot;&quot;&quot;
+-    Class documentation goes here.
+-    &quot;&quot;&quot;
+-    def __init__(self, moduleManager, parent = None):
+-       
+-        QDialog.__init__(self, parent)
+-        self.setupUi(self)
+-
+-        self.moduleManager = moduleManager
+-        self.moduleManager.parseModuleConfig()
+-        
+-        for m in self.moduleManager.moduleList:
+-            self.moduleDependenciesList.addItem(m.name)
+-
+-    @pyqtSignature(&quot;QString&quot;)
+-    def on_moduleNameLineEdit_textChanged(self, p0):
+-        if not self.moduleManager.moduleExists(str(self.moduleNameLineEdit.text())):
+-            self.sceneNameLineEdit.setEnabled(True)
+-            self.mapNameLineEdit.setEnabled(True)
+-            self.moduleDependenciesList.setEnabled(True)
+-            self.scriptDependenciesList.setEnabled(True)
+-            self.okButton.setEnabled(True)
+-        else:
+-            self.sceneNameLineEdit.setEnabled(False)
+-            self.mapNameLineEdit.setEnabled(False)
+-            self.moduleDependenciesList.setEnabled(False)
+-            self.scriptDependenciesList.setEnabled(False)
+-            self.okButton.setEnabled(False)
+-    
+-    def scanDirForScripts(self, dir):
+-        for file in os.listdir(dir):
+-            curFile = dir + &quot;/&quot; + file
+-
+-            if file.startswith('.'): #ignore dot files (hidden)
+-                continue
+-            if os.path.isdir(curFile):
+-                self.scanDirForScripts(curFile)
+-                continue
+-            if os.path.isfile(curFile):
+-                if file.endswith(&quot;.rb&quot;):
+-                    self.scriptDependenciesList.addItem(dir + &quot;/&quot; + file)
+-    
+-    @pyqtSignature(&quot;&quot;)
+-    def on_moduleDependenciesList_itemSelectionChanged(self):
+-        self.scriptDependenciesList.clear()
+-        modulePath = self.moduleManager.moduleCfgPath.replace(&quot;modules.cfg&quot;,  &quot;&quot;)
+-        
+-        for m in self.moduleDependenciesList.selectedItems():
+-            path = os.path.join(modulePath, str(m.text()))
+-            cmd = os.path.join(path + &quot;/scripts&quot;)
+-            self.scanDirForScripts(cmd)
+-        
+-    @pyqtSignature(&quot;&quot;)
+-    def on_moduleNameLineEdit_returnPressed(self):
+-        return
+-            
+-    @pyqtSignature(&quot;&quot;)
+-    def on_mapNameLineEdit_returnPressed(self):
+-        return
+-        
+-    @pyqtSignature(&quot;&quot;)
+-    def on_okButton_clicked(self):
+-        f = open(self.moduleManager.moduleCfgPath, &quot;a&quot;)
+-        f.write(&quot;module=&quot; + str(self.moduleNameLineEdit.text()) + &quot;\n&quot;)
+-        f.close()
+-        
+-        modulePath = self.moduleManager.moduleCfgPath.replace(&quot;modules.cfg&quot;,  &quot;&quot;)
+-        modulePath = str(modulePath + self.moduleNameLineEdit.text())
+-        os.mkdir(modulePath)
+-        os.mkdir(os.path.join(modulePath, &quot;dialogs&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;dsa&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;gui&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;maps&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;materials&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;materials/textures&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;models&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;quests&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;scripts&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;scripts/maps&quot;))
+-        os.mkdir(os.path.join(modulePath, &quot;sound&quot;))
+-        
+-        mname = str(self.moduleNameLineEdit.text())
+-        mdeps = &quot;&quot;
+-        for m in self.moduleDependenciesList.selectedItems():
+-            mdeps = mdeps + str(&quot;\&quot;&quot; + m.text() + &quot;\&quot;, &quot;)
+-        mdeps = mdeps.strip(&quot;, &quot;)
+-        
+-        sdeps = &quot;&quot;
+-        for s in self.scriptDependenciesList.selectedItems():
+-            script = str(str(s.text()).replace(&quot;\\&quot;, &quot;/&quot;))
+-            script = script.split(&quot;/&quot;)
+-            script = script[len(script) - 1]
+-            sdeps = sdeps + str(&quot;       require &quot; + script + &quot;\n&quot;)
+-        
+-        p = os.path.join(modulePath, &quot;scripts&quot;)
+-        p = os.path.join(p, &quot;moduleconfig.rb&quot;)
+-        f = open(p, &quot;w&quot;)
+-        f.write(&quot;include RlScript\n&quot;)
+-        f.write(&quot;\n\n&quot;)
+-        f.write(&quot;class &quot; + mname.capitalize() + &quot;Module &lt; ContentModule\n&quot;)
+-        f.write(&quot;    def initialize()\n&quot;)
+-        f.write(&quot;        super(\&quot;&quot; + mname + &quot;\&quot;&quot; + &quot;, \&quot;&quot; + mname + &quot;\&quot;&quot; + &quot;, false, 200608012)\n&quot;)
+-        f.write(&quot;    end\n\n&quot;)
+-        f.write(&quot;    def getDependencies()\n&quot;)
+-        f.write(&quot;       return [&quot; + str(mdeps) + &quot;];\n&quot;)
+-        f.write(&quot;    end\n\n&quot;)
+-        f.write(&quot;    def getTextureLocations()\n&quot;)
+-        f.write(&quot;       return [\&quot;textures\&quot;];\n&quot;)
+-        f.write(&quot;    end\n\n&quot;)
+-        f.write(&quot;    def getModelLocations()\n&quot;)
+-        f.write(&quot;       return [\&quot;models\&quot;];\n&quot;)
+-        f.write(&quot;    end\n\n&quot;)
+-        f.write(&quot;    def getSoundLocations()\n&quot;)
+-        f.write(&quot;       return [\&quot;sound\&quot;];\n&quot;)
+-        f.write(&quot;    end\n\n&quot;)
+-        f.write(&quot;    def start()\n&quot;)
+-        f.write(sdeps)
+-        f.write(&quot;\n\n       SceneManager.getSingleton().loadScene(\&quot;&quot; + self.sceneNameLineEdit.text() + &quot;\&quot;);\n&quot;)
+-        f.write(&quot;       $World = $CORE.getWorld();\n&quot;)
+-        f.write(&quot;    end\n&quot;)
+-        f.write(&quot;end\n\n&quot;)
+-
+-        f.write(&quot;CoreSubsystem.getSingleton().registerModule(&quot; + mname.capitalize() + &quot;Module.new());\n&quot;)
+-        f.close()
+-        
+-        
+-        
+-        p = os.path.join(modulePath, &quot;maps&quot;)
+-        p = os.path.join(p, str(self.sceneNameLineEdit.text()) + &quot;.rlscene&quot;)
+-        
+-        f = open(p, &quot;w&quot;)
+-        f.write(&quot;&lt;scene name=\&quot;&quot; + str(self.sceneNameLineEdit.text()) + &quot;\&quot;&gt;\n&quot;)
+-        f.write(&quot;    &lt;map file=\&quot;&quot; + str(self.mapNameLineEdit.text()) + &quot;.rlmap.xml\&quot;&quot; +  &quot;/&gt;\n&quot;)
+-        f.write(&quot;&lt;/scene&gt;\n&quot;)
+-        f.close()
+-        
+-        p = os.path.join(modulePath, &quot;maps&quot;)
+-        p = os.path.join(p, str(self.mapNameLineEdit.text()) + &quot;.rlmap.xml&quot;)
+-        
+-        f = open(p, &quot;w&quot;)
+-        f.write(&quot;&lt;rastullahmap formatVersion=\&quot;0.4.0\&quot;&gt;\n&quot;)
+-        f.write(&quot;    &lt;nodes&gt;\n&quot;)
+-        f.write(&quot;    &lt;/nodes&gt;\n&quot;)
+-        f.write(&quot;&lt;/rastullahmap&gt;\n&quot;)
+-        f.close()
+-        
+-        self.moduleManager.resetParsedModuleConfig()
+-        self.moduleManager.openLoadModuleDialog()
+-        
+-    @pyqtSignature(&quot;&quot;)
+-    def on_cancelButton_pressed(self):
+-        self.close()
+-
+-
++# -*- coding: utf-8 -*-
++
++&quot;&quot;&quot;
++Module implementing NewModuleWizard.
++&quot;&quot;&quot;
++
++import os
++import glob
++
++from PyQt4.QtGui import QDialog
++from PyQt4.QtCore import pyqtSignature
++
++from Ui_NewModuleWizard import Ui_Dialog
++
++class NewModuleWizard(QDialog, Ui_Dialog):
++    &quot;&quot;&quot;
++    Class documentation goes here.
++    &quot;&quot;&quot;
++    def __init__(self, moduleManager, parent = None):
++       
++        QDialog.__init__(self, parent)
++        self.setupUi(self)
++
++        self.moduleManager = moduleManager
++        self.moduleManager.parseModuleConfig()
++        
++        for m in self.moduleManager.moduleList:
++            self.moduleDependenciesList.addItem(m.name)
++
++    @pyqtSignature(&quot;QString&quot;)
++    def on_moduleNameLineEdit_textChanged(self, p0):
++        if not self.moduleManager.moduleExists(str(self.moduleNameLineEdit.text())):
++            self.sceneNameLineEdit.setEnabled(True)
++            self.mapNameLineEdit.setEnabled(True)
++            self.moduleDependenciesList.setEnabled(True)
++            self.scriptDependenciesList.setEnabled(True)
++            self.okButton.setEnabled(True)
++        else:
++            self.sceneNameLineEdit.setEnabled(False)
++            self.mapNameLineEdit.setEnabled(False)
++            self.moduleDependenciesList.setEnabled(False)
++            self.scriptDependenciesList.setEnabled(False)
++            self.okButton.setEnabled(False)
++    
++    def scanDirForScripts(self, dir):
++        for file in os.listdir(dir):
++            curFile = dir + &quot;/&quot; + file
++
++            if file.startswith('.'): #ignore dot files (hidden)
++                continue
++            if os.path.isdir(curFile):
++                self.scanDirForScripts(curFile)
++                continue
++            if os.path.isfile(curFile):
++                if file.endswith(&quot;.rb&quot;):
++                    self.scriptDependenciesList.addItem(dir + &quot;/&quot; + file)
++    
++    @pyqtSignature(&quot;&quot;)
++    def on_moduleDependenciesList_itemSelectionChanged(self):
++        self.scriptDependenciesList.clear()
++        modulePath = self.moduleManager.moduleCfgPath.replace(&quot;modules.cfg&quot;,  &quot;&quot;)
++        
++        for m in self.moduleDependenciesList.selectedItems():
++            path = os.path.join(modulePath, str(m.text()))
++            cmd = os.path.join(path + &quot;/scripts&quot;)
++            self.scanDirForScripts(cmd)
++        
++    @pyqtSignature(&quot;&quot;)
++    def on_moduleNameLineEdit_returnPressed(self):
++        return
++            
++    @pyqtSignature(&quot;&quot;)
++    def on_mapNameLineEdit_returnPressed(self):
++        return
++        
++    @pyqtSignature(&quot;&quot;)
++    def on_okButton_clicked(self):
++        f = open(self.moduleManager.moduleCfgPath, &quot;a&quot;)
++        f.write(&quot;module=&quot; + str(self.moduleNameLineEdit.text()) + &quot;\n&quot;)
++        f.close()
++        
++        modulePath = self.moduleManager.moduleCfgPath.replace(&quot;modules.cfg&quot;,  &quot;&quot;)
++        modulePath = str(modulePath + self.moduleNameLineEdit.text())
++        os.mkdir(modulePath)
++        os.mkdir(os.path.join(modulePath, &quot;dialogs&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;dsa&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;gui&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;maps&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;materials&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;materials/textures&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;models&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;quests&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;scripts&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;scripts/maps&quot;))
++        os.mkdir(os.path.join(modulePath, &quot;sound&quot;))
++        
++        mname = str(self.moduleNameLineEdit.text())
++        mdeps = &quot;&quot;
++        for m in self.moduleDependenciesList.selectedItems():
++            mdeps = mdeps + str(&quot;\&quot;&quot; + m.text() + &quot;\&quot;, &quot;)
++        mdeps = mdeps.strip(&quot;, &quot;)
++        
++        sdeps = &quot;&quot;
++        for s in self.scriptDependenciesList.selectedItems():
++            script = str(str(s.text()).replace(&quot;\\&quot;, &quot;/&quot;))
++            script = script.split(&quot;/&quot;)
++            script = script[len(script) - 1]
++            sdeps = sdeps + str(&quot;       require &quot; + script + &quot;\n&quot;)
++        
++        p = os.path.join(modulePath, &quot;scripts&quot;)
++        p = os.path.join(p, &quot;moduleconfig.rb&quot;)
++        f = open(p, &quot;w&quot;)
++        f.write(&quot;include RlScript\n&quot;)
++        f.write(&quot;\n\n&quot;)
++        f.write(&quot;class &quot; + mname.capitalize() + &quot;Module &lt; ContentModule\n&quot;)
++        f.write(&quot;    def initialize()\n&quot;)
++        f.write(&quot;        super(\&quot;&quot; + mname + &quot;\&quot;&quot; + &quot;, \&quot;&quot; + mname + &quot;\&quot;&quot; + &quot;, false, 200608012)\n&quot;)
++        f.write(&quot;    end\n\n&quot;)
++        f.write(&quot;    def getDependencies()\n&quot;)
++        f.write(&quot;       return [&quot; + str(mdeps) + &quot;];\n&quot;)
++        f.write(&quot;    end\n\n&quot;)
++        f.write(&quot;    def getTextureLocations()\n&quot;)
++        f.write(&quot;       return [\&quot;textures\&quot;];\n&quot;)
++        f.write(&quot;    end\n\n&quot;)
++        f.write(&quot;    def getModelLocations()\n&quot;)
++        f.write(&quot;       return [\&quot;models\&quot;];\n&quot;)
++        f.write(&quot;    end\n\n&quot;)
++        f.write(&quot;    def getSoundLocations()\n&quot;)
++        f.write(&quot;       return [\&quot;sound\&quot;];\n&quot;)
++        f.write(&quot;    end\n\n&quot;)
++        f.write(&quot;    def start()\n&quot;)
++        f.write(sdeps + &quot;\n&quot;)
++        f.write(&quot;       hero = $GOM.getGameObject(XXXXXX);\n&quot;)
++        f.write(&quot;       PlayerSettings.preparePlayer(hero)\n&quot;)
++        f.write(&quot;       PartyManager.getSingleton().setActiveCharacter(hero)\n&quot;)
++        f.write(&quot;\n\n       SceneManager.getSingleton().loadScene(\&quot;&quot; + self.sceneNameLineEdit.text() + &quot;\&quot;);\n&quot;)
++        f.write(&quot;       $World = $CORE.getWorld();\n&quot;)
++        f.write(&quot;    end\n&quot;)
++        f.write(&quot;end\n\n&quot;)
++
++        f.write(&quot;CoreSubsystem.getSingleton().registerModule(&quot; + mname.capitalize() + &quot;Module.new());\n&quot;)
++        f.close()
++        
++        
++        
++        p = os.path.join(modulePath, &quot;maps&quot;)
++        p = os.path.join(p, str(self.sceneNameLineEdit.text()) + &quot;.rlscene&quot;)
++        
++        f = open(p, &quot;w&quot;)
++        f.write(&quot;&lt;scene name=\&quot;&quot; + str(self.sceneNameLineEdit.text()) + &quot;\&quot;&gt;\n&quot;)
++        f.write(&quot;    &lt;map file=\&quot;&quot; + str(self.mapNameLineEdit.text()) + &quot;.rlmap.xml\&quot;&quot; +  &quot;/&gt;\n&quot;)
++        f.write(&quot;&lt;/scene&gt;\n&quot;)
++        f.close()
++        
++        p = os.path.join(modulePath, &quot;maps&quot;)
++        p = os.path.join(p, str(self.mapNameLineEdit.text()) + &quot;.rlmap.xml&quot;)
++        
++        f = open(p, &quot;w&quot;)
++        f.write(&quot;&lt;rastullahmap formatVersion=\&quot;0.4.0\&quot;&gt;\n&quot;)
++        f.write(&quot;    &lt;nodes&gt;\n&quot;)
++        f.write(&quot;    &lt;/nodes&gt;\n&quot;)
++        f.write(&quot;&lt;/rastullahmap&gt;\n&quot;)
++        f.close()
++        
++        self.moduleManager.resetParsedModuleConfig()
++        self.moduleManager.openLoadModuleDialog()
++        
++    @pyqtSignature(&quot;&quot;)
++    def on_cancelButton_pressed(self):
++        self.close()
++
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001853.html">[Dsa-hl-svn] r4796 - dependencies/opensteer/win32
+</A></li>
+	<LI>Next message: <A HREF="001855.html">[Dsa-hl-svn] r4798 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1854">[ date ]</a>
+              <a href="thread.html#1854">[ thread ]</a>
+              <a href="subject.html#1854">[ subject ]</a>
+              <a href="author.html#1854">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

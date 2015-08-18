@@ -1,0 +1,242 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4210 - in rl/trunk/engine: ai/include ai/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4210%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200803071252.m27CqK6A006769%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001280.html">
+   <LINK REL="Next"  HREF="001282.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4210 - in rl/trunk/engine: ai/include ai/src	script/swig</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4210%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200803071252.m27CqK6A006769%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4210 - in rl/trunk/engine: ai/include ai/src	script/swig">timm at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar  7 13:52:20 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001280.html">[Dsa-hl-svn] r4209 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+        <LI>Next message: <A HREF="001282.html">[Dsa-hl-svn] r4211 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1281">[ date ]</a>
+              <a href="thread.html#1281">[ thread ]</a>
+              <a href="subject.html#1281">[ subject ]</a>
+              <a href="author.html#1281">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-07 13:52:16 +0100 (Fri, 07 Mar 2008)
+New Revision: 4210
+
+Modified:
+   rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+   rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+changed constructor params of CreatureController: CreatureController &lt;-&gt; Creature
+
+Modified: rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+===================================================================
+--- rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2008-03-07 12:36:03 UTC (rev 4209)
++++ rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2008-03-07 12:52:16 UTC (rev 4210)
+@@ -38,7 +38,7 @@
+         * @param movingCreature the job has to know a moving creature
+         * @param startLandmark first landmark, the moving creature has to go to
+         */
+-        CreatureWalkPathJob(const Ogre::String&amp; name, CreatureController* movingCreature, Landmark* startLandmark);
++        CreatureWalkPathJob(const Ogre::String&amp; name, Creature* movingCreature, Landmark* startLandmark);
+         //destructor
+         virtual ~CreatureWalkPathJob();
+ 
+@@ -54,12 +54,12 @@
+         virtual bool execute(Ogre::Real time);
+ 
+         // @retval the moving creature controlled by this object
+-        CreatureController* getMovingCreature();
++        Creature* getCreature();
+     private:
+ 
+         LandmarkPath mLandmarkPath;
+         Ogre::String mName;
+-        CreatureController* mMovingCreature;
++        Creature* mMovingCreature;
+ 
+         Landmark* mCurrentLandmark;
+         Landmark* mNextLandmark;
+
+Modified: rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2008-03-07 12:36:03 UTC (rev 4209)
++++ rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2008-03-07 12:52:16 UTC (rev 4210)
+@@ -18,10 +18,11 @@
+ 
+ #include &quot;CreatureWalkPathJob.h&quot;
+ #include &quot;AStar.h&quot;
++#include &lt;CreatureControllerManager.h&gt;
+ 
+ namespace rl
+ {
+-    CreatureWalkPathJob::CreatureWalkPathJob(const Ogre::String&amp; name, CreatureController* movingCreature, Landmark* startLandmark)
++    CreatureWalkPathJob::CreatureWalkPathJob(const Ogre::String&amp; name, Creature* movingCreature, Landmark* startLandmark)
+         : Job(false, true, TimeSource::GAMETIME, Job::FINISH_WHEN_GAME_LOADED), 
+         mLandmarkPath(&quot;LandmarkPath&quot; + name), 
+         mWayPoints(NULL),
+@@ -30,7 +31,7 @@
+     {
+         //the moving creature moves from the current position to the landmark
+         mMovingCreature = movingCreature;
+-        mCurrentLandmark = new Landmark(name + &quot;_startup&quot;,mMovingCreature-&gt;getCreature()-&gt;getPosition());
++        mCurrentLandmark = new Landmark(name + &quot;_startup&quot;,mMovingCreature-&gt;getPosition());
+         mNextLandmark = startLandmark;
+     }
+ 
+@@ -42,11 +43,13 @@
+     {
+         mTimeSinceLastRotation += time;
+ 
+-        Ogre::Vector3 direction = mCurrentLandmark-&gt;getPosition() - mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPosition();
++        CreatureController* controller = CreatureControllerManager::getSingleton().getCreatureController(mMovingCreature);
++
++        Ogre::Vector3 direction = mCurrentLandmark-&gt;getPosition() - mMovingCreature-&gt;getActor()-&gt;getPosition();
+         direction.y = 0;
+         if (direction.squaredLength() &lt; 0.04 )
+         {
+-            mMovingCreature-&gt;setMovement(CreatureController::MT_STEHEN, Ogre::Vector3::ZERO, Ogre::Vector3::ZERO);
++            controller-&gt;setMovement(CreatureController::MT_STEHEN, Ogre::Vector3::ZERO, Ogre::Vector3::ZERO);
+ 
+             if (!mLandmarkPath.isEmpty())
+             {
+@@ -57,16 +60,16 @@
+                 {
+                     mCurrentWayPath = AStar::search(
+                         mWayPoints,
+-                        mMovingCreature-&gt;getCreature()-&gt;getPosition(), 
++                        mMovingCreature-&gt;getPosition(), 
+                         mCurrentLandmark-&gt;getPosition());
+                     std::ostringstream ss;
+-                    ss &lt;&lt; &quot;Current Position: &quot; &lt;&lt; mMovingCreature-&gt;getCreature()-&gt;getPosition() &lt;&lt; &quot;\n&quot;;
++                    ss &lt;&lt; &quot;Current Position: &quot; &lt;&lt; mMovingCreature-&gt;getPosition() &lt;&lt; &quot;\n&quot;;
+                     for (AStar::AStarPath::const_iterator it = mCurrentWayPath.begin();
+                         it != mCurrentWayPath.end(); ++it)
+                     {
+                         ss &lt;&lt; *it &lt;&lt; &quot; &quot;;
+                     }
+-                    LOG_MESSAGE2(&quot;WalkPathJob&quot;, ss.str(), &quot;Next Path&quot;);
++                    LOG_DEBUG(&quot;WalkPathJob&quot;, ss.str() + &quot;Next Path&quot;);
+                 }
+             }
+             else if (mNextLandmark)
+@@ -90,19 +93,19 @@
+             {
+                 mCurrentWayPath = AStar::search(
+                         mWayPoints,
+-                        mMovingCreature-&gt;getCreature()-&gt;getPosition(), 
++                        mMovingCreature-&gt;getPosition(), 
+                         mCurrentLandmark-&gt;getPosition());
+                 std::ostringstream ss;
+-                ss &lt;&lt; &quot;Current Position: &quot; &lt;&lt; mMovingCreature-&gt;getCreature()-&gt;getPosition() &lt;&lt; &quot;\n&quot;;
++                ss &lt;&lt; &quot;Current Position: &quot; &lt;&lt; mMovingCreature-&gt;getPosition() &lt;&lt; &quot;\n&quot;;
+                 for (AStar::AStarPath::const_iterator it = mCurrentWayPath.begin();
+                     it != mCurrentWayPath.end(); ++it)
+                 {
+                     ss &lt;&lt; *it &lt;&lt; &quot; &quot;;
+                 }
+-                LOG_MESSAGE2(&quot;WalkPathJob&quot;, ss.str(), &quot;Next Path&quot;);
++                LOG_DEBUG(&quot;WalkPathJob&quot;, ss.str() + &quot;Next Path&quot;);
+             }
+ 
+-            direction = mCurrentWayPath.back() - mMovingCreature-&gt;getCreature()-&gt;getPosition();
++            direction = mCurrentWayPath.back() - mMovingCreature-&gt;getPosition();
+             while (direction.squaredLength() &lt; 0.04)
+             {
+                 mCurrentWayPath.pop_back();
+@@ -110,16 +113,16 @@
+                 {
+                     break;
+                 }
+-                direction = mCurrentWayPath.back() - mMovingCreature-&gt;getCreature()-&gt;getPosition();
++                direction = mCurrentWayPath.back() - mMovingCreature-&gt;getPosition();
+             }
+             mUpdatedDirection = true;
+         }
+ 
+-        LOG_MESSAGE(&quot;WalkPathJob&quot;, 
+-            &quot;Going to &quot; + Ogre::StringConverter::toString(direction + mMovingCreature-&gt;getCreature()-&gt;getPosition()) 
+-            + &quot;, current position &quot;  + Ogre::StringConverter::toString(mMovingCreature-&gt;getCreature()-&gt;getPosition()));
++        LOG_DEBUG(&quot;WalkPathJob&quot;, 
++            &quot;Going to &quot; + Ogre::StringConverter::toString(direction + mMovingCreature-&gt;getPosition()) 
++            + &quot;, current position &quot;  + Ogre::StringConverter::toString(mMovingCreature-&gt;getPosition()));
+ 
+-        Ogre::Vector3 creatureViewVector = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getOrientation() * Ogre::Vector3::NEGATIVE_UNIT_Z;
++        Ogre::Vector3 creatureViewVector = mMovingCreature-&gt;getActor()-&gt;getOrientation() * Ogre::Vector3::NEGATIVE_UNIT_Z;
+         creatureViewVector.y = 0;
+         Ogre::Quaternion rotation = creatureViewVector.getRotationTo(direction, Ogre::Vector3::UNIT_Y);
+         Ogre::Radian yaw = rotation.getYaw();
+@@ -136,7 +139,7 @@
+             mTimeSinceLastRotation = 0;
+         }
+ 
+-        mMovingCreature-&gt;setMovement(CreatureController::MT_GEHEN, Ogre::Vector3::NEGATIVE_UNIT_Z, usedRotation);
++        controller-&gt;setMovement(CreatureController::MT_GEHEN, Ogre::Vector3::NEGATIVE_UNIT_Z, usedRotation);
+         return false;
+     }
+ 
+@@ -150,7 +153,7 @@
+         mLandmarkPath.addPoint(lm);
+     }
+ 
+-    CreatureController* CreatureWalkPathJob::getMovingCreature()
++    Creature* CreatureWalkPathJob::getCreature()
+     {
+         return mMovingCreature;
+     }
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2008-03-07 12:36:03 UTC (rev 4209)
++++ rl/trunk/engine/script/swig/RlAi.swig	2008-03-07 12:52:16 UTC (rev 4210)
+@@ -262,7 +262,7 @@
+ 	class CreatureWalkPathJob : public Job
+     {
+     public:
+-        CreatureWalkPathJob(const Ogre::String&amp; name, rl::CreatureController* movingCreature, rl::Landmark* startLandmark);
++        CreatureWalkPathJob(const Ogre::String&amp; name, rl::Creature* movingCreature, rl::Landmark* startLandmark);
+ 
+         void addLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
+         void addLandmark(rl::Landmark* lm);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001280.html">[Dsa-hl-svn] r4209 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+	<LI>Next message: <A HREF="001282.html">[Dsa-hl-svn] r4211 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1281">[ date ]</a>
+              <a href="thread.html#1281">[ thread ]</a>
+              <a href="subject.html#1281">[ subject ]</a>
+              <a href="author.html#1281">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

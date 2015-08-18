@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4209 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4209%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200803071236.m27CaD93005511%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001279.html">
+   <LINK REL="Next"  HREF="001281.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4209 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4209%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200803071236.m27CaD93005511%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4209 - in rl/trunk/engine: rules/include rules/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar  7 13:36:13 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001279.html">[Dsa-hl-svn] r4208 - in rl/trunk/engine: core/src rules/src
+</A></li>
+        <LI>Next message: <A HREF="001281.html">[Dsa-hl-svn] r4210 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1280">[ date ]</a>
+              <a href="thread.html#1280">[ thread ]</a>
+              <a href="subject.html#1280">[ subject ]</a>
+              <a href="author.html#1280">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-07 13:36:03 +0100 (Fri, 07 Mar 2008)
+New Revision: 4209
+
+Modified:
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/Effect.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+-small fixes (effect::setProperty still doesn't work in ruby)
+-set AL_AIRBORNE correctly in CreatureController
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2008-03-07 11:27:44 UTC (rev 4208)
++++ rl/trunk/engine/rules/include/CreatureController.h	2008-03-07 12:36:03 UTC (rev 4209)
+@@ -177,6 +177,7 @@
+ 
+         // only used in userProcess
+         Time mLastFloorContact;
++        Time mLastFloorContact2;
+ 
+         // used to reset the material
+         const OgreNewt::MaterialID *mOldMaterialId;
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-07 11:27:44 UTC (rev 4208)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-07 12:36:03 UTC (rev 4209)
+@@ -1466,7 +1466,8 @@
+         mLastCollisionName(&quot;&quot;),
+         mLastAnimationSpeed(1),
+         mStillWeightedAnimationName(&quot;&quot;),
+-        mLastFloorContact(TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock())
++        mLastFloorContact(TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock()),
++        mLastFloorContact2(mLastFloorContact)
+     {
+         mGameObjectId = mCreature-&gt;getId();
+ 
+@@ -1672,8 +1673,34 @@
+         Time timeSinceLastFloorContact = 
+             TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock()
+             - mLastFloorContact;
+-        if(timeSinceLastFloorContact &gt;= Time(Date::ONE_SECOND*2) || getAbstractLocation() == AL_AIRBORNE) // 2 seconds?
++        Time timeSinceLastFloorContact2 = 
++            TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock()
++            - mLastFloorContact2;
++        Vector3 speed = getVelocity();
++        std::ostringstream oss;
++        oss &lt;&lt; &quot;Speed in y-Richtung: &quot; &lt;&lt; speed.y;
++        oss &lt;&lt; &quot;   Zeit seit letztem Kontakt: &quot; &lt;&lt; timeSinceLastFloorContact / (Time(Date::ONE_SECOND)/1.0);
++        if( getAbstractLocation() == AL_AIRBORNE )
++        {
++            // find a reason why we now are AL_FLOOR
++            if( timeSinceLastFloorContact &lt; Time(Date::ONE_SECOND)*0.09 &amp;&amp;
++                -speed.y &lt; 0.4 )
++            {
++                oss &lt;&lt; &quot;     set to floor&quot;;
++                setAbstractLocation(AL_FLOOR);
++            }
++        }
++        else
++        {
++            // find a reason why we now are AL_AIRBORNE
++            if( timeSinceLastFloorContact &gt;= Time(Date::ONE_SECOND*0.1) &amp;&amp; // 2 seconds?
++                -speed.y &gt; 0.4 )
++            {
++                oss &lt;&lt; &quot;     set to air&quot;;
+                 setAbstractLocation(AL_AIRBORNE);
++            }
++        }
++        LOG_MESSAGE(Logger::RULES, oss.str());
+ 
+         if(mMovement != NULL)
+         {
+@@ -1737,16 +1764,25 @@
+         mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getPositionOrientation(charPos, charOri);
+         bool isFloorCollision(false);
+ 
+-        //AxisAlignedBox CharAab = mCharBody-&gt;getCollision()-&gt;getAABB();
+-        //Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
++        AxisAlignedBox CharAab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
++        Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
+         Real stepHeight = point.y - charPos.y;
+ 
+-        if( stepHeight &lt; 0.4f )
++        if( stepHeight &lt; charHeight/2 )
+             isFloorCollision = true;
+ 
+         if ( isFloorCollision )
+         {
+-            setAbstractLocation(AL_FLOOR);
++            Time time = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock();
++            if( time != mLastFloorContact )
++            {
++                mLastFloorContact2 = mLastFloorContact;
++                mLastFloorContact = time;
++            }
++        }
++
++        if( stepHeight &lt; 0.4 )
++        {
+             if(stepHeight &gt; 0.05f) // experimantal value, 
+                                    // too low means the creature glides upwards on inclined planes, 
+                                    // too high means the creature stops if moving slowly onto a step because of the friction
+@@ -1764,7 +1800,6 @@
+             }
+             //setContactTangentAcceleration(5);
+             //setContactElasticity(0.0f);
+-            mLastFloorContact = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock();
+         }
+         else
+         {
+
+Modified: rl/trunk/engine/rules/src/Effect.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Effect.cpp	2008-03-07 11:27:44 UTC (rev 4208)
++++ rl/trunk/engine/rules/src/Effect.cpp	2008-03-07 12:36:03 UTC (rev 4209)
+@@ -119,7 +119,7 @@
+         //{
+             LOG_WARNING(
+                 Logger::RULES,
+-                key + &quot; is not a property of this GameObject (&quot;+mName+&quot;)&quot;);
++                key + &quot; is not a property of this Effect (&quot;+mName+&quot;)&quot;);
+         //}
+     }
+ 
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2008-03-07 11:27:44 UTC (rev 4208)
++++ rl/trunk/engine/script/swig/RlRules.swig	2008-03-07 12:36:03 UTC (rev 4209)
+@@ -530,8 +530,8 @@
+     {
+     public:
+     
+-        static const Ogre::String Armor::PROPERTY_G_BE = &quot;g_be&quot;;
+-        static const Ogre::String Armor::PROPERTY_G_RS = &quot;g_rs&quot;;
++        static const CeGuiString Armor::PROPERTY_G_BE = &quot;g_be&quot;;
++        static const CeGuiString Armor::PROPERTY_G_RS = &quot;g_rs&quot;;
+         
+         Armor(unsigned int id);
+         virtual ~Armor();
+@@ -637,9 +637,9 @@
+         virtual Status getStatus();
+         virtual int getMod(rl::CeGuiString target, ModType type, ModTag tag);
+ 
+-        virtual const rl::Property getProperty(const rl::CeGuiString&amp; key) const = 0;
+-        virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value) = 0;
+-        virtual rl::PropertyKeys getAllPropertyKeys() const = 0;
++        virtual const rl::Property getProperty(const rl::CeGuiString&amp; key) const;
++        virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value);
++        virtual rl::PropertyKeys getAllPropertyKeys() const;
+     };
+ 
+     class EffectFactory
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001279.html">[Dsa-hl-svn] r4208 - in rl/trunk/engine: core/src rules/src
+</A></li>
+	<LI>Next message: <A HREF="001281.html">[Dsa-hl-svn] r4210 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1280">[ date ]</a>
+              <a href="thread.html#1280">[ thread ]</a>
+              <a href="subject.html#1280">[ subject ]</a>
+              <a href="author.html#1280">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

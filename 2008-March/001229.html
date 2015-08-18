@@ -1,0 +1,618 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4158 - in rl/trunk/engine: ai/include ai/src	common/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4158%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/src%20ui/src&In-Reply-To=%3C200803051833.m25IXNlH024778%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001228.html">
+   <LINK REL="Next"  HREF="001230.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4158 - in rl/trunk/engine: ai/include ai/src	common/src ui/src</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4158%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/src%20ui/src&In-Reply-To=%3C200803051833.m25IXNlH024778%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4158 - in rl/trunk/engine: ai/include ai/src	common/src ui/src">iblis at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  5 19:33:23 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001228.html">[Dsa-hl-svn] r4157 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="001230.html">[Dsa-hl-svn] r4159 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1229">[ date ]</a>
+              <a href="thread.html#1229">[ thread ]</a>
+              <a href="subject.html#1229">[ subject ]</a>
+              <a href="author.html#1229">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-05 19:33:22 +0100 (Wed, 05 Mar 2008)
+New Revision: 4158
+
+Modified:
+   rl/trunk/engine/ai/include/DialogCondition.h
+   rl/trunk/engine/ai/include/DialogElement.h
+   rl/trunk/engine/ai/include/DialogOption.h
+   rl/trunk/engine/ai/include/DialogVariable.h
+   rl/trunk/engine/ai/src/DialogCondition.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/ai/src/DialogOption.cpp
+   rl/trunk/engine/ai/src/DialogResponse.cpp
+   rl/trunk/engine/ai/src/DialogVariable.cpp
+   rl/trunk/engine/common/src/XmlProcessor.cpp
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+   rl/trunk/engine/ui/src/DialogWindow.cpp
+Log:
+enhanced dialogs:
+monologues for pc's, attribute&amp; talentchecks for npc's, display if there is a attribute or talentcheck
+xmlprocessor: transcoding XMLCh to utf8/CeGuiString does not encode Whitespaces if the string contains nothing else but whitespaces. ATTENTION: this could lead to edge-cases! 
+
+Modified: rl/trunk/engine/ai/include/DialogCondition.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogCondition.h	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/include/DialogCondition.h	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -29,6 +29,8 @@
+         DialogCondition();
+         virtual ~DialogCondition();
+ 
++        const CeGuiString&amp; getVariableType();
++
+         void setVariable(DialogVariable* var);
+ 
+         bool isTrue(Dialog* dialog);
+
+Modified: rl/trunk/engine/ai/include/DialogElement.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogElement.h	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/include/DialogElement.h	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -48,7 +48,7 @@
+     {
+     public:
+         DialogSelection(int id)
+-            : DialogElementType(id), mVariable(NULL)
++            : DialogElementType(id, false), mVariable(NULL)
+         {
+         }
+ 
+@@ -62,6 +62,17 @@
+             mVariable = variable;
+         }
+ 
++        virtual bool isConditional()
++        {
++            return (mVariable != NULL);
++        }
++            
++        virtual const CeGuiString&amp; getConditionVariableType()
++        {
++            RlAssert(mVariable, &quot;No variable found for option with id: &quot; + getId()); 
++            return mVariable-&gt;getType();
++        }
++
+         virtual std::list&lt;DialogParagraph*&gt; getParagraphs(Dialog* dialog)
+         {
+             RlAssert(dialog, &quot;No dialog given! Possible reason: DialogSelection has no label set&quot;);
+
+Modified: rl/trunk/engine/ai/include/DialogOption.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogOption.h	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/include/DialogOption.h	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -33,7 +33,7 @@
+     class _RlAiExport DialogOption : public DialogElement
+     {
+     public:
+-        DialogOption(int id);
++        DialogOption(int id, bool isAutoSelected);
+         ~DialogOption();
+ 
+ 
+@@ -45,13 +45,17 @@
+ 
+ 
+         void setPrecondition(DialogCondition* precondition);
++        virtual const CeGuiString&amp; getConditionVariableType();
++        virtual bool isConditional();
+ 
++        bool isAutoSelected() const;
+         bool isAvailable(Dialog* dialog) const;
+ 
+     private:
+         DialogResponse* mResponse;
+         DialogCondition* mPrecondition;
+         CeGuiString mLabel;
++        bool mIsAutoSelected;
+     };
+     
+     typedef DialogSelection&lt;DialogOption&gt; DialogOptionSelection;
+
+Modified: rl/trunk/engine/ai/include/DialogVariable.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogVariable.h	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/include/DialogVariable.h	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -30,13 +30,16 @@
+         const Property&amp; getValue(Dialog* dialog);
+         void invalidate();
+ 
++        const CeGuiString&amp; getType();
++
+     protected:
+-        DialogVariable();
++        DialogVariable(const CeGuiString&amp; type);
+         virtual ~DialogVariable();
+         virtual Property calculateValue(Dialog* dialog) = 0;
+ 
+     private:
+         bool mRecalculate;
++        CeGuiString mType;
+         Property mValue;
+     };
+ 
+@@ -44,7 +47,7 @@
+     {
+     public:
+         DialogPropertyVariable(const Ogre::String&amp; propertyName);
+-
++        
+     protected:
+         virtual Property calculateValue(Dialog* dialog);
+ 
+@@ -68,26 +71,28 @@
+     class EigenschaftsProbeVariable : public DialogVariable
+     {
+     public:
+-        EigenschaftsProbeVariable(const CeGuiString&amp; eigenschaft, int modifier);
++        EigenschaftsProbeVariable(const CeGuiString&amp; eigenschaft, int modifier, const CeGuiString&amp; target);
+ 
+     protected:
+         virtual Property calculateValue(Dialog* dialog);
+ 
+     private:
+         CeGuiString mEigenschaft;
++        CeGuiString mTarget;
+         int mModifier;
+     };
+ 
+     class TalentProbeVariable : public DialogVariable
+     {
+     public:
+-        TalentProbeVariable(const CeGuiString&amp; talent, int modifier);
++        TalentProbeVariable(const CeGuiString&amp; talent, int modifier, const CeGuiString&amp; target);
+         
+     protected:
+         virtual Property calculateValue(Dialog* dialog);
+ 
+     private:
+         CeGuiString mTalent;
++        CeGuiString mTarget;
+         int mModifier;
+     };
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogCondition.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogCondition.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/src/DialogCondition.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -33,6 +33,12 @@
+     {
+     }
+ 
++    const CeGuiString&amp; DialogCondition::getVariableType()
++    {
++        RlAssert(mVariable, &quot;No variable available for the condition&quot;);
++        return mVariable-&gt;getType();
++    }
++
+     bool DialogCondition::isTrue(Dialog* dialog)
+     {
+         if (mVariable)
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -229,7 +229,8 @@
+             }
+             else if (hasNodeName(dialogElemXml, &quot;option&quot;))
+             {
+-                DialogOption* option = new DialogOption(id);
++                bool isAutoSelected = getAttributeValueAsBool(dialogElemXml, &quot;autoSelect&quot;);
++                DialogOption* option = new DialogOption(id, isAutoSelected);
+                 if (hasAttribute(dialogElemXml, &quot;label&quot;))
+                 {
+                     option-&gt;setLabel(getAttributeValueAsString(dialogElemXml, &quot;label&quot;));
+@@ -766,22 +767,24 @@
+         else if (hasNodeName(variableXml, &quot;attributecheck&quot;))
+         {
+             CeGuiString attr = getAttributeValueAsString(variableXml, &quot;attribute&quot;);
++            CeGuiString target = getAttributeValueAsString(variableXml, &quot;target&quot;);
+             int modifier = 0;
+             if (hasAttribute(variableXml, &quot;modifier&quot;))
+             {
+                 modifier = getAttributeValueAsInteger(variableXml, &quot;modifier&quot;);
+             }
+-            return new EigenschaftsProbeVariable(attr, modifier);
++            return new EigenschaftsProbeVariable(attr, modifier, target);
+         }
+         else if (hasNodeName(variableXml, &quot;talentcheck&quot;))
+         {
+             CeGuiString attr = getAttributeValueAsString(variableXml, &quot;talent&quot;);
++            CeGuiString target = getAttributeValueAsString(variableXml, &quot;target&quot;);
+             int modifier = 0;
+             if (hasAttribute(variableXml, &quot;modifier&quot;))
+             {
+                 modifier = getAttributeValueAsInteger(variableXml, &quot;modifier&quot;);
+             }
+-            return new TalentProbeVariable(attr, modifier);
++            return new TalentProbeVariable(attr, modifier, target);
+         }
+ 
+         return NULL;
+
+Modified: rl/trunk/engine/ai/src/DialogOption.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogOption.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/src/DialogOption.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -22,8 +22,8 @@
+ namespace rl
+ {
+ 
+-    DialogOption::DialogOption(int id)
+-    : DialogElement(id), mPrecondition(NULL), mLabel(&quot;&quot;)
++    DialogOption::DialogOption(int id, bool isAutoSelected)
++    : DialogElement(id), mPrecondition(NULL), mResponse(NULL), mLabel(&quot;&quot;), mIsAutoSelected(isAutoSelected)
+     {
+     }
+ 
+@@ -46,6 +46,24 @@
+         mPrecondition = precondition;
+     }
+ 
++    const CeGuiString&amp; DialogOption::getConditionVariableType()
++    {
++        RlAssert(mPrecondition, &quot;No precondition found for option with id: &quot; 
++                                + Ogre::StringConverter::toString(getId())
++                                + &quot;\nA precondition must be set to get its variable type&quot;);
++        return mPrecondition-&gt;getVariableType();
++    }
++
++    bool DialogOption::isConditional()
++    {
++        return (mPrecondition != NULL);
++    }
++
++    bool DialogOption::isAutoSelected() const
++    {
++        return mIsAutoSelected;
++    }
++
+     bool DialogOption::isAvailable(Dialog* dialog) const
+     {
+         if (mPrecondition)
+@@ -59,6 +77,7 @@
+     void DialogOption::setLabel(const CeGuiString &amp;label)
+     {
+         mLabel = label;
++        mLabel.c_str();
+     }
+ 
+     const CeGuiString&amp; DialogOption::getLabel() const
+
+Modified: rl/trunk/engine/ai/src/DialogResponse.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogResponse.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/src/DialogResponse.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -51,12 +51,16 @@
+         for (Options::const_iterator it = allOptions.begin(); it != allOptions.end(); ++it)
+         {
+             DialogOption* cur = *it;
++            if (cur-&gt;isAutoSelected())
++            {
++                availableOptions.push_back(cur);
++                break;
++            }
+             if (cur-&gt;isAvailable(dialog))
+             {
+                 availableOptions.push_back(cur);
+             }
+         }
+-
+         return availableOptions;
+     }
+ 
+
+Modified: rl/trunk/engine/ai/src/DialogVariable.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogVariable.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ai/src/DialogVariable.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -24,8 +24,8 @@
+ 
+ namespace rl
+ {
+-    DialogVariable::DialogVariable()
+-        : mRecalculate(true)
++    DialogVariable::DialogVariable(const CeGuiString&amp; type)
++        : mRecalculate(true), mType(type)
+     {
+     }
+ 
+@@ -33,6 +33,11 @@
+     {
+     }
+ 
++    const CeGuiString&amp; DialogVariable::getType()
++    {
++        return mType;
++    }
++
+     const Property&amp; DialogVariable::getValue(Dialog* dialog)
+     {
+         if (mRecalculate)
+@@ -50,7 +55,7 @@
+     }
+ 
+     DialogPropertyVariable::DialogPropertyVariable(const Ogre::String &amp;propertyName)
+-        : mPropertyName(propertyName)
++        : DialogVariable(&quot;dialogvariable&quot;), mPropertyName(propertyName)
+     {
+     }
+ 
+@@ -60,7 +65,7 @@
+     }
+ 
+     QuestStateVariable::QuestStateVariable(const Ogre::String &amp;questId, const Ogre::String &amp;propertyName)
+-        : mQuestId(questId), mPropertyName(propertyName)
++        : DialogVariable(&quot;queststate&quot;), mQuestId(questId), mPropertyName(propertyName)
+     {
+     }
+ 
+@@ -69,27 +74,47 @@
+         return RulesSubsystem::getSingleton().getQuestBook()-&gt;getQuest(mQuestId)-&gt;getProperty(mPropertyName);
+     }
+ 
+-    TalentProbeVariable::TalentProbeVariable(const rl::CeGuiString &amp;talent, int modifier)
+-        : mTalent(talent), mModifier(modifier)
++    TalentProbeVariable::TalentProbeVariable(const rl::CeGuiString &amp;talent, int modifier, const rl::CeGuiString&amp; target)
++        : DialogVariable(&quot;talentcheck&quot;), mTalent(talent), mTarget(target), mModifier(modifier)
+     {
+     }
+ 
+     Property TalentProbeVariable::calculateValue(Dialog* dialog)
+     {
+-        Creature* cr = dialog-&gt;getPc(0); ///@todo allow multiple PCs
++        Creature* cr = NULL;
++        if(mTarget == &quot;pc&quot;)
++        {
++            cr = dialog-&gt;getPc(0); ///@todo allow multiple PCs
++        }
++        else if (mTarget == &quot;npc&quot;)
++        {
++            cr = dialog-&gt;getNpc(0);
++        }
++        // if no target was given, use the player character. 
++        // @todo: remove this, target should be required!
++        if(cr == NULL) { cr = dialog-&gt;getPc(0);}
+         return Property(cr-&gt;doTalentprobe(mTalent, mModifier));
+     }
+ 
+-EigenschaftsProbeVariable::EigenschaftsProbeVariable(const rl::CeGuiString &amp;eigenschaft, int modifier)
+-        : mEigenschaft(eigenschaft), mModifier(modifier)
++    EigenschaftsProbeVariable::EigenschaftsProbeVariable(const rl::CeGuiString &amp;eigenschaft, int modifier, const rl::CeGuiString&amp; target)
++        : DialogVariable(&quot;attributecheck&quot;), mEigenschaft(eigenschaft), mTarget(target), mModifier(modifier)
+     {
+     }
+ 
+     Property EigenschaftsProbeVariable::calculateValue(Dialog* dialog)
+     {
+-        Creature* cr = dialog-&gt;getPc(0); ///@todo allow multiple PCs
++        Creature* cr = NULL;
++        if(mTarget == &quot;pc&quot;)
++        {
++            cr = dialog-&gt;getPc(0); ///@todo allow multiple PCs
++        }
++        else if (mTarget == &quot;npc&quot;)
++        {
++            cr = dialog-&gt;getNpc(0);
++        }
++        // if no target was given, use the player character. 
++        // @todo: remove this, target should be required!
++        if(cr == NULL) { cr = dialog-&gt;getPc(0);}
+         return Property(cr-&gt;doEigenschaftsprobe(mEigenschaft, mModifier));
+     }
+-
+-
+ }
+
+Modified: rl/trunk/engine/common/src/XmlProcessor.cpp
+===================================================================
+--- rl/trunk/engine/common/src/XmlProcessor.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/common/src/XmlProcessor.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -560,9 +560,16 @@
+ utf8* XmlProcessor::transcodeToUtf8(const XMLCh* const string16) const
+ {
+ 	unsigned int str16len = XMLString::stringLen(string16);
+-	if (str16len == 0)
+-		return (utf8*)&quot;&quot;;
+ 
++    /// Check if the XMLCh contains nothing but whitespaces. If so, remove them 
++    /// @note this does also mean, that this method will never return something like &quot; &quot; 
++    XMLCh* tmpVal = XMLString::replicate(string16);
++    if(XMLChar1_0::isAllSpaces(tmpVal, str16len))
++    {
++        XMLString::removeWS(tmpVal);
++        str16len = XMLString::stringLen(tmpVal);
++    }
++
+ 	utf8* rval;
+ 	unsigned int eaten = 0;
+ 	unsigned int size = str16len;
+@@ -571,7 +578,7 @@
+ 	{
+ 		rval = new utf8[size+1];
+ 	
+-		sTranscoder-&gt;transcodeTo(string16, str16len, rval, size, eaten, XMLTranscoder::UnRep_RepChar);
++		sTranscoder-&gt;transcodeTo(tmpVal, str16len, rval, size, eaten, XMLTranscoder::UnRep_RepChar);
+ 		rval[size] = 0;
+ 
+ 		if (eaten &lt; str16len)
+@@ -581,7 +588,7 @@
+ 		}
+ 	}
+ 	while (eaten &lt; str16len);
+-
++    XMLString::release(&amp;tmpVal);
+ 	return rval;	
+ }
+ 
+@@ -616,6 +623,7 @@
+ 	XercesDOMParser* parser = new XercesDOMParser();
+ 
+     parser-&gt;setValidationScheme(XercesDOMParser::Val_Auto);    // optional.
++    //parser-&gt;setIncludeIgnorableWhitespace(false); // optional, if you want to ignore whitespaces
+     parser-&gt;setDoNamespaces(true);    // optional
+ 
+     XmlPtr res = XmlResourceManager::getSingleton().getByName(resourceName);
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -155,7 +155,7 @@
+             handleDialogClose();
+             return;
+ 		}
+-
++        mDialog-&gt;setProperty(Dialog::PROP_EXIT_REQUESTED, false);
+         mCurrentSpeaker = mDialog-&gt;getNpc(0);
+         mCurrentListener = mDialog-&gt;getPc(0);
+         showResponse(mDialog-&gt;getDialogStart());
+@@ -275,6 +275,12 @@
+         mDialogWindow-&gt;setVisible(false);
+         Ogre::String soundFile = paragraph-&gt;getVoiceFile();
+         CeGuiString text = paragraph-&gt;getText();
++        // if there is no text in the paragraph, go directly to the next entry!
++        if(text.empty())
++        {
++            textFinished();
++            return;
++        }
+         processTextVariables(text);
+ 
+         recalculateCamera(mCurrentListener, mCurrentSpeaker);
+@@ -371,6 +377,7 @@
+ 	{
+         if (!response)
+ 		{
++            LOG_MESSAGE(Logger::UI, &quot;No response found! Close Dialog!&quot;);
+ 			mDialogWindow-&gt;setDialogEnd();
+ 			mState = CLOSING_DIALOG;
+ 			handleDialogClose();
+@@ -399,12 +406,34 @@
+         {
+             DialogParagraph* firstParagraph = mCurrentParagraphs.front();
+             mCurrentResponse-&gt;applyImplications(mDialog);
++            // does this paragraph contain a response?
+             if (!firstParagraph-&gt;getResponse())
+             {
++                // no, so directly start with the first paragraph
+                 doTalk(firstParagraph);
+             }
++            else if(mCurrentParagraphs.size() &gt; 1)
++            {
++                // yes, but there are other paragraphs in the list.
++                // the response should be executed at last, so we put it back to the end
++                mCurrentParagraphs.pop_front();
++                mCurrentParagraphs.push_back(firstParagraph);
++                firstParagraph = mCurrentParagraphs.front();
++                // we don't allow more than one goto per response
++                if(firstParagraph-&gt;getResponse())
++                {
++                    LOG_ERROR(Logger::UI, &quot;To many gotoresponses in response with id: &quot; 
++                        + mCurrentResponse-&gt;getId()); 
++                    handleDialogClose();
++                }
++                else
++                {
++                    doTalk(firstParagraph);
++                }
++            }
+             else
+             {
++                // we only have a response as paragraph, execute it!
+                 showResponse(firstParagraph-&gt;getResponse());
+             }
+         }
+@@ -443,6 +472,13 @@
+                 mCurrentSpeaker = mDialog-&gt;getPc(0);
+ 
+                 DialogResponse::Options options = mCurrentResponse-&gt;getAvailableOptions(mDialog);
++                // if there is just one option and it is an auto selected one,
++                // display it.
++                if(options.size() == 1 &amp;&amp;  options.front()-&gt;isAutoSelected())
++                {
++                    handleDialogSelectOption(options.front());
++                    return;
++                }
+                 mDialogWindow-&gt;setAvailableOptions(options);
+ 		        mDialogWindow-&gt;setVisible(true);
+ 		        mState = CHOOSING_OPTION;
+
+Modified: rl/trunk/engine/ui/src/DialogWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogWindow.cpp	2008-03-05 18:32:10 UTC (rev 4157)
++++ rl/trunk/engine/ui/src/DialogWindow.cpp	2008-03-05 18:33:22 UTC (rev 4158)
+@@ -110,6 +110,20 @@
+             {
+                 text = cur-&gt;getLabel();
+             }
++            if (cur-&gt;isConditional())
++            {
++                CeGuiString type = cur-&gt;getConditionVariableType();
++                type.c_str();
++                if ( type == &quot;talentcheck&quot;)
++                {
++                    text += &quot; [T] &quot;;
++                }
++                else if (type == &quot;attributecheck&quot;)
++                {
++                    text += &quot; [E] &quot;;
++                }
++            }
++            text.c_str();
+ 
+ 			if (optionCount &lt; mDialogOptions-&gt;getItemCount())
+ 			{
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001228.html">[Dsa-hl-svn] r4157 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="001230.html">[Dsa-hl-svn] r4159 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1229">[ date ]</a>
+              <a href="thread.html#1229">[ thread ]</a>
+              <a href="subject.html#1229">[ subject ]</a>
+              <a href="author.html#1229">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

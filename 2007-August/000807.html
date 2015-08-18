@@ -1,0 +1,517 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3736 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3736%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200708241247.l7OCl3Tm010702%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000806.html">
+   <LINK REL="Next"  HREF="000808.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3736 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3736%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200708241247.l7OCl3Tm010702%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3736 - in rl/trunk/engine: rules/include rules/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Aug 24 14:47:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000806.html">[Dsa-hl-svn] r3735 - in rl/trunk/engine/core: . include src
+</A></li>
+        <LI>Next message: <A HREF="000808.html">[Dsa-hl-svn] r3737 - in modules/common/scripts: . effects
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#807">[ date ]</a>
+              <a href="thread.html#807">[ thread ]</a>
+              <a href="subject.html#807">[ subject ]</a>
+              <a href="author.html#807">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-24 14:46:53 +0200 (Fri, 24 Aug 2007)
+New Revision: 3736
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/src/Armor.cpp
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+changed item::setitem and implemented RS in creature
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/include/Creature.h	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -125,7 +125,7 @@
+             static const Ogre::String PROPERTY_AP;
+             static const Ogre::String PROPERTY_INVENTORY;
+ 
+-			typedef std::string Wert;
++            typedef CeGuiString Wert;
+ 
+     // some targets
+ 			static const std::string ALL_EIGENSCHAFTEN;
+@@ -141,6 +141,7 @@
+             static const Wert WERT_GS;
+             static const Wert WERT_SOZIALSTATUS;
+             static const Wert WERT_BE;
++            static const Wert WERT_RS;
+             static const Wert WERT_INI;
+             static const Wert WERT_KAMPFUNFAEHIGKEITSSCHWELLE; 
+             static const Wert WERT_REGENERATION;
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/include/Item.h	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -81,15 +81,13 @@
+ 
+         /**
+          * F&#252;gt das Verhalten f&#252;r die GO-States: GOS_READY, GOS_HELD und GOS_IN_POSSESION hinzu.
+-         * @warning Falls ein Actor existiert, wird dieser gel&#246;scht. Das bedeutet, dass diese Funktion
+-         * aufgerufen werden muss, bevor gegebenenfalls ein neuer Actor erstellt wird!
+-         * Der Owner und der ParentSlot wird ebenfalls resettet. Au&#223;erdem wird das Item aus dem Slot entfernt!
+-         * Bei den drei States ist die zu Grunde liegende Idee, dass man (in dieser Reihenfolge) mit dieser
+-         * Funktion den neuen State setzt und dann dann den neuen State einrichtet (evt doCreateActor() aufruft).
+-         * Dabei muss man sich nicht mehr darum k&#252;mmern, welchen State das Item vorher hatte.
++         * @warning Bevor einer der drei States gesetzt wird, sollte zun&#228;chst die Funktion removeOldState
++         * aufgerufen werden, dann m&#252;ssen Owner und ParentSlot/ParentContainer gesetzt werden und
++         * eventuell doCreateActor. Als letztes muss diese Funktion mit dem neuen State aufgerufen werden.
++         * Die Reihenfolge ist wichtig, damit die onStateChange-Funktionen funktionieren k&#246;nnen!
+          **/
+         virtual void setState(GameObjectState state);
+-        //void hold();
++        virtual void removeOldState();
+ 
+         void setParentSlot(Slot* slot);
+         Slot* getParentSlot() const;
+
+Modified: rl/trunk/engine/rules/src/Armor.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Armor.cpp	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/src/Armor.cpp	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -152,23 +152,29 @@
+ 
+     void Armor::onStateChange(GameObjectState oldState, GameObjectState newState)
+     {
++        int rs = 0;
+         if (oldState != newState)
+         {
+-            if (newState == GOS_HELD)
++            if (newState == GOS_READY)
+             {
+                 if (getOwner())
+                 {
+                     mRsEffect = EffectFactoryManager::getSingleton().createEffect(
+                         &quot;Ruestung&quot;);
++                    if(mRsEffect == NULL)
++                        return;
+                     mRsEffect-&gt;setProperty(Armor::PROPERTY_G_BE, Property(mGBE));
+                     mRsEffect-&gt;setProperty(Armor::PROPERTY_G_RS, Property(mGRS));
+                     getOwner()-&gt;addEffect(mRsEffect);
++                    rs = static_cast&lt;Creature*&gt;(getOwner())-&gt;getWert(Creature::WERT_RS);
+                 }
+             }
+-            else if (oldState == GOS_HELD)
++            else if (oldState == GOS_READY)
+             {
+                 if (getOwner())
+                 {
++                    if(mRsEffect == NULL)
++                        return;
+                     getOwner()-&gt;removeEffect(mRsEffect);
+                     delete mRsEffect;
+                 }
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/src/Container.cpp	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -112,8 +112,15 @@
+ 		{
+ 			mItemPositions[item] = pos;
+ 			mItems.insert(item);
++
++            item-&gt;removeOldState();
++            item-&gt;setParentContainer(this);
++            if(mOwner)
++                item-&gt;setOwner(mOwner);
++            else
++                item-&gt;setOwner(this);
+ 			item-&gt;setState(GOS_IN_POSSESSION);
+-            item-&gt;setParentContainer(this);
++
+ 			return true;
+ 		}
+ 		else
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -71,6 +71,7 @@
+     const Creature::Wert Creature::WERT_GS = &quot;GS&quot;;
+     const Creature::Wert Creature::WERT_SOZIALSTATUS = &quot;SO&quot;;
+     const Creature::Wert Creature::WERT_BE = &quot;BE&quot;;
++    const Creature::Wert Creature::WERT_RS = &quot;RS&quot;;
+     const Creature::Wert Creature::WERT_INI = &quot;INI&quot;;
+     const Creature::Wert Creature::WERT_KAMPFUNFAEHIGKEITSSCHWELLE =&quot;Kampfunf&#195;&#164;higkeitsschwelle&quot;;
+     const Creature::Wert Creature::WERT_REGENERATION = &quot;Regeneration&quot;;
+@@ -105,6 +106,7 @@
+ 		setWert(WERT_MOD_AU, 0);
+ 		setWert(WERT_MOD_MR, 0);
+ 		setWert(WERT_GS, 8);
++        setWert(WERT_RS, 0);
+         setWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE, 0);
+ 		mEigenschaften[E_MUT] = 0;
+ 		mEigenschaften[E_KLUGHEIT] = 0;
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/src/Item.cpp	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -82,12 +82,7 @@
+ 	{
+ 		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
+ 	}
+-/*
+-	void Item::hold()
+-	{
+-		setState(GOS_HELD);
+-	}
+-*/
++
+     void Item::doHold()
+     {
+         setActor(createActor());
+@@ -103,14 +98,17 @@
+         }
+     }
+ 
++    void Item::removeOldState()
++    {
++        setState(GOS_LOADED);
++    }
++
+ // --------------- Warning ------------
+ // do not change this function without
+ // having a look at the containers and slots
+     void Item::setState(GameObjectState targetstate)
+     {
+-        // do reset if one of the new states
+-        if (mState != GOS_HELD &amp;&amp; mState != GOS_IN_POSSESSION &amp;&amp; mState != GOS_READY &amp;&amp;
+-            mState == targetstate)
++        if (mState == targetstate)
+         {
+             return;
+         }
+@@ -118,172 +116,53 @@
+         GameObjectState oldState = mState;
+ 
+ 
+-        if( mState == GOS_HELD ||
+-            mState == GOS_IN_POSSESSION ||
+-            mState == GOS_READY )
++        if( targetstate != GOS_HELD &amp;&amp;
++            targetstate != GOS_IN_POSSESSION &amp;&amp;
++            targetstate != GOS_READY )
+         {
+-            mState = GOS_LOADED; // &lt;- this is important to avoid endless recursion!
+-            if( getParentSlot() )
+-                getParentSlot()-&gt;setItem(NULL);
+-            setParentSlot(NULL);
+-            if( getParentContainer() )
+-                getParentContainer()-&gt;removeItem(this);
+-            setParentContainer(NULL);
+-            doLoose();
+-            setOwner(NULL);
+-        }
+-        else
+-        {
+-            GameObject::setState(GOS_LOADED);
+-            oldState = GOS_LOADED;
+-        }
+-
+-        if( targetstate == GOS_HELD || 
+-            targetstate == GOS_IN_POSSESSION || 
+-            targetstate == GOS_READY )
+-        {
+-            mState = targetstate;
+-            onStateChange(oldState, mState);
+-        }
+-        else
+-        {
+-            onStateChange(oldState, mState);
+-            GameObject::setState(targetstate);
+-        }
+-    }
+-
+-/*
+-    void Item::setState(GameObjectState targetstate)
+-    {
+-        if (mState == targetstate)
+-        {
+-            return;
+-        }
+-
+-        bool stateChanged = false;
+-        GameObjectState oldState = mState;
+-
+-        if (targetstate == GOS_IN_POSSESSION)
+-        {
+             if( mState == GOS_HELD ||
+                 mState == GOS_IN_POSSESSION ||
+                 mState == GOS_READY )
+             {
+-                mState = GOS_LOADED;
+-                doLoose();
+-                setOwner(NULL);
++                mState = GOS_LOADED; // &lt;- this is important to avoid endless recursion!
+                 onStateChange(oldState, mState);
+-            }
+-            else
+-            {
+-                GameObject::setState(GOS_LOADED);
+-                oldState = GOS_LOADED;
+-            }
+-            mState = targetstate;
+-            stateChanged = true;
+-            /*
+-            if (mState == GOS_LOADED)
+-            {
+-                stateChanged = true;
+-            }
+-            else if (mState == GOS_IN_SCENE)
+-            {
+-                doRemoveFromScene();
+-                stateChanged = true;
+-            }
+-            else if (mState == GOS_HELD)
+-            {
++
++                if( getParentSlot() )
++                    getParentSlot()-&gt;setItem(NULL);
++                setParentSlot(NULL);
++                if( getParentContainer() )
++                    getParentContainer()-&gt;removeItem(this);
++                setParentContainer(NULL);
+                 doLoose();
+-                destroyActor();
+-                stateChanged = true;
+-            }
+-            */ /*
+-        }
+-        else if (targetstate == GOS_LOADED)
+-        {
+-                doLoose();
+                 setOwner(NULL);
+-            if (mState == GOS_IN_POSSESSION)
+-            {
+-				mState = GOS_LOADED;
+-                stateChanged = true;
+             }
+-            if (mState == GOS_HELD)
+-            {
+-                doLoose();
+-                destroyActor();
+-                mState = GOS_LOADED;
+-				stateChanged = true;
+-            }
++
++            GameObject::setState(targetstate);
+         }
+-        else if (targetstate == GOS_IN_SCENE)
++        else
+         {
+-            if (mState == GOS_IN_POSSESSION)
+-            {
+-                ///@todo remove from parent container?
+-                doRemoveFromScene();
+-                stateChanged = true;
+-			}
+-            if (mState == GOS_HELD)
+-            {
+-                doLoose();
+-				doPlaceIntoScene();
+-                stateChanged = true;
+-            }
+-        }
+-        else if (targetstate == GOS_HELD)
+-        {
+             if( mState == GOS_HELD ||
+                 mState == GOS_IN_POSSESSION ||
+                 mState == GOS_READY )
+             {
+-                mState = GOS_LOADED;
+-                doLoose();
+-                setOwner(NULL);
+-                onStateChange(oldState, mState);
++                LOG_WARNING(Logger::RULES, 
++                    &quot;Item::removeOldState() or Item::setState(GOS_LOADED) should be called  \
++                    before setting one of the States GOS_HELD, GOS_IN_POSSESSION or GOS_READY!&quot;);
+             }
+             else
+             {
+-                GameObject::setState(GOS_LOADED);
+-                oldState = GOS_LOADED;
++                if( mState != GOS_LOADED )
++                {
++                    GameObject::setState(GOS_LOADED);
++                    oldState = GOS_LOADED;
++                }
++
++                mState = targetstate;
++                onStateChange(oldState, mState);
+             }
+-            mState = targetstate;
+-            stateChanged = true;*/
+-            /*
+-            if (mState == GOS_LOADED)
+-            {
+-                //doHold();
+-                stateChanged = true;
+-            }
+-            else if (mState == GOS_IN_SCENE)
+-            {
+-                doRemoveFromScene();
+-                //doHold();
+-                stateChanged = true;
+-            }
+-            else if (mState == GOS_IN_POSSESSION)
+-            {
+-                //doHold();
+-                stateChanged = true;
+-            }
+-            */
+-/*
+         }
+-        else if (targetstate == GOS_READY)
+-        {
+-            ///@todo
+-        }
+-
+-        if (stateChanged)
+-        {
+-            onStateChange(oldState, targetstate);
+-        }
+-        else
+-        {
+-            GameObject::setState(targetstate);
+-        }
+     }
+-*/
++
+     void Item::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+     {
+         if (key == Item::PROPERTY_IMAGENAME)
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -65,12 +65,14 @@
+         {
+             if( isAllowed(item) &amp;&amp; isEmpty())
+             {
++                item-&gt;removeOldState();
++                item-&gt;setOwner(mOwner);
++                item-&gt;setParentSlot(this);
+                 if( canReady(item) )
+                     item-&gt;setState(GOS_READY);
+                 else
+                     item-&gt;setState(GOS_HELD);
+-                item-&gt;setOwner(mOwner);
+-                item-&gt;setParentSlot(this);
++
+                 mItem = item;
+             }
+             else
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-08-23 19:53:33 UTC (rev 3735)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-08-24 12:46:53 UTC (rev 3736)
+@@ -432,7 +432,17 @@
+         void setItemType(rl::Item::ItemType itemType);
+         rl::Item::ItemType getItemType() const;
+         virtual void setState(rl::GameObjectState state);
++        virtual void removeOldState();
+ 
++        void setParentSlot(rl::Slot* slot);
++        rl::Slot* getParentSlot() const;
++
++        void setParentContainer(rl::Container* cont);
++        rl::Container* getParentContainer() const;
++
++        void setOwner(rl::GameObject* go);
++        rl::GameObject* getOwner() const;
++
+         virtual const rl::Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertySet* getAllProperties() const;
+@@ -476,6 +486,10 @@
+     class Armor : public Item
+     {
+     public:
++    
++        static const Ogre::String Armor::PROPERTY_G_BE = &quot;g_be&quot;;
++        static const Ogre::String Armor::PROPERTY_G_RS = &quot;g_rs&quot;;
++        
+         Armor(unsigned int id);
+         virtual ~Armor();
+ 
+@@ -620,7 +634,7 @@
+     class Creature : public GameObject {
+     public:
+     
+-    typedef std::string Wert;
++    typedef CeGuiString Wert;
+         enum Alignment
+         {
+             ALIGNMENT_ALLY,    ///&lt; Creature fights with the player.
+@@ -642,6 +656,7 @@
+         static const Creature::Wert Creature::WERT_GS = &quot;GS&quot;;
+         static const Creature::Wert Creature::WERT_SOZIALSTATUS = &quot;SO&quot;;
+         static const Creature::Wert Creature::WERT_BE = &quot;BE&quot;;
++        static const Creature::Wert Creature::WERT_RS = &quot;RS&quot;;
+         static const Creature::Wert Creature::WERT_INI = &quot;INI&quot;;
+         static const Creature::Wert Creature::WERT_KAMPFUNFAEHIGKEITSSCHWELLE =&quot;Kampfunf&#195;&#164;higkeitsschwelle&quot;; 
+         static const Creature::Wert Creature::WERT_REGENERATION = &quot;Regeneration&quot;;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000806.html">[Dsa-hl-svn] r3735 - in rl/trunk/engine/core: . include src
+</A></li>
+	<LI>Next message: <A HREF="000808.html">[Dsa-hl-svn] r3737 - in modules/common/scripts: . effects
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#807">[ date ]</a>
+              <a href="thread.html#807">[ thread ]</a>
+              <a href="subject.html#807">[ subject ]</a>
+              <a href="author.html#807">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

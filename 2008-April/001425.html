@@ -1,0 +1,1134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4354 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4354%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200804201609.m3KG9AvN024934%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001424.html">
+   <LINK REL="Next"  HREF="001426.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4354 - rl/trunk/engine/rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4354%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200804201609.m3KG9AvN024934%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4354 - rl/trunk/engine/rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Apr 20 18:09:10 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001424.html">[Dsa-hl-svn] r4353 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001426.html">[Dsa-hl-svn] r4355 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1425">[ date ]</a>
+              <a href="thread.html#1425">[ thread ]</a>
+              <a href="subject.html#1425">[ subject ]</a>
+              <a href="author.html#1425">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-04-20 18:09:09 +0200 (Sun, 20 Apr 2008)
+New Revision: 4354
+
+Modified:
+   rl/trunk/engine/rules/src/Combat.cpp
+Log:
+Different hit types (half damage, normal damage, increased damage)
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-04-20 16:06:29 UTC (rev 4353)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-04-20 16:09:09 UTC (rev 4354)
+@@ -1,516 +1,542 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot;
+-
+-#include &quot;Combat.h&quot;
+-
+-#include &quot;Combatant.h&quot;
+-#include &quot;CombatManager.h&quot;
+-#include &quot;CreatureController.h&quot;
+-#include &quot;Effect.h&quot;
+-#include &quot;GameEventLog.h&quot;
+-#include &quot;Inventory.h&quot;
+-#include &quot;Job.h&quot;
+-#include &quot;JobQueue.h&quot;
+-#include &quot;JobScheduler.h&quot;
+-#include &quot;MathUtil.h&quot;
+-#include &quot;MessagePump.h&quot;
+-#include &quot;RulesMessages.h&quot;
+-#include &quot;Weapon.h&quot;
+-
+-
+-using namespace boost;
+-using namespace boost::tuples;
+-using namespace Ogre;
+-
+-namespace rl
+-{
+-    struct InitiativeComparator
+-		: std::binary_function&lt;std::pair&lt;int, Combatant*&gt;, std::pair&lt;int, Combatant*&gt;, bool&gt;
+-    {
+-        /// \todo take into account other values of the combatant according to TDE rules,
+-        /// in case initiative is equal.
+-        bool operator()(const std::pair&lt;int, Combatant*&gt;&amp; c1,
+-            const std::pair&lt;int, Combatant*&gt;&amp; c2) const
+-        {
+-            return c1.first &gt; c2.first;
+-        }
+-    };
+-
+-	struct FindCombatantByCreature : std::binary_function&lt;Combatant*, Creature*, bool&gt;
+-    {
+-        bool operator()(Combatant* combatant, Creature* creature) const
+-        {
+-			return combatant-&gt;getCreature() == creature;
+-        }
+-    };
+-
+-    Combat::Combat()
+-        : mOwnedCombatants(),
+-		  mOpponents(),
+-          mAllies(),
+-          mCombatantQueue(),
+-          mCombatantActions(),
+-		  mCombatantReactions(),
+-		  mCancelledActions(),
+-		  mRemovedCombatants(),
+-          mCurrentRound(0),
+-		  mNextActionId(0),
+-		  mAnimationSequenceTicket(0)
+-    {
+-		mLifeStateChangeConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectLifeStateChanged&gt;(
+-			    boost::bind(&amp;Combat::onGameObjectLifeStateChanged, this, _1, _2, _3));
+-    }
+-
+-    Combat::~Combat()
+-    {
+-    }
+-
+-    void Combat::addOpponent(Combatant* combatant)
+-    {
+-        mOpponents.insert(combatant);
+-		GameEventLog::getSingleton().logEvent(
+-			combatant-&gt;getName() + &quot; wurde in einen Kampf verwickelt.&quot;, GET_COMBAT);
+-		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentEntered&gt;(combatant);
+-    }
+-
+-    Combatant* Combat::addOpponent(Creature* creature)
+-	{
+-		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
+-		mOwnedCombatants.insert(combatant);
+-        addOpponent(combatant);
+-		return combatant;
+-	}
+-
+-    void Combat::removeOpponent(Combatant* combatant)
+-    {
+-        mOpponents.erase(combatant);
+-		GameEventLog::getSingleton().logEvent(
+-			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
+-		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentLeft&gt;(combatant);
+-		checkAndMarkCombatant(combatant);
+-    }
+-
+-    void Combat::addAlly(Combatant* combatant)
+-    {
+-        mAllies.insert(combatant);
+-    }
+-
+-    Combatant* Combat::addAlly(Creature* creature)
+-	{
+-		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
+-		mOwnedCombatants.insert(combatant);
+-        addAlly(combatant);
+-		return combatant;
+-	}
+-
+-    void Combat::removeAlly(Combatant* combatant)
+-    {
+-        mAllies.erase(combatant);
+-		GameEventLog::getSingleton().logEvent(
+-			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
+-		checkAndMarkCombatant(combatant);
+-    }
+-
+-	void Combat::checkAndMarkCombatant(Combatant* combatant)
+-	{
+-		// Cancel any action this combatant takes part in.
+-		for (CombatantActionsMap::iterator it = mCombatantActions.begin();
+-			it != mCombatantActions.end(); ++it)
+-		{
+-			for (size_t i = 0; i &lt; it-&gt;second.size(); ++i)
+-			{
+-				const ActionEntry&amp; ae = it-&gt;second[i];
+-				if (ae.actor == combatant || ae.target == combatant)
+-				{
+-					mCancelledActions.insert(it-&gt;second[i].id);
+-				}
+-			}
+-		}
+-		mRemovedCombatants.insert(combatant);
+-	}
+-
+-	void Combat::clearRemovedCombatantSet()
+-	{
+-		for (CombatantSet::iterator i = mRemovedCombatants.begin();
+-			i != mRemovedCombatants.end(); ++i)
+-		{
+-			// Are we owner of this combatant? If so, delete it.
+-			CombatantSet::iterator it = std::find(
+-				mOwnedCombatants.begin(), mOwnedCombatants.end(), *i);
+-			if (it != mOwnedCombatants.end())
+-			{
+-				Combatant* combatant = *it;
+-				mOwnedCombatants.erase(it);
+-				CombatManager::getSingleton().destroyCombatant(combatant);
+-			}
+-		}
+-		mRemovedCombatants.clear();
+-	}
+-
+-    const Combat::CombatantSet&amp; Combat::getAllOpponents() const
+-    {
+-        return mOpponents;
+-    }
+-
+-    const Combat::CombatantSet&amp; Combat::getAllAllies() const
+-    {
+-        return mAllies;
+-    }
+-
+-    void Combat::start()
+-    {
+-		GameEventLog::getSingleton().logEvent(&quot;Kampf beginnt.&quot;, GET_COMBAT);
+-
+-        mCurrentRound = 0;
+-		mCombatantQueue.clear();
+-
+-        std::vector&lt;Combatant*&gt; combatants;
+-        combatants.insert(combatants.end(), mAllies.begin(), mAllies.end());
+-        combatants.insert(combatants.end(), mOpponents.begin(), mOpponents.end());
+-        // Calculate initiative for all participiants
+-        for (std::vector&lt;Combatant*&gt;::const_iterator it = combatants.begin();
+-            it != combatants.end(); ++it)
+-        {
+-            mCombatantQueue.push_back(std::make_pair(
+-                (*it)-&gt;getCreatureController()-&gt;getCreature()-&gt;doInitiativeWurf(), *it));
+-        }
+-        std::sort(mCombatantQueue.begin(), mCombatantQueue.end(), InitiativeComparator());
+-
+-        beginRound();
+-    }
+-
+-    void Combat::pause()
+-    {
+-		///@todo implement
+-    }
+-
+-    void Combat::stop()
+-    {
+-		///@todo implement
+-    }
+-
+-	void Combat::registerAttacke(Combatant* actor, Combatant* target)
+-	{
+-		ActionEntry entry;
+-		entry.id = mNextActionId++;
+-		entry.aktion = ATTACKE;
+-		entry.actor = actor;
+-		entry.target = target;
+-
+-		mCombatantActions[actor].push_back(entry);
+-	}
+-
+-	void Combat::registerParade(Combatant* actor)
+-	{
+-		mCombatantReactions[actor] = PARADE;
+-	}
+-
+-	void Combat::registerAusweichen(Combatant* actor)
+-	{
+-		mCombatantReactions[actor] = AUSWEICHEN;
+-	}
+-
+-	void Combat::registerBewegen(Combatant* actor, const Ogre::Vector3&amp; targetPos)
+-	{
+-		ActionEntry entry;
+-		entry.id = mNextActionId++;
+-		entry.aktion = BEWEGEN;
+-		entry.actor = actor;
+-		entry.targetPos = targetPos;
+-
+-		mCombatantActions[actor].push_back(entry);
+-	}
+-
+-	void Combat::registerFolgen(Combatant* actor, Combatant* target)
+-	{
+-		ActionEntry entry;
+-		entry.id = mNextActionId++;
+-		entry.aktion = FOLGEN;
+-		entry.actor = actor;
+-		entry.target = target;
+-
+-		mCombatantActions[actor].push_back(entry);
+-	}
+-
+-	void Combat::registerCombatantRoundDone(Combatant* combatant)
+-	{
+-		mFinishedCombatants.insert(combatant);
+-        // Are all combatants registered now?
+-        if (mFinishedCombatants.size() == mCombatantQueue.size())
+-        {
+-            executeRound();
+-        }
+-	}
+-
+-	bool Combat::canAttack(Combatant* actor, Combatant* target) const
+-	{
+-		// Does the actor have a weapon readied?
+-		if (actor-&gt;getActiveWeapon() == NULL)
+-		{
+-			return false;
+-		}
+-		// Is target in weapon range?
+-		Real distance = MathUtil::distance(target-&gt;getCreature()-&gt;getWorldBoundingBox(),
+-			actor-&gt;getCreature()-&gt;getWorldBoundingBox());
+-		if (distance &gt; getMaximumAttackeDistance(actor))
+-		{
+-			return false;
+-		}
+-		return true;
+-	}
+-
+-	Ogre::Real Combat::getMaximumAttackeDistance(Combatant* actor) const
+-	{
+-		std::vector&lt;Weapon*&gt; weapons = actor-&gt;getCreature()-&gt;getInventory()-&gt;getReadiedWeapons();
+-		Real distance = 0.0f;
+-		for (size_t i = 0; i &lt; weapons.size(); ++i)
+-		{
+-			distance = std::max(weapons[i]-&gt;getMaximumDistance(), distance);
+-		}
+-		return distance;
+-	}
+-
+-    void Combat::beginRound()
+-    {
+-        // Increment round counter
+-        mCurrentRound++;
+-
+-        mCombatantActions.clear();
+-		mCombatantReactions.clear();
+-		mCancelledActions.clear();
+-		mFinishedCombatants.clear();
+-
+-		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
+-			GET_COMBAT);
+-		// Show ini for this round.
+-        for (CombatantQueue::iterator it = mCombatantQueue.begin();
+-			it != mCombatantQueue.end(); ++it)
+-        {
+-			CeGuiString evt = it-&gt;second-&gt;getName();
+-			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
+-			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
+-        }
+-
+-        // Request actions from combatants
+-        for (CombatantQueue::iterator it = mCombatantQueue.begin();
+-            it != mCombatantQueue.end(); ++it)
+-        {
+-            it-&gt;second-&gt;requestCombatantAction();
+-        }
+-    }
+-
+-    void Combat::executeRound()
+-	{
+-		// Auf gehts!
+-
+-		// Prepare JobQueue for animations.
+-		JobQueue* jobQueue = new JobQueue();
+-
+-		for (size_t actionIndex = 0; actionIndex &lt; 3; ++actionIndex)
+-		{
+-			JobSet* jobSet = new JobSet();
+-
+-			for (CombatantQueue::iterator it = mCombatantQueue.begin();
+-				it != mCombatantQueue.end(); ++it)
+-			{
+-				Combatant* combatant = it-&gt;second;
+-
+-			    // Is there an action registed for combatant?
+-			    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
+-			    if (actionsIt != mCombatantActions.end())
+-			    {
+-				    // Do we have an action for this pass ?
+-				    if (actionIndex &lt; actionsIt-&gt;second.size())
+-				    {
+-					    // Yes we do.
+-					    ActionEntry entry = actionsIt-&gt;second[actionIndex];
+-
+-						// Ignore action if cancelled
+-						if (mCancelledActions.find(entry.id) != mCancelledActions.end())
+-						{
+-							continue;
+-						}
+-
+-					    if (entry.aktion == ATTACKE)
+-					    {
+-						    // Check whether possible
+-						    if (canAttack(combatant, entry.target))
+-						    {
+-							    doAttacke(jobSet, combatant, entry.target);
+-						    }
+-					    }
+-					    else if (entry.aktion == BEWEGEN)
+-					    {
+-						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
+-							    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
+-						    combatant-&gt;doBewegen(jobSet, entry.targetPos);
+-					    }
+-					    else if (entry.aktion == FOLGEN)
+-					    {
+-						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
+-							    + entry.target-&gt;getName(), GET_COMBAT);
+-						    combatant-&gt;doFolgen(jobSet, entry.target);
+-					    }
+-				    }
+-				}
+-			}
+-			jobQueue-&gt;add(jobSet);
+-		}
+-		mAnimationSequenceTicket = JobScheduler::getSingleton().addJob(jobQueue,
+-			JobScheduler::JP_NORMAL, 0.0f, Ogre::Math::POS_INFINITY, this);
+-	}
+-
+-    void Combat::endRound()
+-    {
+-		clearRemovedCombatantSet();
+-        // All actions executed. Analyze outcome of this round.
+-        if (mAllies.empty())
+-        {
+-            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(false);
+-        }
+-        else if (mOpponents.empty())
+-        {
+-            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(true);
+-        }
+-        else 
+-        {
+-            // Refill combatant queue with combatants that are still alive.
+-		    beginRound();
+-        }
+-    }
+-
+-	void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
+-	{
+-        GameEventLog::getSingleton().logEvent(
+-			actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
+-        
+-        bool rollDamage = false;
+-		// Make an attack roll.
+-		int aresult = actor-&gt;rollAttacke();
+-		if (aresult &gt;= RESULT_ERFOLG)
+-		{
+-			// Ok, succeeded
+-			// Has target registered a reaction?
+-			CombatantReactionsMap::iterator it = mCombatantReactions.find(target);
+-			if (it != mCombatantReactions.end())
+-			{
+-				// Yes, there is a reaction
+-				if (it-&gt;second == PARADE)
+-				{
+-					int presult = target-&gt;rollParade(aresult &gt;= RESULT_GLUECKLICH);
+-					if (presult &gt;= RESULT_ERFOLG)
+-					{
+-						GameEventLog::getSingleton().logEvent(&quot;Erfolg, aber pariert.&quot;, GET_COMBAT);
+-					}
+-					else
+-					{
+-						GameEventLog::getSingleton().logEvent(&quot;Erfolg, nicht pariert, Treffer!&quot;,
+-							GET_COMBAT);
+-						rollDamage = true;
+-					}
+-					target-&gt;doParade(jobSet, actor, presult);
+-					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
+-				}
+-				else if (it-&gt;second == AUSWEICHEN)
+-				{
+-					// Faellt aus wegen is nich.
+-				}
+-			}
+-			else
+-			{
+-				GameEventLog::getSingleton().logEvent(&quot;Treffer!&quot;, GET_COMBAT);
+-				actor-&gt;doAttacke(jobSet, target, aresult, false);
+-				rollDamage = true;
+-			}
+-		}
+-		else
+-		{
+-			GameEventLog::getSingleton().logEvent(&quot;Verfehlt!&quot;, GET_COMBAT);
+-			actor-&gt;doAttacke(jobSet, target, aresult, false);
+-			target-&gt;doGetroffen(jobSet);
+-		}
+-		
+-		if (rollDamage)
+-		{
+-			int tp = actor-&gt;rollTrefferpunkte();
+-			int sp = target-&gt;applyTrefferpunkte(tp);
+-			CeGuiString msg = actor-&gt;getName() + &quot; trifft f&#252;r &quot;
+-				+ CeGuiString(StringConverter::toString(tp))
+-				+ &quot; Trefferpunkte, &quot; + target-&gt;getName() + &quot; erleidet &quot;
+-				+ CeGuiString(StringConverter::toString(sp)) + &quot; Schadenspunkte.&quot;;
+-			GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
+-		}
+-	}
+-
+-    void Combat::jobFinished(unsigned long ticket)
+-	{
+-		if (ticket == mAnimationSequenceTicket)
+-		{
+-			endRound();
+-		}
+-	}
+-
+-    bool Combat::onGameObjectLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
+-		Effect::LifeState newstate)
+-	{
+-        if (newstate &amp; Effect::LS_NO_COMBAT)
+-		{
+-			// Is a creature in combat affected?
+-			for (size_t i = 0; i &lt; mCombatantQueue.size(); ++i)
+-			{
+-                Creature* curCreature = mCombatantQueue[i].second-&gt;getCreature();
+-				if (gameobject == curCreature)
+-				{
+-					// Yes. Log about it and remove it from combat.
+-					CeGuiString msg = curCreature-&gt;getName() + &quot; ist jetzt &quot;;
+-					if (newstate == Effect::LS_INCAPACITATED)
+-					{
+-						msg += &quot;kampfunf&#228;hig.&quot;;
+-					}
+-                    else if (newstate == Effect::LS_UNCONSCIOUS)
+-					{
+-						msg += &quot;bewusstlos.&quot;;
+-					}
+-					else
+-					{
+-						msg += &quot;tot.&quot;;
+-					}
+-					GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
+-
+-					CombatantSet::iterator it = std::find_if(mOpponents.begin(), mOpponents.end(),
+-						std::bind2nd(FindCombatantByCreature(), curCreature));
+-					if (it != mOpponents.end())
+-					{
+-						removeOpponent(mCombatantQueue[i].second);
+-					}
+-					else
+-					{
+-						CombatantSet::iterator it = std::find_if(mAllies.begin(), mAllies.end(),
+-							std::bind2nd(FindCombatantByCreature(), curCreature));
+-						if (it != mAllies.end())
+-						{
+-							removeAlly(mCombatantQueue[i].second);
+-						}
+-					}
+-					break;
+-				}
+-			}
+-		}
+-		return true;
+-	}
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot;
++
++#include &quot;Combat.h&quot;
++
++#include &quot;Combatant.h&quot;
++#include &quot;CombatManager.h&quot;
++#include &quot;CreatureController.h&quot;
++#include &quot;Effect.h&quot;
++#include &quot;GameEventLog.h&quot;
++#include &quot;Inventory.h&quot;
++#include &quot;Job.h&quot;
++#include &quot;JobQueue.h&quot;
++#include &quot;JobScheduler.h&quot;
++#include &quot;MathUtil.h&quot;
++#include &quot;MessagePump.h&quot;
++#include &quot;RulesMessages.h&quot;
++#include &quot;Weapon.h&quot;
++
++
++using namespace boost;
++using namespace boost::tuples;
++using namespace Ogre;
++
++namespace rl
++{
++    struct InitiativeComparator
++		: std::binary_function&lt;std::pair&lt;int, Combatant*&gt;, std::pair&lt;int, Combatant*&gt;, bool&gt;
++    {
++        /// \todo take into account other values of the combatant according to TDE rules,
++        /// in case initiative is equal.
++        bool operator()(const std::pair&lt;int, Combatant*&gt;&amp; c1,
++            const std::pair&lt;int, Combatant*&gt;&amp; c2) const
++        {
++            return c1.first &gt; c2.first;
++        }
++    };
++
++	struct FindCombatantByCreature : std::binary_function&lt;Combatant*, Creature*, bool&gt;
++    {
++        bool operator()(Combatant* combatant, Creature* creature) const
++        {
++			return combatant-&gt;getCreature() == creature;
++        }
++    };
++
++    Combat::Combat()
++        : mOwnedCombatants(),
++		  mOpponents(),
++          mAllies(),
++          mCombatantQueue(),
++          mCombatantActions(),
++		  mCombatantReactions(),
++		  mCancelledActions(),
++		  mRemovedCombatants(),
++          mCurrentRound(0),
++		  mNextActionId(0),
++		  mAnimationSequenceTicket(0)
++    {
++		mLifeStateChangeConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectLifeStateChanged&gt;(
++			    boost::bind(&amp;Combat::onGameObjectLifeStateChanged, this, _1, _2, _3));
++    }
++
++    Combat::~Combat()
++    {
++    }
++
++    void Combat::addOpponent(Combatant* combatant)
++    {
++        mOpponents.insert(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; wurde in einen Kampf verwickelt.&quot;, GET_COMBAT);
++		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentEntered&gt;(combatant);
++    }
++
++    Combatant* Combat::addOpponent(Creature* creature)
++	{
++		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
++		mOwnedCombatants.insert(combatant);
++        addOpponent(combatant);
++		return combatant;
++	}
++
++    void Combat::removeOpponent(Combatant* combatant)
++    {
++        mOpponents.erase(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
++		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentLeft&gt;(combatant);
++		checkAndMarkCombatant(combatant);
++    }
++
++    void Combat::addAlly(Combatant* combatant)
++    {
++        mAllies.insert(combatant);
++    }
++
++    Combatant* Combat::addAlly(Creature* creature)
++	{
++		Combatant* combatant = CombatManager::getSingleton().createCombatant(creature);
++		mOwnedCombatants.insert(combatant);
++        addAlly(combatant);
++		return combatant;
++	}
++
++    void Combat::removeAlly(Combatant* combatant)
++    {
++        mAllies.erase(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
++		checkAndMarkCombatant(combatant);
++    }
++
++	void Combat::checkAndMarkCombatant(Combatant* combatant)
++	{
++		// Cancel any action this combatant takes part in.
++		for (CombatantActionsMap::iterator it = mCombatantActions.begin();
++			it != mCombatantActions.end(); ++it)
++		{
++			for (size_t i = 0; i &lt; it-&gt;second.size(); ++i)
++			{
++				const ActionEntry&amp; ae = it-&gt;second[i];
++				if (ae.actor == combatant || ae.target == combatant)
++				{
++					mCancelledActions.insert(it-&gt;second[i].id);
++				}
++			}
++		}
++		mRemovedCombatants.insert(combatant);
++	}
++
++	void Combat::clearRemovedCombatantSet()
++	{
++		for (CombatantSet::iterator i = mRemovedCombatants.begin();
++			i != mRemovedCombatants.end(); ++i)
++		{
++			// Are we owner of this combatant? If so, delete it.
++			CombatantSet::iterator it = std::find(
++				mOwnedCombatants.begin(), mOwnedCombatants.end(), *i);
++			if (it != mOwnedCombatants.end())
++			{
++				Combatant* combatant = *it;
++				mOwnedCombatants.erase(it);
++				CombatManager::getSingleton().destroyCombatant(combatant);
++			}
++		}
++		mRemovedCombatants.clear();
++	}
++
++    const Combat::CombatantSet&amp; Combat::getAllOpponents() const
++    {
++        return mOpponents;
++    }
++
++    const Combat::CombatantSet&amp; Combat::getAllAllies() const
++    {
++        return mAllies;
++    }
++
++    void Combat::start()
++    {
++		GameEventLog::getSingleton().logEvent(&quot;Kampf beginnt.&quot;, GET_COMBAT);
++
++        mCurrentRound = 0;
++		mCombatantQueue.clear();
++
++        std::vector&lt;Combatant*&gt; combatants;
++        combatants.insert(combatants.end(), mAllies.begin(), mAllies.end());
++        combatants.insert(combatants.end(), mOpponents.begin(), mOpponents.end());
++        // Calculate initiative for all participiants
++        for (std::vector&lt;Combatant*&gt;::const_iterator it = combatants.begin();
++            it != combatants.end(); ++it)
++        {
++            mCombatantQueue.push_back(std::make_pair(
++                (*it)-&gt;getCreatureController()-&gt;getCreature()-&gt;doInitiativeWurf(), *it));
++        }
++        std::sort(mCombatantQueue.begin(), mCombatantQueue.end(), InitiativeComparator());
++
++        beginRound();
++    }
++
++    void Combat::pause()
++    {
++		///@todo implement
++    }
++
++    void Combat::stop()
++    {
++		///@todo implement
++    }
++
++	void Combat::registerAttacke(Combatant* actor, Combatant* target)
++	{
++		ActionEntry entry;
++		entry.id = mNextActionId++;
++		entry.aktion = ATTACKE;
++		entry.actor = actor;
++		entry.target = target;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++	void Combat::registerParade(Combatant* actor)
++	{
++		mCombatantReactions[actor] = PARADE;
++	}
++
++	void Combat::registerAusweichen(Combatant* actor)
++	{
++		mCombatantReactions[actor] = AUSWEICHEN;
++	}
++
++	void Combat::registerBewegen(Combatant* actor, const Ogre::Vector3&amp; targetPos)
++	{
++		ActionEntry entry;
++		entry.id = mNextActionId++;
++		entry.aktion = BEWEGEN;
++		entry.actor = actor;
++		entry.targetPos = targetPos;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++	void Combat::registerFolgen(Combatant* actor, Combatant* target)
++	{
++		ActionEntry entry;
++		entry.id = mNextActionId++;
++		entry.aktion = FOLGEN;
++		entry.actor = actor;
++		entry.target = target;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++	void Combat::registerCombatantRoundDone(Combatant* combatant)
++	{
++		mFinishedCombatants.insert(combatant);
++        // Are all combatants registered now?
++        if (mFinishedCombatants.size() == mCombatantQueue.size())
++        {
++            executeRound();
++        }
++	}
++
++	bool Combat::canAttack(Combatant* actor, Combatant* target) const
++	{
++		// Does the actor have a weapon readied?
++		if (actor-&gt;getActiveWeapon() == NULL)
++		{
++			return false;
++		}
++		// Is target in weapon range?
++		Real distance = MathUtil::distance(target-&gt;getCreature()-&gt;getWorldBoundingBox(),
++			actor-&gt;getCreature()-&gt;getWorldBoundingBox());
++		if (distance &gt; getMaximumAttackeDistance(actor))
++		{
++			return false;
++		}
++		return true;
++	}
++
++	Ogre::Real Combat::getMaximumAttackeDistance(Combatant* actor) const
++	{
++		std::vector&lt;Weapon*&gt; weapons = actor-&gt;getCreature()-&gt;getInventory()-&gt;getReadiedWeapons();
++		Real distance = 0.0f;
++		for (size_t i = 0; i &lt; weapons.size(); ++i)
++		{
++			distance = std::max(weapons[i]-&gt;getMaximumDistance(), distance);
++		}
++		return distance;
++	}
++
++    void Combat::beginRound()
++    {
++        // Increment round counter
++        mCurrentRound++;
++
++        mCombatantActions.clear();
++		mCombatantReactions.clear();
++		mCancelledActions.clear();
++		mFinishedCombatants.clear();
++
++		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
++			GET_COMBAT);
++		// Show ini for this round.
++        for (CombatantQueue::iterator it = mCombatantQueue.begin();
++			it != mCombatantQueue.end(); ++it)
++        {
++			CeGuiString evt = it-&gt;second-&gt;getName();
++			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
++			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
++        }
++
++        // Request actions from combatants
++        for (CombatantQueue::iterator it = mCombatantQueue.begin();
++            it != mCombatantQueue.end(); ++it)
++        {
++            it-&gt;second-&gt;requestCombatantAction();
++        }
++    }
++
++    
++    void Combat::executeRound()
++	{
++		// Auf gehts!
++
++		// Prepare JobQueue for animations.
++		JobQueue* jobQueue = new JobQueue();
++
++		for (size_t actionIndex = 0; actionIndex &lt; 3; ++actionIndex)
++		{
++			JobSet* jobSet = new JobSet();
++
++			for (CombatantQueue::iterator it = mCombatantQueue.begin();
++				it != mCombatantQueue.end(); ++it)
++			{
++				Combatant* combatant = it-&gt;second;
++
++			    // Is there an action registed for combatant?
++			    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
++			    if (actionsIt != mCombatantActions.end())
++			    {
++				    // Do we have an action for this pass ?
++				    if (actionIndex &lt; actionsIt-&gt;second.size())
++				    {
++					    // Yes we do.
++					    ActionEntry entry = actionsIt-&gt;second[actionIndex];
++
++						// Ignore action if cancelled
++						if (mCancelledActions.find(entry.id) != mCancelledActions.end())
++						{
++							continue;
++						}
++
++					    if (entry.aktion == ATTACKE)
++					    {
++						    // Check whether possible
++						    if (canAttack(combatant, entry.target))
++						    {
++							    doAttacke(jobSet, combatant, entry.target);
++						    }
++					    }
++					    else if (entry.aktion == BEWEGEN)
++					    {
++						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
++							    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
++						    combatant-&gt;doBewegen(jobSet, entry.targetPos);
++					    }
++					    else if (entry.aktion == FOLGEN)
++					    {
++						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
++							    + entry.target-&gt;getName(), GET_COMBAT);
++						    combatant-&gt;doFolgen(jobSet, entry.target);
++					    }
++				    }
++				}
++			}
++			jobQueue-&gt;add(jobSet);
++		}
++		mAnimationSequenceTicket = JobScheduler::getSingleton().addJob(jobQueue,
++			JobScheduler::JP_NORMAL, 0.0f, Ogre::Math::POS_INFINITY, this);
++	}
++
++    void Combat::endRound()
++    {
++		clearRemovedCombatantSet();
++        // All actions executed. Analyze outcome of this round.
++        if (mAllies.empty())
++        {
++            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(false);
++        }
++        else if (mOpponents.empty())
++        {
++            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(true);
++        }
++        else 
++        {
++            // Refill combatant queue with combatants that are still alive.
++		    beginRound();
++        }
++    }
++
++    void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
++	{
++        enum Damage {
++            DMG_NONE,
++            DMG_HALF,
++            DMG_NORMAL,
++            DMG_DOUBLE
++        };
++        
++        GameEventLog::getSingleton().logEvent(
++                                              actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
++        
++        Damage rollDamage = DMG_NONE;
++		// Make an attack roll.
++		int aresult = actor-&gt;rollAttacke();
++        
++		if (aresult &gt;= RESULT_ERFOLG)
++		{
++            if (aresult &gt;= RESULT_GLUECKLICH)
++            {
++                rollDamage = DMG_DOUBLE;
++            }
++            else
++            {
++                rollDamage = DMG_NORMAL;
++            }
++            
++			// Ok, succeeded
++			// Has target registered a reaction?
++			CombatantReactionsMap::iterator it = mCombatantReactions.find(target);
++			if (it != mCombatantReactions.end())
++			{
++				// Yes, there is a reaction
++				if (it-&gt;second == PARADE)
++				{
++					int presult = target-&gt;rollParade(aresult &gt;= RESULT_GLUECKLICH);
++					if (presult &gt;= RESULT_ERFOLG)
++					{
++						GameEventLog::getSingleton().logEvent(&quot;Erfolg, aber pariert.&quot;, GET_COMBAT);
++                        if (target-&gt;getActiveWeapon()-&gt;isNatural())
++                        {
++                            rollDamage = DMG_HALF;
++                        }
++                        else
++                        {
++                            rollDamage = DMG_NONE;
++                        }
++					}
++					else
++					{
++						GameEventLog::getSingleton().logEvent(&quot;Erfolg, nicht pariert, Treffer!&quot;,
++                                                              GET_COMBAT);
++						
++					}
++					target-&gt;doParade(jobSet, actor, presult);
++					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
++				}
++				else if (it-&gt;second == AUSWEICHEN)
++				{
++					// Faellt aus wegen is nich.
++				}
++			}
++			else
++			{
++				GameEventLog::getSingleton().logEvent(&quot;Treffer!&quot;, GET_COMBAT);
++				actor-&gt;doAttacke(jobSet, target, aresult, false);
++			}
++		}
++		else
++		{
++			GameEventLog::getSingleton().logEvent(&quot;Verfehlt!&quot;, GET_COMBAT);
++			actor-&gt;doAttacke(jobSet, target, aresult, false);
++			target-&gt;doGetroffen(jobSet);
++		}
++		
++		if (rollDamage != DMG_NONE) ///@todo half/double damage
++		{
++			int tp = actor-&gt;rollTrefferpunkte();
++			int sp = target-&gt;applyTrefferpunkte(tp);
++			CeGuiString msg = actor-&gt;getName() + &quot; trifft f&#194;&#184;r &quot;
++            + CeGuiString(StringConverter::toString(tp))
++            + &quot; Trefferpunkte, &quot; + target-&gt;getName() + &quot; erleidet &quot;
++            + CeGuiString(StringConverter::toString(sp)) + &quot; Schadenspunkte.&quot;;
++			GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
++		}
++	}
++    
++
++    void Combat::jobFinished(unsigned long ticket)
++	{
++		if (ticket == mAnimationSequenceTicket)
++		{
++			endRound();
++		}
++	}
++
++    bool Combat::onGameObjectLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
++		Effect::LifeState newstate)
++	{
++        if (newstate &amp; Effect::LS_NO_COMBAT)
++		{
++			// Is a creature in combat affected?
++			for (size_t i = 0; i &lt; mCombatantQueue.size(); ++i)
++			{
++                Creature* curCreature = mCombatantQueue[i].second-&gt;getCreature();
++				if (gameobject == curCreature)
++				{
++					// Yes. Log about it and remove it from combat.
++					CeGuiString msg = curCreature-&gt;getName() + &quot; ist jetzt &quot;;
++					if (newstate == Effect::LS_INCAPACITATED)
++					{
++						msg += &quot;kampfunf&#228;hig.&quot;;
++					}
++                    else if (newstate == Effect::LS_UNCONSCIOUS)
++					{
++						msg += &quot;bewusstlos.&quot;;
++					}
++					else
++					{
++						msg += &quot;tot.&quot;;
++					}
++					GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
++
++					CombatantSet::iterator it = std::find_if(mOpponents.begin(), mOpponents.end(),
++						std::bind2nd(FindCombatantByCreature(), curCreature));
++					if (it != mOpponents.end())
++					{
++						removeOpponent(mCombatantQueue[i].second);
++					}
++					else
++					{
++						CombatantSet::iterator it = std::find_if(mAllies.begin(), mAllies.end(),
++							std::bind2nd(FindCombatantByCreature(), curCreature));
++						if (it != mAllies.end())
++						{
++							removeAlly(mCombatantQueue[i].second);
++						}
++					}
++					break;
++				}
++			}
++		}
++		return false;
++	}
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001424.html">[Dsa-hl-svn] r4353 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001426.html">[Dsa-hl-svn] r4355 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1425">[ date ]</a>
+              <a href="thread.html#1425">[ thread ]</a>
+              <a href="subject.html#1425">[ subject ]</a>
+              <a href="author.html#1425">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

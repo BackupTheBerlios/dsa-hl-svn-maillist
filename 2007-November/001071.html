@@ -1,0 +1,306 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4000 - in rl/trunk/engine: common/include common/src	core/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4000%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/src%20ui/src&In-Reply-To=%3C200711181930.lAIJU1t3012111%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001070.html">
+   <LINK REL="Next"  HREF="001075.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4000 - in rl/trunk/engine: common/include common/src	core/src ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4000%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/src%20ui/src&In-Reply-To=%3C200711181930.lAIJU1t3012111%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4000 - in rl/trunk/engine: common/include common/src	core/src ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Nov 18 20:30:01 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001070.html">[Dsa-hl-svn] r3999 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001075.html">[Dsa-hl-svn] r4001 - modules/techdemo/dialogs modules/techdemo/dsa	modules/techdemo/maps rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1071">[ date ]</a>
+              <a href="thread.html#1071">[ thread ]</a>
+              <a href="subject.html#1071">[ subject ]</a>
+              <a href="author.html#1071">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-11-18 20:29:55 +0100 (Sun, 18 Nov 2007)
+New Revision: 4000
+
+Modified:
+   rl/trunk/engine/common/include/Properties.h
+   rl/trunk/engine/common/src/Properties.cpp
+   rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/ui/src/PropertiesWindow.cpp
+Log:
+Added method to set a property with a string
+
+Modified: rl/trunk/engine/common/include/Properties.h
+===================================================================
+--- rl/trunk/engine/common/include/Properties.h	2007-11-18 19:28:07 UTC (rev 3999)
++++ rl/trunk/engine/common/include/Properties.h	2007-11-18 19:29:55 UTC (rev 4000)
+@@ -24,8 +24,6 @@
+     class PropertyRecord;
+     class PropertyRecordPtr;
+ 
+-    typedef std::map&lt;const Ogre::String, Property&gt; PropertyRecordMap;
+-
+     /**
+      * This is the base class of all objects having Propertys
+      */
+@@ -34,6 +32,7 @@
+     public:
+         virtual const Property getProperty(const Ogre::String&amp; key) const = 0;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value) = 0;
++        void setPropertyAsString(const Ogre::String&amp; key, const CeGuiString&amp; value);
+         virtual PropertyRecord* getAllProperties() const = 0;
+         void setProperties(const PropertyRecord* props);
+         void setProperties(const PropertyMap&amp; propmap);
+@@ -45,6 +44,8 @@
+     class _RlCommonExport PropertyRecord : public PropertyHolder
+     {
+ 	public:
++        typedef std::map&lt;const Ogre::String, Property&gt; PropertyRecordMap;
++
+         PropertyRecord();
+         PropertyRecord(const PropertyRecord* ps);
+         PropertyRecord(const PropertyMap&amp; propmap);
+
+Modified: rl/trunk/engine/common/src/Properties.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Properties.cpp	2007-11-18 19:28:07 UTC (rev 3999)
++++ rl/trunk/engine/common/src/Properties.cpp	2007-11-18 19:29:55 UTC (rev 4000)
+@@ -27,7 +27,7 @@
+ 
+     void PropertyHolder::setProperties(const PropertyRecord* props)
+     {
+-        for (PropertyRecordMap::const_iterator it = props-&gt;begin();
++        for (PropertyRecord::PropertyRecordMap::const_iterator it = props-&gt;begin();
+             it != props-&gt;end(); it++)
+         {
+             setProperty((*it).first, (*it).second);
+@@ -43,6 +43,13 @@
+         }
+     }
+ 
++    void PropertyHolder::setPropertyAsString(const Ogre::String&amp; key, const CeGuiString&amp; value)
++    {
++        Property prop = getProperty(key);
++        prop.getFromString(value);
++        setProperty(key, prop);
++    }
++
+     PropertyRecord::PropertyRecord()
+         : PropertyHolder()
+     {
+@@ -89,12 +96,12 @@
+         return new PropertyRecord(this);
+     }
+ 
+-    const PropertyRecordMap::const_iterator PropertyRecord::begin() const
++    const PropertyRecord::PropertyRecordMap::const_iterator PropertyRecord::begin() const
+     {
+         return mProperties.begin();
+     }
+ 
+-    const PropertyRecordMap::const_iterator PropertyRecord::end() const
++    const PropertyRecord::PropertyRecordMap::const_iterator PropertyRecord::end() const
+     {
+         return mProperties.end();
+     }
+
+Modified: rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-11-18 19:28:07 UTC (rev 3999)
++++ rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-11-18 19:29:55 UTC (rev 4000)
+@@ -66,7 +66,7 @@
+         DOMElement* header = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;header&quot;);
+         
+         PropertyRecord* headerSet = file-&gt;getAllProperties();
+-        for(PropertyRecordMap::const_iterator it_header = headerSet-&gt;begin(); it_header != headerSet-&gt;end(); it_header++)
++        for (PropertyRecord::PropertyRecordMap::const_iterator it_header = headerSet-&gt;begin(); it_header != headerSet-&gt;end(); it_header++)
+         {
+             this-&gt;processProperty(header, PropertyEntry(it_header-&gt;first.c_str(), it_header-&gt;second));
+         }
+
+Modified: rl/trunk/engine/ui/src/PropertiesWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/PropertiesWindow.cpp	2007-11-18 19:28:07 UTC (rev 3999)
++++ rl/trunk/engine/ui/src/PropertiesWindow.cpp	2007-11-18 19:29:55 UTC (rev 4000)
+@@ -79,21 +79,21 @@
+         int row = 0;
+         //  Iterate through all properties and add a row for
+         //  every Entry
+-        for( PropertyRecordMap::const_iterator propIter = props-&gt;begin();
++        for (PropertyRecord::PropertyRecordMap::const_iterator propIter = props-&gt;begin();
+             propIter != props-&gt;end(); propIter++ )
+         {
+             Ogre::String key = propIter-&gt;first;
+ 
+-            if( key == &quot;description&quot; || key == &quot;name&quot; )
++            if (key == &quot;description&quot; || key == &quot;name&quot; )
+                 continue;
+ 
+             // Check for Int
+-            if( propIter-&gt;second.isInt() )
++            if (propIter-&gt;second.isInt() )
+             {
+                 addPropertyInt(propIter-&gt;second, mMainTable, key );
+             }
+             // Check for IntPair
+-            else if( propIter-&gt;second.isIntPair() )
++            else if (propIter-&gt;second.isIntPair() )
+             {
+                 addPropertyIntPair(propIter-&gt;second, mMainTable, key);
+                 int rowCount = mMainTable-&gt;getRowCount();
+@@ -101,7 +101,7 @@
+                 mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for IntTriple
+-            else if( propIter-&gt;second.isIntTriple() )
++            else if (propIter-&gt;second.isIntTriple() )
+             {
+                 addPropertyIntTriple(propIter-&gt;second, mMainTable, key);
+                 int rowCount = mMainTable-&gt;getRowCount();
+@@ -109,22 +109,22 @@
+                 mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for String
+-            else if( propIter-&gt;second.isString() )
++            else if (propIter-&gt;second.isString() )
+             {
+                 addPropertyString(propIter-&gt;second, mMainTable, key);
+             }
+             // Check for Bool
+-            else if( propIter-&gt;second.isBool() )
++            else if (propIter-&gt;second.isBool() )
+             {
+                 addPropertyBool(propIter-&gt;second, mMainTable, key);
+             }
+             // Check for Real
+-            else if( propIter-&gt;second.isReal() )
++            else if (propIter-&gt;second.isReal() )
+             {
+                 addPropertyReal(propIter-&gt;second, mMainTable, key);
+             }
+             // Check for Vector3
+-            else if( propIter-&gt;second.isVector3() )
++            else if (propIter-&gt;second.isVector3() )
+             {
+                 addPropertyVector3(propIter-&gt;second, mMainTable, key);
+                 int rowCount = mMainTable-&gt;getRowCount();
+@@ -132,7 +132,7 @@
+                 mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for Quaternion
+-            else if( propIter-&gt;second.isQuaternion() )
++            else if (propIter-&gt;second.isQuaternion() )
+             {
+                 addPropertyQuaternion(propIter-&gt;second, mMainTable, key);
+                 int rowCount = mMainTable-&gt;getRowCount();
+@@ -140,7 +140,7 @@
+                 mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for Array
+-            else if( propIter-&gt;second.isArray() )
++            else if (propIter-&gt;second.isArray() )
+             {
+                 addPropertyArray(propIter-&gt;second, key);
+             }
+@@ -542,12 +542,12 @@
+         for(PropertyVector::const_iterator it = vProp.begin(); it != vProp.end(); it++)
+         {
+             // Check for Int
+-            if( it-&gt;isInt() )
++            if (it-&gt;isInt() )
+             {
+                 addPropertyInt(*it, newTable);
+             }
+             // Check for IntPair
+-            else if( it-&gt;isIntPair() )
++            else if (it-&gt;isIntPair() )
+             {
+                 addPropertyIntPair(*it, newTable);
+                 int rowCount = newTable-&gt;getRowCount();
+@@ -555,7 +555,7 @@
+                 newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for IntTriple
+-            else if( it-&gt;isIntTriple() )
++            else if (it-&gt;isIntTriple() )
+             {
+                 addPropertyIntTriple(*it, newTable);
+                 int rowCount = newTable-&gt;getRowCount();
+@@ -563,22 +563,22 @@
+                 newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for String
+-            else if( it-&gt;isString() )
++            else if (it-&gt;isString() )
+             {
+                 addPropertyString(*it, newTable);
+             }
+             // Check for Bool
+-            else if( it-&gt;isBool() )
++            else if (it-&gt;isBool() )
+             {
+                 addPropertyBool(*it, newTable);
+             }
+             // Check for Real
+-            else if( it-&gt;isReal() )
++            else if (it-&gt;isReal() )
+             {
+                 addPropertyReal(*it, newTable);
+             }
+             // Check for Vector3
+-            else if( it-&gt;isVector3() )
++            else if (it-&gt;isVector3() )
+             {
+                 addPropertyVector3(*it, newTable);
+                 int rowCount = newTable-&gt;getRowCount();
+@@ -586,7 +586,7 @@
+                 newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
+             }
+             // Check for Quaternion
+-            else if( it-&gt;isQuaternion() )
++            else if (it-&gt;isQuaternion() )
+             {
+                 addPropertyQuaternion(*it, newTable);
+                 int rowCount = newTable-&gt;getRowCount();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001070.html">[Dsa-hl-svn] r3999 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001075.html">[Dsa-hl-svn] r4001 - modules/techdemo/dialogs modules/techdemo/dsa	modules/techdemo/maps rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1071">[ date ]</a>
+              <a href="thread.html#1071">[ thread ]</a>
+              <a href="subject.html#1071">[ subject ]</a>
+              <a href="author.html#1071">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

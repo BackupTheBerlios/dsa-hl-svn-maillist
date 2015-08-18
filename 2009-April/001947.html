@@ -1,0 +1,1266 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4890 - in rl/trunk/engine: ai/src core/include	core/src rules/src script/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4890%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20script/src%20ui/include%20ui/src&In-Reply-To=%3C200904072230.n37MU2nN032545%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001946.html">
+   <LINK REL="Next"  HREF="001948.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4890 - in rl/trunk/engine: ai/src core/include	core/src rules/src script/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4890%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20script/src%20ui/include%20ui/src&In-Reply-To=%3C200904072230.n37MU2nN032545%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4890 - in rl/trunk/engine: ai/src core/include	core/src rules/src script/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr  8 00:30:02 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001946.html">[Dsa-hl-svn] r4889 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample inc src
+</A></li>
+        <LI>Next message: <A HREF="001948.html">[Dsa-hl-svn] r4891 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1947">[ date ]</a>
+              <a href="thread.html#1947">[ thread ]</a>
+              <a href="subject.html#1947">[ subject ]</a>
+              <a href="author.html#1947">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-04-08 00:29:54 +0200 (Wed, 08 Apr 2009)
+New Revision: 4890
+
+Modified:
+   rl/trunk/engine/ai/src/PhysicalObstacle.cpp
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/include/PhysicsMaterialRaycast.h
+   rl/trunk/engine/core/include/PhysicsRagDoll.h
+   rl/trunk/engine/core/src/DotSceneLoader.cpp
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/GameEventManager.cpp
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+   rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+   rl/trunk/engine/core/src/SceneQuery.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/SelectionHelper.cpp
+   rl/trunk/engine/script/src/EntityNodeProcessor.cpp
+   rl/trunk/engine/script/src/PlaneNodeProcessor.cpp
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+-added support for using Ogre::Any as userdata in OgreNewt and shared-pointers for collisions (can be activated through preprocessor definitions for now)
+-fixed some bugs (e.g. PhysicsManager corrects size of objects that are too small correctly)
+-EntityNodeProcessor etc use PhysicsManager for creation of collisions... no class should create them directly through OgreNewt, this will be useful to
+ implement caching collisions and reading serialized collisions
+- DotSceneLoader not adopted, should be removed anyway
+
+
+Modified: rl/trunk/engine/ai/src/PhysicalObstacle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/PhysicalObstacle.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/ai/src/PhysicalObstacle.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -70,7 +70,7 @@
+         Quaternion orientation;
+         body-&gt;getPositionOrientation(position, orientation);
+ 
+-    	const OgreNewt::Collision* collision = body-&gt;getCollision();
++    	const OgreNewt::CollisionPtr collision = body-&gt;getCollision();
+     	RlAssert(collision, &quot;Body has no collision!&quot;);
+     	AxisAlignedBox box = collision-&gt;getAABB();
+     	Ogre::Vector3 dims = box.getMaximum() - box.getMinimum();
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -223,6 +223,8 @@
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
+ 		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
++         * @param nocache if set to true a new collision will be created (without looking for an existing one in the cache);
++         *                the new collision is not added to the cache
+ 		*/
+ 		OgreNewt::CollisionPtr createCollision(
+ 			Ogre::Entity* entity,
+@@ -232,7 +234,8 @@
+ 			Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+             Ogre::Vector3* inertia = NULL,
+-            Ogre::Vector3* centerOfMass = NULL);
++            Ogre::Vector3* centerOfMass = NULL,
++            bool nocache = false);
+ 
+         /** creates a collision primitive for OgreNewt.
+ 		 * The collision primitive created has got a basic orientation which can be influenced by
+@@ -251,6 +254,8 @@
+          * @param mass gives the mass of the collision primitive used for calculating the inertia
+ 		 * @param inertia Vector3 returns the inertia coefficients for the created collision primitiv
+ 		 * @param centerOfMass Vector3 returns the centerOfMass coefficients for the created collision primitiv
++         * @param nocache if set to true a new collision will be created (without looking for an existing one in the cache);
++         *                the new collision is not added to the cache
+ 		*/
+         OgreNewt::CollisionPtr createCollision(
+             const Ogre::String&amp; name,
+@@ -260,7 +265,8 @@
+ 			Ogre::Quaternion* orientation = NULL,
+             const Ogre::Real mass = 0,
+             Ogre::Vector3* inertia = NULL,
+-            Ogre::Vector3* centerOfMass = NULL);
++            Ogre::Vector3* centerOfMass = NULL,
++            bool nocache = false);
+ 
+         /** Makes the collision primitive generation available to non mesh objects.
+          * Non mesh objects need collision objects too. Therefore they can
+@@ -296,7 +302,11 @@
+         struct CollisionInUse
+         {
+         public:
+-            CollisionInUse() : colPtr(NULL), geomType(GT_NONE) {}
++            CollisionInUse() :
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++                colPtr(NULL),
++#endif
++                geomType(GT_NONE) {}
+             GeometryType geomType;  //! primitive type
+             OgreNewt::CollisionPtr colPtr;          //! the collision primitve
+         };
+@@ -382,13 +392,13 @@
+     {
+     public:
+         /** checks if the specified size is ok for OgreNewt
+-         * @param size to check
++         * @param aabb check the aabb's size
+          */
+-        bool checkSize(const Ogre::Vector3&amp; size) const;
++        bool checkSize(const Ogre::AxisAlignedBox&amp; aabb) const;
+         /** corrects the specified size if it is not ok for OgreNewt
+-         * @param size to correct
++         * @param aabb correct the aabb's size
+          */
+-        void correctSize(Ogre::Vector3&amp; size);
++        void correctSize(Ogre::AxisAlignedBox&amp; aabb);
+         /** calculates the Inertia for the given primitive type
+          */
+         //Ogre::Vector3 calculateIntertia(const Ogre::Real&amp; Mass, Ogre::Vector3* inertiaCoefficients);
+
+Modified: rl/trunk/engine/core/include/PhysicsMaterialRaycast.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsMaterialRaycast.h	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/include/PhysicsMaterialRaycast.h	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -111,7 +111,7 @@
+         * @param invertmat if &quot;true&quot;, the ray finds all collisions, which do NOT have the material-id &quot;material&quot;
+         */
+         ConvexcastInfo execute(OgreNewt::World* world, const OgreNewt::MaterialID* material,
+-            const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
++            const OgreNewt::ConvexCollisionPtr&amp; col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
+             const Ogre::Vector3&amp; endpt, bool invertmat = false);
+         
+         /** executes the Convexcast
+@@ -125,7 +125,7 @@
+         * @param invertmat if &quot;true&quot;, the ray finds all collisions, which do NOT have the material-id &quot;material&quot;
+         */
+         ConvexcastInfo execute(OgreNewt::World* world, const MaterialVector* materials,
+-            const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
++            const OgreNewt::ConvexCollisionPtr&amp; col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
+             const Ogre::Vector3&amp; endpt, bool invertmat = false);
+ 
+ 
+
+Modified: rl/trunk/engine/core/include/PhysicsRagDoll.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsRagDoll.h	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/include/PhysicsRagDoll.h	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -112,7 +112,7 @@
+ 
+ 	private:
+         //! create a convexhull from a mesh
+-		OgreNewt::ConvexCollision* _makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight );
++		OgreNewt::ConvexCollisionPtr _makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight );
+ 
+ 		//! the ragdoll to that this bone belongs
+ 		PhysicsRagDoll* mDoll;
+
+Modified: rl/trunk/engine/core/src/DotSceneLoader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/DotSceneLoader.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/DotSceneLoader.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -473,7 +473,11 @@
+     // eine benutzerdefinierte Collision
+     void DotSceneLoader::processCollisions(XERCES_CPP_NAMESPACE::DOMElement *rootCollisionXml)
+     {
+-        OgreNewt::CollisionPtr collision = OgreNewt::CollisionPtr();
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++        OgreNewt::CollisionPtr collision;
++#else
++        OgreNewt::CollisionPtr collision = NULL;
++#endif
+         DOMNode* child = rootCollisionXml-&gt;getFirstChild();
+         OgreNewt::World *thisWorld = PhysicsManager::getSingleton()._getNewtonWorld();
+ 
+@@ -492,7 +496,11 @@
+                 child = child-&gt;getNextSibling();
+                 continue;
+             }
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            collision.reset();
++#else
+             collision = NULL;
++#endif
+             // am Anfang steht ein Node mit dem Typ
+             std::string typeAsString = transcodeToStdString(child-&gt;getNodeName());
+ 
+@@ -701,7 +709,11 @@
+                 {
+                     LOG_MESSAGE(Logger::CORE,
+                         &quot; Mesh-Collisions in &lt;collisions&gt; werden momentan noch nicht unterst&#252;tzt (Eintrag wird ignoriert).&quot;);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++                    collision.reset();
++#else
+                     collision = NULL;
++#endif
+                 }
+ /*
+                 else if (typeAsString.compare(&quot;meshhull&quot;) == 0)  // automatische convexhull mit daten aus mesh
+@@ -715,15 +727,18 @@
+                 {
+                     LOG_MESSAGE(Logger::CORE,
+                         &quot; &gt; Parse Error beim Erstellen einer Collision; ung&#252;ltiger typ: '&quot;+typeAsString+&quot;' !&quot;);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++                    collision.reset();
++#else
+                     collision = NULL;
+-                    //return OgreNewt::CollisionPtr(NULL);
++#endif
+                 }
+ 
+             }
+ 
+ 
+             // Collision dem vektor hinzuf&#252;gen
+-            if (collision != NULL)
++            if ( !collision )
+                 mCollisions.push_back(collision);
+ 
+             child = child-&gt;getNextSibling();
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -244,8 +244,15 @@
+             col);
+         mBody-&gt;setMaterialGroupID(
+             PhysicsManager::getSingleton().getMaterialID(&quot;gamearea&quot;));
++#ifndef OGRENEWT_USE_OGRE_ANY
+         mBody-&gt;setUserData(NULL);
+-        ((OgreNewt::ConvexCollision*)col)-&gt;setAsTriggerVolume(true);
++#endif
++
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++        boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(col)-&gt;setAsTriggerVolume(true);
++#else
++        dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(col)-&gt;setAsTriggerVolume(true);
++#endif
+     }
+ 
+     GameSimpleCollisionAreaType::GameSimpleCollisionAreaType(
+@@ -262,8 +269,15 @@
+             col);
+         mBody-&gt;setMaterialGroupID(
+             PhysicsManager::getSingleton().getMaterialID(&quot;gamearea&quot;));
++#ifndef OGRENEWT_USE_OGRE_ANY
+         mBody-&gt;setUserData(NULL);
+-        ((OgreNewt::ConvexCollision*)col)-&gt;setAsTriggerVolume(true);
++#endif
++
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++        boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(col)-&gt;setAsTriggerVolume(true);
++#else
++        dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(col)-&gt;setAsTriggerVolume(true);
++#endif
+     }
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameEventManager.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/GameEventManager.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -308,6 +308,10 @@
+ 
+     Actor* GameEventManager::bodyToActor(OgreNewt::Body* body)
+     {
++#ifdef OGRENEWT_USE_OGRE_ANY
++        return Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#else
+         return static_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#endif
+     }
+ }
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -28,7 +28,6 @@
+ 
+ using namespace Ogre;
+ using namespace OgreNewt;
+-using namespace OgreNewt::CollisionPrimitives;
+ 
+ namespace rl
+ {
+@@ -128,7 +127,11 @@
+ 	void PhysicalThing::setBody(OgreNewt::Body* body)
+     {
+         mBody = body;
+-		mBody-&gt;setUserData(mActor);
++#ifdef OGRENEWT_USE_OGRE_ANY
++		mBody-&gt;setUserData( Ogre::Any(mActor) );
++#else
++        mBody-&gt;setUserData( mActor );
++#endif
+     }
+ 
+     void PhysicalThing::_update()
+@@ -155,7 +158,13 @@
+     {
+         mActor = actor;
+ 		if (mBody != NULL)
+-			mBody-&gt;setUserData(actor);
++        {
++#ifdef OGRENEWT_USE_OGRE_ANY
++    		mBody-&gt;setUserData( Ogre::Any(mActor) );
++#else
++            mBody-&gt;setUserData( mActor );
++#endif
++        }
+     }
+ 
+     void PhysicalThing::_attachToSceneNode(Ogre::SceneNode* node)
+@@ -272,10 +281,25 @@
+             &quot;PhysicalThing::updateCollisionHull: PhysicalThing must not be controlled by a RagDoll in order to update its collision hull.&quot;);
+ 
+ 
++        
+         Vector3 position;
+         Quaternion orientation;
+         mBody-&gt;getPositionOrientation(position, orientation);
++        CollisionPtr collision = PhysicsManager::getSingleton().createCollision(
++                entity,
++                mGeometryType,
++                &quot;&quot;,
++                NULL,
++                NULL,
++                0, NULL, NULL,
++                true); // don't cache
++        if( collision )
++        {
++            mBody-&gt;setCollision(collision);
++            mBody-&gt;setPositionOrientation(position, orientation);
++        }
+ 
++/*
+ 		if (mGeometryType == GT_CONVEXHULL)
+ 		{
+ 			Matrix4 transform = node-&gt;_getFullTransform().inverse();
+@@ -328,18 +352,19 @@
+ 					vbuffer-&gt;unlock();
+ 				}
+ 			}
+-	        CollisionPtr collision(new ConvexHull(PhysicsManager::getSingleton()._getNewtonWorld(),
++	        CollisionPtr collision(new CollisionPrimitives::ConvexHull(PhysicsManager::getSingleton()._getNewtonWorld(),
+ 			    &amp;vertices[0], vertices.size()));
+ 		    mBody-&gt;setCollision(collision);
+ 		}
+ 		else if (mGeometryType == GT_MESH)
+ 		{
+-	        CollisionPtr collision(new TreeCollision(
++	        CollisionPtr collision(new CollisionPrimitives::TreeCollision(
+ 				PhysicsManager::getSingleton()._getNewtonWorld(), entity, true));
+ 		    mBody-&gt;setCollision(collision);
+ 		}
+ 
+         mBody-&gt;setPositionOrientation(position, orientation);
++*/
+     }
+ 
+     void PhysicalThing::freeze()
+
+Modified: rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -29,8 +29,30 @@
+     {
+         userProcess(contactJoint, timestep, threadid);
+ 
+-        Actor* a1 = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+-        Actor* a2 = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
++        Actor* a1 = NULL;
++        Actor* a2 = NULL;
++
++#ifdef OGRENEWT_USE_OGRE_ANY
++        try
++        {
++            a1 = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++        }
++        catch(...)
++        {
++            LOG_WARNING(Logger::CORE, &quot;Found collision with a OgreNewt::Body that doesn't have an Actor as UserData in PhysicsGenericContactCallback::contactsProcess&quot;);
++        }
++        try
++        {
++            a2 = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
++        }
++        catch(...)
++        {
++            LOG_WARNING(Logger::CORE, &quot;Found collision with a OgreNewt::Body that doesn't have an Actor as UserData in PhysicsGenericContactCallback::contactsProcess&quot;);
++        }
++#else
++        a1 = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++        a2 = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
++#endif
+         if (a1 &amp;&amp; a1-&gt;getPhysicalThing()-&gt;getContactListener())
+         {
+             a1-&gt;getPhysicalThing()-&gt;getContactListener()-&gt;
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -36,7 +36,7 @@
+ 
+ namespace rl
+ {
+-    const Ogre::Real PhysicsManager::NEWTON_GRID_WIDTH = 0.01;
++    const Ogre::Real PhysicsManager::NEWTON_GRID_WIDTH = 0.02;
+ 
+ 	LQTBodies::LQTBodies(int maxData, int maxDepth, float looseness,
+ 		const Ogre::Vector2&amp; tlc, const Ogre::Vector2&amp; brc, float mWidth)
+@@ -326,7 +326,10 @@
+         
+ 
+         // try one compound collision for the entity if there are several collisions
+-        OgreNewt::CollisionPtr collision(NULL);
++        OgreNewt::CollisionPtr collision;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        collision = NULL;
++#endif
+         switch( collisions.size() )
+         {
+             case 0:
+@@ -335,7 +338,7 @@
+                 collision = collisions[0];
+                 break;
+             default:
+-                collision = new OgreNewt::CollisionPrimitives::CompoundCollision(mWorld, collisions);
++                collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::CompoundCollision(mWorld, collisions));
+                 break;
+         }
+ 
+@@ -403,17 +406,28 @@
+     void PhysicsManager::genericForceCallback(OgreNewt::Body* body, float timestep, int)
+     {
+         // apply saved forces in the PhysicalThing
+-        PhysicalThing* thing =
+-            static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++        PhysicalThing* thing;
+ 
++#ifdef OGRENEWT_USE_OGRE_ANY
++        thing = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++#else
++        thing = static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++#endif
++
+         thing-&gt;onApplyForceAndTorque(timestep);
+     }
+ 
+     void PhysicsManager::controlledForceCallback(OgreNewt::Body* body, float timestep, int)
+     {
+-        PhysicalThing* thing =
+-            static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++        PhysicalThing* thing;
+ 
++#ifdef OGRENEWT_USE_OGRE_ANY
++        thing = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++#else
++        thing = static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
++#endif
++
++
+         if (thing-&gt;getPhysicsController())
+         {
+             thing-&gt;getPhysicsController()-&gt;OnApplyForceAndTorque(thing, timestep);
+@@ -508,7 +522,7 @@
+         Ogre::Entity* entity, const GeometryType&amp; geomType,
+ 		const Ogre::String animName, Ogre::Vector3* offset,
+         Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia,
+-        Ogre::Vector3* centerOfMass)
++        Ogre::Vector3* centerOfMass, bool nocache)
+     {
+         // problem here is that a mesh can have different animations with
+         // different extents. Therefore we add the animName to the meshname
+@@ -516,7 +530,10 @@
+         Ogre::String collisionName (entity-&gt;getMesh()-&gt;getName() + animName);
+ 
+         // result value
+-        CollisionPtr rval(NULL);
++        CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[collisionName]);
+@@ -555,10 +572,13 @@
+         const Ogre::String&amp; name, const Ogre::AxisAlignedBox&amp; aabb,
+         const GeometryType&amp; geomType, Ogre::Vector3* offset,
+         Ogre::Quaternion* orientation, const Ogre::Real mass, Ogre::Vector3* inertia,
+-        Ogre::Vector3* centerOfMass)
++        Ogre::Vector3* centerOfMass, bool nocache)
+     {
+         // result value
+-        CollisionPtr rval(NULL);
++        CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[name]);
+@@ -637,8 +657,9 @@
+ 		return typestr;
+ 	}
+ 
+-    bool PhysicsCollisionFactory::checkSize(const Ogre::Vector3&amp; size) const
++    bool PhysicsCollisionFactory::checkSize(const Ogre::AxisAlignedBox&amp; aabb) const
+     {
++        Ogre::Vector3 size = aabb.getSize();
+         if( size.x &lt; PhysicsManager::NEWTON_GRID_WIDTH ||
+             size.y &lt; PhysicsManager::NEWTON_GRID_WIDTH ||
+             size.z &lt; PhysicsManager::NEWTON_GRID_WIDTH )
+@@ -646,8 +667,9 @@
+         return true;
+     }
+ 
+-    void PhysicsCollisionFactory::correctSize(Ogre::Vector3&amp; size)
++    void PhysicsCollisionFactory::correctSize(Ogre::AxisAlignedBox&amp; aabb)
+     {
++        Ogre::Vector3 size = aabb.getSize();
+         // correct size, log warning and fail back to box
+         if (size.x &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+             size.x = PhysicsManager::NEWTON_GRID_WIDTH;
+@@ -656,6 +678,9 @@
+         if (size.z &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+             size.z = PhysicsManager::NEWTON_GRID_WIDTH;
+         LOG_MESSAGE(Logger::CORE, &quot;Correcting collision primitiv size&quot;);
++        Ogre::Vector3 center = aabb.getCenter();
++        aabb.setMaximum(center + 0.5*size);
++        aabb.setMinimum(center - 0.5*size);
+     }
+ 
+     /*
+@@ -665,7 +690,7 @@
+     }
+     */
+ 
+-    OgreNewt::CollisionPtr PhysicsCollisionFactory::createCollisionFromAABB(const Ogre::AxisAlignedBox aabb,
++    OgreNewt::CollisionPtr PhysicsCollisionFactory::createCollisionFromAABB(const Ogre::AxisAlignedBox passedAabb,
+         const GeometryType&amp; geomType,
+         Ogre::Vector3* offset,
+         Ogre::Quaternion* orientation,
+@@ -673,18 +698,20 @@
+         Ogre::Vector3* inertia,
+         Ogre::Vector3* centerOfMass)
+     {
+-        // size of the mesh
+-        Vector3 size( aabb.getSize() );
++        Ogre::AxisAlignedBox aabb(passedAabb);
+         // type for the collision primitiv (can change internally here)
+         bool forceBox (false);
+ 
+         // result value
+-        CollisionPtr rval(NULL);
++        CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+-        if (checkSize(size) == false )
++        if (checkSize(aabb) == false )
+         {
+-            correctSize(size);
++            correctSize(aabb);
+             LOG_MESSAGE(Logger::CORE,
+                 &quot; AABB is too small, using 'box' instead of primitiv '&quot; +
+                 PhysicsManager::convertGeometryTypeToString(geomType));
+@@ -741,19 +768,20 @@
+         Ogre::Vector3* centerOfMass)
+     {
+         // bounding box of the mesh
+-        const Ogre::AxisAlignedBox aabb(entity-&gt;getBoundingBox());
+-        // size of the mesh
+-        Vector3 size( aabb.getSize() );
++        Ogre::AxisAlignedBox aabb(entity-&gt;getBoundingBox());
+         // type for the collision primitiv (can change internally here)
+         bool forceBox (false);
+ 
+         // result value
+-        CollisionPtr rval(NULL);
++        CollisionPtr rval;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
++        rval = NULL;
++#endif
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+-        if (checkSize(size) == false )
++        if (checkSize(aabb) == false )
+         {
+-            correctSize(size);
++            correctSize(aabb);
+             LOG_MESSAGE(Logger::CORE, &quot; Entity '&quot;+entity-&gt;getName()+
+                 &quot;' is too small, using 'box' instead of primitiv '&quot;+
+                 PhysicsManager::convertGeometryTypeToString(geomType));
+@@ -808,7 +836,11 @@
+             if (inertia != NULL || centerOfMass != NULL )
+             {
+                 Vector3 temp_inertia, temp_centerOfMass;
+-                static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++                boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++                dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+                 if( inertia != NULL )
+                     *inertia = temp_inertia*mass;
+                 if( centerOfMass != NULL )
+@@ -874,7 +906,11 @@
+         if (inertia != NULL || centerOfMass != NULL )
+         {
+             Vector3 temp_inertia, temp_centerOfMass;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++            dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+             if( inertia )
+                 *inertia = temp_inertia*mass;
+             if( centerOfMass )
+@@ -911,7 +947,11 @@
+         if (inertia != NULL || centerOfMass != NULL )
+         {
+             Vector3 temp_inertia, temp_centerOfMass;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++            dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+             if( inertia )
+                 *inertia = temp_inertia*mass;
+             if( centerOfMass )
+@@ -952,7 +992,11 @@
+         if (inertia != NULL || centerOfMass != NULL )
+         {
+             Vector3 temp_inertia, temp_centerOfMass;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++            dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+             if( inertia )
+                 *inertia = temp_inertia*mass;
+             if( centerOfMass )
+@@ -994,7 +1038,11 @@
+         if (inertia != NULL || centerOfMass != NULL )
+         {
+             Vector3 temp_inertia, temp_centerOfMass;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++            dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+             if( inertia )
+                 *inertia = temp_inertia*mass;
+             if( centerOfMass )
+@@ -1030,7 +1078,7 @@
+ 
+         // an capsule primitiv has got its coordinate system at its center, so shift it with radius
+         // additionally it is x axis aligned, so rotate it 90 degrees around z axis
+-        OgreNewt::CollisionPtr rval(new OgreNewt::CollisionPrimitives::Capsule(
++        OgreNewt::ConvexCollisionPtr rval(new OgreNewt::CollisionPrimitives::Capsule(
+             PhysicsManager::getSingleton()._getNewtonWorld(),
+             radius, height, *orientation, *offset));
+ 
+@@ -1038,7 +1086,11 @@
+         if (inertia != NULL || centerOfMass != NULL )
+         {
+             Vector3 temp_inertia, temp_centerOfMass;
+-            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#else
++            dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(rval)-&gt;calculateInertialMatrix(temp_inertia, temp_centerOfMass);
++#endif
+             if( inertia )
+                 *inertia = temp_inertia*mass;
+             if( centerOfMass )
+
+Modified: rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -186,7 +186,7 @@
+     }
+ 
+     ConvexcastInfo PhysicsMaterialConvexcast::execute(OgreNewt::World* world, const OgreNewt::MaterialID* material,
+-                        const OgreNewt::Collision *col, const Vector3&amp; startpt, const Quaternion &amp;ori,
++                        const OgreNewt::ConvexCollisionPtr&amp; col, const Vector3&amp; startpt, const Quaternion &amp;ori,
+                         const Vector3&amp; endpt, bool invertmat)
+     {
+         mMaterialVector = NULL;
+@@ -201,7 +201,7 @@
+     }
+ 
+     ConvexcastInfo PhysicsMaterialConvexcast::execute(OgreNewt::World* world, const MaterialVector* materials,
+-                        const OgreNewt::Collision *col, const Vector3&amp; startpt, const Quaternion &amp;ori,
++                        const OgreNewt::ConvexCollisionPtr&amp; col, const Vector3&amp; startpt, const Quaternion &amp;ori,
+                         const Vector3&amp; endpt, bool invertmat)
+     {
+         mMaterialVector = materials;
+
+Modified: rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -35,7 +35,11 @@
+ 	mParent = parent;
+ 	mOgreBone = ogreBone;
+ 
+-	OgreNewt::ConvexCollision* col = NULL;
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++	OgreNewt::ConvexCollisionPtr col;
++#else
++	OgreNewt::ConvexCollisionPtr col = NULL;
++#endif
+ 
+ 	// in the case of the cylindrical primitives, they need to be rotated to align the main axis with the direction vector.
+ 	Ogre::Quaternion orient = Ogre::Quaternion::IDENTITY;
+@@ -59,23 +63,23 @@
+ 	switch (shape)
+ 	{
+ 	case PhysicsRagDoll::RagBone::BS_BOX:
+-		col = new OgreNewt::CollisionPrimitives::Box( world, size );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Box( world, size ));
+ 		break;
+ 
+ 	case PhysicsRagDoll::RagBone::BS_CAPSULE:
+-		col = new OgreNewt::CollisionPrimitives::Capsule( world, size.y, size.x, orient, pos );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Capsule( world, size.y, size.x, orient, pos ));
+ 		break;
+ 
+ 	case PhysicsRagDoll::RagBone::BS_CONE:
+-		col = new OgreNewt::CollisionPrimitives::Cone( world, size.y, size.x, orient, pos );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Cone( world, size.y, size.x, orient, pos ));
+ 		break;
+ 
+ 	case PhysicsRagDoll::RagBone::BS_CYLINDER:
+-		col = new OgreNewt::CollisionPrimitives::Cylinder( world, size.y, size.x, orient, pos );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Cylinder( world, size.y, size.x, orient, pos ));
+ 		break;
+ 
+ 	case PhysicsRagDoll::RagBone::BS_ELLIPSOID:
+-		col = new OgreNewt::CollisionPrimitives::Ellipsoid( world, size );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid( world, size ));
+ 		break;
+ 
+ 	case PhysicsRagDoll::RagBone::BS_CONVEXHULL:
+@@ -83,7 +87,7 @@
+ 		break;
+ 
+ 	default:
+-		col = new OgreNewt::CollisionPrimitives::Box( world, size );
++		col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::Box( world, size ));
+ 		break;
+ 	}
+ 
+@@ -91,12 +95,16 @@
+     {
+         if( col-&gt;getNewtonCollision() == NULL )
+         {
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++            col.reset();
++#else
+             delete col;
+             col = NULL;
++#endif
+         }
+     }
+ 
+-    if( col == NULL )
++    if( !col )
+     {
+         LOG_WARNING(Logger::CORE, &quot; error creating collision for '&quot; + ogreBone-&gt;getName() + &quot;', still continuing.&quot;);
+         mBody = NULL;
+@@ -104,7 +112,11 @@
+     else
+     {
+     	mBody = new OgreNewt::Body( world, col );
++#ifdef OGRENEWT_USE_OGRE_ANY
++        mBody-&gt;setUserData( Ogre::Any(parentActor) );
++#else
+ 	    mBody-&gt;setUserData( parentActor );
++#endif
+     	mBody-&gt;setStandardForceCallback();
+         const OgreNewt::MaterialID* ragdollMat = PhysicsManager::getSingleton().createMaterialID(&quot;default&quot;);
+         mBody-&gt;setMaterialGroupID(ragdollMat);
+@@ -134,7 +146,11 @@
+ 
+ void PhysicsRagDoll::RagBone::_hingeCallback( OgreNewt::BasicJoints::Hinge* me )
+ {
+-	PhysicsRagDoll::RagBone* bone = (PhysicsRagDoll::RagBone*)me-&gt;getUserData();
++#ifdef OGRENEWT_USE_OGRE_ANY
++    PhysicsRagDoll::RagBone* bone = Ogre::any_cast&lt;PhysicsRagDoll::RagBone*&gt;(me-&gt;getUserData());
++#else
++    PhysicsRagDoll::RagBone* bone = static_cast&lt;PhysicsRagDoll::RagBone*&gt;(me-&gt;getUserData());
++#endif
+ 
+ 	Ogre::Degree angle = me-&gt;getJointAngle();
+ 	Ogre::Degree lim1( bone-&gt;getLimit1() );
+@@ -155,7 +171,7 @@
+ }
+ 
+ 
+-OgreNewt::ConvexCollision* PhysicsRagDoll::RagBone::_makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight )
++OgreNewt::ConvexCollisionPtr PhysicsRagDoll::RagBone::_makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight )
+ {
+ 	std::vector&lt; Ogre::Vector3 &gt; vertexVector;
+ 
+@@ -245,9 +261,13 @@
+ 	}
+ 
+ 	//////////////////////////////////////////////////////////////////////////////////
+-    OgreNewt::ConvexCollision* col = NULL;
++#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
++    OgreNewt::ConvexCollisionPtr col;
++#else
++    OgreNewt::ConvexCollisionPtr col = NULL;
++#endif
+     if( numVerts &gt; 0 )
+-    	col = new OgreNewt::CollisionPrimitives::ConvexHull( world, verts, numVerts );
++    	col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull( world, verts, numVerts ));
+ 
+ 	delete []verts;
+ 
+@@ -444,7 +464,11 @@
+ 	case PhysicsRagDoll::JT_HINGE:
+ 		joint = new OgreNewt::BasicJoints::Hinge( world, child-&gt;getBody(), parent-&gt;getBody(), pos, pin );
+ 		((OgreNewt::BasicJoints::Hinge*)joint)-&gt;setCallback( RagBone::_hingeCallback );
++#ifdef OGRENEWT_USE_OGRE_ANY
++		joint-&gt;setUserData( Ogre::Any(child) );
++#else
+ 		joint-&gt;setUserData( child );
++#endif
+ 		child-&gt;setLimits( limit1, limit2 );
+ 		break;
+ 	}
+@@ -454,7 +478,11 @@
+ 
+ void PhysicsRagDoll::_placementCallback( OgreNewt::Body* me, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, int threadindex )
+ {
++#ifdef OGRENEWT_USE_OGRE_ANY
++    Actor* parentActor = Ogre::any_cast&lt;Actor*&gt;(me-&gt;getUserData());
++#else
+     Actor* parentActor = static_cast&lt;Actor*&gt;(me-&gt;getUserData());
++#endif
+ 	PhysicsRagDoll* doll = parentActor-&gt;getPhysicalThing()-&gt;getRagDoll();
+     PhysicsRagDoll::RagBoneMapIterator it = doll-&gt;mRagBonesMap.find(me);
+     if( it == doll-&gt;mRagBonesMap.end() )
+
+Modified: rl/trunk/engine/core/src/SceneQuery.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SceneQuery.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/core/src/SceneQuery.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -116,7 +116,11 @@
+                 if (mLevelOcclusion &amp;&amp; (body-&gt;getMaterialGroupID() == levelId)) break;
+ 
+                 // Add actor to this body to the result
++#ifdef OGRENEWT_USE_OGRE_ANY
++                Actor* actor = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#else
+                 Actor* actor = static_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#endif
+                 if (actor != NULL) mResult.push_back(actor);
+             }
+         }
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -166,7 +166,11 @@
+ 
+     void CreatureControllerManager::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int threadid)
+     {
++#ifdef OGRENEWT_USE_OGRE_ANY
++        Actor *actor = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++#else
+         Actor *actor = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++#endif
+         if( actor != NULL )
+         {
+             ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
+@@ -178,7 +182,11 @@
+         }
+ 
+         // if the controlled body is the second body...
+-        actor = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
++#ifdef OGRENEWT_USE_OGRE_ANY
++        actor = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++#else
++        actor = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++#endif
+         if( actor != NULL )
+         {
+             ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
+
+Modified: rl/trunk/engine/rules/src/SelectionHelper.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SelectionHelper.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/rules/src/SelectionHelper.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -84,7 +84,11 @@
+             OgreNewt::Body* body = info.mBody;
+             if (body != NULL)
+             {
++#ifdef OGRENEWT_USE_OGRE_ANY
++                Actor* hitActor = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#else
+                 Actor* hitActor = static_cast&lt;Actor*&gt;(body-&gt;getUserData());
++#endif
+                 isVisible = hitActor == actor2 || hitActor == actor1;
+                 if (!isVisible) break;
+             }
+
+Modified: rl/trunk/engine/script/src/EntityNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/EntityNodeProcessor.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/script/src/EntityNodeProcessor.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -43,13 +43,13 @@
+ 
+         Ogre::String entName = getAttributeValueAsStdString(nodeElem, &quot;name&quot;);
+ 
+-        LOG_DEBUG(Logger::RULES,
++        LOG_DEBUG(Logger::SCRIPT,
+             &quot;Processing entity node &quot;
+                 + entName);
+ 
+         if (!hasAttribute(nodeElem, &quot;meshfile&quot;))
+         {
+-            LOG_ERROR(Logger::RULES, &quot;Entity node defines no meshfile attribute&quot;);
++            LOG_ERROR(Logger::SCRIPT, &quot;Entity node defines no meshfile attribute&quot;);
+             return false;
+         }
+ 
+@@ -73,7 +73,7 @@
+         }
+         else
+         {
+-            LOG_WARNING(Logger::RULES, &quot;No position given for entity, used (0,0,0)&quot;);
++            LOG_WARNING(Logger::SCRIPT, &quot;No position given for entity, used (0,0,0)&quot;);
+         }
+ 
+         DOMElement* oriElem = getChildNamed(nodeElem, &quot;rotation&quot;);
+@@ -83,7 +83,7 @@
+         }
+         else
+         {
+-            LOG_WARNING(Logger::RULES, &quot;No orientation given for entity, used Identity&quot;);
++            LOG_WARNING(Logger::SCRIPT, &quot;No orientation given for entity, used Identity&quot;);
+         }
+ 
+         ///@todo static geometry groups
+@@ -108,11 +108,11 @@
+             newEnt = CoreSubsystem::getSingleton().getWorld()
+                         -&gt;getSceneManager()-&gt;createEntity(entName, meshFile);
+ 
+-            LOG_DEBUG(Logger::RULES, &quot; Loaded meshfile &quot;+meshFile);
++            LOG_DEBUG(Logger::SCRIPT, &quot; Loaded meshfile &quot;+meshFile);
+         }
+         catch(...)
+         {
+-	        LOG_ERROR(Logger::RULES, &quot; Entity '&quot;+meshFile+&quot;' mit dem Namen '&quot;+entName+&quot;' konnte nicht geladen werden.&quot;);
++	        LOG_ERROR(Logger::SCRIPT, &quot; Entity '&quot;+meshFile+&quot;' mit dem Namen '&quot;+entName+&quot;' konnte nicht geladen werden.&quot;);
+             return false;
+         }
+ 
+@@ -141,6 +141,62 @@
+ 
+     void EntityNodeProcessor::createCollision(Entity* entity, Ogre::String meshName, DOMElement* physicsProxyElem)
+ 	{
++        Ogre::String physicsProxyTypeAsString;
++        if (physicsProxyElem == NULL || !hasAttribute(physicsProxyElem, &quot;type&quot;))
++        {
++            physicsProxyTypeAsString = &quot;auto&quot;;
++        }
++        else
++        {
++            physicsProxyTypeAsString = getAttributeValueAsStdString(physicsProxyElem, &quot;type&quot;);
++        }
++
++
++
++        if (physicsProxyTypeAsString == &quot;custom&quot;)
++        {
++            ///@todo create physics proxy from custom collision primitives which are defined in children elements of &lt;code&gt;physicsProxyElem&lt;code&gt;
++        }
++        else if (physicsProxyTypeAsString == &quot;none&quot;)
++        {
++            LOG_DEBUG(Logger::SCRIPT, &quot;No physics proxy for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++        }
++        else
++        {
++            GeometryType physicsProxyType = PhysicsManager::getSingleton().convertStringToGeometryType(physicsProxyTypeAsString);
++            if( physicsProxyType == GT_NONE )
++            {
++                // auto -&gt; mesh
++                if (physicsProxyTypeAsString == &quot;auto&quot;)
++                    physicsProxyType = GT_MESH;
++                
++                if (physicsProxyTypeAsString == &quot;custom&quot;)
++                {
++                    ///@todo create physics proxy from custom collision primitives which are defined in children elements of &lt;code&gt;physicsProxyElem&lt;code&gt;
++                    LOG_WARNING(Logger::SCRIPT, &quot;Physics proxy type 'custom' is not yet implemented.&quot;);
++                }
++                else if ( physicsProxyType != GT_NONE )
++                {
++                    OgreNewt::CollisionPtr collision = PhysicsManager::getSingleton().createCollision(entity, physicsProxyType);
++                    if (collision)
++                    {
++                        LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type '&quot; + physicsProxyTypeAsString + &quot;' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                        std::vector&lt;OgreNewt::CollisionPtr&gt; collisionVector;
++                        collisionVector.push_back(collision);
++                        PhysicsManager::getSingleton().addLevelGeometry(entity, collisionVector);
++                    }
++                }
++                else
++                {
++                    LOG_ERROR(Logger::SCRIPT,
++                            &quot;Physics proxy type '&quot; + physicsProxyTypeAsString + &quot;' of entity '&quot;+entity-&gt;getName()+&quot;' is unknown.&quot;);
++                    return;
++                }
++            }
++
++                
++        }
++/*
+         std::vector&lt;OgreNewt::CollisionPtr&gt; collisions;
+ 
+         Ogre::String physicsProxyType;
+@@ -164,7 +220,7 @@
+         }
+         else if (physicsProxyType == &quot;none&quot;)
+         {
+-            LOG_DEBUG(Logger::RULES, &quot;No physics proxy for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++            LOG_DEBUG(Logger::SCRIPT, &quot;No physics proxy for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+         }
+         else
+         {
+@@ -185,7 +241,7 @@
+                 if (size.z &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+                     size.z = PhysicsManager::NEWTON_GRID_WIDTH;
+ 
+-                LOG_MESSAGE(Logger::RULES, &quot;Entity '&quot;+entity-&gt;getName()+&quot;' is planar, using 'box' as instead of '&quot;+physicsProxyType+&quot;'.&quot;);
++                LOG_MESSAGE(Logger::SCRIPT, &quot;Entity '&quot;+entity-&gt;getName()+&quot;' is planar, using 'box' as instead of '&quot;+physicsProxyType+&quot;'.&quot;);
+                 forceBox = true;
+             }
+             const Quaternion orientation(0,0,0,0);// = parentNode-&gt;getOrientation();
+@@ -199,7 +255,7 @@
+                 (!forceBox)) // sicherheitshalber
+             {
+                 collision = aucol.ColPtr;
+-                LOG_DEBUG(Logger::RULES, &quot; Reused physical body for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                LOG_DEBUG(Logger::SCRIPT, &quot; Reused physical body for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+             }
+             else
+             {
+@@ -207,13 +263,13 @@
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Box(
+                                      thisWorld, size, orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'box' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'box' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;pyramid&quot;)
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Pyramid(
+                                     thisWorld, size, orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'pyramid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'pyramid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;sphere&quot;)
+                 {
+@@ -221,7 +277,7 @@
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+                                     thisWorld, Vector3(radius, radius, radius),
+                                     orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'sphere' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'sphere' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;ellipsoid&quot;)
+                 {
+@@ -232,7 +288,7 @@
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+                                     thisWorld, s,
+                                     orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'ellipsoid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'ellipsoid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;capsule&quot;)
+                 {
+@@ -244,24 +300,24 @@
+                                     radius,
+                                     height,
+                                     orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'capsule' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'capsule' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;convexhull&quot;)
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull(
+                                     thisWorld,
+                                     entity));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'convexhull' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'convexhull' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else if (physicsProxyType == &quot;mesh&quot; || physicsProxyType == &quot;auto&quot;)
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+                                     thisWorld, entity, true));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'mesh' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
++                    LOG_DEBUG(Logger::SCRIPT, &quot;Created physics proxy type 'mesh' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else
+                 {
+-                    LOG_ERROR(Logger::RULES,
++                    LOG_ERROR(Logger::SCRIPT,
+                         &quot;Physics proxy type '&quot;+physicsProxyType+&quot;' of entity '&quot;+entity-&gt;getName()+&quot;' is unknown.&quot;);
+                     return;
+                 }
+@@ -282,9 +338,10 @@
+         if (collisions.size() &gt; 0)
+         {
+             PhysicsManager::getSingleton().addLevelGeometry(entity, collisions);
+-            LOG_DEBUG(Logger::RULES, &quot; Entity '&quot;+entity-&gt;getName()+&quot;' in levelGeometry geladen&quot;);
++            LOG_DEBUG(Logger::SCRIPT, &quot; Entity '&quot;+entity-&gt;getName()+&quot;' in levelGeometry geladen&quot;);
+         }
+-	}
++*/
++    }
+ 
+ 	void EntityNodeProcessor::processAnimation(Ogre::Entity* entity, DOMElement *animationElem)
+ 	{
+
+Modified: rl/trunk/engine/script/src/PlaneNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/PlaneNodeProcessor.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/script/src/PlaneNodeProcessor.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -148,7 +148,8 @@
+ 			const Quaternion orientation(0,0,0,0);// = parentNode-&gt;getOrientation();
+ 			const Ogre::Vector3 pos = aab.getMinimum() * parentNode-&gt;getScale() + (size/2.0);
+ 
+-			collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Box(world, size, orientation, pos));
++			//collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Box(world, size, orientation, pos));
++            collision = PhysicsManager::getSingleton().createCollision(entity, GT_BOX, &quot;&quot;, NULL, NULL, 0, NULL, NULL, true);
+ 
+ 			if ( collision != NULL )
+ 			{
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -126,7 +126,7 @@
+ 
+         PhysicsMaterialRaycast* mRaycast;
+         PhysicsMaterialConvexcast * mConvexcast;
+-        OgreNewt::Collision *mCameraCastCollision;
++        OgreNewt::ConvexCollisionPtr mCameraCastCollision;
+         HalfSphereSelector mSelector;
+         HalfSphereSelector mCombatSelector;
+ 
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-04-07 22:24:33 UTC (rev 4889)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-04-07 22:29:54 UTC (rev 4890)
+@@ -87,7 +87,9 @@
+         mViewMode(VM_THIRD_PERSON),
+         mRaycast(new PhysicsMaterialRaycast()),
+         mConvexcast(new PhysicsMaterialConvexcast()),
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+         mCameraCastCollision(NULL),
++#endif
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+             QUERYFLAG_CREATURE),
+@@ -158,7 +160,7 @@
+             }
+         }
+         //! TODO: remove this workaround (newton-bug: &quot;spheres don't cast&quot;!)
+-        mCameraCastCollision = new OgreNewt::CollisionPrimitives::ConvexHull(mCamBody-&gt;getWorld(), verts, 80);
++        mCameraCastCollision = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull(mCamBody-&gt;getWorld(), verts, 80));
+         //mCameraCastCollision = new OgreNewt::CollisionPrimitives::Ellipsoid(mCamBody-&gt;getWorld(), Vector3::UNIT_SCALE * camRadius);
+     }
+ 
+@@ -171,7 +173,9 @@
+         mSelector.setFilter(NULL);
+         delete mRaycast;
+         delete mConvexcast;
++#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+         delete mCameraCastCollision;
++#endif
+ 
+         if (DebugWindow::getSingletonPtr())
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001946.html">[Dsa-hl-svn] r4889 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample inc src
+</A></li>
+	<LI>Next message: <A HREF="001948.html">[Dsa-hl-svn] r4891 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1947">[ date ]</a>
+              <a href="thread.html#1947">[ thread ]</a>
+              <a href="subject.html#1947">[ subject ]</a>
+              <a href="author.html#1947">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

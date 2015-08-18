@@ -1,0 +1,226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3729 - rl/trunk/engine/ai/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3729%20-%20rl/trunk/engine/ai/src&In-Reply-To=%3C200708212230.l7LMUUnR011390%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000799.html">
+   <LINK REL="Next"  HREF="000801.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3729 - rl/trunk/engine/ai/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3729%20-%20rl/trunk/engine/ai/src&In-Reply-To=%3C200708212230.l7LMUUnR011390%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3729 - rl/trunk/engine/ai/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Aug 22 00:30:30 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000799.html">[Dsa-hl-svn] r3728 - in modules: common/scripts minidemo/scripts	techdemo2/scripts techdemo2/scripts/maps tutorial/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000801.html">[Dsa-hl-svn] r3730 - rl/trunk/engine/ai
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#800">[ date ]</a>
+              <a href="thread.html#800">[ thread ]</a>
+              <a href="subject.html#800">[ subject ]</a>
+              <a href="author.html#800">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-22 00:30:27 +0200 (Wed, 22 Aug 2007)
+New Revision: 3729
+
+Removed:
+   rl/trunk/engine/ai/src/DialogSubsystem.cpp
+Log:
+Die! Die! Die!
+
+Deleted: rl/trunk/engine/ai/src/DialogSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogSubsystem.cpp	2007-08-21 22:20:29 UTC (rev 3728)
++++ rl/trunk/engine/ai/src/DialogSubsystem.cpp	2007-08-21 22:30:27 UTC (rev 3729)
+@@ -1,150 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &lt;xercesc/util/PlatformUtils.hpp&gt;
+-
+-#include &quot;XmlHelper.h&quot;
+-#include &quot;XmlResourceManager.h&quot;
+-#include &quot;Logger.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;ContentModule.h&quot;
+-
+-#include &quot;DialogSubsystem.h&quot;
+-#include &quot;AimlCore.h&quot;
+-#include &quot;AimlParserImplRl.h&quot;
+-#include &quot;DialogCharacter.h&quot;
+-#include &quot;ScriptProcessor.h&quot;
+-#include &quot;DialogScriptProcessor.h&quot;
+-#include &quot;ContextInterpreter.h&quot;
+-
+-using namespace Ogre;
+-using namespace MadaBot;
+-using namespace XERCES_CPP_NAMESPACE;
+-
+-template&lt;&gt; rl::DialogSubsystem* Singleton&lt;rl::DialogSubsystem&gt;::ms_Singleton = 0;
+-
+-namespace rl {
+-
+-DialogSubsystem::DialogSubsystem()
+-	: mCore(new AimlCore()),
+-	  mContextInterpreter(new ContextInterpreter()),
+-	  mCurrentBot(NULL)
+-{
+-	LOG_MESSAGE(Logger::DIALOG, &quot;Init Start&quot;);
+-	initialize();
+-	LOG_MESSAGE(Logger::DIALOG, &quot;Init Ende&quot;);
+-}
+-
+-DialogSubsystem::~DialogSubsystem()
+-{
+-	delete mCore;
+-	delete mContextInterpreter;
+-
+-	for(BotMap::iterator iter = mBots.begin();
+-		iter != mBots.end();
+-		++iter)
+-	{
+-		delete iter-&gt;second;
+-	}
+-}
+-
+-void DialogSubsystem::initialize()
+-{
+-#if OGRE_PLATFORM != OGRE_PLATFORM_WIN32
+-    setlocale(LC_ALL, &quot;C&quot;);
+-#endif
+-
+-	mCore-&gt;setParser(new AimlParserImplRl());
+-	mCore-&gt;getBotInterpreter().addProcessor(new DialogScriptProcessor());
+-	mCore-&gt;getAimlInterpreter().addProcessor(new ScriptProcessor());
+-//  Initialize Xerces if this wasn't done already
+-	try
+-	{
+-        XMLPlatformUtils::Initialize();
+-		XmlHelper::initializeTranscoder();
+-    }
+-    catch (const XMLException&amp; exc)
+-	{
+-		char* excmsg = XMLString::transcode(exc.getMessage());
+-		std::string excs=&quot;Exception while initializing Xerces: &quot;;
+-		excs+=excmsg;
+-		LOG_MESSAGE(Logger::DIALOG, excs);
+-        XMLString::release(&amp;excmsg);
+-    }
+-}
+-
+-DialogCharacter* DialogSubsystem::getBot(const CeGuiString&amp; botName)
+-{
+-	BotMap::iterator itr = mBots.find(botName);
+-	if(itr != mBots.end())
+-	{
+-		return itr-&gt;second;
+-	}
+-	return NULL;
+-}
+-
+-
+-DialogCharacter* DialogSubsystem::loadBot(const CeGuiString&amp; botName, const CeGuiString&amp; fileName)
+-{
+-	mCurrentBot = NULL;
+-	AimlBot&lt;CeGuiString&gt;* bot = mCore-&gt;loadBot(botName.c_str(), fileName.c_str());
+-//  while processing the bot definition, a DialogCharacter should have been created
+-//  through a ruby script and stored in mCurrentBot
+-    if (mCurrentBot == NULL)
+-    {
+-        mCurrentBot = new DialogCharacter();
+-    }
+-
+-	if(bot != NULL)
+-	{
+-		mCurrentBot-&gt;setBot(bot);
+-		mCurrentBot-&gt;initialize();
+-	}
+-	LOG_MESSAGE(Logger::DIALOG,&quot;AimlBot &quot; + botName + &quot;loaded and initialized&quot;);
+-	mBots.insert(BotMap::value_type(mCurrentBot-&gt;getName(), mCurrentBot));
+-	return mCurrentBot;
+-}
+-
+-ResourcePtr DialogSubsystem::getXmlResource(const Ogre::String&amp; filename)
+-{
+-    ResourcePtr res = XmlResourceManager::getSingleton().getByName(filename);
+-
+-    if (res.isNull())
+-    {
+-        Ogre::String group = ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
+-        if (ResourceGroupManager::getSingleton().resourceExists(
+-			CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId(), filename))
+-        {
+-            group = CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId();
+-        }
+-        res = XmlResourceManager::getSingleton().create(filename, group);
+-
+-    }
+-    return res;
+-}
+-
+-void DialogSubsystem::setCurrentDialogCharacter(DialogCharacter* bot)
+-{
+-	mCurrentBot = bot;
+-}
+-
+-DialogCharacter* DialogSubsystem::getCurrentDialogCharacter() const
+-{
+-    return mCurrentBot;
+-}
+-
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000799.html">[Dsa-hl-svn] r3728 - in modules: common/scripts minidemo/scripts	techdemo2/scripts techdemo2/scripts/maps tutorial/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000801.html">[Dsa-hl-svn] r3730 - rl/trunk/engine/ai
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#800">[ date ]</a>
+              <a href="thread.html#800">[ thread ]</a>
+              <a href="subject.html#800">[ subject ]</a>
+              <a href="author.html#800">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

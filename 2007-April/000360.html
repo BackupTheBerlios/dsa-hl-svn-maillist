@@ -1,0 +1,291 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3289 - rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3289%20-%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704131102.l3DB2E8R029241%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000359.html">
+   <LINK REL="Next"  HREF="000361.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3289 - rl/trunk/engine/script/swig</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3289%20-%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704131102.l3DB2E8R029241%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3289 - rl/trunk/engine/script/swig">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr 13 13:02:14 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000359.html">[Dsa-hl-svn] r3288 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="000361.html">[Dsa-hl-svn] r3290 - in modules/ruchin: scripts/maps sound
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#360">[ date ]</a>
+              <a href="thread.html#360">[ thread ]</a>
+              <a href="subject.html#360">[ subject ]</a>
+              <a href="author.html#360">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-04-13 13:02:07 +0200 (Fri, 13 Apr 2007)
+New Revision: 3289
+
+Modified:
+   rl/trunk/engine/script/swig/RlExports.i
+   rl/trunk/engine/script/swig/TypeDynamicDirector.swig
+   rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+   rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+   rl/trunk/engine/script/swig/TypeOgreVector3.swig
+Log:
+Some more typemap cleanups
+
+Modified: rl/trunk/engine/script/swig/RlExports.i
+===================================================================
+--- rl/trunk/engine/script/swig/RlExports.i	2007-04-12 23:36:13 UTC (rev 3288)
++++ rl/trunk/engine/script/swig/RlExports.i	2007-04-13 11:02:07 UTC (rev 3289)
+@@ -83,7 +83,6 @@
+ 
+ 
+ // Handling of errors in director methods
+-
+ %feature(&quot;director:except&quot;) 
+ {
+ 	RL_handleRubyError( error );
+@@ -128,12 +127,7 @@
+ 
+ 
+ // Converting C++ Exceptions to Ruby Exceptions
+-
+-namespace Swig {
+-	class DirectorException;
+-}
+-
+-%exception {
++%exception %{
+   try {
+     $action
+   }
+@@ -145,9 +139,6 @@
+     static VALUE ceguiException = rb_define_class(&quot;CeguiException&quot;, rb_eRuntimeError);
+     rb_raise(ceguiException, ce.getMessage().c_str());
+   }
+-  catch (Swig::DirectorException&amp;) {
+-    SWIG_fail; 
+-  } 
+   catch (std::exception&amp; se) {
+     static VALUE stdException = rb_define_class(&quot;StdException&quot;, rb_eRuntimeError);
+     rb_raise(stdException, se.what());
+@@ -156,16 +147,14 @@
+     static VALUE unknownException = rb_define_class(&quot;UnknownException&quot;, rb_eRuntimeError);
+     rb_raise(unknownException,&quot;Unbekannte Exception&quot;);
+   }
+-}
++%}
+ 
+ 
+ 
+-
+ // deaktiviere Warnung ueber unreferenzierte lokale Variable, 
+ // da dies in allen erzeugten Exceptionhandlern auftritt
+ %{
+-#pragma warning( disable : 4101 )	
+-									
++#pragma warning( disable : 4101 )									
+ %}
+ 
+ // Include bodies
+
+Modified: rl/trunk/engine/script/swig/TypeDynamicDirector.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeDynamicDirector.swig	2007-04-12 23:36:13 UTC (rev 3288)
++++ rl/trunk/engine/script/swig/TypeDynamicDirector.swig	2007-04-13 11:02:07 UTC (rev 3289)
+@@ -36,9 +36,7 @@
+ /// @todo unbenutzt???
+ // Actor* getActor oder andere OUTPUT Parameter
+ %typemap(out) SWIGTYPE*
+-{
+-	$result = getInScriptObject((void *) $1, $1_descriptor );
+-} 
++&quot;   $result = getInScriptObject((void *) $1, $1_descriptor );&quot; 
+ 
+ %{
+ static VALUE getDirectorInScriptObject( Swig::Director * dir, void* ptr, swig_type_info *type )
+@@ -54,10 +52,7 @@
+ /// @todo unbenutzt???
+ // doWithActor( Actor* ) oder andere Director-Methoden Parameter
+ %typemap(directorin) SWIGTYPE*
+-{
+-	$input = getDirectorInScriptObject( 
+-		dynamic_cast&lt; Swig::Director * &gt;($1), (void *)$1, $1_descriptor);
+-} 
++&quot;   $input = getDirectorInScriptObject(dynamic_cast&lt; Swig::Director * &gt;($1), (void *)$1, $1_descriptor);&quot; 
+ 
+ %{
+ static VALUE getOutScriptObject( void* ptr, swig_type_info *type )
+@@ -78,9 +73,7 @@
+ 
+ // Animation* getActor oder andere OUTPUT Parameter f&#252;r DYNAMICs
+ %typemap(out) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
+-{
+-	getOutScriptObject((void *) $1, $1_descriptor );
+-} 
++&quot;   $result = getOutScriptObject((void *) $1, $1_descriptor );&quot;
+ 
+ %{
+ static VALUE getDirectorOutScriptObject( Swig::Director * dir, void* ptr, swig_type_info *type )
+@@ -94,7 +87,4 @@
+ 
+ // doWithAnimation( Animation* ) oder andere Director-Methoden Parameter fr DYNAMICs
+ %typemap(directorin) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
+-{
+-	getDirectorOutScriptObject(
+-		dynamic_cast&lt; Swig::Director * &gt;($1), (void *) $1, $1_descriptor );
+-} 
+\ No newline at end of file
++&quot;   $input = getDirectorOutScriptObject(dynamic_cast&lt; Swig::Director * &gt;($1), (void *) $1, $1_descriptor );&quot; 
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-12 23:36:13 UTC (rev 3288)
++++ rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-13 11:02:07 UTC (rev 3289)
+@@ -39,9 +39,10 @@
+ %typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) 
+    Ogre::ColourValue, const Ogre::ColourValue, 
+    Ogre::ColourValue*, Ogre::ColourValue&amp;,
+-   const Ogre::ColourValue*, const Ogre::ColourValue&amp; { 
++   const Ogre::ColourValue*, const Ogre::ColourValue&amp; 
++%{ 
+ 	$1 = checkRubyColourValue($input);
+-}
++%}
+  
+ %{
+ // Helper method for filling the ColourValue
+@@ -96,13 +97,15 @@
+ }
+ %}
+ 
+-%typemap(out) Ogre::ColourValue, const Ogre::ColourValue {
++%typemap(out) Ogre::ColourValue, const Ogre::ColourValue 
++%{
+    $result = convertColourValueToRuby( &amp; $1 );
+-}
++%}
+ 
+-%typemap(out) Ogre::ColourValue*, const Ogre::ColourValue*, const Ogre::ColourValue&amp;, Ogre::ColourValue&amp; {
++%typemap(out) Ogre::ColourValue*, const Ogre::ColourValue*, const Ogre::ColourValue&amp;, Ogre::ColourValue&amp; 
++%{
+    $result = convertColourValueToRuby( $1 );
+-} 
++%} 
+ 
+ 
+ %typemap(freearg) Ogre::ColourValue*, Ogre::ColourValue&amp;,
+
+Modified: rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-12 23:36:13 UTC (rev 3288)
++++ rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-13 11:02:07 UTC (rev 3289)
+@@ -69,9 +69,10 @@
+ %typemap(typecheck)  
+    Ogre::Quaternion, const Ogre::Quaternion, 
+    Ogre::Quaternion*, Ogre::Quaternion&amp;,
+-   const Ogre::Quaternion*, const Ogre::Quaternion&amp; {
++   const Ogre::Quaternion*, const Ogre::Quaternion&amp; 
++%{
+ 	$1 = checkRubyQuaternion($input);	
+-}
++%}
+ 
+ 
+ %{
+@@ -155,13 +156,15 @@
+ }
+ %}
+ 
+-%typemap(out) Ogre::Quaternion, const Ogre::Quaternion {  
++%typemap(out) Ogre::Quaternion, const Ogre::Quaternion 
++%{  
+    $result = convertQuaternionToRuby( &amp; $1 );
+-}
++%}
+ 
+-%typemap(out) Ogre::Quaternion*, const Ogre::Quaternion*, const Ogre::Quaternion&amp;, Ogre::Quaternion&amp; {
++%typemap(out) Ogre::Quaternion*, const Ogre::Quaternion*, const Ogre::Quaternion&amp;, Ogre::Quaternion&amp; 
++%{
+    $result = convertQuaternionToRuby( $1 );
+-} 
++%} 
+ 
+ 
+ %typemap(freearg)  Ogre::Quaternion*, Ogre::Quaternion&amp;,
+
+Modified: rl/trunk/engine/script/swig/TypeOgreVector3.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreVector3.swig	2007-04-12 23:36:13 UTC (rev 3288)
++++ rl/trunk/engine/script/swig/TypeOgreVector3.swig	2007-04-13 11:02:07 UTC (rev 3289)
+@@ -37,9 +37,8 @@
+ %typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) 
+    Ogre::Vector3, const Ogre::Vector3, 
+    Ogre::Vector3*, Ogre::Vector3&amp;,
+-   const Ogre::Vector3*, const Ogre::Vector3&amp; { 
+-	$1 = checkRubyVector3($input);
+-}
++   const Ogre::Vector3*, const Ogre::Vector3&amp; 
++&quot;$1 = checkRubyVector3($input);&quot;
+  
+ %{
+ // Helper method for filling the Vector3
+@@ -90,13 +89,11 @@
+ }
+ %}
+ 
+-%typemap(out) Ogre::Vector3, const Ogre::Vector3 {
+-   $result = convertVector3ToRuby( &amp; $1 );
+-}
++%typemap(out) Ogre::Vector3, const Ogre::Vector3 
++&quot;   $result = convertVector3ToRuby( &amp; $1 );&quot;
+ 
+-%typemap(out) Ogre::Vector3*, const Ogre::Vector3*, const Ogre::Vector3&amp;, Ogre::Vector3&amp; {
+-   $result = convertVector3ToRuby( $1 );
+-} 
++%typemap(out) Ogre::Vector3*, const Ogre::Vector3*, const Ogre::Vector3&amp;, Ogre::Vector3&amp; 
++&quot;   $result = convertVector3ToRuby( $1 );&quot; 
+ 
+ 
+ %typemap(freearg) Ogre::Vector3*, Ogre::Vector3&amp;,
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000359.html">[Dsa-hl-svn] r3288 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="000361.html">[Dsa-hl-svn] r3290 - in modules/ruchin: scripts/maps sound
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#360">[ date ]</a>
+              <a href="thread.html#360">[ thread ]</a>
+              <a href="subject.html#360">[ subject ]</a>
+              <a href="author.html#360">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

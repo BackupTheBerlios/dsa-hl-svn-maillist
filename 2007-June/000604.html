@@ -1,0 +1,245 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3533 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3533%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200706132047.l5DKlXdp005209%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000603.html">
+   <LINK REL="Next"  HREF="000605.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3533 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3533%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200706132047.l5DKlXdp005209%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3533 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Jun 13 22:47:34 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000603.html">[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src
+</A></li>
+        <LI>Next message: <A HREF="000605.html">[Dsa-hl-svn] r3534 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#604">[ date ]</a>
+              <a href="thread.html#604">[ thread ]</a>
+              <a href="subject.html#604">[ subject ]</a>
+              <a href="author.html#604">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-06-13 22:47:08 +0200 (Wed, 13 Jun 2007)
+New Revision: 3533
+
+Modified:
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/ui/include/CombatCharacterController.h
+   rl/trunk/engine/ui/src/CombatCharacterController.cpp
+Log:
+Not yet working changes to CombatController. Starting litte HUD display, but for some reasons nothing is shown yet. Oh well...
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2007-06-12 17:27:18 UTC (rev 3532)
++++ rl/trunk/engine/rules/include/Combat.h	2007-06-13 20:47:08 UTC (rev 3533)
+@@ -28,6 +28,8 @@
+     class _RlRulesExport Combat
+     {
+     public:
++        typedef std::set&lt;Creature*&gt; CreatureSet;
++
+         Combat(Creature* character);
+         ~Combat();
+ 
+@@ -37,8 +39,10 @@
+         void addAlly(Creature*);
+         void removeAlly(Creature*);
+ 
++        const CreatureSet&amp; getAllOpponents() const;
++        const CreatureSet&amp; getAllAllies() const;
++
+     private:
+-        typedef std::set&lt;Creature*&gt; CreatureSet;
+         Creature* mCharacter;
+         CreatureSet mOpponents;
+         CreatureSet mAllies;
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2007-06-12 17:27:18 UTC (rev 3532)
++++ rl/trunk/engine/rules/src/Combat.cpp	2007-06-13 20:47:08 UTC (rev 3533)
+@@ -45,4 +45,14 @@
+     {
+         mAllies.erase(creature);
+     }
++
++    const Combat::CreatureSet&amp; Combat::getAllOpponents() const
++    {
++        return mOpponents;
++    }
++
++    const Combat::CreatureSet&amp; Combat::getAllAllies() const
++    {
++        return mAllies;
++    }
+ }
+
+Modified: rl/trunk/engine/ui/include/CombatCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatCharacterController.h	2007-06-12 17:27:18 UTC (rev 3532)
++++ rl/trunk/engine/ui/include/CombatCharacterController.h	2007-06-13 20:47:08 UTC (rev 3533)
+@@ -22,6 +22,8 @@
+ #include &quot;CharacterController.h&quot;
+ #include &quot;Selector.h&quot;
+ 
++#include &lt;OgreRectangle.h&gt;
++
+ namespace rl {
+ 
+     class Combat;
+@@ -48,6 +50,13 @@
+         Combat* mCombat;
+         CombatWindow* mCombatWindow;
+         HalfSphereSelector mEnemySelector;
++
++        Ogre::Camera* mCamera;
++
++        /// Little Helper-MO for visualisation for everything that is difficult with cegui.
++        Ogre::ManualObject* mHud;
++
++        Ogre::Rectangle getScreenRectFromWorldAABB(const Ogre::AxisAlignedBox&amp; aabb) const;
+ 	};
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/CombatCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-06-12 17:27:18 UTC (rev 3532)
++++ rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-06-13 20:47:08 UTC (rev 3533)
+@@ -30,6 +30,9 @@
+ #include &quot;WindowFactory.h&quot;
+ #include &quot;World.h&quot;
+ 
++#include &lt;OgreManualObject.h&gt;
++using namespace Ogre;
++
+ namespace rl {
+     CombatCharacterController::CombatCharacterController(CommandMapper* cmdMapper,
+         Actor* camera, Person* character)
+@@ -38,13 +41,26 @@
+           mCombat(NULL),
+           mCombatWindow(NULL),
+           mEnemySelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+-            QUERYFLAG_CREATURE)
++            QUERYFLAG_CREATURE),
++          mCamera(NULL)
+     {
+         CreatureSelectionFilter* filter = new CreatureSelectionFilter();
+         filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
+         mEnemySelector.setFilter(filter);
+ 
+         mCombatWindow = WindowFactory::getSingleton().getCombatWindow();
++        mCamera = static_cast&lt;Ogre::Camera*&gt;(mCameraActor-&gt;_getMovableObject());
++
++        // Initialise HUD-MO. Put it into 2D mode and make sure it is always rendered.
++        SceneManager* sceneMgr = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager();
++        mHud = sceneMgr-&gt;createManualObject(&quot;__COMBAT_HUD__&quot;);
++        mHud-&gt;setUseIdentityProjection(true);
++        mHud-&gt;setUseIdentityView(true);
++        AxisAlignedBox infiniteAabb;
++        infiniteAabb.setInfinite();
++        mHud-&gt;setBoundingBox(infiniteAabb);
++        mHud-&gt;setRenderQueueGroup(RENDER_QUEUE_OVERLAY);
++        sceneMgr-&gt;getRootSceneNode()-&gt;createChildSceneNode()-&gt;attachObject(mHud);
+     }
+ 
+ 	CombatCharacterController::~CombatCharacterController()
+@@ -111,5 +127,54 @@
+ 
+ 	void CombatCharacterController::run(Ogre::Real elapsedTime)
+     {
++        // HUD aktualisieren.
++        mHud-&gt;clear();
++        
++        mHud-&gt;begin(&quot;BaseWhiteNoLighting&quot;, RenderOperation::OT_TRIANGLE_LIST);
++        const Combat::CreatureSet&amp; opponents = mCombat-&gt;getAllOpponents();
++        for (Combat::CreatureSet::const_iterator it = opponents.begin(), end = opponents.end();
++            it != end; ++it)
++        {
++            MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;((*it)-&gt;getActor()-&gt;getControlledObject());
++            Ogre::Rectangle rec = getScreenRectFromWorldAABB(mesh-&gt;getDefaultSize());
++            mHud-&gt;position(rec.left,  rec.top,    0.0f);
++            mHud-&gt;position(rec.left,  rec.bottom, 0.0f);
++            mHud-&gt;position(rec.right, rec.top,    0.0f);
++
++            mHud-&gt;position(rec.right, rec.top,    0.0f);
++            mHud-&gt;position(rec.left,  rec.bottom, 0.0f);
++            mHud-&gt;position(rec.right, rec.bottom, 0.0f);
++        }
++        mHud-&gt;end();
+     }
++
++    Ogre::Rectangle CombatCharacterController::getScreenRectFromWorldAABB(
++        const AxisAlignedBox&amp; aabb) const
++    {
++        // Initialise each to the value of the opposite side, so that min/max work smoothly.
++        Real left = 1.0f, bottom = 1.0f, right = -1.0f, top = -1.0f;
++
++        const Matrix4&amp; viewMatrix = mCamera-&gt;getViewMatrix(true);
++        const Matrix4&amp; projMatrix = mCamera-&gt;getProjectionMatrix();
++
++        // Determine screen pos of all corners and widen the rect if needed
++        const Vector3* corners = aabb.getAllCorners();
++        for (size_t i = 0; i &lt; 8; ++i)
++        {
++            Vector3 eyeSpacePos = viewMatrix.transformAffine(corners[i]);
++
++            // ignore point, if it is behind the cam.
++            if (eyeSpacePos.z &gt; 0) continue;
++
++            Vector3 screenSpacePos =  projMatrix * eyeSpacePos;
++
++            left   = std::min(left,   screenSpacePos.x);
++            right  = std::max(right,  screenSpacePos.x);
++            bottom = std::min(bottom, screenSpacePos.y);
++            top    = std::max(top,    screenSpacePos.y);
++        }
++
++        Ogre::Rectangle rval = {left,top, right, bottom};
++        return rval;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000603.html">[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src
+</A></li>
+	<LI>Next message: <A HREF="000605.html">[Dsa-hl-svn] r3534 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#604">[ date ]</a>
+              <a href="thread.html#604">[ thread ]</a>
+              <a href="subject.html#604">[ subject ]</a>
+              <a href="author.html#604">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

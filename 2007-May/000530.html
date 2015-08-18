@@ -1,0 +1,213 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3459 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3459%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200705192319.l4JNJj0b006606%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000529.html">
+   <LINK REL="Next"  HREF="000531.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3459 - in rl/trunk/engine/core: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3459%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200705192319.l4JNJj0b006606%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3459 - in rl/trunk/engine/core: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun May 20 01:19:45 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000529.html">[Dsa-hl-svn] r3458 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="000531.html">[Dsa-hl-svn] r3460 - in rl/trunk/engine: rules rules/include	rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#530">[ date ]</a>
+              <a href="thread.html#530">[ thread ]</a>
+              <a href="subject.html#530">[ subject ]</a>
+              <a href="author.html#530">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-05-20 01:19:35 +0200 (Sun, 20 May 2007)
+New Revision: 3459
+
+Modified:
+   rl/trunk/engine/core/include/PhysicsMaterialRaycast.h
+   rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+Log:
+overloaded the execute function in order to specify a vector with multiple materials (needed in MovementCharacterController)
+
+Modified: rl/trunk/engine/core/include/PhysicsMaterialRaycast.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsMaterialRaycast.h	2007-05-19 11:03:32 UTC (rev 3458)
++++ rl/trunk/engine/core/include/PhysicsMaterialRaycast.h	2007-05-19 23:19:35 UTC (rev 3459)
+@@ -19,6 +19,8 @@
+ 
+ #include &quot;CorePrerequisites.h&quot;
+ #include &lt;OgreNewt.h&gt;
++#include &lt;vector&gt;
++#include &lt;utility&gt;
+ 
+ namespace rl {
+     struct _RlCoreExport RaycastInfo
+@@ -35,6 +37,8 @@
+     class _RlCoreExport PhysicsMaterialRaycast : OgreNewt::Raycast
+     {
+     public:
++        typedef std::vector&lt;const OgreNewt::MaterialID*&gt; MaterialVector;
++
+         PhysicsMaterialRaycast();
+ 
+         /** executes the Raycast
+@@ -47,10 +51,21 @@
+         */
+         RaycastInfo execute(OgreNewt::World* world, const OgreNewt::MaterialID* material,
+             const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool invertmat = false);
++        
++        /** executes the Raycast
++        * @param world OgreNewt-World
++        * @param materials a vector with pairs of a material and a boolean value, that describes if this material should be matched or not
++        * If this param is NULL, every material will be found
++        * @param startpt start-point of the cast
++        * @param endpt end-point of the cast
++        */
++        RaycastInfo execute(OgreNewt::World* world, const MaterialVector* materials,
++            const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool invertmat = false);
+ 
+         bool userCallback(OgreNewt::Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID);
+     private:
+         RaycastInfo mInfo;
++        const MaterialVector *mMaterialVector;
+         const OgreNewt::MaterialID* mMaterial;
+         bool mGetNearest;
+         bool mInvertMat;
+
+Modified: rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2007-05-19 11:03:32 UTC (rev 3458)
++++ rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2007-05-19 23:19:35 UTC (rev 3459)
+@@ -28,6 +28,7 @@
+     RaycastInfo PhysicsMaterialRaycast::execute(OgreNewt::World* world, const MaterialID* material,
+         const Vector3&amp; start, const Vector3&amp; end, bool invertmat)
+     {
++        mMaterialVector = NULL;
+         mMaterial = material;
+         mInvertMat = invertmat;
+ 
+@@ -41,23 +42,75 @@
+         return mInfo;
+     }
+ 
++    RaycastInfo PhysicsMaterialRaycast::execute(OgreNewt::World* world, const MaterialVector* materials,
++        const Vector3&amp; start, const Vector3&amp; end, bool invertmat)
++    {
++        mMaterialVector = materials;
++        mMaterial = NULL;
++        mInvertMat = invertmat;
++
++        mInfo.mBody = 0;
++        mInfo.mDistance = 1.1;
++        mInfo.mNormal = Vector3::ZERO;
++        
++        mGetNearest = false;
++        go(world, start, end);
++        
++        return mInfo;
++    }
++
+     bool PhysicsMaterialRaycast::userCallback(Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID)
+     {
+-        if( mMaterial == NULL )
++        if( body-&gt;getMaterialGroupID() == NULL )
+         {
+             mInfo.mBody = body;
+             mInfo.mDistance = distance;
+             mInfo.mNormal = normal;
+             mGetNearest = true;
++            LOG_MESSAGE(Logger::CORE, &quot;Warning PhysicsMaterialRaycast found body without material (getMaterialGroupId() == NULL)!&quot;);
+         }
+-        else if (body-&gt;getMaterialGroupID() &amp;&amp; 
+-            (body-&gt;getMaterialGroupID()-&gt;getID() == mMaterial-&gt;getID() &amp;&amp; !mInvertMat ||
+-             body-&gt;getMaterialGroupID()-&gt;getID() != mMaterial-&gt;getID() &amp;&amp; mInvertMat))
++        else
+         {
+-            mInfo.mBody = body;
+-            mInfo.mDistance = distance;
+-            mInfo.mNormal = normal;
+-            mGetNearest = true;
++            if( mMaterial == NULL &amp;&amp; mMaterialVector == NULL)
++            {
++                mInfo.mBody = body;
++                mInfo.mDistance = distance;
++                mInfo.mNormal = normal;
++                mGetNearest = true;
++            }
++            else if( mMaterial != NULL )
++            {
++                if (body-&gt;getMaterialGroupID()-&gt;getID() == mMaterial-&gt;getID() &amp;&amp; !mInvertMat ||
++                    body-&gt;getMaterialGroupID()-&gt;getID() != mMaterial-&gt;getID() &amp;&amp; mInvertMat)
++                {
++                    mInfo.mBody = body;
++                    mInfo.mDistance = distance;
++                    mInfo.mNormal = normal;
++                    mGetNearest = true;
++                }
++            }
++            else // mMaterialVector != NULL
++            {
++                bool found = false;
++
++                MaterialVector::const_iterator iter;
++                for(iter = mMaterialVector-&gt;begin(); iter != mMaterialVector-&gt;end(); iter++)
++                {
++                    if (body-&gt;getMaterialGroupID()-&gt;getID() == (*iter)-&gt;getID())
++                    {
++                        found = true;
++                        break;
++                    }
++                }
++
++                if( found &amp;&amp; !mInvertMat || !found &amp;&amp; mInvertMat )
++                {
++                    mInfo.mBody = body;
++                    mInfo.mDistance = distance;
++                    mInfo.mNormal = normal;
++                    mGetNearest = true;
++                }
++            }
+         }
+         return mGetNearest;
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000529.html">[Dsa-hl-svn] r3458 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="000531.html">[Dsa-hl-svn] r3460 - in rl/trunk/engine: rules rules/include	rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#530">[ date ]</a>
+              <a href="thread.html#530">[ thread ]</a>
+              <a href="subject.html#530">[ subject ]</a>
+              <a href="author.html#530">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

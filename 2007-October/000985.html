@@ -1,0 +1,520 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3914 - in rl/trunk/engine: core/include core/src	rules/include rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3914%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200710161802.l9GI2XkH004474%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000984.html">
+   <LINK REL="Next"  HREF="000986.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3914 - in rl/trunk/engine: core/include core/src	rules/include rules/src ui/include ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3914%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200710161802.l9GI2XkH004474%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3914 - in rl/trunk/engine: core/include core/src	rules/include rules/src ui/include ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Oct 16 20:02:33 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000984.html">[Dsa-hl-svn] r3913 - in rl/trunk/engine: core/src rules/src
+</A></li>
+        <LI>Next message: <A HREF="000986.html">[Dsa-hl-svn] r3915 - modules/kanalisation/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#985">[ date ]</a>
+              <a href="thread.html#985">[ thread ]</a>
+              <a href="subject.html#985">[ subject ]</a>
+              <a href="author.html#985">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-16 20:02:11 +0200 (Tue, 16 Oct 2007)
+New Revision: 3914
+
+Modified:
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/SaveGameFileReader.cpp
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/include/CreatureControllerManager.h
+   rl/trunk/engine/rules/include/GameObjectManager.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/ui/include/ControlState.h
+   rl/trunk/engine/ui/src/ControlState.cpp
+Log:
+loading is still broken, please use rev 3910 instead
+
+changes since 3910:
+
+- started with loading features of the game object manager
+- the save game data is sorted by priority now
+- send messages when save game is loaded/saved
+
+
+
+todo:
+
+because every game object is deleted and a new game object is created, there are a lot of invalid pointer which has to be refreshed
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -20,6 +20,7 @@
+ #include &quot;SaveGameFileWriter.h&quot;
+ #include &quot;SaveGameFileReader.h&quot;
+ #include &quot;SaveGameFile.h&quot;
++#include &quot;MessagePump.h&quot;
+ 
+ #include &lt;XmlPropertyWriter.h&gt;
+ #include &lt;XmlPropertyReader.h&gt;
+@@ -28,6 +29,20 @@
+ 
+ namespace rl
+ {
++    enum SaveGameMessageTypeIds
++    {
++        //Mask
++        RLMSG_SAVEGAME_EVENTS     = 0x0300000,
++        //Events
++        RLMSG_SAVEGAME_LOADED     = 0x0300001,
++        RLMSG_SAVEGAME_SAVED      = 0x0300002,
++        RLMSG_SAVEGAME_GOS_LOADED = 0x3000003
++    };
++
++    typedef MessageType&lt;RLMSG_SAVEGAME_LOADED&gt; MessageType_SaveGameLoaded;
++
++    typedef MessageType&lt;RLMSG_SAVEGAME_SAVED&gt; MessageType_SaveGameSaved;
++
+     class _RlCoreExport SaveGameData
+     {
+     public:
+
+Modified: rl/trunk/engine/core/src/SaveGameFileReader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -36,7 +36,7 @@
+ 
+         mDocument = loadDocument(file-&gt;getDataStream());
+ 
+-        for(SaveGameDataOrderMap::const_iterator data_iter = map.end(); data_iter != map.begin(); data_iter--)
++        for(SaveGameDataOrderMap::const_reverse_iterator data_iter = map.rbegin(); data_iter != map.rend(); data_iter++)
+         {
+             data_iter-&gt;second-&gt;readData(this);
+         }
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/include/CreatureController.h	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -24,6 +24,7 @@
+ #include &quot;Creature.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &lt;map&gt;
++#include &lt;MessagePump.h&gt;
+ 
+ 
+ 
+@@ -39,8 +40,7 @@
+      */
+     class _RlRulesExport CreatureController :
+         public PhysicsController,
+-        public PhysicsGenericContactCallback,
+-        public PropertyHolder
++        public PhysicsGenericContactCallback
+     {
+     public:
+         static const Ogre::String PROPERTY_CREATUREID;
+@@ -65,7 +65,7 @@
+         int userProcess();
+ 
+         Creature* getCreature() {return mCreature;}
+-        void refetchCreature();
++        bool refetchCreature();
+ 
+         /** 
+          * the different movements a creature can perform, 
+@@ -152,10 +152,6 @@
+         MovementType getLastMovementType() const { return mLastMovementType; }
+         Ogre::Real getAnimationTimePlayed() const; // this is a relative value between 0 and 1
+ 
+-        
+-        virtual const Property getProperty(const Ogre::String&amp; key) const;
+-        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+-        virtual PropertySet* getAllProperties() const;
+     protected:
+         Creature *mCreature;
+         int mGameObjectId;
+@@ -173,6 +169,7 @@
+         // in order to copy the contactcallback members correctly;
+         friend class CreatureControllerManager;
+ 
++        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     private:
+         // only used in setAnimation
+         Ogre::String mLastAnimationName;
+
+Modified: rl/trunk/engine/rules/include/CreatureControllerManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureControllerManager.h	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/include/CreatureControllerManager.h	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -38,8 +38,7 @@
+     class _RlRulesExport CreatureControllerManager : 
+         public GameTask,
+         public Ogre::Singleton&lt;CreatureControllerManager&gt;,
+-        public PhysicsGenericContactCallback,
+-        public SaveGameData
++        public PhysicsGenericContactCallback
+     {
+     public:
+         CreatureControllerManager();
+@@ -61,11 +60,6 @@
+ 
+         // Newton Contact Callback
+         int userProcess();
+-
+-        virtual CeGuiString getXmlNodeIdentifier() const;
+-        virtual void writeData(SaveGameFileWriter* writer);
+-        virtual void readData(SaveGameFileReader* reader);
+-        virtual int getPriority() const;
+     protected:
+         typedef std::map&lt;Creature*, CreatureController*&gt; ControllerMap;
+         ControllerMap mControllers;
+
+Modified: rl/trunk/engine/rules/include/GameObjectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObjectManager.h	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/include/GameObjectManager.h	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -32,6 +32,8 @@
+ 	class Property;
+     class PropertySet;
+ 
++    typedef MessageType&lt;RLMSG_SAVEGAME_GOS_LOADED&gt; MessageType_GameObjectsLoaded;
++
+     class _RlRulesExport GameObjectFactory
+     {
+     public:
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -1191,6 +1191,9 @@
+         movementPair.first = MT_WEITSPRUNG;
+         movementPair.second = new Weitsprung (this);
+         mMovementMap.insert(movementPair);
++
++        mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
++                boost::bind(&amp;CreatureController::refetchCreature, this));
+     }
+ 
+     CreatureController::~CreatureController()
+@@ -1507,33 +1510,9 @@
+         return Radian(drehen-&gt;getMovementDefinedValue());
+     }
+ 
+-    const Property CreatureController::getProperty(const Ogre::String&amp; key) const
++    bool CreatureController::refetchCreature()
+     {
+-        if(key == PROPERTY_CREATUREID)
+-        {
+-            return Property(mCreature-&gt;getId());
+-        }
+-        else
+-            return Property();
+-    }
+-
+-    void CreatureController::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+-    {
+-        if(key == PROPERTY_CREATUREID)
+-        {
+-            mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(value.toInt()));
+-        }
+-    }
+-
+-    PropertySet* CreatureController::getAllProperties() const
+-    {
+-        PropertySet* ps = new PropertySet();
+-        ps-&gt;setProperty(PROPERTY_CREATUREID, getProperty(PROPERTY_CREATUREID));
+-        return ps;
+-    }
+-
+-    void CreatureController::refetchCreature()
+-    {
+         mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(mGameObjectId));
++        return false;
+     }
+ }
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -51,14 +51,10 @@
+         physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0,0);
+ 
+         physicsManager-&gt;getNewtonDebugger()-&gt;setMaterialColor(char_mat, Ogre::ColourValue::Red);
+-
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+     {
+-        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+-
+         PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
+         const OgreNewt::MaterialID *char_mat = physicsManager-&gt;getMaterialID(&quot;character&quot;);
+ 
+@@ -175,65 +171,4 @@
+         static Ogre::String name = &quot;CreatureControllerManager&quot;;
+         return name;
+     }
+-
+-    CeGuiString CreatureControllerManager::getXmlNodeIdentifier() const
+-    {
+-        return &quot;creaturecontrollermanager&quot;;
+-    }
+-
+-    using namespace XERCES_CPP_NAMESPACE;
+-
+-    void CreatureControllerManager::writeData(SaveGameFileWriter* writer)
+-    {
+-        /*DOMElement* controllersElem = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(),
+-            getXmlNodeIdentifier().c_str());
+-
+-        std::list&lt;CreatureController*&gt; controllers = getAllCreatureController();
+-
+-        for(std::list&lt;CreatureController*&gt;::const_iterator it_controllers = controllers.begin();
+-            it_controllers != controllers.end(); it_controllers++)
+-        {
+-            DOMElement* controller = writer-&gt;appendChildElement(writer-&gt;getDocument(), controllersElem, &quot;creaturecontroller&quot;);
+-            PropertyMap map = (*it_controllers)-&gt;getAllProperties()-&gt;toPropertyMap();
+-            writer-&gt;writeEachProperty(controller, map);
+-        }*/
+-    }
+-
+-    void CreatureControllerManager::readData(SaveGameFileReader* reader)
+-    {
+-        std::list&lt;CreatureController*&gt; controllers = getAllCreatureController();
+-
+-        for(std::list&lt;CreatureController*&gt;::const_iterator it_controllers = controllers.begin();
+-            it_controllers != controllers.end(); it_controllers++)
+-        {
+-            (*it_controllers)-&gt;refetchCreature();
+-        }
+-        /*reader-&gt;initializeXml();
+-
+-        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
+-
+-        if(rootNodeList-&gt;getLength())
+-        {
+-            DOMNodeList* xmlControllers = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;creaturecontroller&quot;).data()); //there should be only one &quot;gameobjects&quot; node
+-            if(xmlGameObjects-&gt;getLength())
+-            {
+-                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlControllers-&gt;getLength(); childIdx1++)
+-                {
+-                    DOMNode* xmlController = xmlGameObjects-&gt;item(childIdx1);
+-                    if(xmlController-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-                    {
+-                        PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlController));
+-                        applyProperties(object, &amp;properties);
+-                    }
+-                }
+-            }
+-        }  
+-
+-        reader-&gt;shutdownXml();*/
+-    }
+-
+-    int CreatureControllerManager::getPriority() const
+-    {
+-        return 1;
+-    }
+  }
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -311,6 +311,7 @@
+             DOMElement* gameobject = writer-&gt;appendChildElement(writer-&gt;getDocument(), gameobjects, &quot;gameobject&quot;);
+             writer-&gt;setAttributeValueAsInteger(gameobject, &quot;ID&quot;, (*it_gameobjects)-&gt;getId());
+             writer-&gt;setAttributeValueAsString(gameobject, &quot;ClassID&quot;, (*it_gameobjects)-&gt;getClassId());
++            writer-&gt;setAttributeValueAsInteger(gameobject, &quot;State&quot;, (int)(*it_gameobjects)-&gt;getState());
+ 
+             PropertyMap map = (*it_gameobjects)-&gt;getAllProperties()-&gt;toPropertyMap();
+             writer-&gt;writeEachProperty(gameobject, map);
+@@ -337,14 +338,18 @@
+                     {
+                         int ID = reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ID&quot;);
+                         Ogre::String classID = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ClassID&quot;);
++                        GameObjectState state = (GameObjectState)reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;State&quot;);
+                         PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlGameObject));
+                         GameObject* object = createGameObject(classID, ID);
+                         applyProperties(object, &amp;properties);
++                        object-&gt;setState(state);
+                     }
+                 }
+             }
+-        }  
++        } 
+ 
++        MessagePump::getSingleton().sendMessage&lt;MessageType_GameObjectsLoaded&gt;();
++
+         reader-&gt;shutdownXml();
+     }
+ 
+
+Modified: rl/trunk/engine/ui/include/ControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/ControlState.h	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/ui/include/ControlState.h	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -25,6 +25,8 @@
+ #include &lt;OISMouse.h&gt;
+ #include &lt;OISKeyboard.h&gt;
+ 
++#include &lt;SaveGameManager.h&gt;
++
+ namespace rl {
+ 
+     class Actor;
+@@ -38,6 +40,7 @@
+     class _RlUiExport ControlState// : public OIS::KeyListener, public OIS::MouseListener
+     {
+ 	public:
++        static const Ogre::String PROPERTY_CHARACTERID;
+ 
+         /**
+          *  @throw NullPointerException if camera or character is NULL.
+@@ -62,13 +65,15 @@
+         ControlStateType getType() const { return mType;}
+ 
+         static bool startAction(const CeGuiString&amp; actionName, Creature* character = NULL);
+-
++        
++        bool refetchCharacter();
+ 	protected:
+ 
+         /// returns wether cegui currently uses the mouse
+         bool isMouseUsedByCegui() const;
+ 
+         Person* mCharacter;
++        int mCharacterId;
+ 
+         Actor* mCameraActor;
+         Actor* mCharacterActor;
+@@ -79,6 +84,8 @@
+ 		CommandMapper* mCommandMapper;
+ 
+         ControlStateType mType;
++
++        MessagePump::ScopedConnection mMessageType_GameObjectsLoaded_Handler;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/ControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ControlState.cpp	2007-10-14 22:57:42 UTC (rev 3913)
++++ rl/trunk/engine/ui/src/ControlState.cpp	2007-10-16 18:02:11 UTC (rev 3914)
+@@ -24,6 +24,7 @@
+ #include &quot;ActionManager.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &quot;CameraObject.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ #include &quot;CommandMapper.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;Creature.h&quot;
+@@ -38,6 +39,8 @@
+ 
+ namespace rl {
+ 
++    const Ogre::String ControlState::PROPERTY_CHARACTERID = &quot;characterid&quot;;
++
+ 	ControlState::ControlState(CommandMapper* commandMapper,
+         Actor* camera, Person* character, ControlStateType type)
+ 		: mCharacter(character),
+@@ -55,6 +58,11 @@
+ 
+ 		if (mCharacter != NULL)
+ 		{
++            mCharacterId = mCharacter-&gt;getId();
++
++            mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
++                boost::bind(&amp;ControlState::refetchCharacter, this));
++
+             mCharacterActor = mCharacter-&gt;getActor();
+ 
+ 			if (mCharacter != NULL &amp;&amp; mCharacterActor-&gt;_getSceneNode() == NULL)
+@@ -108,7 +116,6 @@
+ 
+     ControlState::~ControlState()
+     {
+-
+     }
+ 
+ 	bool ControlState::startAction(const CeGuiString&amp; actionName, Creature* character)
+@@ -175,4 +182,28 @@
+     {
+         return WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT;
+     }
++
++    bool ControlState::refetchCharacter()
++    {
++        mCharacter = static_cast&lt;Person*&gt;(GameObjectManager::getSingleton().getGameObject(mCharacterId));
++
++        if (mCharacter != NULL)
++		{
++            mCharacterActor = mCharacter-&gt;getActor();
++
++			if (mCharacter != NULL &amp;&amp; mCharacterActor-&gt;_getSceneNode() == NULL)
++			{
++				Throw(IllegalArgumentException,
++					&quot;character has to be placed in the scene beforehand&quot;);
++			}
++            if (mCharacter != NULL &amp;&amp; mCharacterActor-&gt;getPhysicalThing() == NULL)
++			{
++				Throw(IllegalArgumentException,
++					&quot;character must have a physics proxy&quot;);
++			}
++
++			mCharBody = mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody();
++		}
++        return false;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000984.html">[Dsa-hl-svn] r3913 - in rl/trunk/engine: core/src rules/src
+</A></li>
+	<LI>Next message: <A HREF="000986.html">[Dsa-hl-svn] r3915 - modules/kanalisation/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#985">[ date ]</a>
+              <a href="thread.html#985">[ thread ]</a>
+              <a href="subject.html#985">[ subject ]</a>
+              <a href="author.html#985">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

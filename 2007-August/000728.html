@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3657 - modules/common/materials/programs
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3657%20-%20modules/common/materials/programs&In-Reply-To=%3C200708030805.l7385rZ5023852%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000727.html">
+   <LINK REL="Next"  HREF="000729.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3657 - modules/common/materials/programs</H1>
+    <B>pnyx at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3657%20-%20modules/common/materials/programs&In-Reply-To=%3C200708030805.l7385rZ5023852%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3657 - modules/common/materials/programs">pnyx at mail.berlios.de
+       </A><BR>
+    <I>Fri Aug  3 10:05:53 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000727.html">[Dsa-hl-svn] r3656 - modules/ruchin/maps
+</A></li>
+        <LI>Next message: <A HREF="000729.html">[Dsa-hl-svn] r3658 - in modules: common/materials	common/materials/model common/materials/programs	common/models ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#728">[ date ]</a>
+              <a href="thread.html#728">[ thread ]</a>
+              <a href="subject.html#728">[ subject ]</a>
+              <a href="author.html#728">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: pnyx
+Date: 2007-08-03 10:05:47 +0200 (Fri, 03 Aug 2007)
+New Revision: 3657
+
+Modified:
+   modules/common/materials/programs/TerrainVColorBlending.material
+   modules/common/materials/programs/TerrainVColorBlending_Vertex_Shader.program.source
+   modules/common/materials/programs/Torso_Vertex_Shader.source
+Log:
+added hemisphere lightingmodell for Terrainshader
+
+Modified: modules/common/materials/programs/TerrainVColorBlending.material
+===================================================================
+--- modules/common/materials/programs/TerrainVColorBlending.material	2007-08-02 20:38:42 UTC (rev 3656)
++++ modules/common/materials/programs/TerrainVColorBlending.material	2007-08-03 08:05:47 UTC (rev 3657)
+@@ -47,10 +47,11 @@
+ 				param_named_auto Light_Position0 light_position 0
+ 				param_named_auto Light_Position1 light_position 1
+ 
++				param_named skycolor float4 0.5 0.5 0.5 1.0
++				param_named groundcolor float4 0.10 0.10 0.10 1.0
+ 				
+ 				
+ 				
+-				
+ 				param_named scale_Texture0 float 0.018000 // Schwarz
+ 				param_named scale_Detail0 float 0.020000
+ 
+
+Modified: modules/common/materials/programs/TerrainVColorBlending_Vertex_Shader.program.source
+===================================================================
+--- modules/common/materials/programs/TerrainVColorBlending_Vertex_Shader.program.source	2007-08-02 20:38:42 UTC (rev 3656)
++++ modules/common/materials/programs/TerrainVColorBlending_Vertex_Shader.program.source	2007-08-03 08:05:47 UTC (rev 3657)
+@@ -20,7 +20,10 @@
+ uniform float4 Light_Position1;
+ uniform float4 Light_Attenuation1;
+ 
++float4 skycolor;
++float4 groundcolor;
+ 
++
+ struct VS_OUTPUT 
+ {
+    float4 Position : POSITION0;
+@@ -75,7 +78,7 @@
+    
+    
+    // Light Output
+-   Output.Light = (Light_Ambient-0.5 + ((Light_Color0 * DistAttn0 * AngleAttn0) + (Light_Color1 * DistAttn1 * AngleAttn1))*1.25);
++   Output.Light =lerp(skycolor,groundcolor,(dot(Normal, float3(0,-1,0))+1)/2 ) +(Light_Ambient-0.5 + ((Light_Color0 * DistAttn0 * AngleAttn0) + (Light_Color1 * DistAttn1 * AngleAttn1))*1.25);
+    
+    return( Output );
+    
+
+Modified: modules/common/materials/programs/Torso_Vertex_Shader.source
+===================================================================
+--- modules/common/materials/programs/Torso_Vertex_Shader.source	2007-08-02 20:38:42 UTC (rev 3656)
++++ modules/common/materials/programs/Torso_Vertex_Shader.source	2007-08-03 08:05:47 UTC (rev 3657)
+@@ -69,7 +69,6 @@
+    
+    Output.Color += (Light1_color * AngleAttn + SpecAttn) * DistAttn ;
+    
+-   
+    // Light3
+    
+    LightDir = Light3_position - Input.Position * Light3_position.w;
+@@ -90,7 +89,6 @@
+    
+    Output.Color += (Light3_color * AngleAttn + SpecAttn) * DistAttn ;
+    
+-   
+    // Light2
+    
+    LightDir = Light2_position - Input.Position * Light2_position.w;
+@@ -109,13 +107,15 @@
+                         ,0,1);
+    
+    Output.Color += (Light2_color * AngleAttn + SpecAttn) * DistAttn ;
+-   
++
+    // fake SSS
+-   Output.SubColor = lerp((subsurfcolor*Output.Color),Output.Color,( saturate(abs(Output.Color*3 -0.2))));
++   Output.SubColor = lerp((subsurfcolor*Output.Color),Output.Color,(saturate(abs(Output.Color*3 -0.2))));
+    
+-   Output.Color += lerp(skycolor,groundcolor,(dot(Input.Normal, float3(0,-1,0))+1)/2 );
+-   Output.SubColor += lerp(skycolor,groundcolor,(dot(Input.Normal, float3(0,-1,0))+1)/2 );
+    
++   float4 ambient= lerp(skycolor,groundcolor,(dot(Input.Normal, float3(0,-1,0))+1)/2 );
++   Output.Color += ambient;
++   Output.SubColor += ambient;;
++   
+    Output.Texcoord = Input.Texcoord;
+    Output.Texcoord1 = Input.Texcoord1;
+    Output.Texcoord2 = Input.Texcoord2;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000727.html">[Dsa-hl-svn] r3656 - modules/ruchin/maps
+</A></li>
+	<LI>Next message: <A HREF="000729.html">[Dsa-hl-svn] r3658 - in modules: common/materials	common/materials/model common/materials/programs	common/models ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#728">[ date ]</a>
+              <a href="thread.html#728">[ thread ]</a>
+              <a href="subject.html#728">[ subject ]</a>
+              <a href="author.html#728">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,233 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3899 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3899%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200710111937.l9BJb64e004521%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000970.html">
+   <LINK REL="Next"  HREF="000971.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3899 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3899%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200710111937.l9BJb64e004521%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3899 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Oct 11 21:37:06 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000970.html">[Dsa-hl-svn] r3898 - modules/kanalisation/materials/textures
+</A></li>
+        <LI>Next message: <A HREF="000971.html">[Dsa-hl-svn] r3900 - in modules/kanalisation/materials: . textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#969">[ date ]</a>
+              <a href="thread.html#969">[ thread ]</a>
+              <a href="subject.html#969">[ subject ]</a>
+              <a href="author.html#969">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-11 21:36:57 +0200 (Thu, 11 Oct 2007)
+New Revision: 3899
+
+Modified:
+   rl/trunk/engine/rules/include/QuestListener.h
+   rl/trunk/engine/rules/src/QuestBook.cpp
+   rl/trunk/engine/rules/src/QuestListener.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/ui/include/InfoPopup.h
+   rl/trunk/engine/ui/include/JournalWindow.h
+   rl/trunk/engine/ui/src/InfoPopup.cpp
+   rl/trunk/engine/ui/src/JournalWindow.cpp
+Log:
+added journalEntryDeleted event
+
+Modified: rl/trunk/engine/rules/include/QuestListener.h
+===================================================================
+--- rl/trunk/engine/rules/include/QuestListener.h	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/rules/include/QuestListener.h	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -46,6 +46,7 @@
+ 	virtual void questSubquestAdded(QuestEvent* anEvent) = 0;
+ 
+ 	virtual void journalEntryAdded(JournalEvent* anEvent) = 0;
++    virtual void journalEntryDeleted(JournalEvent* anEvent) = 0;
+ };
+ 
+ }
+
+Modified: rl/trunk/engine/rules/src/QuestBook.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -207,6 +207,7 @@
+                 if (!quest)
+                 {
+                     quest = new Quest(id);
++                    addQuest(quest);
+                 }
+                
+                 quest-&gt;setProperties(curVal);
+@@ -224,7 +225,6 @@
+ 
+                 addJournalEntry(caption.toString(), text.toString());
+             }
+-            ///@todo implement journal properties
+         }
+         else
+         {
+@@ -267,6 +267,8 @@
+ 
+     void QuestBook::writeData(SaveGameFileWriter *writer)
+     {
++        LOG_MESSAGE(Logger::RULES, &quot;Saving questbook&quot;);
++
+         DOMElement* quests = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+ 
+         PropertySet* set = getAllProperties();
+@@ -275,6 +277,8 @@
+ 
+     void QuestBook::readData(SaveGameFileReader* reader)
+     {
++        LOG_MESSAGE(Logger::RULES, &quot;Loading questbook&quot;);
++
+         clear();
+         reader-&gt;initializeXml();
+ 
+@@ -295,12 +299,13 @@
+     {
+         delete mRootQuest;
+         for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
+-            it != mJournalEntries.end(); it++ )
++            it != mJournalEntries.end(); )
+         {
+-            fireJournalChanged(*it, JournalEvent::JOURNAL_ENTRY_DELETED);
+-            delete *it;
++            JournalEntry* entry = *it;
++            it = mJournalEntries.erase(it);
++            fireJournalChanged(entry, JournalEvent::JOURNAL_ENTRY_DELETED);
++            delete entry;
+         }
+-        mJournalEntries.clear();
+ 
+         createRoot();
+     }
+
+Modified: rl/trunk/engine/rules/src/QuestListener.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestListener.cpp	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/rules/src/QuestListener.cpp	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -46,6 +46,10 @@
+         {
+             journalEntryAdded(evt);
+         }
++        if (evt-&gt;getReason() == JournalEvent::JOURNAL_ENTRY_DELETED)
++        {
++            journalEntryDeleted(evt);
++        }
+ 
+         // consumed or not
+         return false;
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -142,6 +142,7 @@
+         virtual void questKnownChanged(rl::QuestEvent* anEvent) = 0;
+         virtual void questSubquestAdded(rl::QuestEvent* anEvent) = 0;
+         virtual void journalEntryAdded(rl::JournalEvent* anEvent) = 0;
++        virtual void journalEntryDeleted(rl::JournalEvent* anEvent) = 0;
+     };
+ 
+     class JournalEntry
+
+Modified: rl/trunk/engine/ui/include/InfoPopup.h
+===================================================================
+--- rl/trunk/engine/ui/include/InfoPopup.h	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/ui/include/InfoPopup.h	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -41,6 +41,7 @@
+         void questSubquestAdded(QuestEvent* anEvent);
+ 
+         void journalEntryAdded(JournalEvent* anEvent);
++        void journalEntryDeleted(JournalEvent* anEvent);
+     private:
+         static const int ICON_SPACING = 5;
+ 
+
+Modified: rl/trunk/engine/ui/include/JournalWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/JournalWindow.h	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/ui/include/JournalWindow.h	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -34,6 +34,7 @@
+         virtual void questKnownChanged(QuestEvent* anEvent);
+         virtual void questSubquestAdded(QuestEvent* anEvent);
+         virtual void journalEntryAdded(JournalEvent* anEvent);
++        virtual void journalEntryDeleted(JournalEvent* anEvent);
+ 
+     private:
+         CEGUI::Listbox* mQuests;
+
+Modified: rl/trunk/engine/ui/src/InfoPopup.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InfoPopup.cpp	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/ui/src/InfoPopup.cpp	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -112,4 +112,8 @@
+ 		showQuestBookChange();
+     }
+ 
++    void InfoPopup::journalEntryDeleted(JournalEvent *anEvent)
++    {
++        showQuestBookChange();
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/JournalWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/JournalWindow.cpp	2007-10-11 19:36:39 UTC (rev 3898)
++++ rl/trunk/engine/ui/src/JournalWindow.cpp	2007-10-11 19:36:57 UTC (rev 3899)
+@@ -103,6 +103,11 @@
+         updateJournal();
+     }
+ 
++    void JournalWindow::journalEntryDeleted(JournalEvent* anEvent)
++    {
++        updateJournal();
++    }
++
+     void JournalWindow::updateJournal()
+     {
+         mJournalEntries-&gt;clearAllSelections();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000970.html">[Dsa-hl-svn] r3898 - modules/kanalisation/materials/textures
+</A></li>
+	<LI>Next message: <A HREF="000971.html">[Dsa-hl-svn] r3900 - in modules/kanalisation/materials: . textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#969">[ date ]</a>
+              <a href="thread.html#969">[ thread ]</a>
+              <a href="subject.html#969">[ subject ]</a>
+              <a href="author.html#969">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

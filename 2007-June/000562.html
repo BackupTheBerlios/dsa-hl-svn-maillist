@@ -1,0 +1,226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3491 - in rl/trunk/engine: core/include core/src	rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3491%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200706021356.l52DuTA4023784%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000561.html">
+   <LINK REL="Next"  HREF="000563.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3491 - in rl/trunk/engine: core/include core/src	rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3491%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200706021356.l52DuTA4023784%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3491 - in rl/trunk/engine: core/include core/src	rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Jun  2 15:56:29 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000561.html">[Dsa-hl-svn] r3490 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="000563.html">[Dsa-hl-svn] r3492 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#562">[ date ]</a>
+              <a href="thread.html#562">[ thread ]</a>
+              <a href="subject.html#562">[ subject ]</a>
+              <a href="author.html#562">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-06-02 15:56:06 +0200 (Sat, 02 Jun 2007)
+New Revision: 3491
+
+Modified:
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+Update physics proxy after merging
+
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2007-06-02 13:53:46 UTC (rev 3490)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2007-06-02 13:56:06 UTC (rev 3491)
+@@ -126,6 +126,7 @@
+         void setMass(Ogre::Real mass);
+ 
+ 		void createPhysicsProxy(Ogre::SceneNode* node);
++        void updatePhysicsProxy();
+ 
+         /** Called to update the collision of the physical thing, in order to adapt
+          *  to a new animation state.
+@@ -211,6 +212,8 @@
+ 		 */
+ 		GeometryType getGeometryType() const;
+ 		void setBody(OgreNewt::Body* body);
++
++        OgreNewt::CollisionPtr createCollision(PhysicalObject* po, Ogre::Vector3&amp; inertia) const;
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-06-02 13:53:46 UTC (rev 3490)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-06-02 13:56:06 UTC (rev 3491)
+@@ -377,38 +377,9 @@
+ 	{
+ 		if (mBody == NULL) 
+ 		{
+-            OgreNewt::CollisionPtr coll;
+             Vector3 inertia;
++            OgreNewt::CollisionPtr coll = createCollision(mPhysicalObject, inertia);
+ 
+-            // there is a difference between a meshobject and a 'normal' object
+-            // because a meshobject has got a mesh entity and therefore a it is
+-            // likely that there will be more than one object with those collision 
+-            // primitives, so they need to get cached.
+-
+-            if (mPhysicalObject-&gt;isMeshObject())
+-            {
+-                Entity* entity = dynamic_cast&lt;MeshObject*&gt;(mPhysicalObject)-&gt;getEntity();
+-                coll = PhysicsManager::getSingleton().createCollision(
+-                    entity,
+-                    mGeometryType,
+-                    &quot;&quot;,
+-                    NULL,
+-                    NULL,
+-                    mMass,
+-                    &amp;inertia);
+-            }
+-            else
+-            {
+-                const AxisAlignedBox&amp; aabb = mPhysicalObject-&gt;getDefaultSize();
+-                coll = PhysicsManager::getSingleton().getCollisionFactory()-&gt;createCollisionFromAABB(
+-                    aabb,
+-                    mGeometryType,
+-                    NULL,
+-                    NULL,
+-                    mMass,
+-                    &amp;inertia);
+-            }
+-
+ 			OgreNewt::Body* body = new OgreNewt::Body(
+                 PhysicsManager::getSingleton()._getNewtonWorld(), coll);
+ 
+@@ -424,6 +395,59 @@
+         }
+ 	}
+ 
++    OgreNewt::CollisionPtr PhysicalThing::createCollision(PhysicalObject* po, Vector3&amp; inertia) const
++    {
++        OgreNewt::CollisionPtr coll;
++
++        // there is a difference between a meshobject and a 'normal' object
++        // because a meshobject has got a mesh entity and therefore a it is
++        // likely that there will be more than one object with those collision 
++        // primitives, so they need to get cached.
++
++        if (mPhysicalObject-&gt;isMeshObject())
++        {
++            Entity* entity = static_cast&lt;MeshObject*&gt;(mPhysicalObject)-&gt;getEntity();
++            coll = PhysicsManager::getSingleton().createCollision(
++                entity,
++                mGeometryType,
++                &quot;&quot;,
++                NULL,
++                NULL,
++                mMass,
++                &amp;inertia);
++        }
++        else
++        {
++            const AxisAlignedBox&amp; aabb = mPhysicalObject-&gt;getDefaultSize();
++            coll = PhysicsManager::getSingleton().getCollisionFactory()-&gt;createCollisionFromAABB(
++                aabb,
++                mGeometryType,
++                NULL,
++                NULL,
++                mMass,
++                &amp;inertia);
++        }
++
++        return coll;
++    }
++
++    void PhysicalThing::updatePhysicsProxy()
++    {
++        if (mBody)
++        {
++            mPoseCollisions.clear();
++
++            Vector3 inertia;
++            
++            // update the collision
++		    mBody-&gt;setCollision(createCollision(mPhysicalObject, inertia));
++		    if (mMass &gt; 0.0 &amp;&amp; mGeometryType != GT_MESH)
++            {
++                mBody-&gt;setMassMatrix(mMass, inertia);
++            }
++        }
++    }
++
+     PhysicsController* PhysicalThing::getPhysicsController() const
+     {
+         return mPhysicsController;
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-06-02 13:53:46 UTC (rev 3490)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-06-02 13:56:06 UTC (rev 3491)
+@@ -20,6 +20,7 @@
+ #include &quot;Item.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;MergeableMeshObject.h&quot;
++#include &quot;PhysicalThing.h&quot;
+ 
+ namespace rl {
+ 
+@@ -118,6 +119,12 @@
+ 					}
+ 				}
+ 			}
++
++            if (mOwner-&gt;getActor() 
++                &amp;&amp; mOwner-&gt;getActor()-&gt;getPhysicalThing())
++            {
++                mOwner-&gt;getActor()-&gt;getPhysicalThing()-&gt;updatePhysicsProxy();
++            }
+ 		}
+     }
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000561.html">[Dsa-hl-svn] r3490 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="000563.html">[Dsa-hl-svn] r3492 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#562">[ date ]</a>
+              <a href="thread.html#562">[ thread ]</a>
+              <a href="subject.html#562">[ subject ]</a>
+              <a href="author.html#562">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

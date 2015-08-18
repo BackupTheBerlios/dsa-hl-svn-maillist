@@ -1,0 +1,1585 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3578 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3578%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707022023.l62KNhJB010058%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000648.html">
+   <LINK REL="Next"  HREF="000650.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3578 - rl/trunk/engine/rules/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3578%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707022023.l62KNhJB010058%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3578 - rl/trunk/engine/rules/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Jul  2 22:23:43 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000648.html">[Dsa-hl-svn] r3577 - rl/trunk/engine/rules/include
+</A></li>
+        <LI>Next message: <A HREF="000650.html">[Dsa-hl-svn] r3579 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#649">[ date ]</a>
+              <a href="thread.html#649">[ thread ]</a>
+              <a href="subject.html#649">[ subject ]</a>
+              <a href="author.html#649">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-07-02 22:23:38 +0200 (Mon, 02 Jul 2007)
+New Revision: 3578
+
+Added:
+   rl/trunk/engine/rules/src/CreatureController.cpp
+Removed:
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+Renamed remotely
+
+Copied: rl/trunk/engine/rules/src/CreatureController.cpp (from rev 3577, rl/trunk/engine/rules/src/MovingCreature.cpp)
+
+Deleted: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-07-02 20:22:12 UTC (rev 3577)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-07-02 20:23:38 UTC (rev 3578)
+@@ -1,1505 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Perl Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Perl Artistic License for more details.
+-*
+-*  You should have received a copy of the Perl Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+-*/
+-
+-
+-#include &quot;Actor.h&quot;
+-#include &quot;Creature.h&quot;
+-#include &quot;DsaManager.h&quot;
+-#include &quot;MeshAnimation.h&quot;
+-#include &quot;MeshObject.h&quot;
+-#include &quot;MovingCreature.h&quot;
+-#include &quot;MovingCreatureManager.h&quot;
+-#include &quot;PhysicsManager.h&quot;
+-#include &quot;PhysicalThing.h&quot;
+-
+-
+-
+-
+-using namespace Ogre;
+-using namespace std;
+-
+-namespace rl
+-{
+-
+-    class Stehen : public AbstractMovement
+-    {
+-    public:
+-        Stehen(MovingCreature *creature) : AbstractMovement(creature), mVelocity(Vector3::ZERO), mRotationMovement(NULL) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_STEHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            getRotationMovement()-&gt;activate();
+-        }
+-        virtual void deactivate()
+-        {
+-            AbstractMovement::deactivate();
+-            getRotationMovement()-&gt;deactivate();
+-        }
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = 0.0f; 
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_DEAD | Effect::STATUS_UNCONSCIOUS | Effect::STATUS_SLEEPING));
+-        }
+-        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
+-        {
+-            getRotationMovement()-&gt;calculateForceAndTorque(force, torque, timestep);
+-
+-            Real mass;
+-            Vector3 inertia;
+-            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-            Vector3 vel = mMovingCreature-&gt;getVelocity();
+-            Real delay = 0.05;//(2 * PhysicsManager::getSingleton().getMaxTimestep());
+-            if(vel.squaredLength() &gt; mVelocity.squaredLength())
+-                delay *= 1.5;
+-            force = mass * (mVelocity - vel) / delay;
+-            force.y = 0;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            direction.normalise();
+-            Real velocity;
+-            calculateBaseVelocity(velocity);
+-            mVelocity = direction * velocity;
+-            applyAuChanges(elapsedTime);
+-            setAnimation(elapsedTime);
+-            if( getRotationMovement()-&gt;isPossible() )
+-                return getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
+-            return false;
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            Real omegaY = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega().y;
+-            if( omegaY &gt; Degree(20).valueRadians() )
+-                mMovingCreature-&gt;setAnimation(&quot;drehen_links&quot;);
+-            else
+-            {
+-                if( omegaY &lt; Degree(-20).valueRadians() )
+-                    mMovingCreature-&gt;setAnimation(&quot;drehen_rechts&quot;);
+-                else
+-                    mMovingCreature-&gt;setAnimation(&quot;Idle&quot;);                            
+-            }
+-        }
+-        virtual void applyAuChanges(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;getCreature()-&gt;regenerateAu(2, 0.5, elapsedTime);
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction = Vector3::ZERO;
+-            return oldDirection == Vector3::ZERO;
+-        }
+-        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+-        {
+-            return getRotationMovement()-&gt;isRotationPossible(rotation);
+-        }
+-    protected:
+-        Ogre::Vector3 mVelocity;
+-        mutable AbstractMovement *mRotationMovement;
+-        virtual AbstractMovement* getRotationMovement() const
+-        {
+-            if( mRotationMovement == NULL)
+-            {                
+-                mRotationMovement = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
+-            }
+-            if( mRotationMovement == NULL )
+-            {
+-                Throw(NullPointerException, &quot;Konnte Movement mit der Id MT_STEHEN_DREHEN nicht finden.&quot;);
+-            }
+-            return mRotationMovement;
+-        }
+-    };
+-
+-    class Drehen : public AbstractMovement
+-    {
+-    public:
+-        Drehen(MovingCreature *creature) : AbstractMovement(creature), mYaw(0)
+-        {
+-            mRotLinearSpringK = 600.0f;
+-            Real relationCoefficient = 1.0f;
+-            mRotLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mRotLinearSpringK);
+-        }
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_DREHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = 0.3f;
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR;// &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+-        }
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            mYaw = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getWorldOrientation().getYaw();
+-        }
+-        virtual void deactivate()
+-        {
+-            AbstractMovement::deactivate();
+-        }
+-        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
+-        {
+-            Real mass;
+-            Vector3 inertia;
+-            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-            Quaternion orientation;
+-            Vector3 position;
+-            body-&gt;getPositionOrientation(position, orientation);
+-            // Calculate angular velocity
+-            // We first need the yaw rotation from actual yaw to desired yaw
+-            Vector3 src = orientation*Vector3::UNIT_Z;
+-            src.y = 0;
+-            Vector3 dst = Quaternion(mYaw, Vector3::UNIT_Y)*Vector3::UNIT_Z;
+-            dst.y = 0;
+-            Radian yaw = src.getRotationTo(dst, Vector3::UNIT_Y).getYaw();
+-
+-            // using a spring system to apply the rotation
+-            Vector3 diff = Vector3(0, yaw.valueRadians(), 0);
+-            Vector3 omega = body-&gt;getOmega();
+-            omega.x = omega.z = 0;
+-            Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+-
+-            /// @ todo change this
+-            torque = springAcc * inertia; // this would be correct
+-            //torque = springAcc * mass * 40;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            mYaw += Radian(rotation.y);
+-            while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+-            while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+-            
+-            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-            Quaternion orientation;
+-            Vector3 position;
+-            body-&gt;getPositionOrientation(position, orientation);
+-
+-            return orientation.getYaw() != mYaw;
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction = Vector3::ZERO;
+-            return oldDirection == Vector3::ZERO;
+-        }
+-        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+-        {
+-            Vector3 oldRotation(rotation);
+-            rotation.x = rotation.z = 0;
+-            return oldRotation.x == 0 &amp;&amp; oldRotation.z == 0;
+-        }
+-    protected:
+-        Ogre::Radian mYaw;
+-        Ogre::Real mRotLinearDampingK, mRotLinearSpringK;
+-        virtual Real getMovementDefinedValue() {return mYaw.valueRadians();}
+-    };
+-
+-
+-    class Gehen : public Stehen
+-    {
+-    public:
+-        Gehen(MovingCreature *creature) : Stehen(creature) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_GEHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 3.6f * 0.7f; 
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp; 
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; Effect::STATUS_IMMOBILE);
+-        }
+-        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            Stehen::run(elapsedTime, direction, rotation);
+-            return true;
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction.x = direction.y = 0;
+-            if( direction.z &gt; 0 )
+-                direction.z = 0;
+-            return oldDirection.x == 0 &amp;&amp; oldDirection.y == 0 &amp;&amp; oldDirection.z &gt; 0;
+-        }
+-        virtual void applyAuChanges(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;getCreature()-&gt;regenerateAu(2, 0.5, elapsedTime);
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            Real step = 1.49; // the width of a step
+-            //MeshObject* charMesh = dynamic_cast&lt;MeshObject*&gt;(mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getControlledObject());
+-            //Real length = charMesh-&gt;getAnimation(&quot;Run&quot;)-&gt;getLength();
+-            Real length = 5./3.;
+-            Real weight = 1;
+-            Real relTimeOffset = 0;
+-            
+-            switch( mMovingCreature-&gt;getLastMovementType() )
+-            {
+-            case MovingCreature::MT_NONE:
+-                break;
+-            case MovingCreature::MT_STEHEN:
+-                relTimeOffset = 0.25;
+-                break;
+-            case MovingCreature::MT_JOGGEN:
+-            case MovingCreature::MT_LAUFEN:
+-            case MovingCreature::MT_RENNEN:
+-                relTimeOffset = mMovingCreature-&gt;getAnimationTimePlayed();
+-                if( mMovingCreature-&gt;getLastMovementChange() &lt; 1.0f )
+-                    weight = mMovingCreature-&gt;getLastMovementChange() / 1.0f;
+-                break;
+-            default:
+-                break;
+-            }
+-
+-
+-            // apply relTimeOffset only once
+-            if( mMovingCreature-&gt;getLastMovementChange() &gt; elapsedTime )
+-                relTimeOffset = 0;
+-
+-            MeshAnimation *meshAnim = mMovingCreature-&gt;setAnimation(&quot;Walk&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length), 0, &quot;Walk&quot;, weight );
+-            if( meshAnim != NULL )
+-                meshAnim-&gt;doAddTime(relTimeOffset*meshAnim-&gt;getLength());
+-        }
+-    };
+-
+-    class Joggen : public Gehen
+-    {
+-    public:
+-        Joggen(MovingCreature *creature) : Gehen(creature) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_JOGGEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_GEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 2.8f; 
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            return Gehen::isPossible() &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
+-        }
+-        virtual void applyAuChanges(Ogre::Real elapsedTime) {} // empty
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            Real step = 2.835; // the width of a step
+-            // if the persons runs, the feet don't touch always the ground, so this value must be bigger
+-            // trynerror:
+-            step += 0.5;
+-            //MeshObject* charMesh = dynamic_cast&lt;MeshObject*&gt;(mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getControlledObject());
+-            //Real length = charMesh-&gt;getAnimation(&quot;Run&quot;)-&gt;getLength();
+-            Real length = 5./3.;
+-            Real weight = 1;
+-            Real relTimeOffset = 0;
+-
+-
+-            switch( mMovingCreature-&gt;getLastMovementType() )
+-            {
+-            case MovingCreature::MT_NONE:
+-                break;
+-            case MovingCreature::MT_STEHEN:
+-                relTimeOffset = 0.25;
+-                break;
+-            case MovingCreature::MT_GEHEN:
+-                relTimeOffset = mMovingCreature-&gt;getAnimationTimePlayed();
+-                if( mMovingCreature-&gt;getLastMovementChange() &lt; 0.5f )
+-                    weight = mMovingCreature-&gt;getLastMovementChange() / 0.5f;
+-                break;
+-            default:
+-                break;
+-            }
+-
+-            // apply relTimeOffset only once
+-            if( mMovingCreature-&gt;getLastMovementChange() &gt; elapsedTime )
+-                relTimeOffset = 0;
+-
+-            MeshAnimation *meshAnim = mMovingCreature-&gt;setAnimation(&quot;Run&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length), 0, &quot;Run&quot;, weight );
+-            if( meshAnim != NULL )
+-                meshAnim-&gt;doAddTime(relTimeOffset*meshAnim-&gt;getLength());
+-        }
+-    };
+-
+-    class Laufen : public Gehen
+-    {
+-    public:
+-        Laufen(MovingCreature *creature) : Gehen(creature), mTimePerAu(1), mLastProbe(0) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_LAUFEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_JOGGEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 2.0f; 
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            if( mMovingCreature-&gt;getMovement() == this )
+-                return Gehen::isPossible() &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
+-            else
+-                return Gehen::isPossible() &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            doTalentProbeIfNecessary();
+-            return Gehen::run(elapsedTime, direction, rotation);
+-        }
+-        virtual void applyAuChanges(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;getCreature()-&gt;damageAu(elapsedTime/mTimePerAu);
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            Real step = 2.835; // the width of a step
+-            // if the persons runs, the feet don't touch always the ground, so this value must be bigger
+-            // trynerror:
+-            step += 0.5;
+-            //MeshObject* charMesh = dynamic_cast&lt;MeshObject*&gt;(mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getControlledObject());
+-            //Real length = charMesh-&gt;getAnimation(&quot;Run&quot;)-&gt;getLength();
+-            Real length = 5./3.;
+-            Real weight = 1;
+-            Real relTimeOffset = 0;
+-
+-
+-            switch( mMovingCreature-&gt;getLastMovementType() )
+-            {
+-            case MovingCreature::MT_NONE:
+-                break;
+-            case MovingCreature::MT_STEHEN:
+-                relTimeOffset = 0.25;
+-                break;
+-            case MovingCreature::MT_GEHEN:
+-                relTimeOffset = mMovingCreature-&gt;getAnimationTimePlayed();
+-                if( mMovingCreature-&gt;getLastMovementChange() &lt; 0.5f )
+-                    weight = mMovingCreature-&gt;getLastMovementChange() / 0.5f;
+-                break;
+-            default:
+-                break;
+-            }
+-
+-            // apply relTimeOffset only once
+-            if( mMovingCreature-&gt;getLastMovementChange() &gt; elapsedTime )
+-                relTimeOffset = 0;
+-
+-            MeshAnimation *meshAnim = mMovingCreature-&gt;setAnimation(&quot;Run&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length), 0, &quot;Run&quot;, weight );
+-            if( meshAnim != NULL )
+-                meshAnim-&gt;doAddTime(relTimeOffset*meshAnim-&gt;getLength());
+-        }
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            doTalentProbeIfNecessary();
+-        }
+-        virtual void doTalentProbeIfNecessary()
+-        {
+-            Date now = DsaManager::getSingleton().getCurrentDate();
+-            if( mLastProbe + Date::ONE_SPIELRUNDE &gt;= now || mLastProbe == 0 )
+-            {
+-                mTimePerAu = 180;
+-                try
+-                {
+-                    mLastProbe = now;
+-                    int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;,0);
+-                    if( taw == RESULT_AUTOERFOLG )
+-                    {
+-                        mTimePerAu += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 5;
+-                    }
+-                    else if( taw == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        mTimePerAu += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 10;
+-                    }
+-                    else
+-                    {
+-                        mTimePerAu += taw * 5;
+-                    }
+-                }
+-                catch(OutOfRangeException)
+-                {
+-                    mTimePerAu = 180;
+-                }
+-            }
+-        }
+-    protected:
+-        Real mTimePerAu;
+-        Date mLastProbe;
+-    };
+-
+-
+-    class Rennen : public Gehen
+-    {
+-    public:
+-        Rennen(MovingCreature *creature) : Gehen(creature), mVelocityImprovement(0), mLastProbe(0) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RENNEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_LAUFEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS(); 
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            if( mMovingCreature-&gt;getMovement() == this )
+-                return Gehen::isPossible() &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax() * 0.3 &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
+-            else
+-                return Gehen::isPossible() &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax() * 0.5 &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            doTalentProbeIfNecessary();
+-            bool ret = Gehen::run(elapsedTime, direction, rotation);
+-            mVelocity += mVelocityImprovement;
+-            return ret;
+-        }
+-        virtual void applyAuChanges(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;getCreature()-&gt;damageAu(elapsedTime/1.5);
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            Real step = 2.835; // the width of a step
+-            // if the persons runs, the feet don't touch always the ground, so this value must be bigger
+-            // trynerror:
+-            step += 1.5;
+-            //MeshObject* charMesh = dynamic_cast&lt;MeshObject*&gt;(mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getControlledObject());
+-            //Real length = charMesh-&gt;getAnimation(&quot;Run&quot;)-&gt;getLength();
+-            Real length = 5./3.;
+-            Real weight = 1;
+-            Real relTimeOffset = 0;
+-
+-
+-            switch( mMovingCreature-&gt;getLastMovementType() )
+-            {
+-            case MovingCreature::MT_NONE:
+-                break;
+-            case MovingCreature::MT_STEHEN:
+-                relTimeOffset = 0.25;
+-                break;
+-            case MovingCreature::MT_GEHEN:
+-                relTimeOffset = mMovingCreature-&gt;getAnimationTimePlayed();
+-                if( mMovingCreature-&gt;getLastMovementChange() &lt; 0.5f )
+-                    weight = mMovingCreature-&gt;getLastMovementChange() / 0.5f;
+-                break;
+-            default:
+-                break;
+-            }
+-
+-            // apply relTimeOffset only once
+-            if( mMovingCreature-&gt;getLastMovementChange() &gt; elapsedTime )
+-                relTimeOffset = 0;
+-
+-            MeshAnimation *meshAnim = mMovingCreature-&gt;setAnimation(&quot;Run&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length), 0, &quot;Run&quot;, weight );
+-            if( meshAnim != NULL )
+-                meshAnim-&gt;doAddTime(relTimeOffset*meshAnim-&gt;getLength());
+-        }
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            doTalentProbeIfNecessary();
+-        }
+-        virtual void doTalentProbeIfNecessary()
+-        {
+-            Date now = DsaManager::getSingleton().getCurrentDate();
+-            if( mLastProbe + mMovingCreature-&gt;getCreature()-&gt;getAuMax() * Date::ONE_SECOND &gt;= now || mLastProbe == 0)
+-            {
+-                mVelocityImprovement = 0;
+-                try
+-                {
+-                    mLastProbe = now;
+-                    int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;,0);
+-                    if( taw == RESULT_AUTOERFOLG )
+-                    {
+-                        mVelocityImprovement += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 0.2;
+-                    }
+-                    else if( taw == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        mVelocityImprovement += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 0.3;
+-                    }
+-                    else
+-                    {
+-                        mVelocityImprovement += taw * 0.1;
+-                    }
+-                }
+-                catch(OutOfRangeException)
+-                {
+-                    mVelocityImprovement = 0;
+-                }
+-            }
+-        }
+-    protected:
+-        Real mVelocityImprovement;
+-        Date mLastProbe;
+-    };
+-
+-    class RueckwaertsGehen : public Gehen
+-    {
+-    public:
+-        RueckwaertsGehen(MovingCreature *creature) : Gehen(creature) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RUECKWAERTS_GEHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 4.0; 
+-            return isPossible();
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;setAnimation(&quot;gehen_rueckwaerts&quot;);
+-        }
+-    };
+-
+-    class RueckwaertsJoggen : public Joggen
+-    {
+-    public:
+-        RueckwaertsJoggen(MovingCreature *creature) : Joggen(creature) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RUECKWAERTS_JOGGEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_RUECKWAERTS_GEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 3.2; 
+-            return isPossible();
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            mMovingCreature-&gt;setAnimation(&quot;Run&quot;);
+-        }
+-    };
+-
+-
+-    class SeitwaertsGehen : public Gehen
+-    {
+-    public:
+-        SeitwaertsGehen(MovingCreature *creature) : Gehen(creature), mLeft(true) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_SEITWAERTS_GEHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 4.0; 
+-            return isPossible();
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction.z = direction.y = 0;
+-            return oldDirection.z == 0 &amp;&amp; oldDirection.y == 0;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            mLeft = direction.x &lt; 0;
+-            return Gehen::run(elapsedTime, direction, rotation);
+-        }
+-        virtual void setAnimation(Ogre::Real elapsedTime)
+-        {
+-            if( mLeft )
+-                mMovingCreature-&gt;setAnimation(&quot;seitwaerts_links&quot;);
+-            else
+-                mMovingCreature-&gt;setAnimation(&quot;seitwaerts_rechts&quot;);
+-        }
+-    protected:
+-        bool mLeft;
+-    };
+-
+-    class Schleichen : public Gehen
+-    {
+-    public:
+-        Schleichen(MovingCreature *creature) : Gehen(creature), mState(UP), mTimer(0) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_SCHLEICHEN;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = mMovingCreature-&gt;getCurrentGS() / 6.0; 
+-            return isPossible();
+-        }
+-        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            if( mState == UPTODOWN )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt; 0.5f )
+-                    mState = DOWN;
+-            }
+-            if( mState == UP )
+-            {
+-                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
+-            }
+-            if( mState == DOWNTOUP )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt; 0.5f )
+-                    mState = UP;
+-            }
+-            if( mState == DOWN )
+-            {
+-                setAnimation(elapsedTime);
+-                direction.normalise();
+-                Real velocity;
+-                calculateBaseVelocity(velocity);
+-                mVelocity = direction * velocity;
+-                if( direction == Vector3::ZERO )
+-                    mMovingCreature-&gt;setAnimation(&quot;hocke_idle&quot;);
+-                else
+-                    mMovingCreature-&gt;setAnimation(&quot;hocke_gehen&quot;);
+-                applyAuChanges(elapsedTime);
+-                if( getRotationMovement()-&gt;isPossible() )
+-                    getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
+-            }
+-            else
+-                mVelocity = Vector3::ZERO;
+-            return true;
+-        }
+-        void applyAuChanges(Ogre::Real elapsedTime) {}
+-        virtual void setAnimation(Ogre::Real elapsedTime) {} // is not used
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            mState = UPTODOWN;
+-            mMovingCreature-&gt;setAnimation(&quot;idle_zu_hocke&quot;,1,1,&quot;Idle&quot;);
+-            mTimer = 0;
+-        }
+-        virtual bool canChangeToMovement(MovingCreature::MovementType id)
+-        {
+-            return mState == UP;
+-        }
+-        virtual void requestChangeToMovement(MovingCreature::MovementType id)
+-        {
+-            if( mState == DOWN )
+-            {
+-                mState = DOWNTOUP;
+-                mMovingCreature-&gt;setAnimation(&quot;hocke_zu_stehen&quot;,1,1,&quot;Idle&quot;);
+-                mTimer = 0;
+-            }
+-        }
+-    protected:
+-        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
+-        Real mTimer;
+-    };
+-
+-
+-    class Hochsprung : public AbstractMovement
+-    {
+-    public:
+-        Hochsprung(MovingCreature *creature) : AbstractMovement(creature), mState(DOWN), mHeight(0), mJumpNow(false), mTimer(0) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_HOCHSPRUNG;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            mState = DOWNTOUP;
+-            mMovingCreature-&gt;setAnimation(&quot;idle_absprung&quot;,1,1,&quot;Idle&quot;);
+-            mTimer = 0;
+-            calculateBaseVelocity(mHeight);
+-
+-            try
+-            {
+-                int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
+-                if( taw &gt; 0 )
+-                {
+-                    if( taw == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 12.5;
+-                    }
+-                    else if( taw == RESULT_AUTOERFOLG )
+-                    {
+-                        mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 25.0;
+-                    }
+-                    else
+-                    {
+-                        mHeight += taw / 25.0;
+-                    }
+-                }
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-            }
+-            mMovingCreature-&gt;getCreature()-&gt;damageAu(2./3);
+-        }
+-        virtual void deactivate()
+-        {
+-            AbstractMovement::deactivate();
+-        }
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = (mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;GE&quot;) + 
+-                        mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;KK&quot;)) / 4.0 / 5.0;
+-
+-            // steht nicht in den Regeln aber finde ich sinnvoll
+-            // velocityBase *= (1 - getrageneLast/KK);
+-            // steht in den Regeln: pro Ersch&#246;pfung ein KK abziehen
+-            //if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
+-            //    velocity -= (mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 4.0 / 5.0;
+-            // steht nicht in den Regeln, aber finde ich sinnvoll
+-            //if( getAu() &lt; getAuBasis() / 3.0 )
+-            //    velocity -= (getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 4.0 / 5.0;
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            if( mMovingCreature-&gt;getMovement() == this )
+-                return
+-                    (mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR ||
+-                    mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_AIRBORNE) &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
+-                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+-            else
+-                return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8 &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+-        }
+-        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
+-        {
+-            Real mass;
+-            Vector3 inertia;
+-            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-            if( mJumpNow )
+-            {
+-                mJumpNow = false;
+-
+-                Real m = mass;
+-                Real g = PhysicsManager::getSingleton().getGravity().length();
+-                Real t = timestep;
+-                Real h = mHeight;
+-                Real jumpForce = 0.5f*g*m * (Math::Sqrt(1 + 8*h/(g * t * t)) - 1);
+-                force = Vector3(0,
+-                    jumpForce,
+-                    0);
+-                mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
+-            }
+-
+-            Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+-            torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * mass;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            if( mState == DOWN )
+-            {
+-                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
+-            }
+-            if( mState == UPTODOWN )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt;= 0.5f )
+-                {
+-                    mState = DOWN;
+-                }
+-            }
+-            if( mState == UP )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &lt; 0.5f )
+-                {
+-                    mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
+-                }
+-                else if( mMovingCreature-&gt;getAbstractLocation() != MovingCreature::AL_AIRBORNE )
+-                {
+-                    mState = UPTODOWN;
+-                    mMovingCreature-&gt;setAnimation(&quot;idle_sprung_landung&quot;, 1, 1, &quot;Idle&quot;);
+-                    mTimer = 0;
+-                }
+-            }
+-            if( mState == DOWNTOUP )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt;= 0.25f )
+-                {
+-                    mState = UP;
+-                    mMovingCreature-&gt;setAbstractLocation(MovingCreature::AL_AIRBORNE);
+-                    //mMovingCreature-&gt;setAnimation(&quot;idle_sprung&quot;); // we also don't need this animation!
+-                    mJumpNow = true;
+-                    mTimer = 0;
+-                }
+-            }
+-            return false;
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction.z = direction.x = 0;
+-            if(direction.y &lt; 0)
+-                direction.y = 0;
+-            return oldDirection.x == 0 &amp;&amp; oldDirection.z == 0 &amp;&amp; oldDirection.y &gt; 0;
+-        }
+-        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+-        {
+-            rotation = Vector3::ZERO;
+-            return false;
+-        }
+-        virtual bool canChangeToMovement(MovingCreature::MovementType id)
+-        {
+-            return mState == DOWN;
+-        }
+-    protected:
+-        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
+-        Ogre::Real mHeight;
+-        bool mJumpNow;
+-        Ogre::Real mTimer;
+-    };
+-
+-
+-    class Weitsprung : public AbstractMovement
+-    {
+-    public:
+-        Weitsprung(MovingCreature *creature) : 
+-          AbstractMovement(creature), mState(DOWN), mWidth(0),
+-              mJumpNow(false), mTimer(0), mApplyForceTime(0.12),
+-              mApplyForceTimer(0), mLastForce(Vector3::ZERO),
+-              mVelocityBeforeJump(0), mTanJumpAngle(Math::Tan(Degree(17))) {}
+-        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_WEITSPRUNG;}
+-        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+-        virtual void activate()
+-        {
+-            AbstractMovement::activate();
+-            mState = DOWNTOUP;
+-            mMovingCreature-&gt;setAnimation(&quot;rennen_absprung&quot;,1,1,&quot;Run&quot;);
+-            mTimer = 0;
+-            calculateBaseVelocity(mWidth);
+-
+-            try
+-            {
+-                // the person will only achieve this width if it is running
+-                // retrieve run movement
+-                AbstractMovement *run = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_RENNEN);
+-                if( run != NULL )
+-                {
+-                    Real vel(0);
+-                    run-&gt;calculateBaseVelocity(vel);
+-                    Real factor = -mMovingCreature-&gt;getVelocity().z / vel;
+-                    factor = std::max(Real(0),factor);
+-                    // without moving before, the width will be 1/3
+-                    mWidth = mWidth/3. + mWidth * 2./3. * factor; 
+-                }
+-
+-
+-                int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
+-                if( taw &gt; 0 )
+-                {
+-                    if( taw == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        mWidth += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 25.0;
+-                    }
+-                    else if( taw == RESULT_AUTOERFOLG )
+-                    {
+-                        mWidth += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 50.0;
+-                    }
+-                    else
+-                    {
+-                        mWidth += taw / 50.0;
+-                    }
+-                }
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-            }
+-            mMovingCreature-&gt;getCreature()-&gt;damageAu(2./3);
+-        }
+-        virtual void deactivate()
+-        {
+-            AbstractMovement::deactivate();
+-        }
+-        virtual bool calculateBaseVelocity(Real &amp;velocity)
+-        {
+-            velocity = (mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;GE&quot;) + 
+-                        mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;KK&quot;)) / 5.0;
+-
+-            // steht nicht in den Regeln aber finde ich sinnvoll
+-            // velocityBase *= (1 - getrageneLast/KK);
+-            // steht in den Regeln: pro Ersch&#246;pfung ein KK abziehen
+-            //if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
+-            //    velocity -= (mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 5.0;
+-            // steht nicht in den Regeln, aber finde ich sinnvoll
+-            //if( getAu() &lt; getAuBasis() / 3.0 )
+-            //    velocity -= (getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 5.0;
+-            return isPossible();
+-        }
+-        virtual bool isPossible() const
+-        {
+-            if( mMovingCreature-&gt;getMovement() == this )
+-                return
+-                    (mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR ||
+-                    mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_AIRBORNE) &amp;&amp;
+-                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
+-                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+-            else
+-                return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8 &amp;&amp;
+-                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+-        }
+-        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
+-        {
+-            Real mass;
+-            Vector3 inertia;
+-            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-
+-            if( mJumpNow &amp;&amp; timestep != 0 )
+-            {
+-                mApplyForceTimer += timestep;
+-
+-                if( mApplyForceTimer == timestep // first time
+-                    &amp;&amp; mApplyForceTimer &lt; mApplyForceTime )// this is handled below
+-                {
+-                    Real t1 = mApplyForceTime;
+-                    Real sx = mWidth;
+-                    Real g = -PhysicsManager::getSingleton().getGravity().y;
+-                    Real v0 = mVelocityBeforeJump;
+-                    Real ax = 0;
+-                    Real ay = 0;
+-
+-                    if( t1 != 0 || 2 * sx &gt;= v0 * t1 )
+-                    {
+-                        Real v1x = ( sx - v0 * t1 / 2 ) / ( Math::Sqrt( mTanJumpAngle * (2*sx /g - v0 * t1/g) ) + t1/2);
+-                        Real v1y = mTanJumpAngle * v1x;
+-                        ax =  (v1x - v0) / t1;
+-                        ay = v1y/t1 + g;
+-                    }
+-                    
+-                    mLastForce.x = 0;
+-                    mLastForce.y = ay * mass;
+-                    mLastForce.z = -ax * mass;
+-                }
+-
+-                if( mApplyForceTimer &lt; mApplyForceTime )
+-                {
+-                    force = mLastForce;
+-                }
+-                else
+-                {
+-                    mJumpNow = false;
+-                    // adoption of the formula to our real jump time
+-                    Real t1 = mApplyForceTimer;
+-                    Real sx = mWidth;
+-                    Real g = -PhysicsManager::getSingleton().getGravity().y;
+-                    Real v0 = mVelocityBeforeJump;
+-                    Real ax = 0;
+-                    Real ay = 0;
+-
+-                    if( t1 != 0 || 2 * sx &gt;= v0 * t1 )
+-                    {
+-                        Real v1x = ( sx - v0 * t1 / 2 ) / ( Math::Sqrt( mTanJumpAngle * (2*sx /g - v0 * t1/g) ) + t1/2);
+-                        Real v1y = mTanJumpAngle * v1x;
+-
+-std::ostringstream oss;
+-oss &lt;&lt; &quot;v0: &quot; &lt;&lt; v0 &lt;&lt; &quot;    v1x: &quot; &lt;&lt; v1x &lt;&lt; &quot;    timediff: &quot; &lt;&lt; mApplyForceTimer - mApplyForceTime;
+-LOG_MESSAGE(Logger::RULES, oss.str());
+-
+-                        Vector3 v_now = mMovingCreature-&gt;getVelocity();
+-                        ax =  (v1x - -v_now.z) / timestep;
+-                        ay = (v1y- v_now.y)/timestep + g;
+-                    }
+-                    
+-                    force.x = 0;
+-                    force.y = ay * mass;
+-                    force.z = -ax * mass;
+-                }
+-            }
+-
+-            Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+-            torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * mass;
+-        }
+-        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+-        {
+-            if( mState == DOWN )
+-            {
+-                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
+-            }
+-            if( mState == UPTODOWN )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt;= 0.2f )
+-                {
+-                    mState = DOWN;
+-                }
+-            }
+-            if( mState == UP )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &lt; 0.5f )
+-                {
+-                    mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
+-                }
+-                else if( mMovingCreature-&gt;getAbstractLocation() != MovingCreature::AL_AIRBORNE )
+-                {
+-                    mState = UPTODOWN;
+-                    mMovingCreature-&gt;setAnimation(&quot;rennen_sprung_landung&quot;, 1, 1, &quot;Run&quot;);
+-                    mTimer = 0;
+-                }
+-            }
+-            if( mState == DOWNTOUP )
+-            {
+-                mTimer += elapsedTime;
+-                if( mTimer &gt;= 0.3f )
+-                {
+-                    mState = UP;
+-                    mMovingCreature-&gt;setAbstractLocation(MovingCreature::AL_AIRBORNE);
+-                    //mMovingCreature-&gt;setAnimation(&quot;rennen_sprung&quot;);
+-                    mJumpNow = true;
+-                    mApplyForceTimer = 0;
+-                    mVelocityBeforeJump = -mMovingCreature-&gt;getVelocity().z;
+-                    mTimer = 0;
+-                }
+-            }
+-            return false;
+-        }
+-        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+-        {
+-            Vector3 oldDirection(direction);
+-            direction.x = 0;
+-            if(direction.y &lt;= 0 || direction.z &gt;= 0)
+-                direction.y = direction.z = 0;
+-            return oldDirection.x == 0 &amp;&amp; oldDirection.z &lt; 0 &amp;&amp; oldDirection.y &gt; 0;
+-        }
+-        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+-        {
+-            rotation = Vector3::ZERO;
+-            return false;
+-        }
+-        virtual bool canChangeToMovement(MovingCreature::MovementType id)
+-        {
+-            return mState == DOWN;
+-        }
+-    protected:
+-        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
+-        Ogre::Real mWidth;
+-        bool mJumpNow;
+-        Ogre::Real mTimer;
+-        Ogre::Real mApplyForceTime;
+-        Ogre::Real mApplyForceTimer;
+-        Ogre::Vector3 mLastForce;
+-        Ogre::Real mVelocityBeforeJump;
+-        Ogre::Real mTanJumpAngle;
+-    };
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-    MovingCreature::MovingCreature(Creature *creature) :
+-        mCreature(creature),
+-        mAbstractLocation(AL_AIRBORNE),
+-        mMovement(NULL),
+-        mLastMovementType(MT_NONE),
+-        mLastMovementChange(0),
+-        mDirection(Vector3::ZERO),
+-        mRotation(Vector3::ZERO),
+-        mLastAnimationName(&quot;&quot;),
+-        mLastCollisionName(&quot;&quot;),
+-        mLastAnimationSpeed(1),
+-        mStillWeightedAnimationName(&quot;&quot;),
+-        mLastFloorContact(0)
+-    {
+-        MovingCreatureManager::getSingleton().add(this);
+-        
+-        const OgreNewt::MaterialID *material = PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;);
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(material);
+-
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+-
+-
+-        std::pair&lt;MovementType, AbstractMovement*&gt; movementPair;
+-        movementPair.first = MT_NONE;
+-        movementPair.second = NULL;
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_DREHEN;
+-        movementPair.second = new Drehen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_STEHEN;
+-        movementPair.second = new Stehen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_GEHEN;
+-        movementPair.second = new Gehen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_JOGGEN;
+-        movementPair.second = new Joggen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_LAUFEN;
+-        movementPair.second = new Laufen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_RENNEN;
+-        movementPair.second = new Rennen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_RUECKWAERTS_GEHEN;
+-        movementPair.second = new RueckwaertsGehen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_RUECKWAERTS_JOGGEN;
+-        movementPair.second = new RueckwaertsJoggen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_SEITWAERTS_GEHEN;
+-        movementPair.second = new SeitwaertsGehen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_SCHLEICHEN;
+-        movementPair.second = new Schleichen (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_HOCHSPRUNG;
+-        movementPair.second = new Hochsprung (this);
+-        mMovementMap.insert(movementPair);
+-        movementPair.first = MT_WEITSPRUNG;
+-        movementPair.second = new Weitsprung (this);
+-        mMovementMap.insert(movementPair);
+-    }
+-
+-    MovingCreature::~MovingCreature()
+-    {
+-        MovementMap::iterator iter;
+-        for(iter = mMovementMap.begin(); iter != mMovementMap.end(); iter++)
+-            delete iter-&gt;second;
+-        mMovementMap.erase(mMovementMap.begin(), mMovementMap.end());
+-
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+-
+-        MovingCreatureManager::getSingleton().remove(this);
+-    }
+-
+-    MovingCreature::MovementType MovingCreature::getMovementId() const
+-    {
+-        if (mMovement == NULL) 
+-            return MT_NONE; 
+-        else 
+-            return mMovement-&gt;getId();
+-    }
+-
+-    int MovingCreature::getCurrentGS() const
+-    {
+-        int act_gs = mCreature-&gt;getWert(Creature::WERT_GS);
+-        ///@todo wy does this not work
+-        //act_gs -= mCreature-&gt;getWert(Creature::WERT_BE);
+-        return max(act_gs,1);
+-    }
+-
+-    MeshAnimation *MovingCreature::setAnimation(const Ogre::String &amp;name, Ogre::Real speed, unsigned int timesToPlay, const Ogre::String &amp;collisionName, Real weight)
+-    {
+-        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
+-        PhysicalThing* pt = mCreature-&gt;getActor()-&gt;getPhysicalThing();
+-        MeshAnimation *meshAnim(NULL);
+-        
+-        if( mLastAnimationName != name)
+-        {
+-            const Ogre::String *pCollisionName = &collisionName;
+-            if( collisionName == &quot;&quot; )
+-                pCollisionName = &name;
+-
+-            if( *pCollisionName != mLastCollisionName )
+-            {
+-                pt-&gt;fitToPose(*pCollisionName);
+-                mLastCollisionName = *pCollisionName;
+-            }
+-
+-
+-            if ( mStillWeightedAnimationName != &quot;&quot; )
+-            {
+-                mesh-&gt;stopAnimation(mStillWeightedAnimationName);
+-                mStillWeightedAnimationName = &quot;&quot;;
+-            }
+-
+-
+-            if( mesh-&gt;hasAnimation(mLastAnimationName) )
+-            {
+-                if ( weight == 1 )
+-                    mesh-&gt;stopAnimation(mLastAnimationName);
+-                else
+-                {
+-                    MeshAnimation *lastAnimation = mesh-&gt;getAnimation(mLastAnimationName);
+-                    if( lastAnimation != NULL )
+-                    {
+-                        mStillWeightedAnimationName = mLastAnimationName;
+-                        lastAnimation-&gt;setWeight(1-weight);
+-                    }
+-                }
+-            }
+-
+-            meshAnim = mesh-&gt;startAnimation(name, speed, timesToPlay);
+-            if( meshAnim )
+-            {
+-                meshAnim-&gt;setWeight(weight);
+-                mLastAnimationName = name;
+-                mLastAnimationSpeed = speed;
+-            }
+-        }
+-        else
+-        {
+-            meshAnim = mesh-&gt;getAnimation(name);
+-            if( mLastAnimationSpeed != speed )
+-            {
+-                meshAnim-&gt;setSpeed(speed);
+-                mLastAnimationSpeed = speed;
+-                meshAnim-&gt;setWeight(weight);
+-            }
+-            if( mStillWeightedAnimationName != &quot;&quot; )
+-            {
+-                MeshAnimation *lastAnimation = mesh-&gt;getAnimation(mStillWeightedAnimationName);
+-                if( lastAnimation !=  NULL )
+-                {
+-                    lastAnimation-&gt;setWeight(1-weight);
+-                    if( weight == 1 )
+-                    {
+-                        mesh-&gt;stopAnimation(mStillWeightedAnimationName);
+-                        mStillWeightedAnimationName = &quot;&quot;;
+-                    }
+-                }
+-                else
+-                {
+-                    mStillWeightedAnimationName = &quot;&quot;;
+-                }
+-            }
+-        }
+-
+-        return meshAnim;
+-    }
+-
+-    Ogre::Real MovingCreature::getAnimationTimePlayed() const
+-    {
+-        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
+-        MeshAnimation *meshAnim = mesh-&gt;getAnimation(mLastAnimationName);
+-        if( meshAnim != NULL )
+-            return meshAnim-&gt;getTimePlayed()/meshAnim-&gt;getLength();
+-        return 0;
+-    }
+-
+-    Ogre::Vector3 MovingCreature::getVelocity() const
+-    {
+-        return 
+-            mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;getOrientation().Inverse() *
+-            mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getVelocity();
+-    }
+-
+-    Ogre::Vector3 MovingCreature::getOmega() const
+-    {
+-        return mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+-    }
+-
+-    bool MovingCreature::run(Real elapsedTime)
+-    {
+-        if(mMovement != NULL)
+-        {
+-            mLastMovementChange += elapsedTime;
+-            if( !mMovement-&gt;isPossible() )
+-            {
+-                setMovement(mMovement-&gt;getFallBackMovement(), mDirection, mRotation);
+-                if( mMovement == NULL )
+-                    return false;
+-            }
+-
+-            Vector3 rotation(mRotation);
+-            mRotation = Vector3::ZERO;
+-            return mMovement-&gt;run(elapsedTime, mDirection, rotation);
+-        }
+-        return false;
+-    }
+-
+-    void MovingCreature::OnApplyForceAndTorque(PhysicalThing* thing)
+-    {
+-        Vector3 force, torque;
+-        OgreNewt::Body *body = thing-&gt;_getBody();
+-        force = Vector3::ZERO;
+-        torque = Vector3::ZERO;
+-        OgreNewt::World *world = PhysicsManager::getSingleton()._getNewtonWorld();
+-        Real timestep = world-&gt;getTimeStep();
+-        Real mass;
+-        Vector3 inertia;
+-        body-&gt;getMassMatrix(mass, inertia);
+-
+-        if(mMovement != NULL)
+-        {
+-            mMovement-&gt;calculateForceAndTorque(force, torque, timestep);
+-            force = thing-&gt;getOrientation() * force;
+-        }
+-        else
+-        {
+-            // don't move
+-            force = - mass * body-&gt;getVelocity() / 1 * timestep;
+-            force.y = 0;
+-        }
+-        force += mass * PhysicsManager::getSingleton().getGravity();
+-        body-&gt;setForce(force);
+-        body-&gt;setTorque(torque);
+-    }
+-
+-    int MovingCreature::userProcess()
+-    {
+-        // own collision handling (floor, in order to get information for mAbstractLocation)
+-        Vector3 point;
+-        Vector3 normal;
+-        getContactPositionAndNormal(point, normal);
+-
+-        // determine if this contact is with the floor.
+-        // Meaning the contact normal has an angle to UNIT_Y of 20 or less.
+-        Degree angle = Math::ACos(normal.dotProduct(Vector3::UNIT_Y));
+-
+-        Vector3 charPos;
+-        Quaternion charOri;
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getPositionOrientation(charPos, charOri);
+-        bool isFloorCollision(false);
+-
+-        //AxisAlignedBox CharAab = mCharBody-&gt;getCollision()-&gt;getAABB();
+-        //Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
+-        Real stepHeight = point.y - charPos.y;
+-
+-        if( stepHeight &lt; 0.5f )
+-            isFloorCollision = true;
+-
+-        if ( isFloorCollision )
+-        {
+-            setAbstractLocation(AL_FLOOR);
+-            if(stepHeight &gt; 0.1f)
+-                setContactNormalAcceleration(10);
+-            setContactElasticity(0.0f);
+-            mLastFloorContact = 0.0f;
+-        }
+-        else
+-        {
+-            mLastFloorContact += PhysicsManager::getSingleton()._getNewtonWorld()-&gt;getTimeStep();
+-            if(mLastFloorContact &gt;= 2.2f || getAbstractLocation() == AL_AIRBORNE)
+-                setAbstractLocation(AL_AIRBORNE);
+-        }
+-
+-
+-        if(mMovement != NULL)
+-        {
+-            // i hope this will copy the protected members of the contact callback
+-            OgreNewt::ContactCallback *movement = mMovement;
+-            *movement = (OgreNewt::ContactCallback)(*this);
+-            return movement-&gt;userProcess();
+-        }
+-
+-        // return one to tell Newton we want to accept this contact
+-        return 1;
+-    }
+-
+-    AbstractMovement *MovingCreature::getMovementFromId(MovingCreature::MovementType id)
+-    {
+-        MovementMap::iterator iter = mMovementMap.find(id);
+-        if(iter == mMovementMap.end())
+-        {
+-            Throw(IllegalArgumentException, &quot;Der angegebene Bewegungstyp wurde nicht gefunden.&quot;);
+-        }
+-        return iter-&gt;second;
+-    }
+-
+-
+-    bool MovingCreature::setMovement(MovementType type, Vector3 direction, Vector3 rotation)
+-    {
+-        if( mMovement != NULL )
+-        {
+-            if( mMovement-&gt;getId() == type )
+-            {
+-                MovingCreatureManager::getSingleton().setActive(this);
+-                mDirection = direction;
+-                mRotation = rotation;
+-                return true;
+-            }
+-        }
+-
+-        if( mMovement != NULL )
+-        {
+-            if( !mMovement-&gt;canChangeToMovement(type) )
+-            {
+-                mMovement-&gt;requestChangeToMovement(type);
+-                return false;
+-            }
+-        }
+-
+-        AbstractMovement *movement = getMovementFromId(type);
+-
+-
+-        while(movement != NULL)
+-        {
+-            if(movement-&gt;isPossible())
+-            {
+-                MovingCreatureManager::getSingleton().setActive(this); // runs the old movement if idle!
+-                if(mMovement == NULL)
+-                {
+-                    mLastMovementType = MT_NONE;
+-                }
+-                else
+-                {
+-                    mLastMovementType = mMovement-&gt;getId();
+-                    mMovement-&gt;deactivate();
+-                }
+-                mMovement = movement;
+-                mMovement-&gt;activate();
+-                mDirection = direction;
+-                mRotation = rotation;
+-                mLastMovementChange = 0;
+-                return true;
+-            }
+-
+-            movement = getMovementFromId(movement-&gt;getFallBackMovement());
+-        }
+-
+-        return false;
+-    }
+-
+-
+-
+-    Ogre::Radian MovingCreature::getYaw()
+-    {
+-        Radian yaw = mCreature-&gt;getActor()-&gt;getWorldOrientation().getYaw();
+-
+-        AbstractMovement *drehen = getMovementFromId(MT_DREHEN);
+-        
+-        if( drehen == NULL )
+-            return yaw;
+-
+-        if( !drehen-&gt;isActive() )
+-            return yaw;
+-
+-        return Radian(drehen-&gt;getMovementDefinedValue());
+-    }
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000648.html">[Dsa-hl-svn] r3577 - rl/trunk/engine/rules/include
+</A></li>
+	<LI>Next message: <A HREF="000650.html">[Dsa-hl-svn] r3579 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#649">[ date ]</a>
+              <a href="thread.html#649">[ thread ]</a>
+              <a href="subject.html#649">[ subject ]</a>
+              <a href="author.html#649">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

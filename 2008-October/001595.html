@@ -1,0 +1,309 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4538 - in rl/branches/newton20/engine: core/include	core/src script/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4538%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20script/src%20ui/src&In-Reply-To=%3C200810011622.m91GMDDY006425%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001596.html">
+   <LINK REL="Next"  HREF="001594.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4538 - in rl/branches/newton20/engine: core/include	core/src script/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4538%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20script/src%20ui/src&In-Reply-To=%3C200810011622.m91GMDDY006425%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4538 - in rl/branches/newton20/engine: core/include	core/src script/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Oct  1 18:22:13 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001596.html">[Dsa-hl-svn] r4537 - in dependencies/OgreNewt_ngt: inc src
+</A></li>
+        <LI>Next message: <A HREF="001594.html">[Dsa-hl-svn] r4539 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj engine/core/include engine/rules	engine/rules/include engine/rules/src engine/script/swig engine/ui
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1595">[ date ]</a>
+              <a href="thread.html#1595">[ thread ]</a>
+              <a href="subject.html#1595">[ subject ]</a>
+              <a href="author.html#1595">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-10-01 18:22:07 +0200 (Wed, 01 Oct 2008)
+New Revision: 4538
+
+Modified:
+   rl/branches/newton20/engine/core/include/PhysicsManager.h
+   rl/branches/newton20/engine/core/src/CoreSubsystem.cpp
+   rl/branches/newton20/engine/core/src/DotSceneLoader.cpp
+   rl/branches/newton20/engine/core/src/PhysicalThing.cpp
+   rl/branches/newton20/engine/core/src/PhysicsManager.cpp
+   rl/branches/newton20/engine/script/src/EntityNodeProcessor.cpp
+   rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+Log:
+- optmize OgreNewt::TreeCollision when created (this was deactived before, why?)
+- physics debugging can now be updated every frame:
+  press l once: show physical bodies at this point in time
+  press l again: update the debugging-lines every frame
+
+
+Modified: rl/branches/newton20/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/PhysicsManager.h	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/core/include/PhysicsManager.h	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -137,8 +137,8 @@
+ 		/// Komplette Levelgeometrie aufl&#246;sen
+ 		void clearLevelGeometry();
+ 		
+-		void toggleDebugMode();
+-        bool isDebugMode() const;
++	void toggleDebugMode();
++        int isDebugMode() const;
+ 
+         // Newton callbacks ...
+         /// generic force callback. Gravity is applied and the force,
+@@ -305,7 +305,8 @@
+         OgreNewt::World* mWorld;
+         //! the visualisation for physical behaviour (actually not the best)
+         OgreNewt::Debugger* mNewtonDebugger;
+-        bool mDebugMode;
++        //! debug mode: 0 no debugging, 1 show debug lines (freezed state), 2 show debug lines (update every frame)
++        int mDebugMode;
+ 
+         //! factory for creating new collision primitives
+         PhysicsCollisionFactory* mPhysicsCollisionFactory;
+
+Modified: rl/branches/newton20/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/CoreSubsystem.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/core/src/CoreSubsystem.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -283,7 +283,7 @@
+         mWorld = new DotSceneOctreeWorld();
+         mActorManager-&gt;setWorld(mWorld);
+ 
+-        mPhysicsManager = new PhysicsManager();
++        mPhysicsManager = new PhysicsManager();  // the World needs to be initialized before!
+         GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+         LOG_MESSAGE(Logger::CORE,&quot;PhysicsManager erzeugt&quot;);
+ 
+
+Modified: rl/branches/newton20/engine/core/src/DotSceneLoader.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/DotSceneLoader.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/core/src/DotSceneLoader.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -874,7 +874,7 @@
+                 else if (physical_body.compare(&quot;mesh&quot;) == 0 || physical_body.compare(&quot;auto&quot;))
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+-                                    thisWorld, newEnt, false));
++                                    thisWorld, newEnt, true));
+                     LOG_DEBUG(Logger::CORE, &quot; physical_body 'mesh' f&#252;r Entity '&quot;+entName+&quot;' erstellt. &quot;);
+                 }
+                 else
+
+Modified: rl/branches/newton20/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicalThing.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/core/src/PhysicalThing.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -299,7 +299,7 @@
+ 		else if (mGeometryType == GT_MESH)
+ 		{
+ 	        CollisionPtr collision(new TreeCollision(
+-				PhysicsManager::getSingleton()._getNewtonWorld(), entity, false));
++				PhysicsManager::getSingleton()._getNewtonWorld(), entity, true));
+ 		    mBody-&gt;setCollision(collision);
+ 		}
+ 
+
+Modified: rl/branches/newton20/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicsManager.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/core/src/PhysicsManager.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -101,6 +101,7 @@
+ 
+         mNewtonDebugger-&gt;setMaterialColor(getMaterialID(&quot;level&quot;), Ogre::ColourValue::Blue);
+ 
++
+         // below here starts 'old' stale fix code that should be removed
+ 
+         // setup level quadtree extents
+@@ -132,6 +133,8 @@
+         }
+         mMaterials.clear();
+ 
++        mNewtonDebugger-&gt;deInit();
++
+         delete mPhysicsCollisionFactory;
+         delete mGenericCallback;
+         delete mWorld;
+@@ -192,6 +195,10 @@
+                     newtonPerBodyLogProperties(body);
+ #endif
+         }
++
++
++        if( mDebugMode == 2 )
++            mNewtonDebugger-&gt;showDebugInformation(mWorld);
+     }
+ 
+ #ifdef _DEBUG
+@@ -274,31 +281,27 @@
+         mEnabled = enabled;
+     }
+ 
+-    bool PhysicsManager::isDebugMode() const
++    int PhysicsManager::isDebugMode() const
+     {
+         return mDebugMode;
+     }
+ 
+     void PhysicsManager::toggleDebugMode()
+     {
+-        if (mDebugMode)
+-		{
+-            mNewtonDebugger-&gt;hideLines();
+-		}
+-        else
++        mDebugMode = (mDebugMode+1)%3;
++        switch(mDebugMode)
+         {
+-            mNewtonDebugger = &amp;OgreNewt::Debugger::getSingleton();
+-
+-			try
+-			{
+-				mNewtonDebugger-&gt;init(
+-					CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager());
+-			}
+-			catch(Ogre::Exception) {}
+-
+-            mNewtonDebugger-&gt;showLines(mWorld);
++            case 0:
++                mNewtonDebugger-&gt;hideDebugInformation();
++                break;
++            case 1:
++	        mNewtonDebugger-&gt;init(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager());
++                mNewtonDebugger-&gt;showDebugInformation(mWorld);
++                break;
++            default:
++	        mNewtonDebugger-&gt;init(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager());
++                break;
+         }
+-        mDebugMode = !mDebugMode;
+     }
+ 
+     void PhysicsManager::addLevelGeometry( Ogre::Entity* levelEntity, const std::vector&lt;OgreNewt::CollisionPtr&gt; &amp;collisions)
+@@ -308,14 +311,24 @@
+ 
+         SceneNode* node = levelEntity-&gt;getParentSceneNode();
+         //Level entity has to be attached to a scene node.
++        
+ 
+-        for( size_t i = 0; i &lt; collisions.size(); i++)
++        // try one compound collision for the entity if there are several collisions
++        OgreNewt::CollisionPtr collision(NULL);
++        switch( collisions.size() )
+         {
+-		    if( collisions[i] == NULL )
+-                continue;
++            case 0:
++                break;
++            case 1:
++                collision = collisions[0];
++                break;
++            default:
++                collision = new OgreNewt::CollisionPrimitives::CompoundCollision(mWorld, collisions);
++                break;
++        }
+ 
+-            OgreNewt::CollisionPtr collision = collisions[i];
+-
++        if( collision )
++        {
+             OgreNewt::Body* body = new OgreNewt::Body(mWorld, collision );
+ 
+ 
+@@ -324,7 +337,7 @@
+                 node-&gt;getWorldOrientation());
+             body-&gt;setMaterialGroupID(getMaterialID(&quot;level&quot;));
+ 
+-			mLevelBodiesQuadTree.add(body);
++            mLevelBodiesQuadTree.add(body);
+             //mLevelBodies.push_back(body);
+         }
+ 
+@@ -846,7 +859,7 @@
+ 
+             rval = CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+                 PhysicsManager::getSingleton()._getNewtonWorld(),
+-                entity, false/*, true */ ));
++                entity, true ));
+         }
+         else
+         {
+@@ -1039,6 +1052,5 @@
+         }
+         return rval;
+     }
+-
+ }
+ 
+
+Modified: rl/branches/newton20/engine/script/src/EntityNodeProcessor.cpp
+===================================================================
+--- rl/branches/newton20/engine/script/src/EntityNodeProcessor.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/script/src/EntityNodeProcessor.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -256,7 +256,7 @@
+                 else if (physicsProxyType == &quot;mesh&quot; || physicsProxyType == &quot;auto&quot;)
+                 {
+                     collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+-                                    thisWorld, entity, false));
++                                    thisWorld, entity, true));
+                     LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'mesh' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+                 }
+                 else
+
+Modified: rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2008-10-01 16:14:19 UTC (rev 4537)
++++ rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2008-10-01 16:22:07 UTC (rev 4538)
+@@ -1012,7 +1012,7 @@
+                 CollisionFound = true;
+                 Real hitBodyVel = info.mBody-&gt;getVelocity().dotProduct(diff.normalisedCopy());
+                 hitBodyVel = std::min(0.0f, hitBodyVel); // if the body moves, try to avoid it
+-                Real dist = std::max(info.mDistance + (hitBodyVel*timestep - 0.1)/diff.length(), 0.0);
++                Real dist = std::max(info.mDistance + (hitBodyVel*timestep - 0.01)/diff.length(), 0.0);
+                 diff *= dist;
+ 
+                 mLastCameraCollision = 0;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001596.html">[Dsa-hl-svn] r4537 - in dependencies/OgreNewt_ngt: inc src
+</A></li>
+	<LI>Next message: <A HREF="001594.html">[Dsa-hl-svn] r4539 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj engine/core/include engine/rules	engine/rules/include engine/rules/src engine/script/swig engine/ui
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1595">[ date ]</a>
+              <a href="thread.html#1595">[ thread ]</a>
+              <a href="subject.html#1595">[ subject ]</a>
+              <a href="author.html#1595">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

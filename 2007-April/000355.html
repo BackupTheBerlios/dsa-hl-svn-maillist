@@ -1,0 +1,736 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3284 - in rl/trunk/engine/script: . swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3284%20-%20in%20rl/trunk/engine/script%3A%20.%20swig&In-Reply-To=%3C200704122159.l3CLxqiP006688%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000354.html">
+   <LINK REL="Next"  HREF="000356.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3284 - in rl/trunk/engine/script: . swig</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3284%20-%20in%20rl/trunk/engine/script%3A%20.%20swig&In-Reply-To=%3C200704122159.l3CLxqiP006688%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3284 - in rl/trunk/engine/script: . swig">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 12 23:59:52 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000354.html">[Dsa-hl-svn] r3283 - in modules: common/scripts/effects	regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="000356.html">[Dsa-hl-svn] r3285 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#355">[ date ]</a>
+              <a href="thread.html#355">[ thread ]</a>
+              <a href="subject.html#355">[ subject ]</a>
+              <a href="author.html#355">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-04-12 23:59:37 +0200 (Thu, 12 Apr 2007)
+New Revision: 3284
+
+Added:
+   rl/trunk/engine/script/swig/TypeDynamicDirector.swig
+Modified:
+   rl/trunk/engine/script/RlScript2005.vcproj
+   rl/trunk/engine/script/swig/RlExports.i
+   rl/trunk/engine/script/swig/TypeMaps.i
+   rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+   rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+   rl/trunk/engine/script/swig/TypeOgreVector3.swig
+Log:
+optimized typemaps 
+
+Modified: rl/trunk/engine/script/RlScript2005.vcproj
+===================================================================
+--- rl/trunk/engine/script/RlScript2005.vcproj	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/RlScript2005.vcproj	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -424,6 +424,10 @@
+ 				Name=&quot;types&quot;
+ 				&gt;
+ 				&lt;File
++					RelativePath=&quot;.\swig\TypeDynamicDirector.swig&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\swig\TypeOgreColourValue.swig&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Modified: rl/trunk/engine/script/swig/RlExports.i
+===================================================================
+--- rl/trunk/engine/script/swig/RlExports.i	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/RlExports.i	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -145,10 +145,6 @@
+     static VALUE ceguiException = rb_define_class(&quot;CeguiException&quot;, rb_eRuntimeError);
+     rb_raise(ceguiException, ce.getMessage().c_str());
+   }
+-  catch (Ogre::Exception&amp; oe) {
+-    static VALUE ogreException = rb_define_class(&quot;OgreException&quot;, rb_eRuntimeError);
+-    rb_raise(ogreException, oe.getFullDescription().c_str());
+-  }
+   catch (Swig::DirectorException&amp;) {
+     SWIG_fail; 
+   } 
+@@ -172,87 +168,6 @@
+ 									
+ %}
+ 
+-
+-
+-
+-// These functions will ensure no C++ will have to different Ruby links
+-
+-// doWithActor( Actor* ) oder andere Director-Methoden Parameter
+-%typemap(directorin) SWIGTYPE*
+-{
+-	// Auf Director testen
+-	Swig::Director *resultdirector = 0;
+-	resultdirector = dynamic_cast&lt;Swig::Director *&gt;($1);
+-    if (resultdirector) {
+-        $input = resultdirector-&gt;swig_get_self();
+-    }
+-    else {
+-		VALUE val = SWIG_RubyInstanceFor( $1 );
+-		
+-		// Es gab das SkriptObjekt noch nicht
+-		if (NIL_P(val))
+-		{
+-			$input = SWIG_NewPointerObj((void *) $1, $1_descriptor, 0);		
+-		}
+-		else	
+-			$input = val;
+-	}
+-} 
+-    
+-// Actor* getActor oder andere OUTPUT Parameter
+-%typemap(out) SWIGTYPE*
+-{
+-	VALUE val = SWIG_RubyInstanceFor( $1 );
+-	
+-	// Es gab das SkriptObjekt noch nicht
+-	if (NIL_P(val)) {
+-		$result = SWIG_NewPointerObj((void *) $1, $1_descriptor, 0);			
+-	}
+-	else	
+-		$result = val;
+-} 
+-
+-// Animation* getActor oder andere OUTPUT Parameter fr DYNAMICs
+-%typemap(out) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
+-{
+-	VALUE val = SWIG_RubyInstanceFor( $1 );
+-	
+-	// Es gab das SkriptObjekt noch nicht
+-	if (NIL_P(val))
+-	{
+-		// Dynamic Cast ausfhren
+-		swig_type_info *ty = SWIG_TypeDynamicCast($1_descriptor, (void **) &amp;$1);
+-		$result = SWIG_NewPointerObj((void *) $1, ty, 0);		
+-	}
+-	else	
+-		$result = val;
+-} 
+-
+-// doWithAnimation( Animation* ) oder andere Director-Methoden Parameter fr DYNAMICs
+-%typemap(directorin) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
+-{
+-	// Auf Director testen
+-	Swig::Director *resultdirector = NULL;
+-	resultdirector = dynamic_cast&lt;Swig::Director *&gt;($1);
+-    if (resultdirector) {
+-        $input = resultdirector-&gt;swig_get_self();        	
+-    }
+-    else
+-	{
+-		VALUE val = SWIG_RubyInstanceFor( $1 );
+-		
+-		// Es gab das SkriptObjekt noch nicht
+-		if (NIL_P(val)) {
+-			// Dynamic Cast ausfhren
+-			swig_type_info *ty = SWIG_TypeDynamicCast($1_descriptor, (void **) &amp;$1);
+-			$input = SWIG_NewPointerObj((void *) $1, ty, 0);		
+-		}
+-		else	
+-			$input = val;
+-	}
+-} 
+-
+-
+ // Include bodies
+ 
+ %include &quot;RlCommon.swig&quot;
+
+Added: rl/trunk/engine/script/swig/TypeDynamicDirector.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeDynamicDirector.swig	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/TypeDynamicDirector.swig	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -0,0 +1,100 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++/* Typemaps for all Dynamic or Director Types
++ * These typemaps ensure no C++ object 
++ * will have links to more than one Ruby objecz
++ * 
++ */
++
++%{
++static VALUE getInScriptObject( void* ptr, swig_type_info *type )
++{
++    VALUE val = SWIG_RubyInstanceFor( ptr );
++	
++	// Es gab das SkriptObjekt noch nicht
++	if( NIL_P(val) ) 
++		return SWIG_NewPointerObj(ptr, type, 0);			
++	else	
++		return val;
++}
++%}
++
++/// @todo unbenutzt???
++// Actor* getActor oder andere OUTPUT Parameter
++%typemap(out) SWIGTYPE*
++{
++	$result = getInScriptObject((void *) $1, $1_descriptor );
++} 
++
++%{
++static VALUE getDirectorInScriptObject( Swig::Director * dir, void* ptr, swig_type_info *type )
++{
++    // Auf Director testen
++    if ( dir ) 
++        return dir-&gt;swig_get_self();
++
++	return getInScriptObject( ptr, type );
++}
++%}
++
++/// @todo unbenutzt???
++// doWithActor( Actor* ) oder andere Director-Methoden Parameter
++%typemap(directorin) SWIGTYPE*
++{
++	$input = getDirectorInScriptObject( 
++		dynamic_cast&lt; Swig::Director * &gt;($1), (void *)$1, $1_descriptor);
++} 
++
++%{
++static VALUE getOutScriptObject( void* ptr, swig_type_info *type )
++{
++	VALUE val = SWIG_RubyInstanceFor( ptr );
++	
++	// Es gab das SkriptObjekt noch nicht
++	if (NIL_P(val))
++	{
++		// Dynamic Cast ausfhren
++		swig_type_info *ty = SWIG_TypeDynamicCast(type, &amp;ptr);
++		return SWIG_NewPointerObj( ptr, ty, 0);		
++	}
++	else	
++		return val;
++}
++%}
++
++// Animation* getActor oder andere OUTPUT Parameter f&#252;r DYNAMICs
++%typemap(out) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
++{
++	getOutScriptObject((void *) $1, $1_descriptor );
++} 
++
++%{
++static VALUE getDirectorOutScriptObject( Swig::Director * dir, void* ptr, swig_type_info *type )
++{
++	if (dir) 
++        return dir-&gt;swig_get_self();        	
++
++	return getOutScriptObject( ptr, type );
++}
++%}
++
++// doWithAnimation( Animation* ) oder andere Director-Methoden Parameter fr DYNAMICs
++%typemap(directorin) SWIGTYPE* DYNAMIC, SWIGTYPE&amp; DYNAMIC
++{
++	getDirectorOutScriptObject(
++		dynamic_cast&lt; Swig::Director * &gt;($1), (void *) $1, $1_descriptor );
++} 
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/TypeMaps.i
+===================================================================
+--- rl/trunk/engine/script/swig/TypeMaps.i	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/TypeMaps.i	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -29,5 +29,6 @@
+ %include &quot;TypeRlProperty.swig&quot;
+ %include &quot;TypeRlTripelInt.swig&quot;
+ %include &quot;TypeStdPairIntInt.swig&quot;
++%include &quot;TypeDynamicDirector.swig&quot;
+ 
+ #endif
+
+Modified: rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -15,24 +15,32 @@
+  */
+ 
+ /* Typemaps fuer ColourValue.
+- * Ein ColourValue wird einfach auf ein dreielementiges Array abgebildet.
++ * Ein ColourValue wird einfach auf ein vierelementiges Array abgebildet.
+  * 
+  */
+ 
++
++%{
++// Helper method for checking the ColourValue
++static int checkRubyColourValue( VALUE input ) 
++{
++   bool correct = 
++       TYPE(input) == T_ARRAY   &amp;&amp; 
++       RARRAY(input)-&gt;len == 4  &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[0] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[1] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[2] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[3] );
++
++    return (correct ? 1 : 0);
++}
++%}
++
+ %typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) 
+    Ogre::ColourValue, const Ogre::ColourValue, 
+    Ogre::ColourValue*, Ogre::ColourValue&amp;,
+-   const Ogre::ColourValue*, const Ogre::ColourValue&amp;
+-{ 
+-   bool correct = 
+-       TYPE($input) == T_ARRAY   &amp;&amp; 
+-       RARRAY($input)-&gt;len == 4  &amp;&amp;
+-       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[0] ) &amp;&amp;
+-       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[1] ) &amp;&amp;
+-       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[2] ) &amp;&amp;
+-       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[3] );
+-
+-   $1 = correct ? 1 : 0;
++   const Ogre::ColourValue*, const Ogre::ColourValue&amp; { 
++	$1 = checkRubyColourValue($input);
+ }
+  
+ %{
+@@ -61,7 +69,7 @@
+ 
+ %typemap(in) Ogre::ColourValue, const Ogre::ColourValue
+ {
+-   Ogre::ColourValue vec(0.0, 0.0, 0.0);
++   Ogre::ColourValue vec(0.0, 0.0, 0.0, 0.0);
+    convertRubyToColourValue( $input, &amp; vec );
+    $1 = vec;
+ }
+@@ -69,7 +77,7 @@
+ %typemap(in) Ogre::ColourValue*, Ogre::ColourValue&amp;,
+    const Ogre::ColourValue*, const Ogre::ColourValue&amp;
+ {
+-   Ogre::ColourValue* vec = new Ogre::ColourValue(0.0, 0.0, 0.0);
++   Ogre::ColourValue* vec = new Ogre::ColourValue(0.0, 0.0, 0.0, 0.0);
+    convertRubyToColourValue(  $input, vec );
+    $1 = vec;
+ }
+
+Modified: rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -15,137 +15,121 @@
+  */
+ 
+ /* Typemaps fuer Quaternion.
+- * Ein Quaternion wird auf ein Array aus einem 3-elementigen Array 
+- * fr die Rotationsachse und einem Wert fr den Winkel abgebildet
++ * Ein Quaternion wird auf 
++ *  - Ein Array aus einem 3-elementigen Array 
++ *    f&#252;r die Rotationsachse und einem Wert f&#252;r den Winkel abgebildet
++ *  - 
+  * 
+  */
+ 
+-%typemap(typecheck) Ogre::Quaternion, const Ogre::Quaternion&amp; {
+-		if (TYPE($input) == T_ARRAY)
++%{
++// Helper method for checking the Quaternion
++static int checkRubyQuaternion( VALUE input ) 
++{
++	bool correct = false;
++
++	if (TYPE(input) == T_ARRAY)
++	{
++		int length = RARRAY(input)-&gt;len;
++
++		if (length == 2)
+ 		{
+-			int length = RARRAY($input)-&gt;len;
+-			if (length == 2)
++			VALUE arr = rb_ary_entry(input, 0);
++			VALUE degree = rb_ary_entry(input, 1);
++
++			if( SWIG_FLOAT_P(degree) &amp;&amp;
++				TYPE(arr) == T_ARRAY &amp;&amp; 
++				RARRAY(arr)-&gt;len == 3 &amp;&amp;
++				SWIG_FLOAT_P( RARRAY(arr)-&gt;ptr[0] ) &amp;&amp;
++				SWIG_FLOAT_P( RARRAY(arr)-&gt;ptr[1] ) &amp;&amp;
++				SWIG_FLOAT_P( RARRAY(arr)-&gt;ptr[2] ) )
+ 			{
+-				VALUE entry0 = rb_ary_entry($input, 0);
+-				VALUE entry1 = rb_ary_entry($input, 1);
+-				if ((TYPE(entry1) == T_FLOAT || TYPE(entry1) == T_FIXNUM)
+-					&amp;&amp; TYPE(entry0) == T_ARRAY 
+-					&amp;&amp; RARRAY(entry0)-&gt;len == 3)
+-				{
+-					$1 = 1;
+-				}
+-				else
+-				{
+-					$1 = 0;
+-				}
++				correct = true;
+ 			}
+-			else if (length == 3 || length == 4)
++		}
++		else if (length == 3 || length == 4)
++		{
++			correct = true;
++			
++			for (int i = 0; i &lt; length; i++)
+ 			{
+-				$1 = 1;
+-				
+-				for (int i = 0; i &lt; length; i++)
++				if( !SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[0] ) )
+ 				{
+-					if (TYPE(rb_ary_entry($input, i)) != T_FLOAT 
+-					    &amp;&amp; TYPE(rb_ary_entry($input, i)) != T_FIXNUM)
+-					{
+-						$1 = 0;
+-						break;
+-					}
++					correct = false;
++					break;
+ 				}
+ 			}
+-			else
+-			{
+-				$1 = 0;
+-			}
+ 		}
+-		else
+-		{
+-			$1 = 0;
+-		}
++	}
++	
++    return (correct ? 1 : 0);
+ }
++%}
+ 
+-%typemap(in) Ogre::Quaternion, const Ogre::Quaternion
++%typemap(typecheck)  
++   Ogre::Quaternion, const Ogre::Quaternion, 
++   Ogre::Quaternion*, Ogre::Quaternion&amp;,
++   const Ogre::Quaternion*, const Ogre::Quaternion&amp; {
++	$1 = checkRubyQuaternion($input);	
++}
++
++
++%{
++// Helper method for converting ruby input to a Quaternion
++static Ogre::Quaternion* convertRubyToQuaternion( VALUE input, Ogre::Quaternion* quat )
+ {
+-   Ogre::Quaternion quat;
+-   
+-   if (RARRAY($input)-&gt;len == 2)
++   if (RARRAY(input)-&gt;len == 2)
+    {
+-	   VALUE axisVal = rb_ary_entry($input, 0);
++	   VALUE axisVal = rb_ary_entry(input, 0);
+ 	   Ogre::Vector3 axis(
+ 				NUM2DBL(rb_ary_entry(axisVal, 0)), 
+ 				NUM2DBL(rb_ary_entry(axisVal, 1)),
+ 				NUM2DBL(rb_ary_entry(axisVal, 2)));
+ 
+-	   double angle = NUM2DBL(rb_ary_entry($input, 1));
++	   double angle = NUM2DBL(rb_ary_entry(input, 1));
+ 	      
+-	   quat.FromAngleAxis(Ogre::Degree(angle), axis);
++	   quat-&gt;FromAngleAxis(Ogre::Degree(angle), axis);
+    }
+-   else if (RARRAY($input)-&gt;len == 3)
++   else if (RARRAY(input)-&gt;len == 3)
+    {
+-	   Ogre::Quaternion rotX, rotY, rotZ;
+-        rotX.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 0))), 
++       Ogre::Quaternion rotX, rotY, rotZ;
++       rotX.FromAngleAxis(
++			Ogre::Degree(NUM2DBL(rb_ary_entry(input, 0))), 
+ 			Ogre::Vector3::UNIT_X);
+-        rotY.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 1))), 
++       rotY.FromAngleAxis(
++			Ogre::Degree(NUM2DBL(rb_ary_entry(input, 1))), 
+ 			Ogre::Vector3::UNIT_Y);
+-        rotZ.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 2))), 
++       rotZ.FromAngleAxis(
++			Ogre::Degree(NUM2DBL(rb_ary_entry(input, 2))), 
+ 			Ogre::Vector3::UNIT_Z);
+ 	   
+-	   quat = rotX * rotY * rotZ;
+-	   quat.normalise();
++	   *quat = rotX * rotY * rotZ;
++	   quat-&gt;normalise();
+    }
+-   else if (RARRAY($input)-&gt;len == 4)
++   else if (RARRAY(input)-&gt;len == 4)
+    {
+-	   quat.w = NUM2DBL(rb_ary_entry($input, 0));
+-	   quat.x = NUM2DBL(rb_ary_entry($input, 1));
+-	   quat.y = NUM2DBL(rb_ary_entry($input, 2));
+-	   quat.z = NUM2DBL(rb_ary_entry($input, 3));
++	   quat-&gt;w = NUM2DBL(rb_ary_entry(input, 0));
++	   quat-&gt;x = NUM2DBL(rb_ary_entry(input, 1));
++	   quat-&gt;y = NUM2DBL(rb_ary_entry(input, 2));
++	   quat-&gt;z = NUM2DBL(rb_ary_entry(input, 3));
+    }
++
++   return quat;
++}
++%}
++
++%typemap(in) Ogre::Quaternion, const Ogre::Quaternion
++{
++   Ogre::Quaternion quat;
++   convertRubyToQuaternion( $input, &amp; quat );
+    $1 = quat;
+ }
+ 
+ %typemap(in) Ogre::Quaternion*, Ogre::Quaternion&amp;,
+    const Ogre::Quaternion*, const Ogre::Quaternion&amp;
+ {
+-   Ogre::Quaternion* quat = new Ogre::Quaternion();
+-   if (RARRAY($input)-&gt;len == 2)
+-   {
+-	   VALUE axisVal = rb_ary_entry($input, 0);
+-	   Ogre::Vector3 axis(
+-				NUM2DBL(rb_ary_entry(axisVal, 0)), 
+-				NUM2DBL(rb_ary_entry(axisVal, 1)),
+-				NUM2DBL(rb_ary_entry(axisVal, 2)));
+-
+-	   double angle = NUM2DBL(rb_ary_entry($input, 1));
+-	      
+-	   quat-&gt;FromAngleAxis(Ogre::Degree(angle), axis);
+-   }
+-   else if (RARRAY($input)-&gt;len == 3)
+-   {
+-	   Ogre::Quaternion rotX, rotY, rotZ;
+-        rotX.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 0))), 
+-			Ogre::Vector3::UNIT_X);
+-        rotY.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 1))), 
+-			Ogre::Vector3::UNIT_Y);
+-        rotZ.FromAngleAxis(
+-			Ogre::Degree(NUM2DBL(rb_ary_entry($input, 2))), 
+-			Ogre::Vector3::UNIT_Z);
+-	   
+-	   *quat = rotX * rotY * rotZ;
+-	   quat-&gt;normalise();
+-   }
+-   else if (RARRAY($input)-&gt;len == 4)
+-   {
+-	   quat-&gt;w = NUM2DBL(rb_ary_entry($input, 0));
+-	   quat-&gt;x = NUM2DBL(rb_ary_entry($input, 1));
+-	   quat-&gt;y = NUM2DBL(rb_ary_entry($input, 2));
+-	   quat-&gt;z = NUM2DBL(rb_ary_entry($input, 3));
+-   }   
+-   $1 = quat;
++   Ogre::Quaternion* quat = new Ogre::Quaternion();  
++   $1 = convertRubyToQuaternion( $input, quat );
+ }
+ 
+ 
+
+Modified: rl/trunk/engine/script/swig/TypeOgreVector3.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreVector3.swig	2007-04-12 21:38:34 UTC (rev 3283)
++++ rl/trunk/engine/script/swig/TypeOgreVector3.swig	2007-04-12 21:59:37 UTC (rev 3284)
+@@ -19,28 +19,53 @@
+  * 
+  */
+ 
+-%typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) Ogre::Vector3, const Ogre::Vector3, Ogre::Vector3*, Ogre::Vector3&amp;,
+-   const Ogre::Vector3*, const Ogre::Vector3&amp;
++%{
++// Helper method for checking the Vector3
++static int checkRubyVector3( VALUE input ) 
+ {
+-   $1 = TYPE($input) == T_ARRAY &amp;&amp; RARRAY($input)-&gt;len == 3 ? 1 : 0;
++   bool correct = 
++       TYPE(input) == T_ARRAY   &amp;&amp; 
++       RARRAY(input)-&gt;len == 3  &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[0] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[1] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY(input)-&gt;ptr[2] );
++
++    return (correct ? 1 : 0);
+ }
++%}
++
++%typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) 
++   Ogre::Vector3, const Ogre::Vector3, 
++   Ogre::Vector3*, Ogre::Vector3&amp;,
++   const Ogre::Vector3*, const Ogre::Vector3&amp; { 
++	$1 = checkRubyVector3($input);
++}
+  
+-%typemap(in) Ogre::Vector3, const Ogre::Vector3
++%{
++// Helper method for filling the Vector3
++static void convertRubyToVector3( VALUE input, Ogre::Vector3* v ) 
+ {
+-   Ogre::Vector3 vec(0.0, 0.0, 0.0);
+-   int length = RARRAY($input)-&gt;len;
+-   VALUE* it = RARRAY($input)-&gt;ptr;
++   int length = RARRAY(input)-&gt;len;
++   VALUE* it = RARRAY(input)-&gt;ptr;
+    if (length &gt; 0) {
+-      vec.x = NUM2DBL(*it);
++      v-&gt;x = NUM2DBL(*it);
+       it++;
+    }
+    if (length &gt; 1) {
+-      vec.y = NUM2DBL(*it);
++      v-&gt;y = NUM2DBL(*it);
+       it++;
+    }
+    if (length &gt; 2) {
+-      vec.z = NUM2DBL(*it);
++      v-&gt;z = NUM2DBL(*it);
++      it++;
+    }
++}
++%}
++
++%typemap(in) Ogre::Vector3, const Ogre::Vector3
++{
++   Ogre::Vector3 vec(0.0, 0.0, 0.0);
++   convertRubyToVector3( $input, &amp; vec );
+    $1 = vec;
+ }
+ 
+@@ -48,40 +73,33 @@
+    const Ogre::Vector3*, const Ogre::Vector3&amp;
+ {
+    Ogre::Vector3* vec = new Ogre::Vector3(0.0, 0.0, 0.0);
+-   int length = RARRAY($input)-&gt;len;
+-   VALUE* it = RARRAY($input)-&gt;ptr;
+-   if (length &gt; 0) {
+-      vec-&gt;x = NUM2DBL(*it);
+-      it++;
+-   }
+-   if (length &gt; 1) {
+-      vec-&gt;y = NUM2DBL(*it);
+-      it++;
+-   }
+-   if (length &gt; 2) {
+-      vec-&gt;z = NUM2DBL(*it);
+-   }
++   convertRubyToVector3(  $input, vec );
+    $1 = vec;
+ }
+-%typemap(freearg) Ogre::Vector3*, Ogre::Vector3&amp;,
+-   const Ogre::Vector3*, const Ogre::Vector3&amp; {
+-   delete $1;
++
++%{
++// Helper method for creating the ruby Array
++static VALUE convertVector3ToRuby( const Ogre::Vector3* v ) 
++{
++   VALUE array = rb_ary_new3(3,
++	rb_float_new(v-&gt;x), 
++	rb_float_new(v-&gt;y), 
++	rb_float_new(v-&gt;z) );
++	
++   return array;
+ }
++%}
+ 
+ %typemap(out) Ogre::Vector3, const Ogre::Vector3 {
+-   VALUE rval = rb_ary_new();
+-   rb_ary_push(rval, rb_float_new($1.x));
+-   rb_ary_push(rval, rb_float_new($1.y));
+-   rb_ary_push(rval, rb_float_new($1.z));
+-   $result = rval;
++   $result = convertVector3ToRuby( &amp; $1 );
+ }
+ 
+-%typemap(out) Ogre::Vector3*, const Ogre::Vector3*, const Ogre::Vector3&amp;, Ogre::Vector&amp; {
+-   VALUE rval = rb_ary_new();
+-   rb_ary_push(rval, rb_float_new($1-&gt;x));
+-   rb_ary_push(rval, rb_float_new($1-&gt;y));
+-   rb_ary_push(rval, rb_float_new($1-&gt;z));
+-   $result = rval;
++%typemap(out) Ogre::Vector3*, const Ogre::Vector3*, const Ogre::Vector3&amp;, Ogre::Vector3&amp; {
++   $result = convertVector3ToRuby( $1 );
+ } 
+ 
+ 
++%typemap(freearg) Ogre::Vector3*, Ogre::Vector3&amp;,
++   const Ogre::Vector3*, const Ogre::Vector3&amp;  
++&quot;   delete $1;&quot;
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000354.html">[Dsa-hl-svn] r3283 - in modules: common/scripts/effects	regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="000356.html">[Dsa-hl-svn] r3285 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#355">[ date ]</a>
+              <a href="thread.html#355">[ thread ]</a>
+              <a href="subject.html#355">[ subject ]</a>
+              <a href="author.html#355">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

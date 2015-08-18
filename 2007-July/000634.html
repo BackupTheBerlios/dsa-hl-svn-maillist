@@ -1,0 +1,326 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3563 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3563%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200707021947.l62JlMmJ005518%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000633.html">
+   <LINK REL="Next"  HREF="000635.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3563 - rl/trunk/engine/ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3563%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200707021947.l62JlMmJ005518%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3563 - rl/trunk/engine/ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Jul  2 21:47:22 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000633.html">[Dsa-hl-svn] r3562 - rl/trunk/engine/ui/include
+</A></li>
+        <LI>Next message: <A HREF="000635.html">[Dsa-hl-svn] r3564 - in rl/trunk/engine: script/swig ui ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#634">[ date ]</a>
+              <a href="thread.html#634">[ thread ]</a>
+              <a href="subject.html#634">[ subject ]</a>
+              <a href="author.html#634">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-07-02 21:46:58 +0200 (Mon, 02 Jul 2007)
+New Revision: 3563
+
+Added:
+   rl/trunk/engine/ui/src/ControlState.cpp
+Removed:
+   rl/trunk/engine/ui/src/CharacterController.cpp
+Log:
+Renamed remotely
+
+Deleted: rl/trunk/engine/ui/src/CharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CharacterController.cpp	2007-07-02 19:45:10 UTC (rev 3562)
++++ rl/trunk/engine/ui/src/CharacterController.cpp	2007-07-02 19:46:58 UTC (rev 3563)
+@@ -1,246 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Perl Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Perl Artistic License for more details.
+-*
+-*  You should have received a copy of the Perl Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+-*/
+-#include &quot;ControlState.h&quot;
+-
+-#include &lt;OgreSceneManager.h&gt;
+-
+-#include &quot;AbstractWindow.h&quot;
+-#include &quot;Action.h&quot;
+-#include &quot;ActionManager.h&quot;
+-#include &quot;Actor.h&quot;
+-#include &quot;CameraObject.h&quot;
+-#include &quot;CommandMapper.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;Creature.h&quot;
+-#include &quot;Exception.h&quot;
+-#include &quot;InputManager.h&quot;
+-#include &quot;Person.h&quot;
+-#include &quot;PhysicalThing.h&quot;
+-#include &quot;WindowManager.h&quot;
+-#include &quot;World.h&quot;
+-
+-using namespace Ogre;
+-
+-namespace rl {
+-
+-	ControlState::ControlState(CommandMapper* commandMapper,
+-        Actor* camera, Person* character, ControlStateType type)
+-		: mCharacter(character),
+-        mCameraActor(camera),
+-		mCharacterActor(NULL),
+-		mCamBody(NULL),
+-		mCharBody(NULL),
+-        mCommandMapper(commandMapper),
+-        mType(type)
+-	{
+-		if (mCameraActor == NULL)
+-		{
+-			Throw(NullPointerException, &quot;Camera must not be NULL.&quot;);
+-		}
+-
+-		if (mCharacter != NULL)
+-		{
+-            mCharacterActor = mCharacter-&gt;getActor();
+-            
+-			if (mCharacter != NULL &amp;&amp; mCharacterActor-&gt;_getSceneNode() == NULL)
+-			{
+-				Throw(IllegalArgumentException,
+-					&quot;character has to be placed in the scene beforehand&quot;);
+-			}
+-            if (mCharacter != NULL &amp;&amp; mCharacterActor-&gt;getPhysicalThing() == NULL)
+-			{
+-				Throw(IllegalArgumentException,
+-					&quot;character must have a physics proxy&quot;);
+-			}
+-
+-			mCharBody = mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody();
+-		}
+-
+-		mCamBody = mCameraActor-&gt;getPhysicalThing()-&gt;_getBody();
+-
+-		if (!mCameraActor-&gt;_getSceneNode())
+-		{
+-			mCameraActor-&gt;placeIntoNode(CoreSubsystem::getSingleton().
+-				getWorld()-&gt;getSceneManager()-&gt;getRootSceneNode());
+-		}
+-
+-		// Reset camera position/orientation, as it is now controlled via scene nodes.
+-		Camera* ogreCam = static_cast&lt;CameraObject*&gt;(
+-            mCameraActor-&gt;getControlledObject())-&gt;getCamera();
+-		ogreCam-&gt;setPosition(Vector3::ZERO);
+-		ogreCam-&gt;setOrientation(Quaternion::IDENTITY);
+-
+-		mCameraActor-&gt;_getSceneNode()-&gt;setFixedYawAxis(true);
+-
+-        PhysicsManager::getSingleton().createMaterialID(&quot;character&quot;);
+-
+-        PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setDefaultFriction(0,0);
+-
+-        PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setDefaultFriction(0,0);
+-
+-        PhysicsManager::getSingleton().createMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setDefaultCollidable(0);
+-	}
+-    
+-    ControlState::~ControlState()
+-    {
+-    
+-    }
+-
+-	bool ControlState::startAction(const CeGuiString&amp; actionName, Creature* character)
+-	{
+-		if (actionName.length() == 0)
+-		{
+-			return false;
+-		}
+-
+-        Action* action = ActionManager::getSingleton().getInGameGlobalAction(actionName);
+-        if (action != NULL)
+-        {
+-            action-&gt;doAction(NULL, NULL, NULL);
+-        }
+-        else if (character != NULL)
+-		{
+-			character-&gt;doAction(actionName, character, character);
+-		}
+-		return true;
+-	}
+-
+-    bool ControlState::mousePressed(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
+-    {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            CEGUI::System::getSingleton().injectMouseButtonDown(
+-                static_cast&lt;CEGUI::MouseButton&gt;(id));
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
+-    }
+-
+-    bool ControlState::mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id)
+-    {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            CEGUI::System::getSingleton().injectMouseButtonUp(static_cast&lt;CEGUI::MouseButton&gt;(id));
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
+-    }
+-
+-    bool ControlState::mouseMoved(const OIS::MouseEvent&amp; evt)
+-    {
+-        if (WindowManager::getSingleton().getWindowInputMask() &amp; AbstractWindow::WIT_MOUSE_INPUT)
+-        {
+-            CEGUI::Renderer* renderer = CEGUI::System::getSingleton().getRenderer();
+-            CEGUI::System::getSingleton().injectMouseMove(evt.state.X.rel, evt.state.Y.rel);
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
+-    }
+-
+-    bool ControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+-    {
+-        InputManager* im = InputManager::getSingletonPtr();
+-
+-        if (sendKeyToCeGui(evt))
+-        {
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            cegui.injectKeyUp(evt.key);
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
+-    }
+-
+-    bool ControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+-    {
+-        InputManager* im = InputManager::getSingletonPtr();
+-
+-        if (sendKeyToCeGui(evt))
+-        {
+-            CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            cegui.injectKeyDown(evt.key);
+-            cegui.injectChar(im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()));
+-            return true;
+-        }
+-        else
+-        {
+-            int code = CommandMapper::encodeKey(evt.key, im-&gt;getModifierCode());
+-
+-            // First see, if a control state action is defined
+-		    CeGuiString action = mCommandMapper-&gt;getControlStateAction(code, mType);
+-            if (action == &quot;&quot;)
+-            {
+-                // No. So try global actions.
+-                action = mCommandMapper-&gt;getGlobalAction(code);
+-            }
+-            return startAction(action, mCharacter);
+-        }
+-    }
+-
+-    bool ControlState::isCeguiActive() const
+-    {
+-        return WindowManager::getSingleton().getWindowInputMask() != 0;
+-    }
+-
+-    bool ControlState::sendKeyToCeGui(const OIS::KeyEvent&amp; evt) const
+-    {
+-        InputManager* im = InputManager::getSingletonPtr();
+-
+-        // Wenn kein Fenster mit Tastatureingabe aktiv ist, kriegt CEGUI keine KeyEvents
+-        if ((WindowManager::getSingleton().getWindowInputMask()
+-            &amp; AbstractWindow::WIT_KEYBOARD_INPUT) == 0)
+-        {
+-            return false;
+-        }
+-
+-        // ---- Tastatureingabe gefordert ----
+-
+-        // Tasten, die Zeichen liefern sollen an CEGUI gesendet werden
+-        if (im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()) != 0)
+-        {
+-            return true;
+-        }
+-
+-        if (evt.key == OIS::KC_RETURN
+-            || evt.key == OIS::KC_HOME || evt.key == OIS::KC_END
+-            || evt.key == OIS::KC_LEFT || evt.key == OIS::KC_RIGHT
+-            || evt.key == OIS::KC_BACK || evt.key == OIS::KC_DELETE
+-            || evt.key == OIS::KC_UP   || evt.key == OIS::KC_DOWN
+-            || evt.key == OIS::KC_RMENU)
+-        {
+-            return true;
+-        }
+-
+-        return false;
+-    }
+-}
+
+Copied: rl/trunk/engine/ui/src/ControlState.cpp (from rev 3562, rl/trunk/engine/ui/src/CharacterController.cpp)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000633.html">[Dsa-hl-svn] r3562 - rl/trunk/engine/ui/include
+</A></li>
+	<LI>Next message: <A HREF="000635.html">[Dsa-hl-svn] r3564 - in rl/trunk/engine: script/swig ui ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#634">[ date ]</a>
+              <a href="thread.html#634">[ thread ]</a>
+              <a href="subject.html#634">[ subject ]</a>
+              <a href="author.html#634">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

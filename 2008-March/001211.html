@@ -1,0 +1,281 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4140 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4140%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200803050106.m2516sD7012869%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001210.html">
+   <LINK REL="Next"  HREF="001212.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4140 - in rl/trunk/engine/ui: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4140%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200803050106.m2516sD7012869%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4140 - in rl/trunk/engine/ui: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  5 02:06:54 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001210.html">[Dsa-hl-svn] r4139 - modules/common/gui/windows
+</A></li>
+        <LI>Next message: <A HREF="001212.html">[Dsa-hl-svn] r4141 - in modules: aitest combattest common intro	kanalisation ruchin techdemo techdemo2
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1211">[ date ]</a>
+              <a href="thread.html#1211">[ thread ]</a>
+              <a href="subject.html#1211">[ subject ]</a>
+              <a href="author.html#1211">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-05 02:06:51 +0100 (Wed, 05 Mar 2008)
+New Revision: 4140
+
+Modified:
+   rl/trunk/engine/ui/include/CombatControlState.h
+   rl/trunk/engine/ui/include/CombatGui.h
+   rl/trunk/engine/ui/include/CombatWindow.h
+   rl/trunk/engine/ui/include/UiMessages.h
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+   rl/trunk/engine/ui/src/CombatGui.cpp
+   rl/trunk/engine/ui/src/CombatWindow.cpp
+Log:
+Started work on combat user interface. Not yet usable.
+
+Modified: rl/trunk/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatControlState.h	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/include/CombatControlState.h	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -21,6 +21,7 @@
+ 
+ #include &quot;ControlState.h&quot;
+ #include &quot;Combatant.h&quot;
++#include &quot;MessagePump.h&quot;
+ #include &quot;Selector.h&quot;
+ 
+ #include &lt;OgreRectangle.h&gt;
+@@ -54,9 +55,18 @@
+         virtual void requestCombatantAction();
+ 		virtual void executeAction(CombatAction* action);
+ 
++		// Event handlers
++		bool userRequestAttackOpponent(Combatant*);
++		bool userRequestParryOpponent(Combatant*);
++		bool userRequestEndTurn();
++
+     private:
+ 		enum State {REQUEST_USER_INPUT, WAIT_FOR_OTHER_COMBATANTS, ROUND_EXECUTION};
+ 
++		MessagePump::ScopedConnection mCombatIoAttackOpponentConnection;
++		MessagePump::ScopedConnection mCombatIoParryOpponentConnection;
++		MessagePump::ScopedConnection mCombatIoEndTurnRequestedConnection;
++
+         CombatManager* mCombatManager;
+ 		CombatGui* mCombatGui;
+         HalfSphereSelector mEnemySelector;
+
+Modified: rl/trunk/engine/ui/include/CombatGui.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatGui.h	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/include/CombatGui.h	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -47,7 +47,7 @@
+ 
+ 		// Message handlers
+ 
+-		bool enemyButtonClicked(int handle, int bottonIndex);
++		bool enemyButtonClicked(int handle, int buttonIndex);
+ 		bool endTurnButtonClicked();
+ 		bool enemyEnteredCombat(Combatant*);
+ 		bool enemyLeftCombat(Combatant*);
+
+Modified: rl/trunk/engine/ui/include/CombatWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatWindow.h	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/include/CombatWindow.h	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -49,6 +49,9 @@
+ 		void enableEnemyButtonSet(int handle, bool enabled);
+ 		void enableAllEnemyButtonSets(bool enabled);
+ 
++		void setAttackedOpponentName(const CeGuiString&amp; name);
++		void setParriedOpponentName(const CeGuiString&amp; name);
++
+ 		// Event handlers
+ 
+ 		bool enemyButtonClicked(int handle, int buttonIndex);
+
+Modified: rl/trunk/engine/ui/include/UiMessages.h
+===================================================================
+--- rl/trunk/engine/ui/include/UiMessages.h	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/include/UiMessages.h	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -22,6 +22,8 @@
+ 
+ namespace rl
+ {
++	class Combatant;
++
+ 	// 0x04XXXXXX is mask for UI messages
+     enum UiMessageTypeIds
+     {
+@@ -31,6 +33,10 @@
+         // Events
+         RLMSG_COMBAT_IO_ENEMY_BUTTON_CLICKED = 0x04000101,
+         RLMSG_COMBAT_IO_END_TURN_BUTTON_CLICKED = 0x04000102,
++
++        RLMSG_COMBAT_IO_ATTACK_OPPONENT = 0x04000103,
++        RLMSG_COMBAT_IO_PARRY_OPPONENT = 0x04000104,
++        RLMSG_COMBAT_IO_END_TURN_REQUESTED = 0x04000105
+     };
+ 
+     /// Message sent after enemy action button has been pressed.
+@@ -39,5 +45,9 @@
+ 	/// Second int arg - button index
+     typedef MessageType&lt;RLMSG_COMBAT_IO_ENEMY_BUTTON_CLICKED, int, int&gt; MessageType_CombatIoEnemyButtonClicked;
+     typedef MessageType&lt;RLMSG_COMBAT_IO_END_TURN_BUTTON_CLICKED&gt; MessageType_CombatIoEndTurnButtonClicked;
++
++    typedef MessageType&lt;RLMSG_COMBAT_IO_ATTACK_OPPONENT, Combatant*&gt; MessageType_CombatIoAttackOpponent;
++    typedef MessageType&lt;RLMSG_COMBAT_IO_PARRY_OPPONENT, Combatant*&gt; MessageType_CombatIoParryOpponent;
++    typedef MessageType&lt;RLMSG_COMBAT_IO_END_TURN_REQUESTED&gt; MessageType_CombatIoEndTurnRequested;
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -31,6 +31,7 @@
+ #include &quot;Person.h&quot;
+ #include &quot;PhysicalThing.h&quot;
+ #include &quot;Selector.h&quot;
++#include &quot;UiMessages.h&quot;
+ #include &quot;World.h&quot;
+ 
+ #include &lt;OgreManualObject.h&gt;
+@@ -54,6 +55,17 @@
+ 
+         mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
+ 		mCombatGui = new CombatGui(mCombat, mCamera);
++
++        // Message handlers
++		mCombatIoAttackOpponentConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoAttackOpponent&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestAttackOpponent, this, _1));
++		mCombatIoParryOpponentConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoParryOpponent&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestParryOpponent, this, _1));
++		mCombatIoEndTurnRequestedConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoEndTurnRequested&gt;(
++			    boost::bind(&amp;CombatControlState::userRequestEndTurn, this));
+     }
+ 
+ 	CombatControlState::~CombatControlState()
+@@ -136,4 +148,19 @@
+ 	void CombatControlState::executeAction(CombatAction* action)
+ 	{
+ 	}
++
++	bool CombatControlState::userRequestAttackOpponent(Combatant* opponent)
++	{
++		return true;
++	}
++
++	bool CombatControlState::userRequestParryOpponent(Combatant* opponent)
++	{
++		return true;
++	}
++
++	bool CombatControlState::userRequestEndTurn()
++	{
++		return true;
++	}
+ }
+
+Modified: rl/trunk/engine/ui/src/CombatGui.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatGui.cpp	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/src/CombatGui.cpp	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -170,13 +170,31 @@
+ 		mHud-&gt;clear();
+ 	}
+ 
+-	bool CombatGui::enemyButtonClicked(int handle, int bottonIndex)
++	bool CombatGui::enemyButtonClicked(int handle, int buttonIndex)
+ 	{
++		for (OpponentButtonsMap::const_iterator it = mOpponentButtons.begin();
++			it != mOpponentButtons.end(); ++it)
++		{
++			if (it-&gt;second == handle)
++			{
++				if (buttonIndex == CombatWindow::ATTACK_BUTTON)
++				{
++					MessagePump::getSingleton().sendMessage&lt;MessageType_CombatIoAttackOpponent&gt;(it-&gt;first);
++				}
++				else if (buttonIndex == CombatWindow::PARRY_BUTTON)
++				{
++					MessagePump::getSingleton().sendMessage&lt;MessageType_CombatIoParryOpponent&gt;(it-&gt;first);
++				}
++				break;
++			}
++		}
++
+ 		return true;
+ 	}
+ 
+ 	bool CombatGui::endTurnButtonClicked()
+ 	{
++		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatIoEndTurnRequested&gt;();
+ 		return true;
+ 	}
+ 
+
+Modified: rl/trunk/engine/ui/src/CombatWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatWindow.cpp	2008-03-05 01:05:48 UTC (rev 4139)
++++ rl/trunk/engine/ui/src/CombatWindow.cpp	2008-03-05 01:06:51 UTC (rev 4140)
+@@ -146,4 +146,14 @@
+ 		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatIoEndTurnButtonClicked&gt;();
+ 		return true;
+ 	}
++
++	void CombatWindow::setAttackedOpponentName(const CeGuiString&amp; name)
++	{
++		getWindow(&quot;CombatWindow/AttackedOpponent&quot;)-&gt;setText(name);
++	}
++
++	void CombatWindow::setParriedOpponentName(const CeGuiString&amp; name)
++	{
++		getWindow(&quot;CombatWindow/AttackedOpponent&quot;)-&gt;setText(name);
++	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001210.html">[Dsa-hl-svn] r4139 - modules/common/gui/windows
+</A></li>
+	<LI>Next message: <A HREF="001212.html">[Dsa-hl-svn] r4141 - in modules: aitest combattest common intro	kanalisation ruchin techdemo techdemo2
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1211">[ date ]</a>
+              <a href="thread.html#1211">[ thread ]</a>
+              <a href="subject.html#1211">[ subject ]</a>
+              <a href="author.html#1211">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

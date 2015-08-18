@@ -1,0 +1,276 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3796 - in rl/trunk/engine: rules/include rules/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3796%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200709022103.l82L3Eb6027915%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000866.html">
+   <LINK REL="Next"  HREF="000868.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3796 - in rl/trunk/engine: rules/include rules/src	ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3796%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200709022103.l82L3Eb6027915%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3796 - in rl/trunk/engine: rules/include rules/src	ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep  2 23:03:14 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000866.html">[Dsa-hl-svn] r3795 - in modules: aitest combattest minidemo	regressiontest ruchin techdemo techdemo2 tutorial
+</A></li>
+        <LI>Next message: <A HREF="000868.html">[Dsa-hl-svn] r3797 - in rl/trunk/engine: common/src rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#867">[ date ]</a>
+              <a href="thread.html#867">[ thread ]</a>
+              <a href="subject.html#867">[ subject ]</a>
+              <a href="author.html#867">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-02 23:03:07 +0200 (Sun, 02 Sep 2007)
+New Revision: 3796
+
+Added:
+   rl/trunk/engine/rules/include/SaveGameFile.h
+   rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+Modified:
+   rl/trunk/engine/rules/src/SaveGameFile.cpp
+   rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+Log:
+- forgot to add SaveGameFileWriter
+- update of saving games
+
+
+Added: rl/trunk/engine/rules/include/SaveGameFile.h
+===================================================================
+--- rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-02 20:37:29 UTC (rev 3795)
++++ rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-02 21:03:07 UTC (rev 3796)
+@@ -0,0 +1,44 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __SaveGameFile_H__
++#define __SaveGameFile_H__
++
++#include &quot;CommonPrerequisites.h&quot;
++#include &lt;OgreDataStream.h&gt;
++
++#include &lt;xercesc/framework/XMLFormatter.hpp&gt;
++
++namespace rl
++{
++    class _RlCommonExport SaveGameFile
++    {
++    public:
++        SaveGameFile(const CeGuiString &amp;name);
++        ~SaveGameFile();
++        void setModulName(const CeGuiString &amp;modulName);
++        CeGuiString buildFilename();
++        CeGuiString getName();
++
++        Ogre::DataStreamPtr load();
++        XERCES_CPP_NAMESPACE::XMLFormatTarget* save();
++    protected:
++        CeGuiString mModulName;
++        CeGuiString mName;
++    };
++}
++
++#endif
+\ No newline at end of file
+
+Modified: rl/trunk/engine/rules/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-02 20:37:29 UTC (rev 3795)
++++ rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-02 21:03:07 UTC (rev 3796)
+@@ -28,6 +28,10 @@
+         mName = name;
+     }
+ 
++    SaveGameFile::~SaveGameFile()
++    {
++    }
++
+     void SaveGameFile::setModulName(const CeGuiString &amp;modulName)
+     {
+         mModulName = modulName;
+@@ -45,11 +49,13 @@
+ 
+     Ogre::DataStreamPtr SaveGameFile::load()
+     {
++        ///@todo: decryption
+         return Ogre::DataStreamPtr( new Ogre::FileHandleDataStream(fopen(this-&gt;buildFilename().c_str(), &quot;r&quot;)));
+     }
+ 
+     XERCES_CPP_NAMESPACE::XMLFormatTarget* SaveGameFile::save()
+     {
++        ///@todo: encryption
+         return new XERCES_CPP_NAMESPACE::LocalFileFormatTarget(this-&gt;buildFilename().c_str());
+     }
+ 
+
+Added: rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-02 20:37:29 UTC (rev 3795)
++++ rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-02 21:03:07 UTC (rev 3796)
+@@ -0,0 +1,87 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#include &quot;stdinc.h&quot;
++
++#include &lt;XmlHelper.h&gt;
++#include &lt;xercesc/dom/DOM.hpp&gt;
++#include &lt;xercesc/dom/DOMAttr.hpp&gt;
++#include &lt;xercesc/dom/DOMElement.hpp&gt;
++#include &lt;Properties.h&gt;
++
++#include &quot;SaveGameFileWriter.h&quot;
++#include &lt;GameObjectManager.h&gt;
++
++#include &lt;OgreResourceManager.h&gt;
++#include &lt;CEGUIPropertyHelper.h&gt;
++
++using namespace XERCES_CPP_NAMESPACE;
++using namespace Ogre;
++
++namespace rl
++{
++    void SaveGameFileWriter::buildSaveGameFile(SaveGameFile *file)
++    {
++        //@toto: build
++        XMLPlatformUtils::Initialize();
++
++        XmlHelper::initializeTranscoder();
++
++        XMLCh tempStr[100];
++        XMLString::transcode(&quot;LS&quot;, tempStr, 99);
++        mImplementation = DOMImplementationRegistry::getDOMImplementation(tempStr);
++        mWriter = ((DOMImplementationLS*)mImplementation)-&gt;createDOMWriter();
++        mTarget = file-&gt;save();
++        mDocument = ((DOMImplementation*)mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameFile&quot;), 0);
++        mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameFile&quot;));
++
++        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
++            mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
++
++        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
++             mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
++
++        //Write globals
++        DOMElement* globals = XmlHelper::appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
++
++        //Write game objects
++        DOMElement* gameobjects = XmlHelper::appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;gameobjects&quot;);
++        
++        std::list&lt;const GameObject*&gt;::const_iterator it;
++        std::list&lt;const GameObject*&gt; gos;
++        gos = GameObjectManager::getSingleton().getAllGameObjects();
++
++        for(it = gos.begin(); it != gos.end(); it++)
++        {
++            DOMElement* gameobject = XmlHelper::appendChildElement(mDocument, gameobjects, &quot;gameobject&quot;);
++
++            PropertyMap map = (*it)-&gt;getAllProperties()-&gt;toPropertyMap();
++            PropertyMap::iterator it2;
++            for(it2 = map.begin(); it2 != map.end(); it2)
++            {
++                this-&gt;processProperty(gameobject, PropertyEntry(it2-&gt;first.c_str(), it2-&gt;second));
++            }
++        }        
++
++        //Write scripts
++        DOMElement* scripts = XmlHelper::appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;scripts&quot;);
++
++        mWriter-&gt;writeNode(mTarget, *mDocument);
++
++        mWriter-&gt;release();
++        delete mTarget;
++    }
++}
+
+Modified: rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-09-02 20:37:29 UTC (rev 3795)
++++ rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-09-02 21:03:07 UTC (rev 3796)
+@@ -116,7 +116,7 @@
+         SaveGameFile saveGameFile(mFilename-&gt;getText());
+         saveGameFile.setModulName(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getName());
+ 
+-        std::list&lt;const GameObject*&gt;::const_iterator it;
++        /*std::list&lt;const GameObject*&gt;::const_iterator it;
+         std::list&lt;const GameObject*&gt; gos;
+         gos = GameObjectManager::getSingleton().getAllGameObjects();
+ 
+@@ -124,9 +124,9 @@
+         for( it=gos.begin(); it!=gos.end(); ++it )
+         {
+             sets.push_back((*it)-&gt;getAllProperties());
+-        }
++        }*/
+         SaveGameFileWriter saveGameFileWriter;
+-        saveGameFileWriter.setPropertySets(sets);
++        //saveGameFileWriter.setPropertySets(sets);
+         saveGameFileWriter.buildSaveGameFile(&amp;saveGameFile);
+ 
+         LOG_MESSAGE(Logger::UI, &quot;Created save game&quot;);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000866.html">[Dsa-hl-svn] r3795 - in modules: aitest combattest minidemo	regressiontest ruchin techdemo techdemo2 tutorial
+</A></li>
+	<LI>Next message: <A HREF="000868.html">[Dsa-hl-svn] r3797 - in rl/trunk/engine: common/src rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#867">[ date ]</a>
+              <a href="thread.html#867">[ thread ]</a>
+              <a href="subject.html#867">[ subject ]</a>
+              <a href="author.html#867">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

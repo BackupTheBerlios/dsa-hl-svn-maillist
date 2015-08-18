@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4244 - in rl/trunk/engine/ai: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4244%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200803081044.m28AiHbb019659%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001314.html">
+   <LINK REL="Next"  HREF="001316.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4244 - in rl/trunk/engine/ai: include src</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4244%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200803081044.m28AiHbb019659%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4244 - in rl/trunk/engine/ai: include src">iblis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 11:44:17 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001314.html">[Dsa-hl-svn] r4243 - modules/common/scripts
+</A></li>
+        <LI>Next message: <A HREF="001316.html">[Dsa-hl-svn] r4245 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1315">[ date ]</a>
+              <a href="thread.html#1315">[ thread ]</a>
+              <a href="subject.html#1315">[ subject ]</a>
+              <a href="author.html#1315">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-08 11:44:16 +0100 (Sat, 08 Mar 2008)
+New Revision: 4244
+
+Modified:
+   rl/trunk/engine/ai/include/DialogImplication.h
+   rl/trunk/engine/ai/src/DialogImplication.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/ai/src/DialogOption.cpp
+Log:
+added active/inactive state for options
+
+Modified: rl/trunk/engine/ai/include/DialogImplication.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogImplication.h	2008-03-08 10:18:57 UTC (rev 4243)
++++ rl/trunk/engine/ai/include/DialogImplication.h	2008-03-08 10:44:16 UTC (rev 4244)
+@@ -43,6 +43,17 @@
+         CeGuiString mValue;
+     };
+ 
++    class DialogElementActivation : public DialogImplication
++    {
++    public:
++        DialogElementActivation(const CeGuiString&amp; id, bool value, bool isOption);
++        virtual void apply(Dialog* dialog);
++    private:
++        CeGuiString mElementId;
++        bool mValue;
++        bool mIsOption;
++    };
++
+ 	class DialogExit : public DialogImplication
+ 	{
+ 	public:
+
+Modified: rl/trunk/engine/ai/src/DialogImplication.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogImplication.cpp	2008-03-08 10:18:57 UTC (rev 4243)
++++ rl/trunk/engine/ai/src/DialogImplication.cpp	2008-03-08 10:44:16 UTC (rev 4244)
+@@ -47,6 +47,26 @@
+         dialog-&gt;setProperty(mVariableName, prop);
+     }
+ 
++    DialogElementActivation::DialogElementActivation(const CeGuiString&amp; id, 
++                                                     bool value,
++                                                     bool isOption)
++        : mElementId(id), mValue(value), mIsOption(isOption)
++    {
++    }
++
++    void DialogElementActivation::apply(Dialog* dialog)
++    {
++        Property prop;
++        if(mIsOption)
++        {
++            dialog-&gt;setProperty(&quot;option&quot; + mElementId + &quot;isActive&quot;, mValue);
++        }
++        else
++        {
++            dialog-&gt;setProperty(&quot;response&quot; + mElementId + &quot;isActive&quot;, mValue);
++        }
++    }
++
+ 	void DialogExit::apply(rl::Dialog *dialog)
+ 	{
+ 		dialog-&gt;setProperty(Dialog::PROP_EXIT_REQUESTED, true);
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-08 10:18:57 UTC (rev 4243)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-08 10:44:16 UTC (rev 4244)
+@@ -55,6 +55,25 @@
+     DialogManager::~DialogManager()
+     {
+         SaveGameManager::getSingleton().unregisterSaveGameData(this);
++        {
++            std::map&lt;Ogre::String, DialogPrototype*&gt;::iterator itr = mDialogs.begin();
++            std::map&lt;Ogre::String, DialogPrototype*&gt;::iterator end = mDialogs.end();
++            for(; itr != end; ++itr)
++            {
++                DialogPrototype* p = itr-&gt;second;
++                //delete (*itr-&gt;second);
++            }
++            mDialogs.clear();
++        }
++        {
++            std::map&lt;DialogConfiguration, Dialog*&gt;::iterator itr = mDialogStates.begin();
++            std::map&lt;DialogConfiguration, Dialog*&gt;::iterator end = mDialogStates.end();
++            for(; itr != end; ++itr)
++            {
++                //delete (*itr-&gt;second);
++            }
++            mDialogStates.clear();
++        }
+     }
+ 
+     const StringVector&amp; DialogManager::getScriptPatterns() const
+@@ -805,6 +824,12 @@
+                 CeGuiString variableValue = getAttributeValueAsString(implicationElem, &quot;value&quot;);
+                 return new DialogVariableAssignment(variableName, variableValue);
+             }
++            else if (hasNodeName(implicationElem, &quot;setoptionactive&quot;))
++            {
++                CeGuiString id = getAttributeValueAsString(implicationElem, &quot;id&quot;);
++                bool value = getAttributeValueAsBool(implicationElem, &quot;value&quot;);
++                return new DialogElementActivation(id, value, true);
++            }
+ 			else if (hasNodeName(implicationElem, &quot;exit&quot;))
+ 			{
+ 				return new DialogExit();
+
+Modified: rl/trunk/engine/ai/src/DialogOption.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogOption.cpp	2008-03-08 10:18:57 UTC (rev 4243)
++++ rl/trunk/engine/ai/src/DialogOption.cpp	2008-03-08 10:44:16 UTC (rev 4244)
+@@ -15,8 +15,8 @@
+  */
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
++#include &quot;Dialog.h&quot;
+ #include &quot;DialogOption.h&quot;
+-
+ #include &quot;DialogCondition.h&quot;
+ 
+ namespace rl
+@@ -66,6 +66,18 @@
+ 
+     bool DialogOption::isAvailable(Dialog* dialog) const
+     {
++        bool isActive = true;
++        
++        if(dialog-&gt;getAllProperties()-&gt;hasProperty(&quot;option&quot; + getId() + &quot;isActive&quot;))
++        {
++            isActive = dialog-&gt;getProperty(&quot;option&quot; + getId() + &quot;isActive&quot;);
++        }
++        // if the DialogOption is not active, return false
++        if(!isActive)
++        {
++            return false;
++        }
++        // if it is active, check it's precondition
+         if (mPrecondition)
+         {
+             return mPrecondition-&gt;isTrue(dialog);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001314.html">[Dsa-hl-svn] r4243 - modules/common/scripts
+</A></li>
+	<LI>Next message: <A HREF="001316.html">[Dsa-hl-svn] r4245 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1315">[ date ]</a>
+              <a href="thread.html#1315">[ thread ]</a>
+              <a href="subject.html#1315">[ subject ]</a>
+              <a href="author.html#1315">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

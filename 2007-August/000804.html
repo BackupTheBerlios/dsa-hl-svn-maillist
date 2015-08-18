@@ -1,0 +1,899 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3733 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3733%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200708222222.l7MMMxpE032507%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000803.html">
+   <LINK REL="Next"  HREF="000805.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3733 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3733%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200708222222.l7MMMxpE032507%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3733 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Aug 23 00:22:59 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000803.html">[Dsa-hl-svn] r3732 - in rl/trunk/engine: core/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="000805.html">[Dsa-hl-svn] r3734 - in modules: common/scripts	regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#804">[ date ]</a>
+              <a href="thread.html#804">[ thread ]</a>
+              <a href="subject.html#804">[ subject ]</a>
+              <a href="author.html#804">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-23 00:22:44 +0200 (Thu, 23 Aug 2007)
+New Revision: 3733
+
+Modified:
+   rl/trunk/engine/rules/include/Inventory.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+Log:
+-implemented GOS_READY in slots with another itemMask
+-fixed bugs in InventoryWindow
+-items automatically remove themselves from containers and slots, if assigned to another
+
+Modified: rl/trunk/engine/rules/include/Inventory.h
+===================================================================
+--- rl/trunk/engine/rules/include/Inventory.h	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/include/Inventory.h	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -76,14 +76,16 @@
+ 
+ 
+     // Das Inventar der Kreatur wird durch das Inventarobjekt verwaltet.
+-    void addToInventory(Item* item, const CeGuiString&amp; containerName);
++    //void addToInventory(Item* item, const CeGuiString&amp; containerName);
+     void hold(Item* item, const CeGuiString&amp; slotName);
+     bool canHold(Item* item, const CeGuiString&amp; slotName) const;
++    bool canReady(Item* item, const CeGuiString&amp; slotName) const;
+ 	void dropItem(const CeGuiString&amp; slotName);
+     void ready(Item* item);
++    //void removeFromInventory(Item* item);
+ 
+     Item* getItem(const CeGuiString&amp; slotName) const;
+-    void addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemMask, SlotType type = SLOT_BONE);
++    void addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemReadyMask, int itemHeldMask, SlotType type = SLOT_BONE);
+     const SlotMap&amp; getAllSlots() const;
+ 
+ 	Creature* getOwner() const;
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/include/Item.h	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -22,6 +22,8 @@
+ namespace rl
+ {
+ 	class _RlRulesExport Item;
++    class Slot;
++    class Container;
+ 
+ 	typedef std::vector&lt;Item*&gt; ContainerColumn;
+ 	typedef std::vector&lt;ContainerColumn&gt; ContainerLayout;
+@@ -76,9 +78,25 @@
+ 		std::pair&lt;int,int&gt; getSize() const;
+ 		void setSize(int width, int height);
+ 
++
++        /**
++         * F&#252;gt das Verhalten f&#252;r die GO-States: GOS_READY, GOS_HELD und GOS_IN_POSSESION hinzu.
++         * @warning Falls ein Actor existiert, wird dieser gel&#246;scht. Das bedeutet, dass diese Funktion
++         * aufgerufen werden muss, bevor gegebenenfalls ein neuer Actor erstellt wird!
++         * Der Owner und der ParentSlot wird ebenfalls resettet. Au&#223;erdem wird das Item aus dem Slot entfernt!
++         * Bei den drei States ist die zu Grunde liegende Idee, dass man (in dieser Reihenfolge) mit dieser
++         * Funktion den neuen State setzt und dann dann den neuen State einrichtet (evt doCreateActor() aufruft).
++         * Dabei muss man sich nicht mehr darum k&#252;mmern, welchen State das Item vorher hatte.
++         **/
+         virtual void setState(GameObjectState state);
+-        void hold();
++        //void hold();
+ 
++        void setParentSlot(Slot* slot);
++        Slot* getParentSlot() const;
++
++        void setParentContainer(Container* cont);
++        Container* getParentContainer() const;
++
+         void setOwner(GameObject* go);
+         GameObject* getOwner() const;
+ 
+@@ -86,11 +104,14 @@
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertySet* getAllProperties() const;
+ 
++        void doCreateActor();
+     protected:
+ 		ItemType mItemType;
+ 		CeGuiString mImageName;
+ 		std::pair&lt;int,int&gt; mSize;
+         GameObject* mOwner;
++        Slot* mParentSlot;
++        Container* mParentContainer;
+ 
+ 		void doHold();
+ 		void doLoose();
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/include/Slot.h	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -28,24 +28,34 @@
+ public:
+     virtual void setItem(Item* item) = 0;
+     Item* getItem() const;
+-    bool isAllowed(Item* item) const;
++    bool isAllowed(const Item* item) const;
++    bool isEmpty() const {return mItem == NULL;}
++    bool canReady(const Item* item) const;
++    CeGuiString getName() const {return mName;}
+     virtual ~Slot();
+ 
+ protected:
+-    Slot(Creature* owner, const CeGuiString&amp; name, int itemMask);
++    Slot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask);
+ 
++    // intended to be used in setItem-Function, provides standard behaviour, sets
++    // item-state etc, returns true, if succeeded to set item, false indicates to to nothing
++    bool standardSetItem(Item* item);
++
+     Creature* mOwner;
+     Item* mItem;
+ 
+ private:
+     CeGuiString mName;
+-    int mItemMask;
++    /// die mItemReadyMask hat Vorrang vor der mItemHeldMask
++    int mItemHeldMask;
++    /// die mItemReadyMask hat Vorrang vor der mItemHeldMask
++    int mItemReadyMask;
+ };
+ 
+ class BoneSlot : public Slot
+ {
+ public:
+-    BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; bone);
++    BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; bone);
+     virtual void setItem(Item* item);
+ 
+ private:
+@@ -55,7 +65,7 @@
+ class SubmeshSlot : public Slot
+ {
+ public:
+-    SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh);
++    SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh);
+     virtual void setItem(Item* item);
+ 
+ private:
+@@ -65,7 +75,7 @@
+ class MaterialSlot : public Slot
+ {
+ public:
+-    MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh);
++    MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh);
+     virtual void setItem(Item* item);
+ 
+ private:
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/src/Container.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -113,6 +113,7 @@
+ 			mItemPositions[item] = pos;
+ 			mItems.insert(item);
+ 			item-&gt;setState(GOS_IN_POSSESSION);
++            item-&gt;setParentContainer(this);
+ 			return true;
+ 		}
+ 		else
+@@ -128,7 +129,11 @@
+         {
+             mItems.erase(it);
+             mItemPositions.erase(mItemPositions.find(item));
+-            item-&gt;setState(GOS_LOADED);
++            
++            // this is the case, if the item is removed automatically
++            // don't change this without looking at Item::setState
++            if( item-&gt;getState() != GOS_LOADED )
++                item-&gt;setState(GOS_LOADED);
+         }
+         else
+         {
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -46,6 +46,9 @@
+ 
+         physicsManager-&gt;createMaterialPair(char_mat, def_mat)-&gt;setContactCallback(this);
+         physicsManager-&gt;createMaterialPair(char_mat, level_mat)-&gt;setContactCallback(this);
++        
++        physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultFriction(0,0);
++        physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0,0);
+     }
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -176,7 +176,7 @@
+         {
+             Throw(rl::IllegalArgumentException, Ogre::String(&quot;Slot '&quot;)+slotName.c_str()+&quot;' doesn't exist.&quot;);
+         }
+-        slotIter-&gt;second-&gt;getItem()-&gt;setOwner(NULL);
++        //slotIter-&gt;second-&gt;getItem()-&gt;setOwner(NULL);
+         slotIter-&gt;second-&gt;setItem(NULL);
+ 
+ 	}
+@@ -190,7 +190,7 @@
+         }
+ 
+         slotIter-&gt;second-&gt;setItem(item);
+-        item-&gt;setOwner(getOwner());
++        //item-&gt;setOwner(getOwner());
+     }
+ 
+ 	bool Inventory::canHold(Item* item, const CeGuiString&amp; slotName) const
+@@ -204,6 +204,17 @@
+ 		return slotIter-&gt;second-&gt;isAllowed(item);
+     }
+ 
++	bool Inventory::canReady(Item* item, const CeGuiString&amp; slotName) const
++    {
++        std::map&lt;CeGuiString, Slot*&gt;::const_iterator slotIter = mSlots.find(slotName);
++        if (slotIter == mSlots.end())
++        {
++            Throw(rl::IllegalArgumentException, Ogre::String(&quot;Slot '&quot;)+slotName.c_str()+&quot;' doesn't exist.&quot;);
++        }
++
++		return true;//slotIter-&gt;second-&gt;canReady(item);
++    }
++
+     Item* Inventory::getItem(const CeGuiString&amp; slotName) const
+     {
+         std::map&lt;CeGuiString, Slot*&gt;::const_iterator slotIter = mSlots.find(slotName);
+@@ -219,7 +230,7 @@
+     {
+     }
+ 
+-    void Inventory::addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemMask, SlotType type)
++    void Inventory::addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemReadyMask, int itemHeldMask, SlotType type)
+     {
+         if (mSlots.find(name) != mSlots.end())
+         {
+@@ -229,13 +240,13 @@
+ 		switch (type)
+         {
+             case SLOT_BONE:
+-			    mSlots[name] = new BoneSlot(mOwner, name, itemMask, meshpartname);
++			    mSlots[name] = new BoneSlot(mOwner, name, itemReadyMask, itemHeldMask, meshpartname);
+                 break;
+             case SLOT_SUBMESH:
+-			    mSlots[name] = new SubmeshSlot(mOwner, name, itemMask, meshpartname);
++			    mSlots[name] = new SubmeshSlot(mOwner, name, itemReadyMask, itemHeldMask, meshpartname);
+                 break;
+             case SLOT_MATERIAL:
+-			    mSlots[name] = new MaterialSlot(mOwner, name, itemMask, meshpartname);
++			    mSlots[name] = new MaterialSlot(mOwner, name, itemReadyMask, itemHeldMask, meshpartname);
+                 break;
+ 		}
+     }
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/src/Item.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -18,7 +18,9 @@
+ #include &quot;Item.h&quot;
+ 
+ #include &quot;Actor.h&quot;
++#include &quot;Container.h&quot;
+ #include &quot;Exception.h&quot;
++#include &quot;Slot.h&quot;
+ 
+ using namespace std;
+ 
+@@ -35,7 +37,9 @@
+ 		mItemType(ITEMTYPE_OTHER),
+ 		mImageName(&quot;&quot;),
+ 		mSize(pair&lt;int,int&gt;(1,1)),
+-        mOwner(NULL)
++        mOwner(NULL),
++        mParentSlot(NULL),
++        mParentContainer(NULL)
+     {
+         mQueryFlags |= QUERYFLAG_ITEM;
+     }
+@@ -78,29 +82,79 @@
+ 	{
+ 		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
+ 	}
+-
++/*
+ 	void Item::hold()
+ 	{
+ 		setState(GOS_HELD);
+ 	}
+-
++*/
+     void Item::doHold()
+     {
+         setActor(createActor());
+         mState = GOS_HELD;
+     }
+ 
+-	void Item::doLoose()
+-	{
+-		if (mActor != NULL)
+-		{
+-			mActor-&gt;detachFromParent();
+-			///@todo is mState = GOS_IN_SCENE; after detaching?
+-		}
+-	}
++    void Item::doLoose()
++    {
++        if (mActor != NULL)
++        {
++            mActor-&gt;detachFromParent();
++            destroyActor();
++        }
++    }
+ 
++// --------------- Warning ------------
++// do not change this function without
++// having a look at the containers and slots
+     void Item::setState(GameObjectState targetstate)
+     {
++        // do reset if one of the new states
++        if (mState != GOS_HELD &amp;&amp; mState != GOS_IN_POSSESSION &amp;&amp; mState != GOS_READY &amp;&amp;
++            mState == targetstate)
++        {
++            return;
++        }
++
++        GameObjectState oldState = mState;
++
++
++        if( mState == GOS_HELD ||
++            mState == GOS_IN_POSSESSION ||
++            mState == GOS_READY )
++        {
++            mState = GOS_LOADED; // &lt;- this is important to avoid endless recursion!
++            if( getParentSlot() )
++                getParentSlot()-&gt;setItem(NULL);
++            setParentSlot(NULL);
++            if( getParentContainer() )
++                getParentContainer()-&gt;removeItem(this);
++            setParentContainer(NULL);
++            doLoose();
++            setOwner(NULL);
++        }
++        else
++        {
++            GameObject::setState(GOS_LOADED);
++            oldState = GOS_LOADED;
++        }
++
++        if( targetstate == GOS_HELD || 
++            targetstate == GOS_IN_POSSESSION || 
++            targetstate == GOS_READY )
++        {
++            mState = targetstate;
++            onStateChange(oldState, mState);
++        }
++        else
++        {
++            onStateChange(oldState, mState);
++            GameObject::setState(targetstate);
++        }
++    }
++
++/*
++    void Item::setState(GameObjectState targetstate)
++    {
+         if (mState == targetstate)
+         {
+             return;
+@@ -111,6 +165,23 @@
+ 
+         if (targetstate == GOS_IN_POSSESSION)
+         {
++            if( mState == GOS_HELD ||
++                mState == GOS_IN_POSSESSION ||
++                mState == GOS_READY )
++            {
++                mState = GOS_LOADED;
++                doLoose();
++                setOwner(NULL);
++                onStateChange(oldState, mState);
++            }
++            else
++            {
++                GameObject::setState(GOS_LOADED);
++                oldState = GOS_LOADED;
++            }
++            mState = targetstate;
++            stateChanged = true;
++            /*
+             if (mState == GOS_LOADED)
+             {
+                 stateChanged = true;
+@@ -126,9 +197,12 @@
+                 destroyActor();
+                 stateChanged = true;
+             }
++            */ /*
+         }
+         else if (targetstate == GOS_LOADED)
+         {
++                doLoose();
++                setOwner(NULL);
+             if (mState == GOS_IN_POSSESSION)
+             {
+ 				mState = GOS_LOADED;
+@@ -159,22 +233,41 @@
+         }
+         else if (targetstate == GOS_HELD)
+         {
++            if( mState == GOS_HELD ||
++                mState == GOS_IN_POSSESSION ||
++                mState == GOS_READY )
++            {
++                mState = GOS_LOADED;
++                doLoose();
++                setOwner(NULL);
++                onStateChange(oldState, mState);
++            }
++            else
++            {
++                GameObject::setState(GOS_LOADED);
++                oldState = GOS_LOADED;
++            }
++            mState = targetstate;
++            stateChanged = true;*/
++            /*
+             if (mState == GOS_LOADED)
+             {
+-                doHold();
++                //doHold();
+                 stateChanged = true;
+             }
+             else if (mState == GOS_IN_SCENE)
+             {
+                 doRemoveFromScene();
+-                doHold();
++                //doHold();
+                 stateChanged = true;
+             }
+             else if (mState == GOS_IN_POSSESSION)
+             {
+-                doHold();
++                //doHold();
+                 stateChanged = true;
+             }
++            */
++/*
+         }
+         else if (targetstate == GOS_READY)
+         {
+@@ -190,7 +283,7 @@
+             GameObject::setState(targetstate);
+         }
+     }
+-
++*/
+     void Item::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+     {
+         if (key == Item::PROPERTY_IMAGENAME)
+@@ -250,4 +343,29 @@
+     {
+         return mOwner;
+     }
++
++    void Item::setParentSlot(Slot* slot)
++    {
++        mParentSlot = slot;
++    }
++
++    Slot* Item::getParentSlot() const
++    {
++        return mParentSlot;
++    }
++
++    void Item::doCreateActor()
++    {
++        setActor(createActor());
++    }
++
++    void Item::setParentContainer(Container* cont)
++    {
++        mParentContainer = cont;
++    }
++
++    Container* Item::getParentContainer() const
++    {
++        return mParentContainer;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -26,8 +26,8 @@
+ 
+ namespace rl {
+ 
+-    Slot::Slot(Creature* owner, const CeGuiString&amp; name, int itemMask)
+-        : mOwner(owner), mName(name), mItemMask(itemMask), mItem(NULL)
++    Slot::Slot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask)
++        : mOwner(owner), mName(name), mItemReadyMask(itemReadyMask), mItemHeldMask(itemHeldMask), mItem(NULL)
+     {
+     }
+ 
+@@ -40,105 +40,146 @@
+         return mItem;
+     }
+ 
+-    bool Slot::isAllowed(Item *item) const
++    bool Slot::isAllowed(const Item *item) const
+     {
++        if( item == NULL )
++            return false;
+         int type = item-&gt;getItemType();
+-        return (type &amp; mItemMask) == type;
++        return (type &amp; mItemReadyMask) == type || (type &amp; mItemHeldMask) == type;
+     }
+ 
++    bool Slot::canReady(const Item *item) const
+ 
+-    BoneSlot::BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; bone)
+-        : Slot(owner, name, itemMask), mBone(bone)
++
+     {
++        if( item == NULL )
++            return false;
++        int type = item-&gt;getItemType();
++        return (type &amp; mItemReadyMask) == type;
+     }
+ 
++    bool Slot::standardSetItem(Item* item)
+ 
++    {
++        if (item)
++        {
++            if( isAllowed(item) &amp;&amp; isEmpty())
++            {
++                if( canReady(item) )
++                    item-&gt;setState(GOS_READY);
++                else
++                    item-&gt;setState(GOS_HELD);
++                item-&gt;setOwner(mOwner);
++                item-&gt;setParentSlot(this);
++                mItem = item;
++            }
++            else
++            {
++                LOG_MESSAGE(Logger::RULES,
++                    &quot;Item '&quot; + item-&gt;getName() + &quot;' konnte nicht in den Slot '&quot; + mName
++                    + &quot;' gelegt werden: &quot; + (isAllowed(item) ? &quot;'falscher Typ' &quot; : &quot;&quot;)
++                    + (isEmpty() ? &quot;'Slot schon belegt&quot; : &quot;&quot;) + &quot;!&quot;);
++                return false;
++            }
++        }
++        else
++        {
++            // this is the case, if the item is removed automatically
++            // don't change this without looking at Item::setState
++            if( mItem-&gt;getState() != GOS_LOADED )
++                mItem-&gt;setState(GOS_LOADED);
++            mItem = NULL;
++
++        }
++
++        return true;
++    }
++
++
++    BoneSlot::BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; bone)
++        : Slot(owner, name, itemReadyMask, itemHeldMask), mBone(bone)
++    {
++    }
++
+     void BoneSlot::setItem(Item* item)
+     {
+-		if (item == NULL)
+-		{
+-			mItem-&gt;setState(GOS_LOADED);
+-			mItem = NULL;
+-			return;
+-		}
++        if( !standardSetItem(item) )
++            return;
+ 
+-        if (isAllowed(item))
++        if(item)
+         {
+-			if (mItem != NULL)
+-			{
+-				/// @todo What to do with the item which was already in the slot (or should we throw an exception if the item is not NULL)
+-			}
+-
+-            mItem = item;
+             if (mOwner-&gt;getState() == GOS_IN_SCENE)
+             {
+-				mItem-&gt;setState(GOS_HELD);
++                mItem-&gt;doCreateActor();
+                 mOwner-&gt;getActor()-&gt;attachToSlot(mItem-&gt;getActor(), mBone);
+             }
+         }
+     }
+ 
+ 
+-    SubmeshSlot::SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh)
+-        : Slot(owner, name, itemMask), mSubmesh(submesh)
++    SubmeshSlot::SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh)
++        : Slot(owner, name, itemReadyMask, itemHeldMask), mSubmesh(submesh)
+     {
+     }
+ 
+-
+     void SubmeshSlot::setItem(Item* item)
+     {
+-		///@todo: what to do if actor is null?, think about changing the inventory of an gameobject not in scene
+-		if (mOwner-&gt;getActor())
+-		{
+-			MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
+-				mOwner-&gt;getActor()-&gt;getControlledObject());
++        Item* oldItem = mItem;
++        if( !standardSetItem(item) )
++            return;
+ 
+-			if (mmo)
+-			{
+-				if (item)
+-				{
+-					if (isAllowed(item))
+-					{
+-						item-&gt;setState(GOS_IN_POSSESSION);
+-						mmo-&gt;replaceSubmesh(
+-							mSubmesh,
+-							item-&gt;getMeshfile().c_str());
+-						mItem = item;
+-					}
+-				}
+-				else
+-				{
+-					MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
+-					if (it != mOwner-&gt;getMeshParts().end())
+-					{
+-						mmo-&gt;replaceSubmesh(
+-							mSubmesh,
+-							(*it).second);
+-					}
+-					else
+-					{
+-						mmo-&gt;removeSubmesh(mSubmesh);
+-					}
+-					mItem = NULL;
+-				}
+-			}
+ 
++	    if (mOwner-&gt;getActor())
++	    {
++		    MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
++			    mOwner-&gt;getActor()-&gt;getControlledObject());
++
++		    if (mmo)
++		    {
++                if (oldItem != mItem)
++			    {
++				    MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
++				    if (it != mOwner-&gt;getMeshParts().end())
++				    {
++					    mmo-&gt;replaceSubmesh(
++						    mSubmesh,
++						    (*it).second);
++				    }
++				    else
++				    {
++					    mmo-&gt;removeSubmesh(mSubmesh);
++				    }
++			    }
++
++			    if (item)
++			    {
++                    item-&gt;doCreateActor();
++				    mmo-&gt;replaceSubmesh(
++					    mSubmesh,
++					    item-&gt;getMeshfile().c_str());
++			    }
++		    }
++
+             if (mOwner-&gt;getActor()
+                 &amp;&amp; mOwner-&gt;getActor()-&gt;getPhysicalThing())
+             {
+                 mOwner-&gt;getActor()-&gt;getPhysicalThing()-&gt;updatePhysicsProxy();
+             }
+-		}
++	    }
+     }
+ 
+-    MaterialSlot::MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh)
+-      : Slot(owner, name, itemMask),
++    MaterialSlot::MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh)
++      : Slot(owner, name, itemReadyMask, itemHeldMask),
+         mSubmesh(submesh)
+     {
+     }
+ 
+     void MaterialSlot::setItem(Item* item)
+     {
++        if( !standardSetItem(item) )
++            return;
++
++
+         if (item)
+         {
+             try
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -610,7 +610,7 @@
+     private:
+         Inventory(rl::Creature* owner);
+     public:
+-        void addSlot(const rl::CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemMask, SlotType type = SLOT_BONE);
++        void addSlot(const rl::CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemReadyMask, int itemHeldMask, SlotType type = SLOT_BONE);
+         rl::Item* getItem(const rl::CeGuiString&amp; slotName) const;
+         void hold(rl::Item* item, const rl::CeGuiString&amp; slot);
+         void dropItem(const rl::CeGuiString&amp; slotName);
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -53,6 +53,8 @@
+         void initInventoryWindow(Inventory* inventory);
+ 
+ 		ItemDragContainer* createItemDragContainer(Item* item, bool showdescription, const CeGuiString&amp; containerName = &quot;&quot;);
++        //ItemDragContainer* getItemDragContainer(Item* item, bool description);
++        CeGuiString getDragContainerNameFromItem(const Item* item, bool description);
+ 		bool handleItemDroppedOnSlot(const CEGUI::EventArgs&amp; evt);
+ 		bool handleItemDroppedOnWorld(const CEGUI::EventArgs&amp; evt);
+ 		bool handleMouseMovedInWorld(const CEGUI::EventArgs&amp; evt);
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-22 22:17:17 UTC (rev 3732)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-22 22:22:44 UTC (rev 3733)
+@@ -146,14 +146,40 @@
+ 		mWorldBackground-&gt;subscribeEvent(Window::EventKeyUp,
+ 			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, false));
+     }
++/*
++    ItemDragContainer* InventoryWindow::getItemDragContainer(Item* item, bool description)
++    {
++		CeGuiString dragContainerName = getDragContainerNameFromItem(item, description);
++		ItemDragContainer* itemhandler = NULL;
+ 
++		DndContainerMap::iterator iter = mWorldDragContainers.find(dragContainerName);
++        if( iter != mWorldDragContainers.end() )
++        {
++            return iter-&gt;second;
++        }
++		iter = mSlotDragContainers.find(dragContainerName);
++        if( iter != mSlotDragContainers.end() )
++        {
++            return iter-&gt;second;
++        }
++
++        return NULL;
++    }
++*/
++
++    CeGuiString InventoryWindow::getDragContainerNameFromItem(const Item* item, bool description)
++    {
++		CeGuiString dragContainerName =
++			mWindow-&gt;getName() +  &quot;/item/&quot;
++			+ Ogre::StringConverter::toString(item-&gt;getId())+&quot;_DragContainer&quot;+
++			(description?&quot;_D&quot;:&quot;_I&quot;);
++        return dragContainerName;
++    }
++
+ 	ItemDragContainer* InventoryWindow::createItemDragContainer(
+ 		Item* item, bool showdescription, const CeGuiString&amp; slotName)
+ 	{
+-		CeGuiString dragContainerName =
+-			mWindow-&gt;getName() +  &quot;/item/&quot;
+-			+ Ogre::StringConverter::toString(item-&gt;getId())+&quot;_DragContainer&quot;+
+-			(showdescription?&quot;_D&quot;:&quot;_I&quot;);
++        CeGuiString dragContainerName = getDragContainerNameFromItem(item, showdescription);
+ 		ItemDragContainer* itemhandler = NULL;
+ 
+ 		DndContainerMap::iterator itW = mWorldDragContainers.find(dragContainerName);
+@@ -208,15 +234,13 @@
+ 			{
+ 				if (dragcont-&gt;getItemParentContainer() != NULL)
+ 				{
+-					dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
++					//dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
+ 					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-					///@todo Swap with old content (if there is some)
+ 				}
+ 				else if (dragcont-&gt;getItemParentSlot() != &quot;&quot;)
+ 				{
+-					dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
++					//dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
+ 					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-					///@todo Swap with old content (if there is some)
+ 				}
+ 
+ 				ItemDragContainer* newCont = createItemDragContainer(item, false, targetSlot);
+@@ -230,9 +254,11 @@
+ 					newCont = dragcont;
+ 				}
+ 
++                CEGUI::Window* slotWindow = mSlotWindows[targetSlot];
++
+ 				mInventory-&gt;hold(item, targetSlot);
+ 
+-				mSlotWindows[targetSlot]-&gt;addChildWindow(newCont);
++				slotWindow-&gt;addChildWindow(newCont);
+ 				newCont-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+ 				newCont-&gt;setItemParent(mInventory, targetSlot);
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000803.html">[Dsa-hl-svn] r3732 - in rl/trunk/engine: core/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="000805.html">[Dsa-hl-svn] r3734 - in modules: common/scripts	regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#804">[ date ]</a>
+              <a href="thread.html#804">[ thread ]</a>
+              <a href="subject.html#804">[ subject ]</a>
+              <a href="author.html#804">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

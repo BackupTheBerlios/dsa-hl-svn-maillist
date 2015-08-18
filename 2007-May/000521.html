@@ -1,0 +1,797 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3450 - in rl/trunk: . engine/common/include	engine/common/src engine/core engine/core/include	engine/core/src engine/script/swig tools
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3450%20-%20in%20rl/trunk%3A%20.%20engine/common/include%0A%09engine/common/src%20engine/core%20engine/core/include%0A%09engine/core/src%20engine/script/swig%20tools&In-Reply-To=%3C200705170708.l4H78KPh027620%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000520.html">
+   <LINK REL="Next"  HREF="000522.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3450 - in rl/trunk: . engine/common/include	engine/common/src engine/core engine/core/include	engine/core/src engine/script/swig tools</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3450%20-%20in%20rl/trunk%3A%20.%20engine/common/include%0A%09engine/common/src%20engine/core%20engine/core/include%0A%09engine/core/src%20engine/script/swig%20tools&In-Reply-To=%3C200705170708.l4H78KPh027620%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3450 - in rl/trunk: . engine/common/include	engine/common/src engine/core engine/core/include	engine/core/src engine/script/swig tools">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu May 17 09:08:20 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000520.html">[Dsa-hl-svn] r3449 - rl/trunk/engine/common/src
+</A></li>
+        <LI>Next message: <A HREF="000522.html">[Dsa-hl-svn] r3451 - modules/regressiontest/dsa	rl/trunk/engine/rules/include rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#521">[ date ]</a>
+              <a href="thread.html#521">[ thread ]</a>
+              <a href="subject.html#521">[ subject ]</a>
+              <a href="author.html#521">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-17 09:08:08 +0200 (Thu, 17 May 2007)
+New Revision: 3450
+
+Added:
+   rl/trunk/engine/core/include/MergeableMeshObject.h
+   rl/trunk/engine/core/src/MergeableMeshObject.cpp
+Modified:
+   rl/trunk/configure.in
+   rl/trunk/engine/common/include/Logger.h
+   rl/trunk/engine/common/src/Logger.cpp
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/ActorManager.h
+   rl/trunk/engine/core/include/CoreDefines.h
+   rl/trunk/engine/core/include/Makefile.am
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/Makefile.am
+   rl/trunk/engine/script/swig/RlCore.head.swig
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/tools/copy_dependencies.bat
+Log:
+Use the meshmagick lib to provide &quot;construction kit&quot; meshes
+
+Modified: rl/trunk/configure.in
+===================================================================
+--- rl/trunk/configure.in	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/configure.in	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -114,6 +114,9 @@
+ # DSA4Werkzeug
+ PKG_CHECK_MODULES(Dsa4Wz, Dsa4Wz &gt;= 1.33.0)
+ 
++# meshmagick libraries
++PKG_CHECK_MODULES(meshmagick, meshmagick &gt;= 0.4.0)
++
+ # XERCES
+ AC_CHECK_HEADERS(xercesc/util/XercesVersion.hpp, ,
+     [AC_MSG_ERROR([cannot find libxerces headers]) ])
+
+Modified: rl/trunk/engine/common/include/Logger.h
+===================================================================
+--- rl/trunk/engine/common/include/Logger.h	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/common/include/Logger.h	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -78,6 +78,8 @@
+ 		bool isErrorPresent() const;
+ 		void resetErrorState();
+ 		const Ogre::String&amp; getErrorLog() const;
++
++		Ogre::Log* _getLog() const;
+ 	private:
+ 		void log(const LogLevel level, const Ogre::String&amp; msg );
+ 
+
+Modified: rl/trunk/engine/common/src/Logger.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Logger.cpp	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/common/src/Logger.cpp	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -179,4 +179,9 @@
+ 	return mErrorBuffer;
+ }
+ 
++Ogre::Log* Logger::_getLog() const
++{
++	return mLog;
+ }
++
++}
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -47,7 +47,7 @@
+ 			&lt;Tool
+ 				Name=&quot;VCCLCompilerTool&quot;
+ 				Optimization=&quot;0&quot;
+-				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include&quot;
++				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\meshmagick\include&quot;
+ 				PreprocessorDefinitions=&quot;WITH_FMOD3;_WINDOWS,_DEBUG,WIN32,RLCORE_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+ 				MinimalRebuild=&quot;true&quot;
+ 				BasicRuntimeChecks=&quot;3&quot;
+@@ -82,12 +82,12 @@
+ 				Name=&quot;VCLinkerTool&quot;
+ 				IgnoreImportLibrary=&quot;true&quot;
+ 				AdditionalOptions=&quot;/MACHINE:I386&quot;
+-				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt_d.lib OgreMain_d.lib xerces-c_2D.lib CEGUIBase_d.lib Newton.lib&quot;
++				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt_d.lib OgreMain_d.lib xerces-c_2D.lib CEGUIBase_d.lib Newton.lib meshmagick_d.lib&quot;
+ 				ShowProgress=&quot;0&quot;
+ 				OutputFile=&quot;./lib/$(ConfigurationName)/RlCore.dll&quot;
+ 				LinkIncremental=&quot;2&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;&quot;..\common\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;&quot;..\..\dependencies\ogrenewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\common\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;&quot;..\..\dependencies\ogrenewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\meshmagick\lib&quot;
+ 				IgnoreDefaultLibraryNames=&quot;&quot;
+ 				TypeLibraryFile=&quot;$(OutDir)\RlCore.lib&quot;
+ 				GenerateDebugInformation=&quot;true&quot;
+@@ -159,7 +159,7 @@
+ 				Optimization=&quot;3&quot;
+ 				EnableIntrinsicFunctions=&quot;true&quot;
+ 				FavorSizeOrSpeed=&quot;1&quot;
+-				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include&quot;
++				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\meshmagick\include&quot;
+ 				PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLCORE_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+ 				StringPooling=&quot;false&quot;
+ 				ExceptionHandling=&quot;1&quot;
+@@ -193,11 +193,11 @@
+ 				Name=&quot;VCLinkerTool&quot;
+ 				IgnoreImportLibrary=&quot;true&quot;
+ 				AdditionalOptions=&quot;/MACHINE:I386&quot;
+-				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt.lib xerces-c_2.lib CEGUIBase.lib OgreMain.lib Newton.lib&quot;
++				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt.lib xerces-c_2.lib CEGUIBase.lib OgreMain.lib Newton.lib meshmagick.lib&quot;
+ 				OutputFile=&quot;./lib/$(ConfigurationName)/RlCore.dll&quot;
+ 				LinkIncremental=&quot;1&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;&quot;..\common\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;&quot;..\..\dependencies\ogrenewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\common\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;&quot;..\..\dependencies\ogrenewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\meshmagick\lib&quot;
+ 				TypeLibraryFile=&quot;$(OutDir)\RlCore.lib&quot;
+ 				ProgramDatabaseFile=&quot;&quot;
+ 				SubSystem=&quot;2&quot;
+@@ -264,7 +264,7 @@
+ 				Optimization=&quot;3&quot;
+ 				EnableIntrinsicFunctions=&quot;true&quot;
+ 				FavorSizeOrSpeed=&quot;1&quot;
+-				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include&quot;
++				AdditionalIncludeDirectories=&quot;.\include;.\include\nulldriver;..\common\include;..\..\dependencies\ogrenew\OgreMain\include;..\..\dependencies\OgreNewt\include\OgreNewt;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\cegui_mk2\include;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\meshmagick\include&quot;
+ 				PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLCORE_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+ 				StringPooling=&quot;false&quot;
+ 				ExceptionHandling=&quot;1&quot;
+@@ -298,11 +298,11 @@
+ 				Name=&quot;VCLinkerTool&quot;
+ 				IgnoreImportLibrary=&quot;true&quot;
+ 				AdditionalOptions=&quot;/MACHINE:I386&quot;
+-				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt.lib xerces-c_2.lib CEGUIBase.lib OgreMain.lib Newton.lib&quot;
++				AdditionalDependencies=&quot;RlCommon.lib msvcrt-ruby18.lib OgreNewt.lib xerces-c_2.lib CEGUIBase.lib OgreMain.lib Newton.lib meshmagick.lib&quot;
+ 				OutputFile=&quot;$(OutDir)/RlCore.dll&quot;
+ 				LinkIncremental=&quot;1&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;..\common\lib\Release;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\ogrenewt\lib\Release;..\..\dependencies\NewtonSDK\sdk\dll&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\common\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\cegui_mk2\lib;&quot;..\..\dependencies\ogrenewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\meshmagick\lib&quot;
+ 				TypeLibraryFile=&quot;$(OutDir)\RlCore.lib&quot;
+ 				GenerateDebugInformation=&quot;true&quot;
+ 				ProgramDatabaseFile=&quot;$(TargetDir)$(TargetName).pdb&quot;
+@@ -457,10 +457,6 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
+-				RelativePath=&quot;.\include\LightFadeJob.h&quot;
+-				&gt;
+-			&lt;/File&gt;
+-			&lt;File
+ 				RelativePath=&quot;.\include\LightObject.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -477,6 +473,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\MergeableMeshObject.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\MeshAnimation.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -710,10 +710,6 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
+-				RelativePath=&quot;.\src\LightFadeJob.cpp&quot;
+-				&gt;
+-			&lt;/File&gt;
+-			&lt;File
+ 				RelativePath=&quot;.\src\LightObject.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -730,6 +726,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\MergeableMeshObject.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\MeshAnimation.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/ActorManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ActorManager.h	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/include/ActorManager.h	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -32,7 +32,7 @@
+ 
+     typedef std::map&lt;const Ogre::String,Actor*&gt; ActorPtrMap;
+     typedef std::pair&lt;const Ogre::String,Actor*&gt; ActorPtrPair;
+-
++	
+     class _RlCoreExport ActorManager : public Ogre::Singleton&lt;ActorManager&gt;
+     {
+     public:
+@@ -47,8 +47,13 @@
+         Actor* createListenerActor(const Ogre::String&amp; name);
+         Actor* createCameraActor(const Ogre::String&amp; name);
+         Actor* createEmptyActor(const Ogre::String&amp; name);
+-        Actor* createMeshActor(const Ogre::String&amp; name,const Ogre::String&amp; meshname,
++        Actor* createMeshActor(const Ogre::String&amp; name, const Ogre::String&amp; meshname,
+             GeometryType geomType = GT_NONE,
++            Ogre::Real mass = 1.0,
++			bool mergeable = false);
++		Actor* createMeshActor(const Ogre::String&amp; name, const Ogre::String&amp; basemeshname, 
++			const MeshPartMap&amp; meshname,
++            GeometryType geomType = GT_NONE,
+             Ogre::Real mass = 1.0);
+         Actor* createParticleSystemActor(const Ogre::String&amp; name, 
+             const Ogre::String&amp; partname);
+
+Modified: rl/trunk/engine/core/include/CoreDefines.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreDefines.h	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/include/CoreDefines.h	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -30,6 +30,7 @@
+         GT_PYRAMID = 6
+     };
+ 
++	typedef std::map&lt;Ogre::String, Ogre::String&gt; MeshPartMap;
+ }
+ 
+ #endif // __CoreConstants_H__
+
+Modified: rl/trunk/engine/core/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/include/Makefile.am	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/include/Makefile.am	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -32,6 +32,7 @@
+ 	LineSetPrimitive.h \
+ 	ListenerMovable.h \
+ 	ListenerObject.h \
++	MergeableMeshObject.h \
+ 	MeshAnimation.h \
+ 	MeshObject.h \
+ 	MovableText.h \
+
+Added: rl/trunk/engine/core/include/MergeableMeshObject.h
+===================================================================
+--- rl/trunk/engine/core/include/MergeableMeshObject.h	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/include/MergeableMeshObject.h	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -0,0 +1,52 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#ifndef __MergeableMeshObject_H__
++#define __MergeableMeshObject_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++#include &lt;OgreEntity.h&gt;
++#include &lt;OgreMesh.h&gt;
++#include &lt;map&gt;
++
++#include &quot;CoreDefines.h&quot;
++#include &quot;MeshObject.h&quot;
++
++namespace rl
++{
++	class _RlCoreExport MergeableMeshObject : public MeshObject
++	{
++	public:
++		MergeableMeshObject(const Ogre::String&amp; name, const Ogre::String&amp; meshname);
++		~MergeableMeshObject();
++
++		void addSubmesh(const Ogre::String&amp; partname, const Ogre::String&amp; meshfile);
++		void removeSubmesh(const Ogre::String&amp; partToRemove);
++		void replaceSubmesh(const Ogre::String&amp; partToReplace, const Ogre::String&amp; substituteMeshname);
++		void setBaseMeshPart(const Ogre::String&amp; partname);
++
++	private:
++		Ogre::MeshPtr mBaseMesh;
++		MeshPartMap mMeshes;
++		Ogre::String mCombinedMeshName;
++
++		void switchTo(const Ogre::MeshPtr&amp; newMesh);
++		void updateMesh();
++	};
++
++}
++
++#endif //__MergeableMeshObject_H__
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -23,6 +23,7 @@
+ #include &quot;LightObject.h&quot;
+ #include &quot;ListenerMovable.h&quot;
+ #include &quot;ListenerObject.h&quot;
++#include &quot;MergeableMeshObject.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;BoxPrimitive.h&quot;
+ #include &quot;MovableText.h&quot;
+@@ -315,17 +316,73 @@
+         return actor;
+     }
+ 
++    Actor* ActorManager::createMeshActor(const String&amp; name, const Ogre::String&amp; basemeshname, 
++		const MeshPartMap&amp; meshparts, GeometryType geomType, Ogre::Real mass)
++	{
++		if (meshparts.empty())
++		{
++			return NULL;
++		}
++
++        const String&amp;  uniquename = nextUniqueName(name);
++        Actor* actor = NULL;
++
++        try
++        {
++			
++			MergeableMeshObject* mmo = new MergeableMeshObject(uniquename, basemeshname);
++
++			for (MeshPartMap::const_iterator partIt = meshparts.begin(); partIt != meshparts.end(); ++partIt)
++			{
++				if (partIt-&gt;second == basemeshname)
++				{
++					mmo-&gt;setBaseMeshPart(partIt-&gt;first);
++				}
++				mmo-&gt;addSubmesh(partIt-&gt;first, partIt-&gt;second);
++			}
++		
++			PhysicalThing* pt = PhysicsManager::getSingleton()
++				.createPhysicalThing(geomType, mmo, mass);
++
++			actor = new Actor(uniquename, mmo, pt);
++			mActors.insert(ActorPtrPair(uniquename,actor)); 
++		}
++        catch (Ogre::Exception&amp; e)
++        {
++            LOG_ERROR(Logger::CORE, &quot;ActorManager - Mesh parts for actor '&quot;
++                + uniquename + &quot;' could not be created. Reason: &quot;
++                + e.getFullDescription());
++        }
++        catch (rl::Exception&amp; e)
++        {
++            LOG_ERROR(Logger::CORE, &quot;ActorManager - Mesh parts for actor '&quot;
++                + uniquename + &quot;' could not be created. Reason: &quot;
++                + e.getMessage());
++        }
++        return actor;
++	}
++
++
+     Actor* ActorManager::createMeshActor(const String&amp; name, const String&amp; meshname,
+-        GeometryType geomType, Ogre::Real mass)
++        GeometryType geomType, Ogre::Real mass, bool mergeable)
+     {
+         const String&amp;  uniquename = nextUniqueName(name);
+         Actor* actor = NULL;
+ 
+         try
+         {
+-            MeshObject* mo = new MeshObject(uniquename, meshname);
++			MeshObject* mo = NULL;
++
++			if (mergeable)
++			{
++				mo = new MergeableMeshObject(uniquename, meshname);
++			}
++			else
++			{
++				mo = new MeshObject(uniquename, meshname);
++			}
+             PhysicalThing* pt = PhysicsManager::getSingleton()
+-                .createPhysicalThing( geomType, mo, mass);
++                .createPhysicalThing(geomType, mo, mass);
+ 
+             actor = new Actor(uniquename, mo, pt);
+             mActors.insert(ActorPtrPair(uniquename,actor)); 
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -23,6 +23,7 @@
+ #include &lt;OgreConfigFile.h&gt;
+ #include &lt;OgreMeshManager.h&gt;
+ #include &lt;OgreBillboardParticleRenderer.h&gt;
++#include &lt;OgreEnvironment.h&gt;
+ 
+ #include &quot;ActorManager.h&quot;
+ #include &quot;AnimationManager.h&quot;
+@@ -83,6 +84,7 @@
+     {
+         mCoreEventCaster.removeEventListeners();
+ 
++		delete meshmagick::OgreEnvironment::getSingletonPtr();
+         delete mZoneManager;
+         delete mGameEventManager;
+ 		delete mWorld;
+@@ -284,6 +286,9 @@
+ 		mZoneManager = new ZoneManager();
+         LOG_MESSAGE(Logger::CORE,&quot;ZoneManager erzeugt&quot;);
+ 
++		new meshmagick::OgreEnvironment();
++		meshmagick::OgreEnvironment::getSingleton().initialize(false, Logger::getSingleton()._getLog());
++
+         return true;
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/src/Makefile.am	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/src/Makefile.am	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -1,10 +1,10 @@
+ # Default values, if configuration file is missing (hard coded)
+ AM_CPPFLAGS = -DRL_MODULEDIR=\&quot;$(RL_MODULEDIR)\&quot; -DOGRE_PLUGINDIR=\&quot;$(OGRE_PLUGINDIR)\&quot;
+ 
+-INCLUDES = $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(CEGUI_CFLAGS) $(STLPORT_CFLAGS) -I../include -I../../common/include -I../include/nulldriver
++INCLUDES = $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(CEGUI_CFLAGS) $(STLPORT_CFLAGS) -I../include -I../../common/include -I../include/nulldriver $(meshmagick_CFLAGS)
+ 
+ lib_LTLIBRARIES = libRlCore.la
+-libRlCore_la_LDFLAGS = $(OGRE_LIBS) $(CEGUI_LIBS) $(RUBY_LIBS) $(LIBS)
++libRlCore_la_LDFLAGS = $(OGRE_LIBS) $(CEGUI_LIBS) $(RUBY_LIBS) $(LIBS) -lmeshmagick
+ libRlCore_la_SOURCES = \
+ 	Actor.cpp \
+ 	ActorControlledObject.cpp \
+@@ -36,6 +36,7 @@
+ 	LineSetPrimitive.cpp \
+ 	ListenerObject.cpp \
+ 	ListenerMovable.cpp \
++	MergeableMeshObject.cpp \
+ 	MeshAnimation.cpp \
+ 	MeshObject.cpp \
+ 	MovableText.cpp \
+@@ -57,7 +58,7 @@
+ 	SoundEvents.cpp \
+ 	SoundResource.cpp \
+ 	TrackAnimation.cpp \
+-	World.cpp \
++	World.cpp \
+ 	Zone.cpp \
+ 	ZoneManager.cpp \
+ 	nulldriver/NullDriver.cpp \
+
+Added: rl/trunk/engine/core/src/MergeableMeshObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MergeableMeshObject.cpp	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/core/src/MergeableMeshObject.cpp	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -0,0 +1,126 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#include &quot;MergeableMeshObject.h&quot;
++
++#include &lt;MeshMergeTool.h&gt;
++#include &lt;OgreMeshManager.h&gt;
++#include &lt;OgreNode.h&gt;
++#include &lt;OgreSceneNode.h&gt;
++#include &lt;OgreSkeletonManager.h&gt;
++#include &lt;OgreTagPoint.h&gt;
++
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;World.h&quot;
++
++using namespace Ogre;
++using meshmagick::MeshMergeTool;
++
++namespace rl
++{
++	MergeableMeshObject::MergeableMeshObject(const Ogre::String&amp; name, const Ogre::String&amp; meshname)
++		: MeshObject(name, meshname),
++		mMeshes(),
++		mCombinedMeshName()
++	{
++		mBaseMesh = getEntity()-&gt;getMesh();
++	}
++
++	MergeableMeshObject::~MergeableMeshObject()
++	{
++	}
++
++	void MergeableMeshObject::addSubmesh(const Ogre::String&amp; partname, const Ogre::String&amp; meshfile)
++	{
++		mMeshes[partname] = meshfile;
++		updateMesh();
++	}
++
++	void MergeableMeshObject::updateMesh()
++	{
++		Ogre::String newMeshName = &quot;&quot;;
++		for (MeshPartMap::const_iterator it = mMeshes.begin(); it != mMeshes.end(); ++it)
++		{
++			newMeshName += &quot;-&quot; + (*it).second;
++		}
++
++		if (mCombinedMeshName != newMeshName)
++		{
++			MeshPtr newMesh = MeshManager::getSingleton().getByName(newMeshName);
++			
++			if (newMesh.isNull())
++			{
++				MeshMergeTool mm;
++				for (MeshPartMap::const_iterator it = mMeshes.begin(); it != mMeshes.end(); ++it)
++				{
++					String curMeshfile = (*it).second;
++					MeshPtr meshToAdd = MeshManager::getSingleton().load(curMeshfile, &quot;regressiontest&quot;); ///@todo this is just for testing
++					mm.addMesh(meshToAdd);
++				}
++				
++				newMesh = mm.bake(newMeshName);
++			}
++
++			switchTo(newMesh);
++
++			mCombinedMeshName = newMeshName;
++		}
++	}
++
++	void MergeableMeshObject::setBaseMeshPart(const Ogre::String&amp; partname)
++	{
++		mMeshes[partname] = mBaseMesh-&gt;getName();
++	}
++
++	void MergeableMeshObject::replaceSubmesh(const Ogre::String&amp; partToReplace, const Ogre::String&amp; substituteMeshname)
++	{
++		///@todo check if submesh exists
++		mMeshes[partToReplace] = substituteMeshname;
++		updateMesh();
++	}
++
++	void MergeableMeshObject::removeSubmesh(const Ogre::String&amp; partToRemove)
++	{
++		///@todo MergeableMeshObject::removeSubmesh
++	}
++
++	void MergeableMeshObject::switchTo(const MeshPtr&amp; newMesh)
++	{
++		Entity* oldEnt = getEntity();
++		Entity* newEnt = CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++			-&gt;getSceneManager()-&gt;createEntity(oldEnt-&gt;getName()+&quot;_&quot;, newMesh-&gt;getName());
++		
++		Node* parentNode = oldEnt-&gt;getParentNode();
++		if (parentNode != NULL)
++		{
++			TagPoint* tp = dynamic_cast&lt;TagPoint*&gt;(parentNode);
++			if (tp != NULL)
++			{
++				tp-&gt;setChildObject(newEnt);
++			}
++		}
++
++		SceneNode* parentSceneNode = oldEnt-&gt;getParentSceneNode();
++		if (parentSceneNode != NULL)
++		{
++			parentSceneNode-&gt;detachObject(oldEnt);
++			parentSceneNode-&gt;attachObject(newEnt);
++		}
++
++		mMovableObject = newEnt;
++		CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++			-&gt;getSceneManager()-&gt;destroyEntity(oldEnt);
++	}
++}
+
+Modified: rl/trunk/engine/script/swig/RlCore.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.head.swig	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/script/swig/RlCore.head.swig	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -21,6 +21,7 @@
+ #include &quot;ActorManager.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &quot;MeshObject.h&quot;
++#include &quot;MergeableMeshObject.h&quot;
+ #include &quot;SoundObject.h&quot;
+ #include &quot;SoundManager.h&quot;
+ #include &quot;ListenerObject.h&quot;
+@@ -58,7 +59,7 @@
+ #include &quot;PlayAnimationJob.h&quot;
+ #include &quot;Zone.h&quot;
+ #include &quot;ZoneManager.h&quot;
+-#include &quot;LightFadeJob.h&quot;
++//#include &quot;LightFadeJob.h&quot;
+ #undef message
+ #undef send
+ %}
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -64,6 +64,11 @@
+     rl::ActorControlledObject **ppActorControlledObject =
+         reinterpret_cast&lt;rl::ActorControlledObject**&gt;(ptr);
+ 
++    rl::MergeableMeshObject *pMergeableMeshObject=dynamic_cast&lt;rl::MergeableMeshObject*&gt;(*ppActorControlledObject);
++    if (pMergeableMeshObject) {
++        *ptr=reinterpret_cast&lt;void*&gt;(pMergeableMeshObject);
++        return SWIGTYPE_p_rl__MergeableMeshObject;
++    }
+     rl::MeshObject *pMeshObject=dynamic_cast&lt;rl::MeshObject*&gt;(*ppActorControlledObject);
+     if (pMeshObject) {
+         *ptr=reinterpret_cast&lt;void*&gt;(pMeshObject);
+@@ -133,7 +138,8 @@
+     rl::Actor* createLightActor(const Ogre::String&amp; name, rl::LightObject::LightTypes type );
+ 	rl::Actor* createMeshActor(const Ogre::String&amp; name, const Ogre::String&amp; meshname,
+ 		    rl::GeometryType geom = rl::GT_NONE,
+-		    Ogre::Real density=1.0);
++		    Ogre::Real mass = 0.0,
++		    bool mergeable = false);
+ 	rl::Actor* createBoxPrimitiveActor(const Ogre::String&amp; name,
+             const Ogre::Vector3&amp; minCorner, const Ogre::Vector3&amp; maxCorner,
+             const Ogre::String&amp; materialName = &quot;&quot;, Ogre::Real mass = 0.0);
+@@ -384,11 +390,11 @@
+     rl::Actor* getActor();
+ };
+ 
+-class PhysicalObject : public ActorControlledObject
++class PhysicalObject : public rl::ActorControlledObject
+ {
+ };
+ 
+-class MeshObject : public PhysicalObject
++class MeshObject : public rl::PhysicalObject
+ {
+ private:
+     MeshObject(const Ogre::String&amp; name, const Ogre::String&amp; meshname);
+@@ -409,9 +415,20 @@
+     bool getCastShadows (void) const;    
+ };
+ 
+-class LightObject : public ActorControlledObject
++class MergeableMeshObject : public rl::MeshObject
+ {
+ private:
++    MergeableMeshObject(const Ogre::String&amp; name, const Ogre::String&amp; meshname);
++public:
++	void addSubmesh(const Ogre::String&amp; meshname, const Ogre::String&amp; meshfile);
++	void removeSubmesh(const Ogre::String&amp; submeshToRemove);
++	void replaceSubmesh(const Ogre::String&amp; submeshToReplace, const Ogre::String&amp; substituteMeshname);
++	void setBaseMeshPart(const Ogre::String&amp; partname);
++};
++
++class LightObject : public rl::ActorControlledObject
++{
++private:
+     LightObject(const Ogre::String&amp; name, rl::LightObject::LightTypes type);
+ public:
+ 	enum LightTypes { LT_POINT, LT_DIRECTIONAL, LT_SPOTLIGHT };
+@@ -427,7 +444,7 @@
+ };
+ 
+ 
+-class SoundObject : public ActorControlledObject
++class SoundObject : public rl::ActorControlledObject
+ {
+ public:
+     SoundObject(rl::Sound *sound, const Ogre::String &amp;name);
+@@ -460,7 +477,7 @@
+ 	rl::Sound* getSound();
+ };
+ 
+-class ParticleSystemObject : public ActorControlledObject
++class ParticleSystemObject : public rl::ActorControlledObject
+ {
+ public:
+      void setActive(bool active);
+@@ -468,7 +485,7 @@
+ 	 ParticleSystemObject(const Ogre::String&amp; name, const Ogre::String&amp; partSys );
+ };
+ 
+-class CameraObject : public PhysicalObject
++class CameraObject : public rl::PhysicalObject
+ {
+ private:
+     CameraObject(const Ogre::String&amp; name);
+@@ -858,15 +875,15 @@
+     bool execute(Ogre::Real time);
+ };
+ 
+-class LightFadeJob : public rl::Job
+-{
+-public:
+-    LightFadeJob(LightObject* lightObject, const Ogre::ColourValue&amp; targetDiffuse, 
+-        const Ogre::ColourValue&amp; targetSpecular, Ogre::Real duration = 1.0f);
++//class LightFadeJob : public rl::Job
++//{
++//public:
++//    LightFadeJob(LightObject* lightObject, const Ogre::ColourValue&amp; targetDiffuse, 
++//        const Ogre::ColourValue&amp; targetSpecular, Ogre::Real duration = 1.0f);
++//
++//    virtual bool execute(Ogre::Real time);
++//};
+ 
+-    virtual bool execute(Ogre::Real time);
+-};
+-
+ class JobScheduler
+ {
+ public:
+
+Modified: rl/trunk/tools/copy_dependencies.bat
+===================================================================
+--- rl/trunk/tools/copy_dependencies.bat	2007-05-16 10:02:09 UTC (rev 3449)
++++ rl/trunk/tools/copy_dependencies.bat	2007-05-17 07:08:08 UTC (rev 3450)
+@@ -66,3 +66,6 @@
+ 
+ copy &quot;%RL_ROOT%\Dependencies\cppunit\lib\cppunit_dll.dll&quot; &quot;%RL_DIST%&quot;
+ copy &quot;%RL_ROOT%\Dependencies\cppunit\lib\cppunitd_dll.dll&quot; &quot;%RL_DIST%&quot;
++
++copy &quot;%RL_ROOT%\Dependencies\meshmagick\lib\*.dll&quot; &quot;%RL_DIST%&quot;
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000520.html">[Dsa-hl-svn] r3449 - rl/trunk/engine/common/src
+</A></li>
+	<LI>Next message: <A HREF="000522.html">[Dsa-hl-svn] r3451 - modules/regressiontest/dsa	rl/trunk/engine/rules/include rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#521">[ date ]</a>
+              <a href="thread.html#521">[ thread ]</a>
+              <a href="subject.html#521">[ subject ]</a>
+              <a href="author.html#521">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

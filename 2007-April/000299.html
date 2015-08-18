@@ -1,0 +1,269 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3228 - modules/common/materials/programs
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3228%20-%20modules/common/materials/programs&In-Reply-To=%3C200704041318.l34DIKL8014388%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000298.html">
+   <LINK REL="Next"  HREF="000300.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3228 - modules/common/materials/programs</H1>
+    <B>pnyx at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3228%20-%20modules/common/materials/programs&In-Reply-To=%3C200704041318.l34DIKL8014388%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3228 - modules/common/materials/programs">pnyx at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr  4 15:18:20 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000298.html">[Dsa-hl-svn] r3227 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="000300.html">[Dsa-hl-svn] r3229 - in rl/trunk/engine/common: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#299">[ date ]</a>
+              <a href="thread.html#299">[ thread ]</a>
+              <a href="subject.html#299">[ subject ]</a>
+              <a href="author.html#299">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: pnyx
+Date: 2007-04-04 15:18:18 +0200 (Wed, 04 Apr 2007)
+New Revision: 3228
+
+Modified:
+   modules/common/materials/programs/NormalMap.program
+   modules/common/materials/programs/NormalMap2Lights.hlsl
+Log:
+Normalmap shader erweitert sodass lichtabgewante Fl?\195?\164chen abgedunkelt werde.
+
+Modified: modules/common/materials/programs/NormalMap.program
+===================================================================
+--- modules/common/materials/programs/NormalMap.program	2007-04-03 22:55:01 UTC (rev 3227)
++++ modules/common/materials/programs/NormalMap.program	2007-04-04 13:18:18 UTC (rev 3228)
+@@ -12,6 +12,14 @@
+     target vs_2_0
+ }
+ 
++vertex_program NormalMap2Lights3UV_VS_HLSL hlsl
++{
++    source NormalMap2Lights.hlsl
++    entry_point vs_main_3uv
++    target vs_2_0
++}
++
++
+ fragment_program NormalMap2Lights_PS_HLSL hlsl
+ {
+     source NormalMap2Lights.hlsl
+@@ -119,7 +127,66 @@
+             }
+         }
+     }
++    
++    technique fixed_function
++    {
++        pass
++        {
++            ambient 0.6 0.6 0.6 1.0
++            diffuse 0.7 0.7 0.7 1.0
++            specular 0.3 0.3 0.3 1.0 16.0
+ 
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++        } 
++    }
++}
++    
++material NormalMapMaterial2Lights3UV
++{
++    technique hlsl
++    {
++        pass
++        {
++            vertex_program_ref NormalMap2Lights3UV_VS_HLSL
++            {
++                param_named_auto WorldViewProjMatrix worldviewproj_matrix
++                param_named_auto Light1PosOS light_position_object_space 0
++                param_named_auto Light2PosOS light_position_object_space 1
++                param_named_auto EyePosOS camera_position_object_space
++            }
++
++            fragment_program_ref NormalMap2Lights_PS_HLSL
++            {
++                param_named_auto Light1Diffuse  light_diffuse_colour  0
++                param_named_auto Light1Specular light_specular_colour 0
++                param_named_auto Light2Diffuse  light_diffuse_colour  1
++                param_named_auto Light2Specular light_specular_colour 1
++                param_named_auto AmbientLight  ambient_light_colour
++
++                param_named MaterialAmbient float4 0.6 0.6 0.6 1.0
++                param_named MaterialDiffuse float4 0.7 0.7 0.7 1.0
++                param_named MaterialSpecular float4 0.3 0.3 0.3 1.0
++                param_named MaterialSpecularExponent float 16.0
++            }
++
++            // Base diffuse texture map
++            texture_unit diffusemap
++            {
++                texture_alias diffusemap
++            }
++
++            // Normal map
++            texture_unit normalmap
++            {
++                texture_alias normalmap
++            }
++        }
++    }
++
+     technique fixed_function
+     {
+         pass
+
+Modified: modules/common/materials/programs/NormalMap2Lights.hlsl
+===================================================================
+--- modules/common/materials/programs/NormalMap2Lights.hlsl	2007-04-03 22:55:01 UTC (rev 3227)
++++ modules/common/materials/programs/NormalMap2Lights.hlsl	2007-04-04 13:18:18 UTC (rev 3228)
+@@ -26,8 +26,8 @@
+     float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
+     float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
+ 
+-    //float3 binormal = cross(inTangent, inNormal);
+-    float3 binormal = cross(inNormal, inTangent);
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
+     float3x3 TangentSpace;
+     TangentSpace[0] = inTangent;
+     TangentSpace[1] = binormal;
+@@ -59,8 +59,8 @@
+     float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
+     float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
+ 
+-    //float3 binormal = cross(inTangent, inNormal);
+-    float3 binormal = cross(inNormal, inTangent);
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
+     float3x3 TangentSpace;
+     TangentSpace[0] = inTangent;
+     TangentSpace[1] = binormal;
+@@ -74,6 +74,43 @@
+     return Out;
+ }
+ 
++
++VS_OUTPUT vs_main_3uv(float4 inPos     : POSITION,
++                      float3 inNormal  : NORMAL,
++                      float3 inTangent : TEXCOORD3,
++                      float2 inUV      : TEXCOORD0,
++                      uniform float4 EyePosOS,
++                      uniform float4 Light1PosOS,
++                      uniform float4 Light2PosOS,
++                      uniform float4x4 WorldViewProjMatrix)
++{
++    VS_OUTPUT Out;
++
++    Out.Pos = mul(WorldViewProjMatrix, inPos);
++    Out.UV = inUV;
++
++    float3 Light1Dir = normalize(Light1PosOS.xyz - inPos.xyz*Light1PosOS.w);
++    float3 Light2Dir = normalize(Light2PosOS.xyz - inPos.xyz*Light2PosOS.w);
++    float3 EyeDir = normalize(EyePosOS.xyz - inPos.xyz);
++
++    float3 binormal = cross(inTangent, inNormal);
++    //float3 binormal = cross(inNormal, inTangent);
++    float3x3 TangentSpace;
++    TangentSpace[0] = inTangent;
++    TangentSpace[1] = binormal;
++    TangentSpace[2] = inNormal;
++
++    Out.Half1DirTS  = mul(TangentSpace, normalize(Light1Dir + EyeDir));
++    Out.Half2DirTS  = mul(TangentSpace, normalize(Light2Dir + EyeDir));
++    Out.Light1DirTS = mul(TangentSpace, Light1Dir);
++    Out.Light2DirTS = mul(TangentSpace, Light2Dir);
++
++    return Out;
++}
++
++
++
++
+ float4 ps_main(VS_OUTPUT In,
+                uniform sampler DiffuseMap : register(s0),
+                uniform sampler NormalMap  : register(s1),
+@@ -94,8 +131,8 @@
+     // Ambient component
+     float4 Ambient = MaterialAmbient * AmbientLight;
+ 
+-    float NdotL1 = saturate(dot(Normal.xyz, normalize(In.Light1DirTS)));
+-    float NdotL2 = saturate(dot(Normal.xyz, normalize(In.Light2DirTS)));
++    float NdotL1 = (dot(Normal.xyz, normalize(In.Light1DirTS)));
++    float NdotL2 = (dot(Normal.xyz, normalize(In.Light2DirTS)));
+     float4 Diffuse1, Diffuse2, Specular1, Specular2;
+     
+     // We only need to calculate lighting, if surface is facing the light.
+@@ -110,6 +147,12 @@
+                 MaterialSpecularExponent);
+         Specular1 = MaterialSpecular * Light1Specular * SpecularAttn;
+     }
++    
++    if (NdotL1 &lt;= 0.0)
++    {
++        // Diffuse component
++        Diffuse1 =((MaterialDiffuse*Light1Diffuse * NdotL1)/2.5);
++    }
+ 
+     if (NdotL2 &gt; 0.0)
+     {
+@@ -122,7 +165,13 @@
+                 MaterialSpecularExponent);
+         Specular2 = MaterialSpecular * Light2Specular * SpecularAttn;
+     }
+-
+-    return TexColour * (Ambient + Diffuse1 + Diffuse2) + Specular1 + Specular2;
++    
++    if (NdotL2 &lt;= 0.0)
++    {
++        // Diffuse component
++        Diffuse2 =((MaterialDiffuse*Light2Diffuse * NdotL2)/2.5);
++    }
++    
++    return (TexColour * (Ambient*1.5 + Diffuse1 + Diffuse2)) + Specular1 + Specular2;
+ }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000298.html">[Dsa-hl-svn] r3227 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="000300.html">[Dsa-hl-svn] r3229 - in rl/trunk/engine/common: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#299">[ date ]</a>
+              <a href="thread.html#299">[ thread ]</a>
+              <a href="subject.html#299">[ subject ]</a>
+              <a href="author.html#299">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,689 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4652 - in rl/trunk/editors/Lockenwickler/src: . media
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4652%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200812152121.mBFLLCMU007432%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001708.html">
+   <LINK REL="Next"  HREF="001710.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4652 - in rl/trunk/editors/Lockenwickler/src: . media</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4652%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200812152121.mBFLLCMU007432%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4652 - in rl/trunk/editors/Lockenwickler/src: . media">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Mon Dec 15 22:21:12 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001708.html">[Dsa-hl-svn] r4651 - in modules: common/materials/programs	ruchin/models
+</A></li>
+        <LI>Next message: <A HREF="001710.html">[Dsa-hl-svn] r4653 - modules/kanalisation/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1709">[ date ]</a>
+              <a href="thread.html#1709">[ thread ]</a>
+              <a href="subject.html#1709">[ subject ]</a>
+              <a href="author.html#1709">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2008-12-15 22:20:57 +0100 (Mon, 15 Dec 2008)
+New Revision: 4652
+
+Added:
+   rl/trunk/editors/Lockenwickler/src/media/UniCube.mesh
+   rl/trunk/editors/Lockenwickler/src/media/UniSphere.mesh
+   rl/trunk/editors/Lockenwickler/src/media/lightbulp.blend
+   rl/trunk/editors/Lockenwickler/src/media/lightbulp.mesh
+   rl/trunk/editors/Lockenwickler/src/media/lightbulp.png
+Removed:
+   rl/trunk/editors/Lockenwickler/src/media/Barrel.mesh
+   rl/trunk/editors/Lockenwickler/src/media/Example.material
+   rl/trunk/editors/Lockenwickler/src/media/lightbulb.blend
+Modified:
+   rl/trunk/editors/Lockenwickler/src/GameObjectClass.py
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModelSelectionDialog.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py
+   rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material
+Log:
+- more updates on loading modules
+
+
+Modified: rl/trunk/editors/Lockenwickler/src/GameObjectClass.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/GameObjectClass.py	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/GameObjectClass.py	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -124,6 +124,7 @@
+         self.gocName = gameObjectClass
+         self.node = node
+         self.meshFile = meshFile
++        self.state = &quot;IN_SCENE&quot;
+ 
+     def getType(self):
+         return &quot;GAME_OBJECT_REPRESENTATION&quot;
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -59,6 +59,8 @@
+         self.objectPropertyWin = ObjectPropertyWin(self)
+         self.sceneExplorerWin = SceneExplorer(self)
+         self.modelSelectionDialog = ModelSelectionDialog(self.ogreRoot, self)
++        self.moduleManager.modelSelectionDialog = self.modelSelectionDialog
++
+         self.gameObjectClassView = GameObjectClassView(self.moduleManager.gocManager)
+ 
+         self.createDockWindows()
+@@ -273,6 +275,9 @@
+         og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
+         og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+ 
++        self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
++        self.moduleManager.pivot.hide()
++
+         oglog = og.LogManager.getSingleton().getDefaultLog()
+         oglog.addListener(self.consoleWindow.lockenLog)
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModelSelectionDialog.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModelSelectionDialog.py	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/ModelSelectionDialog.py	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -97,9 +97,8 @@
+         self.gridlayout.addWidget(self.splitter,1,0,1,1)
+ 
+         self.retranslateUi()
+-        QObject.connect(self.modelSearchBox,SIGNAL(&quot;textChanged(QString)&quot;),self.listWidget.clearSelection)
+-        QMetaObject.connectSlotsByName(self)
+ 
++
+     def retranslateUi(self):
+         self.setWindowTitle(QApplication.translate(&quot;modelPreviewDialog&quot;, &quot;Dialog&quot;, None, QApplication.UnicodeUTF8))
+ 
+@@ -115,14 +114,14 @@
+         self.node.setScale(og.Vector3(1,1,1))
+         bb = self.ent.getBoundingBox()
+ 
+-    def scanDirForModels(self, dir, name):
++    def scanDirForModels(self, dir):
+         for file in os.listdir(dir):
+             curFile = dir + &quot;/&quot; + file
+ 
+             if file.startswith('.'): #ignore dot files (hidden)
+                 continue
+             if isdir(curFile):
+-                self.scanDirForModels(curFile, file)
++                self.scanDirForModels(curFile)
+                 continue
+             if isfile(curFile):
+                 if file.endswith(&quot;.mesh&quot;):
+@@ -143,6 +142,7 @@
+         if event.type() == 5:
+             self.startDrag()
+             event.accept()
++            return True
+ 
+         return False
+ 
+@@ -152,6 +152,7 @@
+                 self.ogreModelPrevWindow.zoomCamera(-5)
+             else:
+                 self.ogreModelPrevWindow.zoomCamera( 5)
++            return True
+ 
+         if event.type() == 5: #mouse moved while button down
+             rotX = (event.globalX() - self.lastMousePosX) * 0.01
+@@ -162,10 +163,12 @@
+ 
+             self.lastMousePosX = event.globalX()
+             self.lastMousePosY = event.globalY()
++            return True
+ 
+         if event.type() == 3: # mouse released
+             self.lastMousePosX = 0
+             self.lastMousePosY = 0
++            return True
+ 
+         return False
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -35,32 +35,77 @@
+ from GameObjectClassManager import *
+ from MyRaySceneQueryListener import *
+ 
++#                &lt;zone name=&quot;Testzone&quot;&gt;
++#                        &lt;area type=&quot;sphere&quot;&gt;
++#                                &lt;position x=&quot;-10&quot; y=&quot;0&quot; z=&quot;-5&quot;/&gt;
++#                                &lt;scale x=&quot;6&quot; y=&quot;6&quot; z=&quot;6&quot;/&gt;
++#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
++#                        &lt;/area&gt;
++#                        &lt;area type=&quot;mesh&quot; meshfile=&quot;arc_UnbHaus_07.mesh&quot;&gt;
++#                                &lt;position x=&quot;25&quot; y=&quot;0&quot; z=&quot;-50&quot;/&gt;
++#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
++#                        &lt;/area&gt;
++#                        &lt;area type=&quot;sphere&quot; subtract=&quot;true&quot;&gt;
++#                                &lt;position x=&quot;-11&quot; y=&quot;0&quot; z=&quot;-4&quot;/&gt;
++#                                &lt;scale x=&quot;2&quot; y=&quot;2&quot; z=&quot;2&quot;/&gt;
++#                        &lt;/area&gt;
++#                        &lt;light name=&quot;red pointlight&quot;/&gt;
++#                        &lt;light name=&quot;green spotlight&quot;/&gt;
++#                        &lt;sound name=&quot;ruchin001.ogg&quot;/&gt;
++#                        &lt;trigger name=&quot;test&quot; classname=&quot;TestTrigger&quot;&gt;
++#                                &lt;property name=&quot;message&quot; type=&quot;STRING&quot; data=&quot;You triggered the dooms day device!&quot; /&gt;
++#                        &lt;/trigger&gt;
++#                &lt;/zone&gt;
++
+ class Map():
+-    def __init__(self, pathToFile, sceneManager, ogreRoot):
++    def __init__(self, pathToFile, sceneManager, ogreRoot, gocManager):
+         self.pathToMapFile = pathToFile
+         self.sceneManager = sceneManager
+         self.mapNode = sceneManager.getRootSceneNode().createChildSceneNode(self.pathToMapFile)
+         self.ogreRoot = ogreRoot
++        self.gocManager = gocManager
+ 
+         xmlTree = xml.parse(pathToFile)
+         root = xmlTree.getroot()
+ 
+         if root.attrib[&quot;formatVersion&quot;] == &quot;0.4.0&quot;:
+-            self.parseMap(root)
++            self.parseMapNodes(root.find(&quot;nodes&quot;))
++            #self.parseMapZones(root.find(&quot;zones&quot;))
+         else:
+             print pathToFile + &quot; has wrong format version. It needs to be 0.4.0&quot;
+             return
+ 
+-    def parseMap(self, rootElement):
+-        nodes = rootElement.getiterator(&quot;entity&quot;)
+-        for n in nodes:
+-            entityName = n.attrib[&quot;name&quot;]
+-            meshFile = n.attrib[&quot;meshfile&quot;]
++    def parseMapNodes(self, nodeElement):
++        nodes = nodeElement.getiterator(&quot;entity&quot;)
++        if len(nodes) &gt; 0:
++            self.createEntites(nodes)
++
++        nodes = nodeElement.getiterator(&quot;light&quot;)
++        if len(nodes) &gt; 0:
++            self.createLights(nodes)
++
++        nodes = nodeElement.getiterator(&quot;sound&quot;)
++        if len(nodes) &gt; 0:
++            self.createSound(nodes)
++
++        nodes = nodeElement.getiterator(&quot;gameobject&quot;)
++        if len(nodes) &gt; 0:
++            self.createGameObjects(nodes)
++
++        nodes = nodeElement.getiterator(&quot;particlesystem&quot;)
++        if len(nodes) &gt; 0:
++            self.createParticleSystems(nodes)
++
++    def createEntites(self, entityNodes):
++        for nodes in entityNodes:
++            entityName = nodes.attrib[&quot;name&quot;]
++            print entityName
++            meshFile = nodes.attrib[&quot;meshfile&quot;]
+             nodePosition = None
+             nodeRotation = None
+             nodeScale = None
+ 
+-            transformations = n.getiterator()
++            transformations = nodes.getiterator()
+             for t in transformations:
+                 if t.tag == &quot;position&quot;:
+                     x = float(t.attrib[&quot;x&quot;])
+@@ -83,7 +128,7 @@
+                 e = self.sceneManager.createEntity(entityName, meshFile)
+             except:
+                 print &quot;Warning: Meshfile &quot; + meshFile + &quot; could not be found.&quot;
+-                return
++                continue
+ 
+             n = self.mapNode.createChild(entityName + &quot;_node&quot;)
+             n.attachObject(e)
+@@ -91,17 +136,113 @@
+             n.setOrientation(nodeRotation)
+             n.setScale(nodeScale)
+ 
++    def createLights(self, lightNodes):
++        for l in lightNodes:
++            lightName = l.attrib[&quot;name&quot;]
++            lightType = l.attrib[&quot;type&quot;]
++            lightVisible = bool(l.attrib[&quot;visible&quot;])
++            castShadows = bool(l.attrib[&quot;castShadows&quot;])
++            lightPosition = None
++            colourDiffuse = None
++            colourSpecular = None
++            lightAttenuationRange = None
++            lightAttenuationConstant= None
++            lightAttenuationlinear = None
++            lightAttenuationQuadratic = None
+ 
++            transformations = l.getiterator()
++            for t in transformations:
++                if t.tag == &quot;position&quot;:
++                    x = float(t.attrib[&quot;x&quot;])
++                    y = float(t.attrib[&quot;y&quot;])
++                    z = float(t.attrib[&quot;z&quot;])
++                    lightPosition = og.Vector3(x, y, z)
++                elif t.tag == &quot;colourDiffuse&quot;:
++                    r = float(t.attrib[&quot;r&quot;])
++                    g = float(t.attrib[&quot;g&quot;])
++                    b= float(t.attrib[&quot;b&quot;])
++                    colourDiffuse = og.ColourValue(r, g, b)
++                elif t.tag == &quot;colourSpecular&quot;:
++                    r = float(t.attrib[&quot;r&quot;])
++                    g = float(t.attrib[&quot;g&quot;])
++                    b= float(t.attrib[&quot;b&quot;])
++                    colourSpecular = og.ColourValue(r, g, b)
++                elif t.tag == &quot;lightAttenuation&quot;:
++                    lightAttenuationRange = float(t.attrib[&quot;range&quot;])
++                    lightAttenuationConstant= float(t.attrib[&quot;constant&quot;])
++                    lightAttenuationlinear = float(t.attrib[&quot;linear&quot;])
++                    lightAttenuationQuadratic = float(t.attrib[&quot;quadratic&quot;])
+ 
++            e = self.sceneManager.createEntity(lightName, &quot;lightbulp.mesh&quot;)
++            n = self.mapNode.createChild(lightName + &quot;_node&quot;)
++            n.attachObject(e)
++            n.setPosition(lightPosition)
+ 
++    def createSound(self, soundNodes):
++        raise NotImplementedError
++        return
++
++    def createGameObjects(self, gameObjectNodes):
++        for g in gameObjectNodes:
++            classid = g.attrib[&quot;class&quot;]
++            id = int(g.attrib[&quot;id&quot;])
++            state = g.attrib[&quot;state&quot;]
++            nodePosition = None
++            nodeRotation = None
++            nodeScale = None
++
++            transformations = g.getiterator()
++            for t in transformations:
++                if t.tag == &quot;position&quot;:
++                    x = float(t.attrib[&quot;x&quot;])
++                    y = float(t.attrib[&quot;y&quot;])
++                    z = float(t.attrib[&quot;z&quot;])
++                    nodePosition = og.Vector3(x, y, z)
++                elif t.tag == &quot;rotation&quot;:
++                    qw = float(t.attrib[&quot;qw&quot;])
++                    qx = float(t.attrib[&quot;qx&quot;])
++                    qy = float(t.attrib[&quot;qy&quot;])
++                    qz = float(t.attrib[&quot;qz&quot;])
++                    nodeRotation = og.Quaternion(qw, qx, qy, qz)
++                elif t.tag == &quot;scale&quot;:
++                    x = float(t.attrib[&quot;x&quot;])
++                    y = float(t.attrib[&quot;y&quot;])
++                    z = float(t.attrib[&quot;z&quot;])
++                    nodeScale = og.Vector3(x, y, z)
++
++            go = self.gocManager.getGameObjectWithClassId(classid)
++            if go is not None:
++                meshFile = go.getMeshFileName()
++                ent = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(id), str(meshFile))
++                dropNode = self.sceneManager.getRootSceneNode().createChild(&quot;dropNode&quot; + str(id))
++                dropNode.attachObject(ent)
++
++                if nodePosition:
++                    dropNode.setPosition(nodePosition)
++                if nodeRotation:
++                    dropNode.setOrientation(nodeRotation)
++                if nodeScale:
++                    dropNode.setScale(nodeScale)
++
++
++                go = GameObjectRepresentation(id, classid, dropNode, meshFile)
++                go.inWorldId = id
++                ent.setUserObject(go)
++
++
++    def createParticleSystems(self, particleNodes):
++        raise NotImplementedError
++        return
++
+ class Scene():
+     def __init__(self):
+         return
+ 
+ class Module():
+-    def __init__(self,name, modulePath, sceneManager, ogreRoot):
++    def __init__(self,name, modulePath, sceneManager, ogreRoot, gameObjectManager):
+         self.sceneManager = sceneManager
+         self.ogreRoot = ogreRoot
++        self.gocManager = gameObjectManager
+ 
+         self.name = name
+         self.moduleRoot = join(modulePath, name)
+@@ -164,11 +305,15 @@
+         self.setResourcePaths()
+         og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+ 
++        cmd = join(self.moduleRoot, &quot;dsa/*.gof&quot;)
++        self.gofFiles = glob.glob(cmd)
++        self.gocManager.parseGOFFiles(self.gofFiles)
++
+         if not self.isCommon():
+             cmd = join(self.moduleRoot, &quot;maps/*.rlmap.xml&quot;)
+             maps = glob.glob(cmd)
+             for m in maps:
+-                self.mapFiles.append(Map(m, self.sceneManager, self.ogreRoot))
++                self.mapFiles.append(Map(m, self.sceneManager, self.ogreRoot, self.gocManager))
+ 
+             cmd = join(self.moduleRoot, &quot;maps/*.rlscene&quot;)
+             sceneFile = glob.glob(cmd)
+@@ -191,7 +336,7 @@
+ 
+ 
+             if file.startswith('.'): #ignore dot files (hidden)
+-                pass
++                continue
+             if os.path.isdir(curFile):
+                 og.ResourceGroupManager.getSingleton().addResourceLocation(curFile, &quot;FileSystem&quot;, self.name, False)
+                 self.setResourcePaths(curFile)
+@@ -202,10 +347,17 @@
+     def __init__(self,  ogreRoot,  sceneManager):
+         self.sceneManager = sceneManager
+         self.ogreRoot = ogreRoot
++        self.modelSelectionDialog = None
++
+         self.raySceneQuery = self.sceneManager.createRayQuery(og.Ray())
+ 
+         self.gocManager = GameObjectClassManager()
++        # we need to hold a reference to the game object representaions ourself
++        # python does not recognize the a reference to a c++ object (Entity in our case) is passed
++        # and deletes the object
++        self.gameObjectRepresentationDict = []
+ 
++
+         self.mainModule = []
+         self.mainModuledependencieList =[]
+         self.moduleList = []
+@@ -213,16 +365,12 @@
+         self.cutList = [] # selection objects that has been cut out and wait to be pasted again
+         self.cutListPreviousNodes = [] # contains the nodes they where copnnected to before the cut
+ 
+-        # we need to hold a reference to the game object representaions ourself
+-        # python does not recognize the a reference to a c++ object (Entity in our case) is passed
+-        # and deletes the object
+-        self.gameObjectRepresentationDict = []
+-
+         self.listenerDings = MyRaySceneQueryListener()
+ 
+         self.lastRay = None
+ #        self.rayLine = None
+ 
++        # pivot is initialzed and set in the Lockenwickler.setUpOgre function
+         self.pivot = None
+         self.movingPivot = False
+ 
+@@ -253,7 +401,7 @@
+             if line.startswith('module='):
+                 splines = line.split('=')
+                 str = splines[1].rstrip().rstrip()
+-                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;), self.sceneManager, self.ogreRoot))
++                self.moduleList.append(Module(str, self.moduleCfgPath.replace(&quot;/modules.cfg&quot;,  &quot;&quot;), self.sceneManager, self.ogreRoot, self.gocManager))
+ 
+         self.moduleConfigIsParsed = True
+ 
+@@ -280,20 +428,33 @@
+         if dlg.exec_():
+             self.loadModule(str(list.currentItem().text()))
+ 
++    # I'm sorry for this
+     def loadModule(self, moduleName):
+         for m in self.moduleList:
+             if m.name == moduleName:
+-                if m.hasDependencies:
++                if m.hasDependencies: # load modules on wich the main module depends before the main module is loaded
+                     for moduleDependencie in m.moduleDependencies:
+                         for m2 in self.moduleList:
+                             if m2.name == moduleDependencie:
+                                 m2.load()
++                                self.modelSelectionDialog.scanDirForModels(m2.moduleRoot)
+                                 self.mainModuledependencieList.append(m2)
+ 
+                 m.load()
++                self.modelSelectionDialog.scanDirForModels(m.moduleRoot)
+                 self.mainModule = m
+ 
++        n = self.sceneManager.getRootSceneNode().createChildSceneNode()
++        e = self.sceneManager.createEntity(&quot;west342wt346t&quot;,  &quot;UniCube.mesh&quot;)
++        e.setMaterialName(&quot;Lockenwickler_Area&quot;)
+ 
++        e2 = self.sceneManager.createEntity(&quot;west342wt34635t&quot;,  &quot;UniSphere.mesh&quot;)
++        e2.setMaterialName(&quot;Lockenwickler_Area&quot;)
++
++        n.attachObject(e)
++        n.attachObject(e2)
++        n.setScale(og.Vector3(10, 5, 20))
++
+     # called when a click into Main Ogre Window occurs
+     def selectionClick(self,  ray,  controlDown=False,  shiftDown=False):
+         self.listenerDings.reset()
+@@ -496,9 +657,9 @@
+ 
+     def startDropGameObjectAction(self, classid, ray):
+         go = self.gocManager.getGameObjectWithClassId(classid)
+-        meshFile = go.getMeshFileName()
+ 
+         if go is not None:
++            meshFile = go.getMeshFileName()
+             dropEntity = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(self.dropCount), str(meshFile))
+             dropNode = self.sceneManager.getRootSceneNode().createChild(&quot;dropNode&quot; + str(self.dropCount))
+             dropNode.attachObject(dropEntity)
+
+Modified: rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -150,6 +150,7 @@
+ 
+     def eventFilter(self, obj, event):
+         if event.type() == 2:
++            self.ogreRenderWindow.setFocus()
+             if event.button() == 1: # left mouse button is pressed
+                 self.leftMouseDown = True
+                 self.moduleManager.leftMouseDown = True
+
+Deleted: rl/trunk/editors/Lockenwickler/src/media/Barrel.mesh
+===================================================================
+(Binary files differ)
+
+Deleted: rl/trunk/editors/Lockenwickler/src/media/Example.material
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/Example.material	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/media/Example.material	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -1,18 +0,0 @@
+-material RustyBarrel
+-{
+-	technique
+-	{
+-		pass
+-		{
+-			ambient 0.5 0.5 0.5 1.0
+-			diffuse 1.0 1.0 1.0 1.0
+-			specular 0.0 0.0 0.0 1.0 12.5
+-			emissive 0.0 0.0 0.0 1.0
+-			texture_unit
+-			{
+-				texture RustyBarrel.png
+-				filtering trilinear
+-			}
+-		}
+-	}
+-}
+
+Modified: rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material	2008-12-15 21:19:06 UTC (rev 4651)
++++ rl/trunk/editors/Lockenwickler/src/media/Pivot_Point.material	2008-12-15 21:20:57 UTC (rev 4652)
+@@ -4,8 +4,6 @@
+ 	{
+ 		pass
+ 		{
+-                        depth_check off
+-                        depth_write off
+ 			ambient 1.0 0.0 0.0 0.5
+ 			diffuse 1.0 0.0 0.0 0.5
+ 			specular 1.0 0.0 0.0 0.5 12.5
+@@ -21,8 +19,6 @@
+ 
+ 		pass
+ 		{
+-                        depth_check off
+-                        depth_write off
+ 			ambient 0.0 0.0 1.0 0.5
+ 			diffuse 0.0 0.0 1.0 0.5
+ 			specular 0.0 0.0 1.0 0.5 12.5
+@@ -37,8 +33,6 @@
+ 	{
+ 		pass
+ 		{
+-                        depth_check off
+-                        depth_write off
+ 			ambient 0.0 1.0 0.0 0.5
+ 			diffuse 0.0 1.0 0.0 0.5
+ 			specular 0.0 1.0 0.0 0.5 12.5
+@@ -60,4 +54,44 @@
+ 		}
+ 	}
+ }
++
++material SOLID/TEX/lightbulp.png
++{
++	technique
++	{
++		pass
++		{
++			texture_unit
++			{
++				texture lightbulp.png
++			}
++		}
++	}
++}
++
++material Lockenwickler_Area
++{
++	technique
++	{
++                pass
++		{
++                        depth_write off
++                        scene_blend alpha_blend
++                        
++			ambient 0.0 1.0 0.0 0.2
++			diffuse 0.0 1.0 0.0 0.2
++			emissive 0.0 1.0 0.0 0.2
++		}
++
++		pass
++		{
++                        polygon_mode wireframe
++
++			ambient 0.0 1.0 0.0 1.0
++			diffuse 0.0 1.0 0.0 1.0
++			emissive 0.0 1.0 0.0 1.0
++		}
++	}
++}
++
+  
+
+Added: rl/trunk/editors/Lockenwickler/src/media/UniCube.mesh
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/UniCube.mesh
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: rl/trunk/editors/Lockenwickler/src/media/UniSphere.mesh
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/UniSphere.mesh
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Deleted: rl/trunk/editors/Lockenwickler/src/media/lightbulb.blend
+===================================================================
+(Binary files differ)
+
+Added: rl/trunk/editors/Lockenwickler/src/media/lightbulp.blend
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/lightbulp.blend
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: rl/trunk/editors/Lockenwickler/src/media/lightbulp.mesh
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/lightbulp.mesh
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: rl/trunk/editors/Lockenwickler/src/media/lightbulp.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/lightbulp.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001708.html">[Dsa-hl-svn] r4651 - in modules: common/materials/programs	ruchin/models
+</A></li>
+	<LI>Next message: <A HREF="001710.html">[Dsa-hl-svn] r4653 - modules/kanalisation/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1709">[ date ]</a>
+              <a href="thread.html#1709">[ thread ]</a>
+              <a href="subject.html#1709">[ subject ]</a>
+              <a href="author.html#1709">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

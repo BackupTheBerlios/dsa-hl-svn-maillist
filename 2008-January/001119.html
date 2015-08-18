@@ -1,0 +1,564 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4048 - in rl/trunk/engine: ai/include ai/src	core/include core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4048%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src&In-Reply-To=%3C200801161842.m0GIgOEn014339%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001118.html">
+   <LINK REL="Next"  HREF="001120.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4048 - in rl/trunk/engine: ai/include ai/src	core/include core/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4048%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src&In-Reply-To=%3C200801161842.m0GIgOEn014339%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4048 - in rl/trunk/engine: ai/include ai/src	core/include core/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Jan 16 19:42:24 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001118.html">[Dsa-hl-svn] r4047 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001120.html">[Dsa-hl-svn] r4049 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1119">[ date ]</a>
+              <a href="thread.html#1119">[ thread ]</a>
+              <a href="subject.html#1119">[ subject ]</a>
+              <a href="author.html#1119">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-01-16 19:42:12 +0100 (Wed, 16 Jan 2008)
+New Revision: 4048
+
+Modified:
+   rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+   rl/trunk/engine/ai/src/AiSubsystem.cpp
+   rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+   rl/trunk/engine/core/include/Job.h
+   rl/trunk/engine/core/include/JobScheduler.h
+   rl/trunk/engine/core/src/Job.cpp
+   rl/trunk/engine/core/src/JobScheduler.cpp
+Log:
+-added the possibility to save/load jobs
+-changed static variables in walkpathjob to member-variables
+
+Modified: rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+===================================================================
+--- rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -65,6 +65,8 @@
+         Landmark* mNextLandmark;
+         const WayPointGraph* mWayPoints;
+         AStar::AStarPath mCurrentWayPath;
++        Ogre::Real mTimeSinceLastRotation;
++        bool mUpdatedDirection;
+ 
+         bool mNextLandmarkRequested;
+     };
+
+Modified: rl/trunk/engine/ai/src/AiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiSubsystem.cpp	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/ai/src/AiSubsystem.cpp	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -104,8 +104,22 @@
+ 
+ Landmark* AiSubsystem::createLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position)
+ {
+-	Landmark* lm = new Landmark(name, position);
+-	mLandmarks[name] = lm;
++    Landmark* lm = getLandmark(name);
++    if( lm == NULL )
++    {
++	    Landmark* lm = new Landmark(name, position);
++	    mLandmarks[name] = lm;
++    }
++    else
++    {
++        if( lm-&gt;getPosition() != position )
++        {
++            std::ostringstream oss;
++            oss &lt;&lt; &quot;A Landmark with the name '&quot; &lt;&lt; name &lt;&lt; &quot;' already exists at position &quot;
++                &lt;&lt; lm-&gt;getPosition() &lt;&lt; &quot;! The position will not be changed to &quot; &lt;&lt; position &lt;&lt; &quot;!&quot;;
++            LOG_ERROR(Logger::AI, oss.str());
++        }
++    }
+ 	return lm;
+ }
+ 
+
+Modified: rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -22,10 +22,12 @@
+ namespace rl
+ {
+     CreatureWalkPathJob::CreatureWalkPathJob(const Ogre::String&amp; name, CreatureController* movingCreature, Landmark* startLandmark)
+-        : Job(true, true), 
++        : Job(false, true, TimeSource::GAMETIME, Job::FINISH_WHEN_GAME_LOADED), 
+         mLandmarkPath(&quot;LandmarkPath&quot; + name), 
+         mNextLandmarkRequested(false),
+-        mWayPoints(NULL)
++        mWayPoints(NULL),
++        mUpdatedDirection(false),
++        mTimeSinceLastRotation(0)
+     {
+         //the moving creature moves from the current position to the landmark
+         mMovingCreature = movingCreature;
+@@ -39,11 +41,8 @@
+ 
+     bool CreatureWalkPathJob::execute(Ogre::Real time)
+     {
+-        static bool updatedDirection(false);
+-        static Ogre::Real timeSinceLastRotation = 0;
++        mTimeSinceLastRotation += time;
+ 
+-        timeSinceLastRotation += time;
+-
+         Ogre::Vector3 direction = mCurrentLandmark-&gt;getPosition() - mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPosition();
+         direction.y = 0;
+         if (direction.squaredLength() &lt; 0.04 )
+@@ -82,7 +81,7 @@
+                 return true;
+             }
+ 
+-            updatedDirection = false;
++            mUpdatedDirection = false;
+             return false;
+         }
+ 
+@@ -115,7 +114,7 @@
+                 }
+                 direction = mCurrentWayPath.back() - mMovingCreature-&gt;getCreature()-&gt;getPosition();
+             }
+-            updatedDirection = true;
++            mUpdatedDirection = true;
+         }
+ 
+         LOG_MESSAGE(&quot;WalkPathJob&quot;, 
+@@ -128,15 +127,15 @@
+         Ogre::Radian yaw = rotation.getYaw();
+         Ogre::Vector3 usedRotation(Ogre::Vector3::ZERO);
+ 
+-        if (!updatedDirection 
++        if (!mUpdatedDirection 
+             || (direction.squaredLength() &gt; 0.04 
+-                &amp;&amp; timeSinceLastRotation &gt; 0.2 
++                &amp;&amp; mTimeSinceLastRotation &gt; 0.2 
+                 &amp;&amp; direction.normalisedCopy().dotProduct(
+                     creatureViewVector.normalisedCopy()) &lt; 0.9))
+         {
+             usedRotation.y = yaw.valueRadians();
+-            updatedDirection = true;
+-            timeSinceLastRotation = 0;
++            mUpdatedDirection = true;
++            mTimeSinceLastRotation = 0;
+         }
+ 
+         mMovingCreature-&gt;setMovement(CreatureController::MT_GEHEN, Ogre::Vector3::NEGATIVE_UNIT_Z, usedRotation);
+
+Modified: rl/trunk/engine/core/include/Job.h
+===================================================================
+--- rl/trunk/engine/core/include/Job.h	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/core/include/Job.h	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -20,6 +20,7 @@
+ #include &quot;CorePrerequisites.h&quot;
+ 
+ #include &quot;TimeSource.h&quot;
++#include &quot;Properties.h&quot;
+ 
+ namespace rl
+ {
+@@ -31,9 +32,15 @@
+      *  The JobScheduler calles Job#execute till the Job has finished, or the JobScheduler
+      *  decides to discard the Job, if allowed.
+      */
+-    class _RlCoreExport Job
++    class _RlCoreExport Job : public PropertyHolder
+     {
+     public:
++        enum JobPersistenceType
++        {
++            NOT_PERSISTENT,             // the job is not influenced by any save/load - events
++            PERSISTENT,                 // the job stores data in (and loads from) a savegamefile, the job is deleted (not discarded) before a new game is loaded
++            FINISH_WHEN_GAME_LOADED     // the job is discarded if it is discardable or deleted, when a new game is loaded
++        };
+         /**
+          * Constructor.
+          *
+@@ -47,7 +54,7 @@
+          *         sometimes it is sensible to pool a number of Jobs for reuse.
+          */
+         Job(bool isDiscardable, bool destroyWhenDone, 
+-            TimeSource::TimeSourceType type = TimeSource::REALTIME_CONTINUOUS);
++            TimeSource::TimeSourceType type = TimeSource::REALTIME_CONTINUOUS, JobPersistenceType persistence = NOT_PERSISTENT);
+         virtual ~Job();
+ 
+         /**
+@@ -70,11 +77,25 @@
+         /// Returns true, if the Job shall be deleted, if the Job is finished. Returns false else.
+         virtual bool destroyWhenDone();
+ 
++        /// Returns the Persistence-Type of this job
++        JobPersistenceType getPersistenceType() const;
++
+         TimeSource::TimeSourceType getTimeSource() const;
+ 
++        /// derived from PropertyHolder
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        /// derived from PropertyHolder
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        /// derived from PropertyHolder
++        virtual PropertyRecord* getAllProperties() const;
++
++        /// returns the name of the class
++        virtual const Ogre::String getClassName() const;
++
+     protected:
+         bool mIsDiscardable;
+         bool mDestroyWhenDone;
++        JobPersistenceType mPersistence;
+         TimeSource::TimeSourceType mTimeSource;
+     };
+ }
+
+Modified: rl/trunk/engine/core/include/JobScheduler.h
+===================================================================
+--- rl/trunk/engine/core/include/JobScheduler.h	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/core/include/JobScheduler.h	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;CorePrerequisites.h&quot;
+ #include &quot;GameTask.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ 
+ #include &lt;deque&gt;
+ #include &lt;functional&gt;
+@@ -43,7 +44,8 @@
+      */
+     class _RlCoreExport JobScheduler
+         : public GameTask,
+-          public Ogre::Singleton&lt;JobScheduler&gt;
++          public Ogre::Singleton&lt;JobScheduler&gt;,
++          public SaveGameData
+     {
+     public:
+         typedef enum {JP_LOW = 10, JP_NORMAL = 20, JP_HIGH = 30} JobPriority;
+@@ -67,7 +69,8 @@
+          * @return The ticket used to identify the Job. This ticket is used to identify a Job in the
+          *         JobListener. It can be used by the listener to identify the Job, even if it
+          *         doesn't exist anymore. When the Job itself is removed from the queue, the ticket
+-         *         looses its validity to the JobScheduler itself though.
++         *         looses its validity to the JobScheduler itself though. If a job is saved and reloaded
++         *         from a SaveGameFile, a new ticket will be assigned!
+          */
+         unsigned long addJob(Job* job, JobPriority priority=JP_NORMAL, Ogre::Real delay=0.0f,
+             Ogre::Real maxRuntime=Ogre::Math::POS_INFINITY, JobListener* listener=NULL);
+@@ -86,6 +89,17 @@
+ 
+         virtual const Ogre::String&amp; getName() const;
+ 
++
++        /// Override from SaveGameData
++        /// Manages saving and loading from the SaveGameFile
++
++        virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual void writeData(SaveGameFileWriter* writer);
++        virtual void readData(SaveGameFileReader* reader);
++        virtual int getPriority() const;  // this should probably be one of the last things to load, so the job can access various things (gameobjects etc)
++
++        typedef Job*(*JobCreateFunction)(void);
++        static void registerJobClass(const Ogre::String &amp;name, JobCreateFunction);
+     private:
+         /// A JobEntry encapsules a Job for the Scheduler, it contains the Job itself and
+         /// various administrional data.
+@@ -118,6 +132,10 @@
+         //JobQueue mRemovedJobs; // should probably replaced by JobsToDelete
+         unsigned short mTokenThreshold;
+         unsigned long mTicketCounter;
++
++        /// map mit funktionszeigern zum erstellen von job klassen
++        typedef std::map&lt;Ogre::String, JobCreateFunction&gt; JobCreationMap;
++        static JobCreationMap mJobCreationMap;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/Job.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Job.cpp	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/core/src/Job.cpp	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -20,10 +20,11 @@
+ 
+ namespace rl
+ {
+-    Job::Job(bool isDiscardable, bool destroyWhenDone, TimeSource::TimeSourceType timesource)
++    Job::Job(bool isDiscardable, bool destroyWhenDone, TimeSource::TimeSourceType timesource, JobPersistenceType peristence)
+         : mIsDiscardable(isDiscardable), 
+         mDestroyWhenDone(destroyWhenDone),
+-        mTimeSource(timesource)
++        mTimeSource(timesource),
++        mPersistence(peristence)
+     {
+     }
+ 
+@@ -50,4 +51,79 @@
+     {
+         return mTimeSource;
+     }
++
++    Job::JobPersistenceType Job::getPersistenceType() const
++    {
++        return mPersistence;
++    }
++
++    const Property Job::getProperty(const Ogre::String&amp; key) const
++    {
++        Property prop;
++        if( key == &quot;discardable&quot; )
++        {
++            prop.setValue(mIsDiscardable);
++        }
++        else if( key == &quot;destroywhendone&quot; )
++        {
++            prop.setValue(mDestroyWhenDone);
++        }
++        else if( key == &quot;timesource&quot; )
++        {
++            prop.setValue((int)mTimeSource);
++        }
++        else
++        {
++            Throw(IllegalArgumentException, key + &quot; is not a property of this Job!&quot;);
++        }
++
++        return prop;
++    }
++
++    void Job::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    {
++        try
++        {
++            if( key == &quot;discardable&quot; )
++            {
++                mIsDiscardable = value.toBool();
++            }
++            else if( key == &quot;destroywhendone&quot; )
++            {
++                mDestroyWhenDone = value.toBool();
++            }
++            else if( key == &quot;timesource&quot; )
++            {
++                mTimeSource = (TimeSource::TimeSourceType)value.toInt();
++            }
++            else
++            {
++                LOG_WARNING(
++                    Logger::RULES,
++                    key + &quot; is not a property of this Job!&quot;);
++            }
++        }
++        catch (WrongFormatException ex)
++        {
++            LOG_ERROR(
++                Logger::RULES,
++                &quot;property &quot; + key + &quot; has the wrong format&quot;);
++        }
++    }
++
++    PropertyRecord* Job::getAllProperties() const
++    {
++        PropertyRecord* ps = new PropertyRecord();
++        ps-&gt;setProperty(&quot;discardable&quot;, Property(mIsDiscardable));
++        ps-&gt;setProperty(&quot;destroywhendone&quot;, Property(mDestroyWhenDone));
++        ps-&gt;setProperty(&quot;timesource&quot;, Property((int)mTimeSource));
++
++        return ps;
++    }
++
++    const Ogre::String Job::getClassName() const
++    {
++        static const Ogre::String name = &quot;&quot;;
++        return name;
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/JobScheduler.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobScheduler.cpp	2008-01-06 19:15:40 UTC (rev 4047)
++++ rl/trunk/engine/core/src/JobScheduler.cpp	2008-01-16 18:42:12 UTC (rev 4048)
+@@ -33,6 +33,7 @@
+         mTokenThreshold(JP_NORMAL), 
+         mTicketCounter(0)
+     {
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     JobScheduler::~JobScheduler()
+@@ -177,10 +178,130 @@
+         }
+     }
+ 
+-    const String&amp; JobScheduler::getName() const
++    const Ogre::String&amp; JobScheduler::getName() const
+     {
+-        static String NAME = &quot;JobScheduler&quot;;
++        static Ogre::String NAME = &quot;JobScheduler&quot;;
+ 
+         return NAME;
+     }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void JobScheduler::writeData(SaveGameFileWriter* writer)
++    {
++        DOMElement* jobSchedulerParentNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++
++        for(JobQueue::const_iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++)
++        {
++            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT &amp;&amp; !(iter-&gt;markedToRemove) )
++            {
++                DOMElement* jobNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), jobSchedulerParentNode, &quot;job&quot;);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;priority&quot;, iter-&gt;priority);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;tokens&quot;, iter-&gt;tokens);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;start&quot;, iter-&gt;start);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;end&quot;, iter-&gt;end);
++                writer-&gt;setAttributeValueAsReal(jobNode, &quot;timeSinceLastCall&quot;, iter-&gt;timeSinceLastCall);
++                writer-&gt;setAttributeValueAsBool(jobNode, &quot;called&quot;, iter-&gt;called);
++                writer-&gt;setAttributeValueAsStdString(jobNode, &quot;classname&quot;, iter-&gt;job-&gt;getClassName());
++
++                PropertyMap map = iter-&gt;job-&gt;getAllProperties()-&gt;toPropertyMap();
++                writer-&gt;writeEachPropertyToElem(jobNode, map);
++            }
++        }
++    }
++
++    void JobScheduler::readData(SaveGameFileReader* reader)
++    {
++        // delete and discard old jobs
++        for( JobQueue::iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++ )
++        {
++            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT )
++            {
++                // delete the job, but do not discard it!
++                iter-&gt;markedToRemove = true;
++            }
++            else if( iter-&gt;job-&gt;getPersistenceType() == Job::FINISH_WHEN_GAME_LOADED )
++            {
++                // discard the job, then delete it
++                if( iter-&gt;job-&gt;isDiscardable() )
++                    iter-&gt;job-&gt;discard();
++                iter-&gt;markedToRemove = true;
++            }
++        }
++
++        
++        // load jobs from savegamefile
++
++        reader-&gt;initializeXml();
++
++
++        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++        
++        if(rootNodeList-&gt;getLength())
++        {
++            DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
++            if(xmlJobs-&gt;getLength())
++            {
++                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
++                {
++                    DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
++                    if(xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++                        DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
++                        JobPriority priority;
++                        unsigned short tokens;
++                        int start, end;
++                        Real timeSinceLastCall;
++                        bool called;
++                        priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
++                        tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
++                        start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
++                        end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
++                        timeSinceLastCall = reader-&gt;getAttributeValueAsReal(xmlJob, &quot;timeSinceLastCall&quot;);
++                        called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
++
++                        Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
++
++                        JobCreationMap::iterator it = mJobCreationMap.find(className);
++                        if( it == mJobCreationMap.end() )
++                        {
++                            LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
++                            continue;
++                        }
++
++                        Job* job = it-&gt;second();
++                        if( job == NULL )
++                        {
++                            LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
++                            continue;
++                        }
++                        PropertyRecord properties = reader-&gt;getPropertiesAsRecord(xmlJob);
++                        job-&gt;setProperties(&amp;properties);
++                        
++                        
++                        unsigned long ticket = ++mTicketCounter;
++                        TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(job-&gt;getTimeSource());
++                        unsigned long clock = ts-&gt;getClock();
++                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeSinceLastCall, called, false};
++                        mJobQueue.push_back(entry);
++                    }
++                }
++            }
++        }
++
++        reader-&gt;shutdownXml();
++    }
++
++    int JobScheduler::getPriority() const
++    {
++        return 0; // must be loaded before triggers!
++    }
++
++    CeGuiString JobScheduler::getXmlNodeIdentifier() const
++    {
++        static const CeGuiString name = &quot;jobsceduler&quot;;
++        return name;
++    }
++
++    JobScheduler::JobCreationMap JobScheduler::mJobCreationMap;
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001118.html">[Dsa-hl-svn] r4047 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001120.html">[Dsa-hl-svn] r4049 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1119">[ date ]</a>
+              <a href="thread.html#1119">[ thread ]</a>
+              <a href="subject.html#1119">[ subject ]</a>
+              <a href="author.html#1119">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

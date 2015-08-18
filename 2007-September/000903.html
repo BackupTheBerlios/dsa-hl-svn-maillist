@@ -1,0 +1,210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3832 - rl/trunk/engine/common/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3832%20-%20rl/trunk/engine/common/src&In-Reply-To=%3C200709082032.l88KW5E7005408%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000902.html">
+   <LINK REL="Next"  HREF="000904.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3832 - rl/trunk/engine/common/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3832%20-%20rl/trunk/engine/common/src&In-Reply-To=%3C200709082032.l88KW5E7005408%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3832 - rl/trunk/engine/common/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Sep  8 22:32:05 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000902.html">[Dsa-hl-svn] r3831 - rl/trunk/engine/common/src
+</A></li>
+        <LI>Next message: <A HREF="000904.html">[Dsa-hl-svn] r3833 - in rl/trunk/engine/common: . include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#903">[ date ]</a>
+              <a href="thread.html#903">[ thread ]</a>
+              <a href="subject.html#903">[ subject ]</a>
+              <a href="author.html#903">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-09-08 22:32:02 +0200 (Sat, 08 Sep 2007)
+New Revision: 3832
+
+Added:
+   rl/trunk/engine/common/src/XmlPropertyWriter.cpp
+Removed:
+   rl/trunk/engine/common/src/PropertyWriter.cpp
+Log:
+Renamed remotely
+
+Deleted: rl/trunk/engine/common/src/PropertyWriter.cpp
+===================================================================
+--- rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-08 20:31:31 UTC (rev 3831)
++++ rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-08 20:32:02 UTC (rev 3832)
+@@ -1,130 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;XmlHelper.h&quot;
+-
+-#include &quot;Properties.h&quot;
+-#include &quot;PropertyWriter.h&quot;
+-
+-#include &lt;OgreResourceManager.h&gt;
+-#include &lt;CEGUIPropertyHelper.h&gt;
+-
+-
+-using namespace XERCES_CPP_NAMESPACE;
+-using namespace Ogre;
+-
+-namespace rl {
+-
+-    XmlPropertyWriter::XmlPropertyWriter()
+-    {
+-    }
+-
+-    XmlPropertyWriter::~XmlPropertyWriter()
+-    {
+-    }
+-
+-    void XmlPropertyWriter::setPropertySets(std::vector&lt;PropertySet*&gt; sets)
+-    {
+-        mPropertySets = sets;
+-    }
+-
+-    void XmlPropertyWriter::addPropertySet(PropertySet* set)
+-    {
+-        mPropertySets.push_back(set);
+-    }
+-
+-    DOMElement* XmlPropertyWriter::processProperty(DOMElement* parent, PropertyEntry entry)
+-    {
+-        DOMElement* element = NULL;
+-        if(!entry.second.isEmpty())
+-        {
+-            if(entry.second.isArray())
+-            {
+-                element = this-&gt;processPropertyArray(parent, entry.first.c_str(), entry.second.toArray());
+-            }
+-            else if(entry.second.isMap())
+-            {
+-                element = this-&gt;processPropertyMap(parent, entry.first.c_str(), entry.second.toMap());
+-            }
+-            else
+-            {
+-                element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-                if(entry.first != &quot;&quot;)
+-                    setAttribute(element, &quot;name&quot;, entry.first.c_str());
+-
+-                //Ogre::String typeName = entry.second.getTypeName();
+-                Ogre::String name = entry.second.getName();
+-                Ogre::StringUtil::toUpperCase(name);
+-                setAttributeValueAsString(element, &quot;type&quot;, name);
+-
+-                if(entry.second.isBool())
+-                    setAttributeValueAsBool(element, &quot;data&quot;, entry.second.toBool());
+-                else if(entry.second.isInt())
+-                    setAttributeValueAsInteger(element, &quot;data&quot;, entry.second.toInt());
+-                else if(entry.second.isIntPair())
+-                    setAttributeValueAsIntegerPair(element, &quot;data&quot;, entry.second.toIntPair());
+-                else if(entry.second.isIntPair())
+-                    setAttributeValueAsIntegerTriple(element, &quot;data&quot;, entry.second.toIntTriple());
+-                else if(entry.second.isQuaternion())
+-                    setValueAsQuaternion(element, entry.second.toQuaternion());
+-                else if(entry.second.isReal())
+-                    setAttributeValueAsReal(element, &quot;data&quot;, entry.second.toReal());
+-                else if(entry.second.isString())
+-                    setAttributeValueAsString(element, &quot;data&quot;, entry.second.toString());
+-                else if(entry.second.isVector3())
+-                    setValueAsVector3(element, entry.second.toVector3());
+-            }
+-        }
+-        return element;
+-    }
+-
+-    DOMElement* XmlPropertyWriter::processPropertySet(DOMElement* parent, const char* const name, PropertySet set)
+-    {
+-        PropertyMap map = set.toPropertyMap();
+-
+-        return processPropertyMap(parent, name, map);
+-    }
+-
+-    DOMElement* XmlPropertyWriter::processPropertyArray(DOMElement *parent, const char *const name, PropertyVector vector)
+-    {
+-        DOMElement* element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-        setAttribute(element, &quot;name&quot;, name);
+-        setAttribute(element, &quot;type&quot;, &quot;MAP&quot;);
+-
+-        PropertyVector::iterator iter;
+-        for(iter = vector.begin(); iter != vector.end(); iter++)
+-        {
+-            processProperty(element, PropertyEntry(&quot;&quot;,*iter));
+-        }
+-        return element;
+-    }
+-
+-    DOMElement* XmlPropertyWriter::processPropertyMap(DOMElement *parent, const char *const name, PropertyMap map)
+-    {
+-        DOMElement* element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-        setAttribute(element, &quot;name&quot;, name);
+-        setAttribute(element, &quot;type&quot;, &quot;MAP&quot;);
+-
+-        PropertyMap::iterator iter;
+-        for(iter = map.begin(); iter != map.end(); iter++)
+-        {
+-            processProperty(element, PropertyEntry(iter-&gt;first.c_str(), iter-&gt;second));
+-        }
+-        return element;
+-    }
+-}
+
+Copied: rl/trunk/engine/common/src/XmlPropertyWriter.cpp (from rev 3831, rl/trunk/engine/common/src/PropertyWriter.cpp)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000902.html">[Dsa-hl-svn] r3831 - rl/trunk/engine/common/src
+</A></li>
+	<LI>Next message: <A HREF="000904.html">[Dsa-hl-svn] r3833 - in rl/trunk/engine/common: . include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#903">[ date ]</a>
+              <a href="thread.html#903">[ thread ]</a>
+              <a href="subject.html#903">[ subject ]</a>
+              <a href="author.html#903">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

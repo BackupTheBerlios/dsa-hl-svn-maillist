@@ -1,0 +1,1513 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4305 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4305%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig%20ui/src&In-Reply-To=%3C200803202133.m2KLX2Tt018955%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001375.html">
+   <LINK REL="Next"  HREF="001377.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4305 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4305%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig%20ui/src&In-Reply-To=%3C200803202133.m2KLX2Tt018955%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4305 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar 20 22:33:02 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001375.html">[Dsa-hl-svn] r4304 - in modules: . kanalisation/scripts	kanalisation/scripts/maps persistenztest	persistenztest/dialogs persistenztest/dsa persistenztest/gui	persistenztest/gui/windows persistenztest/maps	persistenztest/materials persistenztest/materials/textures	persistenztest/models persistenztest/quests	persistenztest/scripts persistenztest/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001377.html">[Dsa-hl-svn] r4306 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1376">[ date ]</a>
+              <a href="thread.html#1376">[ thread ]</a>
+              <a href="subject.html#1376">[ subject ]</a>
+              <a href="author.html#1376">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-20 22:32:52 +0100 (Thu, 20 Mar 2008)
+New Revision: 4305
+
+Modified:
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/ContentLoader.h
+   rl/trunk/engine/core/include/ContentModule.h
+   rl/trunk/engine/core/include/CoreMessages.h
+   rl/trunk/engine/core/src/ContentLoader.cpp
+   rl/trunk/engine/core/src/ContentModule.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/SaveGameData.cpp
+   rl/trunk/engine/script/include/MapLoader.h
+   rl/trunk/engine/script/src/GameObjectNodeProcessor.cpp
+   rl/trunk/engine/script/src/MapLoader.cpp
+   rl/trunk/engine/script/swig/RlCore.head.swig
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlScript.head.swig
+   rl/trunk/engine/script/swig/RlScript.swig
+   rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+   rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+Log:
+- make vc compile the changes by blakharaz
+- first attempt of solving the problem with changing maps (very simple version)
+- disabled loading save games, because there have to be some fixes
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -568,6 +568,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\SaveGameData.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\SaveGameFile.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -869,6 +873,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\SaveGameData.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\SaveGameFile.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/ContentLoader.h
+===================================================================
+--- rl/trunk/engine/core/include/ContentLoader.h	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/include/ContentLoader.h	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -22,11 +22,17 @@
+ 
+ namespace rl
+ {
++    class ContentModule;
++
+     class _RlCoreExport ContentLoader : public PropertyHolder
+     {
+     public:
++        ContentLoader(const Ogre::String&amp; resourceGroup);
+         virtual ~ContentLoader();
+ 
++        virtual void loadContent() = 0;
++        virtual void unloadContent() = 0;
++
+         const Property getProperty(const CeGuiString&amp; key) const;
+         void setProperty(const CeGuiString&amp; key, const Property&amp; value);
+ 
+@@ -34,7 +40,7 @@
+ 
+         virtual const CeGuiString getClassName() const = 0;
+     protected:
+-        ContentLoader();
++        ContentModule* mContentModule;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/ContentModule.h
+===================================================================
+--- rl/trunk/engine/core/include/ContentModule.h	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/include/ContentModule.h	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -40,17 +40,18 @@
+ 		virtual const Ogre::StringVector&amp; getTextureLocations() const = 0;
+ 		virtual const Ogre::StringVector&amp; getSoundLocations() const = 0;
+ 		virtual const Ogre::StringVector&amp; getModelLocations() const = 0;
+-        virtual const Ogre::StringVector&amp; getDefaultMaps() const = 0;
+ 		virtual void start() = 0;
+ 
+ 		static const Ogre::String getInitFile(const Ogre::String&amp; moduleId);
+ 		void initialize();
+ 		void initializeTextures() const;
+ 		void precreateMeshes() const;
++        void loadContent();
+ 		void unload();
+ 
+         bool isLoaded() const;
+ 
++        void registerContentLoader(ContentLoader* loader);
+ 
+         CeGuiString getXmlNodeIdentifier() const;
+         void writeData(SaveGameFileWriter* writer);
+@@ -58,6 +59,9 @@
+         /// defines the loading/saving order higher priority are saved last and loaded first
+         int getPriority() const;
+ 	private:
++        typedef std::vector&lt;ContentLoader*&gt; ContentLoaderVector;
++        ContentLoaderVector mContentLoaders;
++
+ 		static const Ogre::String getDirectory(const Ogre::String&amp; moduleId);
+ 		void addSearchPath(const Ogre::String&amp; path, const Ogre::String&amp; resourceGroup) const;
+ 
+
+Modified: rl/trunk/engine/core/include/CoreMessages.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreMessages.h	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/include/CoreMessages.h	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -1,84 +1,85 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-
+-#ifndef __Rl_CoreMessages_H__
+-#define __Rl_CoreMessages_H__
+-
+-#include &quot;CorePrerequisites.h&quot;
+-#include &quot;MessageType.h&quot;
+-
+-namespace rl
+-{
+-    class BaseAnimation;
+-
+-    enum CoreMessageTypeIds
+-    {
+-        // World //
+-        // Mask
+-        RLMSG_SCENE_EVENTS =            0x01000100,
+-        // Events
+-        RLMSG_SCENE_LOADED =            0x01000101,
+-        RLMSG_SCENE_CLEARING =          0x01000102,
+-
+-        // Animations //
+-        // Mask
+-        RLMSG_ANIMATION_EVENTS =        0x01000200,
+-        // Events
+-        RLMSG_ANIMATION_PAUSED =        0x01000201,
+-        RLMSG_ANIMATION_UNPAUSED =      0x01000202,
+-        RLMSG_ANIMATION_FINISHED =      0x01000203,
+-        RLMSG_ANIMATION_FRAMEREACHED =  0x01000204,
+-
+-        //Mask
+-        RLMSG_SAVEGAME_EVENTS     =     0x01000300,
+-        //Events    
+-        RLMSG_SAVEGAME_LOADED     =     0x01000301,
+-        RLMSG_SAVEGAME_SAVED      =     0x01000302,
+-        RLMSG_SAVEGAME_LOADING    =     0x01000303,
+-        RLMSG_SAVEGAME_SAVING     =     0x01000304,
+-        RLMSG_SAVEGAME_GOS_LOADED =     0x01000311       
+-    };
+-
+-    /// Message sent right after a scene has been loaded.
+-    typedef MessageType&lt;RLMSG_SCENE_LOADED&gt; MessageType_SceneLoaded;
+-
+-    /// Message sent just before a scene will be cleared.
+-    typedef MessageType&lt;RLMSG_SCENE_CLEARING&gt; MessageType_SceneClearing;
+-
+-    /// Message sent when an animation has been paused.
+-    typedef MessageType&lt;RLMSG_ANIMATION_PAUSED, BaseAnimation*&gt; MessageType_AnimationPaused;
+-
+-    /// Message sent when an animation has been unpaused.
+-    typedef MessageType&lt;RLMSG_ANIMATION_UNPAUSED, BaseAnimation*&gt; MessageType_AnimationUnpaused;
+-
+-    /// Message sent when an animation is finished.
+-    typedef MessageType&lt;RLMSG_ANIMATION_FINISHED, BaseAnimation*&gt; MessageType_AnimationFinished;
+-
+-    /// Message sent when an animation has been paused.
+-    /// Real param is the frame time reached
+-    typedef MessageType&lt;RLMSG_ANIMATION_FRAMEREACHED, BaseAnimation*, Ogre::Real&gt;
+-        MessageType_AnimationFrameReached;
+-
+-    typedef MessageType&lt;RLMSG_SAVEGAME_LOADED&gt; MessageType_SaveGameLoaded;
+-    
+-    typedef MessageType&lt;RLMSG_SAVEGAME_SAVED&gt; MessageType_SaveGameSaved;
+-    
+-    typedef MessageType&lt;RLMSG_SAVEGAME_LOADING&gt; MessageType_SaveGameLoading;
+-    
+-    typedef MessageType&lt;RLMSG_SAVEGAME_SAVING&gt; MessageType_SaveGameSaving;
+-    
+-}
+-#endif
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_CoreMessages_H__
++#define __Rl_CoreMessages_H__
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;MessageType.h&quot;
++
++namespace rl
++{
++    class BaseAnimation;
++
++    enum CoreMessageTypeIds
++    {
++        // World //
++        // Mask
++        RLMSG_SCENE_EVENTS =            0x01000100,
++        // Events
++        RLMSG_SCENE_LOADED =            0x01000101,
++        RLMSG_SCENE_CLEARING =          0x01000102,
++        RLMSG_SCENE_CHANGE_REQUESTED = 0x01000103,
++
++        // Animations //
++        // Mask
++        RLMSG_ANIMATION_EVENTS =        0x01000200,
++        // Events
++        RLMSG_ANIMATION_PAUSED =        0x01000201,
++        RLMSG_ANIMATION_UNPAUSED =      0x01000202,
++        RLMSG_ANIMATION_FINISHED =      0x01000203,
++        RLMSG_ANIMATION_FRAMEREACHED =  0x01000204,
++
++        //Mask
++        RLMSG_SAVEGAME_EVENTS     =     0x01000300,
++        //Events    
++        RLMSG_SAVEGAME_LOADED     =     0x01000301,
++        RLMSG_SAVEGAME_SAVED      =     0x01000302,
++        RLMSG_SAVEGAME_LOADING    =     0x01000303,
++        RLMSG_SAVEGAME_SAVING     =     0x01000304,
++        RLMSG_SAVEGAME_GOS_LOADED =     0x01000311       
++    };
++
++    /// Message sent right after a scene has been loaded.
++    typedef MessageType&lt;RLMSG_SCENE_LOADED&gt; MessageType_SceneLoaded;
++
++    /// Message sent just before a scene will be cleared.
++    typedef MessageType&lt;RLMSG_SCENE_CLEARING&gt; MessageType_SceneClearing;
++
++    /// Message sent when an animation has been paused.
++    typedef MessageType&lt;RLMSG_ANIMATION_PAUSED, BaseAnimation*&gt; MessageType_AnimationPaused;
++
++    /// Message sent when an animation has been unpaused.
++    typedef MessageType&lt;RLMSG_ANIMATION_UNPAUSED, BaseAnimation*&gt; MessageType_AnimationUnpaused;
++
++    /// Message sent when an animation is finished.
++    typedef MessageType&lt;RLMSG_ANIMATION_FINISHED, BaseAnimation*&gt; MessageType_AnimationFinished;
++
++    /// Message sent when an animation has been paused.
++    /// Real param is the frame time reached
++    typedef MessageType&lt;RLMSG_ANIMATION_FRAMEREACHED, BaseAnimation*, Ogre::Real&gt;
++        MessageType_AnimationFrameReached;
++
++    typedef MessageType&lt;RLMSG_SAVEGAME_LOADED&gt; MessageType_SaveGameLoaded;
++    
++    typedef MessageType&lt;RLMSG_SAVEGAME_SAVED&gt; MessageType_SaveGameSaved;
++    
++    typedef MessageType&lt;RLMSG_SAVEGAME_LOADING&gt; MessageType_SaveGameLoading;
++    
++    typedef MessageType&lt;RLMSG_SAVEGAME_SAVING&gt; MessageType_SaveGameSaving;
++    
++}
++#endif
+
+Modified: rl/trunk/engine/core/src/ContentLoader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentLoader.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/src/ContentLoader.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -17,10 +17,11 @@
+ #include &quot;stdinc.h&quot;
+ 
+ #include &quot;ContentLoader.h&quot;
++#include &quot;ContentModule.h&quot;
+ 
+ namespace rl
+ {
+-    ContentLoader::ContentLoader()
++    ContentLoader::ContentLoader(const Ogre::String&amp; resourceGroup)
+     {
+     }
+ 
+@@ -30,6 +31,7 @@
+ 
+     const Property ContentLoader::getProperty(const CeGuiString&amp; key) const
+     {
++        LOG_WARNING(Logger::CORE, key + &quot; is not a property of this ContentLoader&quot;);
+         return Property();
+     }
+       
+
+Modified: rl/trunk/engine/core/src/ContentModule.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentModule.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/src/ContentModule.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -1,210 +1,248 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;ContentModule.h&quot;
+-
+-
+-#include &quot;ConfigurationManager.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;RubyInterpreter.h&quot;
+-#include &quot;SaveGameManager.h&quot;
+-#include &quot;SoundManager.h&quot;
+-#include &quot;World.h&quot;
+-
+-using namespace Ogre;
+-
+-namespace rl
+-{
+-    ContentModule::ContentModule(const Ogre::String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion)
+-    :    mId(id),
+-        mName(name),
+-        mCommon(common),
+-        mMinimumEngineVersion(minimumEngineVersion),
+-        mLoaded(false)
+-    {
+-    }
+-
+-    ContentModule::~ContentModule()
+-    {
+-    }
+-
+-    const Ogre::String ContentModule::getInitFile(const Ogre::String&amp; moduleId)
+-    {
+-        return getDirectory(moduleId) + &quot;/scripts/moduleconfig.rb&quot;;
+-    }
+-
+-    const Ogre::String ContentModule::getDirectory(const Ogre::String&amp; moduleId)
+-    {
+-        return ConfigurationManager::getSingleton().
+-                getModulesRootDirectory() + &quot;/&quot; + moduleId;
+-    }
+-
+-    const Ogre::String ContentModule::getDirectory() const
+-    {
+-        return ContentModule::getDirectory(mId);
+-    }
+-
+-    const CeGuiString&amp; ContentModule::getName() const
+-    {
+-        return mName;
+-    }
+-
+-    const Ogre::String&amp; ContentModule::getId() const
+-    {
+-        return mId;
+-    }
+-
+-    long ContentModule::getMinimumEngineVersion() const
+-    {
+-        return mMinimumEngineVersion;
+-    }
+-
+-    bool ContentModule::isCommon() const
+-    {
+-        return mCommon;
+-    }
+-
+-    void ContentModule::initializeTextures() const
+-    {
+-        Ogre::String resourceGroup = getId();
+-
+-        StringVector texLocations = getTextureLocations();
+-        for(StringVector::iterator iter = texLocations.begin();
+-            iter != texLocations.end();
+-            iter++)
+-        {
+-            Ogre::String location = *iter;
+-            if (location.find(&quot;.zip&quot;) != Ogre::String::npos)
+-            {
+-                ResourceGroupManager::getSingleton().addResourceLocation(
+-                    getDirectory() + &quot;/materials/&quot; + location, Ogre::String(&quot;Zip&quot;), resourceGroup);
+-            }
+-            else
+-            {
+-                ResourceGroupManager::getSingleton().addResourceLocation(
+-                    getDirectory() + &quot;/materials/&quot; + location, &quot;FileSystem&quot;, resourceGroup);
+-            }
+-        }
+-
+-        addSearchPath(getDirectory()+&quot;/materials&quot;, resourceGroup);
+-    }
+-
+-    void ContentModule::initialize()
+-    {
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+-
+-        Ogre::String moduleDir = getDirectory();
+-
+-        Ogre::String resourceGroup = getId();
+-
+-        addSearchPath(moduleDir + &quot;/conf&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/dsa&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/maps&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/models&quot;, resourceGroup);
+-           StringVector modelLoc = getModelLocations();
+-        for (StringVector::iterator it = modelLoc.begin(); it != modelLoc.end(); ++it)
+-        {
+-            addSearchPath(moduleDir + &quot;/models/&quot;+*it, resourceGroup);
+-        }
+-
+-        addSearchPath(moduleDir + &quot;/sound&quot;, resourceGroup); ///@todo ueber Verzeichnisnamen nachdenken
+-        StringVector soundLoc = getSoundLocations();
+-        for (StringVector::iterator it = soundLoc.begin(); it != soundLoc.end(); ++it)
+-        {
+-            addSearchPath(moduleDir + &quot;/sound/&quot;+*it, resourceGroup);
+-        }
+-
+-        addSearchPath(moduleDir + &quot;/gui&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/gui/fonts&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/gui/imagesets&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/gui/schemes&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/gui/windows&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/gui/windows/buttons&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/dialogs&quot;, resourceGroup);
+-        addSearchPath(moduleDir + &quot;/quests&quot;, resourceGroup);
+-
+-        RubyInterpreter* interpreter = CoreSubsystem::getSingleton().getRubyInterpreter();
+-        if (interpreter != NULL)
+-        {
+-            interpreter-&gt;addSearchPath(moduleDir + &quot;/scripts&quot;);
+-            interpreter-&gt;addSearchPath(moduleDir + &quot;/scripts/maps&quot;);
+-        }
+-
+-        mLoaded = true;
+-    }
+-
+-    void ContentModule::addSearchPath(const Ogre::String&amp; path, const Ogre::String&amp; resourceGroup) const
+-    {
+-        try
+-        {
+-            ResourceGroupManager::getSingleton().addResourceLocation(path,
+-                &quot;FileSystem&quot;, resourceGroup);
+-        }
+-        catch(...)
+-        {
+-            // and forget
+-        }
+-    }
+-
+-    void ContentModule::precreateMeshes() const
+-    {
+-        StringVectorPtr meshes = ResourceGroupManager::getSingleton()
+-            .findResourceNames(getId(), &quot;*.mesh&quot;);
+-
+-        for (size_t i = 0; i &lt; meshes-&gt;size(); ++i)
+-        {
+-            ResourcePtr res = MeshManager::getSingleton().getByName((*meshes)[i]);
+-            if (res.isNull())
+-            {
+-                MeshPtr mesh = MeshManager::getSingleton().create((*meshes)[i],
+-                    getId());
+-            }
+-        }
+-    }
+-
+-    void ContentModule::unload()
+-    {
+-        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+-        //TODO: unloadModule
+-        CoreSubsystem::getSingleton().getWorld()-&gt;clearScene();
+-        mLoaded = false;
+-    }
+-
+-    bool ContentModule::isLoaded() const
+-    {
+-        return mLoaded;
+-    }
+-
+-    CeGuiString ContentModule::getXmlNodeIdentifier() const
+-    {
+-        return &quot;ContentModule&quot;;
+-    }
+-
+-    void ContentModule::writeData(SaveGameFileWriter* writer)
+-    {
+-    }
+-
+-    void ContentModule::readData(SaveGameFileReader* reader)
+-    {
+-    }
+-
+-    /// defines the loading/saving order higher priority are saved last and loaded first
+-    int ContentModule::getPriority() const
+-    {
+-        return 10;
+-    }
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;ContentModule.h&quot;
++
++
++#include &quot;ConfigurationManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;RubyInterpreter.h&quot;
++#include &quot;SaveGameManager.h&quot;
++#include &quot;SoundManager.h&quot;
++#include &quot;World.h&quot;
++
++using namespace Ogre;
++
++namespace rl
++{
++    ContentModule::ContentModule(const Ogre::String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion)
++    :    mId(id),
++        mName(name),
++        mCommon(common),
++        mMinimumEngineVersion(minimumEngineVersion),
++        mLoaded(false)
++    {
++    }
++
++    ContentModule::~ContentModule()
++    {
++        for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
++        {
++            delete *it;
++        }
++        mContentLoaders.clear();
++    }
++
++    const Ogre::String ContentModule::getInitFile(const Ogre::String&amp; moduleId)
++    {
++        return getDirectory(moduleId) + &quot;/scripts/moduleconfig.rb&quot;;
++    }
++
++    const Ogre::String ContentModule::getDirectory(const Ogre::String&amp; moduleId)
++    {
++        return ConfigurationManager::getSingleton().
++                getModulesRootDirectory() + &quot;/&quot; + moduleId;
++    }
++
++    const Ogre::String ContentModule::getDirectory() const
++    {
++        return ContentModule::getDirectory(mId);
++    }
++
++    const CeGuiString&amp; ContentModule::getName() const
++    {
++        return mName;
++    }
++
++    const Ogre::String&amp; ContentModule::getId() const
++    {
++        return mId;
++    }
++
++    long ContentModule::getMinimumEngineVersion() const
++    {
++        return mMinimumEngineVersion;
++    }
++
++    bool ContentModule::isCommon() const
++    {
++        return mCommon;
++    }
++
++    void ContentModule::initializeTextures() const
++    {
++        Ogre::String resourceGroup = getId();
++
++        StringVector texLocations = getTextureLocations();
++        for(StringVector::iterator iter = texLocations.begin();
++            iter != texLocations.end();
++            iter++)
++        {
++            Ogre::String location = *iter;
++            if (location.find(&quot;.zip&quot;) != Ogre::String::npos)
++            {
++                ResourceGroupManager::getSingleton().addResourceLocation(
++                    getDirectory() + &quot;/materials/&quot; + location, Ogre::String(&quot;Zip&quot;), resourceGroup);
++            }
++            else
++            {
++                ResourceGroupManager::getSingleton().addResourceLocation(
++                    getDirectory() + &quot;/materials/&quot; + location, &quot;FileSystem&quot;, resourceGroup);
++            }
++        }
++
++        addSearchPath(getDirectory()+&quot;/materials&quot;, resourceGroup);
++    }
++
++    void ContentModule::initialize()
++    {
++        SaveGameManager::getSingleton().registerSaveGameData(this);
++
++        Ogre::String moduleDir = getDirectory();
++
++        Ogre::String resourceGroup = getId();
++
++        addSearchPath(moduleDir + &quot;/conf&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/dsa&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/maps&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/models&quot;, resourceGroup);
++           StringVector modelLoc = getModelLocations();
++        for (StringVector::iterator it = modelLoc.begin(); it != modelLoc.end(); ++it)
++        {
++            addSearchPath(moduleDir + &quot;/models/&quot;+*it, resourceGroup);
++        }
++
++        addSearchPath(moduleDir + &quot;/sound&quot;, resourceGroup); ///@todo ueber Verzeichnisnamen nachdenken
++        StringVector soundLoc = getSoundLocations();
++        for (StringVector::iterator it = soundLoc.begin(); it != soundLoc.end(); ++it)
++        {
++            addSearchPath(moduleDir + &quot;/sound/&quot;+*it, resourceGroup);
++        }
++
++        addSearchPath(moduleDir + &quot;/gui&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/gui/fonts&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/gui/imagesets&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/gui/schemes&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/gui/windows&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/gui/windows/buttons&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/dialogs&quot;, resourceGroup);
++        addSearchPath(moduleDir + &quot;/quests&quot;, resourceGroup);
++
++        RubyInterpreter* interpreter = CoreSubsystem::getSingleton().getRubyInterpreter();
++        if (interpreter != NULL)
++        {
++            interpreter-&gt;addSearchPath(moduleDir + &quot;/scripts&quot;);
++            interpreter-&gt;addSearchPath(moduleDir + &quot;/scripts/maps&quot;);
++        }
++
++        mLoaded = true;
++    }
++
++    void ContentModule::addSearchPath(const Ogre::String&amp; path, const Ogre::String&amp; resourceGroup) const
++    {
++        try
++        {
++            ResourceGroupManager::getSingleton().addResourceLocation(path,
++                &quot;FileSystem&quot;, resourceGroup);
++        }
++        catch(...)
++        {
++            // and forget
++        }
++    }
++
++    void ContentModule::precreateMeshes() const
++    {
++        StringVectorPtr meshes = ResourceGroupManager::getSingleton()
++            .findResourceNames(getId(), &quot;*.mesh&quot;);
++
++        for (size_t i = 0; i &lt; meshes-&gt;size(); ++i)
++        {
++            ResourcePtr res = MeshManager::getSingleton().getByName((*meshes)[i]);
++            if (res.isNull())
++            {
++                MeshPtr mesh = MeshManager::getSingleton().create((*meshes)[i],
++                    getId());
++            }
++        }
++    }
++
++    void ContentModule::loadContent()
++    {
++        for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
++        {
++            (*it)-&gt;loadContent();
++        }
++    }
++
++    void ContentModule::unload()
++    {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
++        for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
++        {
++            (*it)-&gt;unloadContent();
++        }
++        mContentLoaders.clear();
++        //TODO: unloadModule
++        CoreSubsystem::getSingleton().getWorld()-&gt;clearScene();
++        mLoaded = false;
++    }
++
++    bool ContentModule::isLoaded() const
++    {
++        return mLoaded;
++    }
++
++    void ContentModule::registerContentLoader(ContentLoader *loader)
++    {
++        mContentLoaders.push_back(loader);
++    }
++
++    CeGuiString ContentModule::getXmlNodeIdentifier() const
++    {
++        return &quot;ContentModule&quot;;
++    }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void ContentModule::writeData(SaveGameFileWriter* writer)
++    {
++        if(!this-&gt;isCommon())
++        {
++            LOG_MESSAGE(Logger::CORE, &quot;Saving ContentLoaders&quot;);
++            DOMElement* contentLoadersNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++            writer-&gt;setAttributeValueAsString(contentLoadersNode, &quot;name&quot;, mName);
++
++            for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
++            {
++                DOMElement* contentLoaderNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), contentLoadersNode, &quot;contentloader&quot;);
++                writer-&gt;setAttributeValueAsString(contentLoaderNode, &quot;classname&quot;, Property((*it)-&gt;getClassName()));
++                writer-&gt;writeEachPropertyToElem(contentLoaderNode, (*it)-&gt;getAllProperties()-&gt;toPropertyMap());
++            }
++        }
++    }
++
++    void ContentModule::readData(SaveGameFileReader* reader)
++    {
++    }
++
++    /// defines the loading/saving order higher priority are saved last and loaded first
++    int ContentModule::getPriority() const
++    {
++        return 10;
++    }
++}
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -251,6 +251,10 @@
+         mRubyInterpreter-&gt;initializeInterpreter();
+         LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter initialisiert&quot;);
+ 
++        mMessagePump = new MessagePump();
++        GameLoop::getSingleton().addTask(mMessagePump, GameLoop::TG_LOGIC);
++        LOG_MESSAGE(Logger::CORE,&quot;MessagePump erzeugt&quot;);
++
+         mActorManager = new ActorManager();
+         LOG_MESSAGE(Logger::CORE,&quot;Aktormanager erzeugt&quot;);
+ 
+@@ -272,10 +276,6 @@
+         mWorld = new DotSceneOctreeWorld();
+         mActorManager-&gt;setWorld(mWorld);
+ 
+-        mMessagePump = new MessagePump();
+-        GameLoop::getSingleton().addTask(mMessagePump, GameLoop::TG_LOGIC);
+-        LOG_MESSAGE(Logger::CORE,&quot;MessagePump erzeugt&quot;);
+-
+         mPhysicsManager = new PhysicsManager();
+         GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+         LOG_MESSAGE(Logger::CORE,&quot;PhysicsManager erzeugt&quot;);
+@@ -432,7 +432,7 @@
+         mActiveAdventureModule = module;
+ 
+         //mCoreEventCaster.dispatchEvent(new DataLoadedEvent(100.0));
+-
++        
+         module-&gt;start();
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameData.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameData.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/core/src/SaveGameData.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -1,11 +1,19 @@
+-/*
+- *  SaveGameData.cpp
+- *  Rastullah
+- *
+- *  Created by Sascha Kolewa on 19.03.08.
+- *  Copyright 2008 __MyCompanyName__. All rights reserved.
+- *
+- */
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
+ 
++#include &quot;stdinc.h&quot;
++
+ #include &quot;SaveGameData.h&quot;
+-
+
+Modified: rl/trunk/engine/script/include/MapLoader.h
+===================================================================
+--- rl/trunk/engine/script/include/MapLoader.h	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/include/MapLoader.h	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -23,15 +23,22 @@
+ #include &lt;list&gt;
+ #include &lt;XmlProcessor.h&gt;
+ #include &lt;ContentLoader.h&gt;
++#include &lt;MessagePump.h&gt;
++#include &lt;CoreMessages.h&gt;
+ 
+ namespace rl {
++   
+ 
++    typedef MessageType&lt;RLMSG_SCENE_CHANGE_REQUESTED, Ogre::StringVector&gt; MessageType_SceneChangeRequested;
++
+     class AbstractMapNodeProcessor;
+     class ProgressWindow;
+ 
+     class _RlScriptExport MapLoader : public ContentLoader,private XmlProcessor 
+     {
+     public:
++        static const CeGuiString PROPERTY_ACTIVEMAPS;
++
+         MapLoader(const Ogre::String&amp; resourceGroup);
+         ~MapLoader();
+ 
+@@ -40,9 +47,20 @@
+         * @param mapresource the name of the map file resource
+         * @param loadGameObjects set &lt;code&gt;false&lt;/code&gt; if the MapLoader should not load the GameObjects of the map file (e.g. when loading a saved game)
+         */
++        void loadContent();
++        void unloadContent();
++        void setDefaultMaps(Ogre::StringVector maps);
+         void loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects = true);
++        void loadScene(Ogre::StringVector mapsresources, bool loadGameObjects = true);
++        void unloadAllMaps(bool removeGameObjects); /// @todo
++        void requestSceneChange(Ogre::StringVector mapsresources);
+ 
+         const CeGuiString getClassName() const;
++
++        const Property getProperty(const CeGuiString&amp; key) const;
++        void setProperty(const CeGuiString&amp; key, const Property&amp; value);
++
++        PropertyKeys getAllPropertyKeys() const;
+     private:
+         std::list&lt;AbstractMapNodeProcessor*&gt; mNodeProcessors;
+ 
+@@ -51,9 +69,16 @@
+         Ogre::String mResourceGroup;
+         ProgressWindow* mPercentageWindow;
+ 
++        Ogre::StringVector mLoadedMaps;
++        Ogre::StringVector mPrevLoadedMaps;
++        Ogre::StringVector mDefaultMaps;
++
+         void setRootSceneNode(Ogre::SceneNode* node);
+         void processSceneNodes(XERCES_CPP_NAMESPACE::DOMElement* nodesElem, bool loadGameObjects);
+         void setLoadingPercentage(Ogre::Real percentage, const Ogre::String&amp; text = &quot;&quot;);
++        bool changeScene(Ogre::StringVector mapsresources);
++
++        MessagePump::ScopedConnection RequestedSceneChangeConnection;
+     };
+ 
+ } // namespace rl
+
+Modified: rl/trunk/engine/script/src/GameObjectNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/GameObjectNodeProcessor.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/src/GameObjectNodeProcessor.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -47,62 +47,65 @@
+             goid = getAttributeValueAsInteger(nodeElem, &quot;id&quot;);
+         }
+ 
+-        GameObject* go = GameObjectManager::getSingleton().createGameObject(classname, goid);
+-
+-        DOMElement* posElem = getChildNamed(nodeElem, &quot;position&quot;);
+-        if (posElem != NULL)
++        GameObject* go = GameObjectManager::getSingleton().getGameObject(goid);
++        if(!go)
+         {
+-            Vector3 pos = processVector3(posElem);
+-            go-&gt;setPosition(pos);
+-        }
++            go = GameObjectManager::getSingleton().createGameObject(classname, goid);
+ 
+-        DOMElement* oriElem = getChildNamed(nodeElem, &quot;rotation&quot;);
+-        if (oriElem != NULL)
+-        {
+-            Quaternion ori = processQuaternion(oriElem);
+-            go-&gt;setOrientation(ori);
+-        }
++            DOMElement* posElem = getChildNamed(nodeElem, &quot;position&quot;);
++            if (posElem != NULL)
++            {
++                Vector3 pos = processVector3(posElem);
++                go-&gt;setPosition(pos);
++            }
+ 
+-        DOMNodeList* goElChildNodes = nodeElem-&gt;getChildNodes();
+-        for (XMLSize_t idx = 0; idx &lt; goElChildNodes-&gt;getLength(); idx++)
+-        {
+-            DOMNode* cur = goElChildNodes-&gt;item(idx);
+-            if (cur-&gt;getNodeType() == DOMNode::ENTITY_NODE
+-                &amp;&amp; hasNodeName(cur, &quot;property&quot;))
++            DOMElement* oriElem = getChildNamed(nodeElem, &quot;rotation&quot;);
++            if (oriElem != NULL)
+             {
+-                PropertyEntry propEntry = processProperty(static_cast&lt;DOMElement*&gt;(cur));
+-                if (propEntry.first != &quot;&quot;)
++                Quaternion ori = processQuaternion(oriElem);
++                go-&gt;setOrientation(ori);
++            }
++
++            DOMNodeList* goElChildNodes = nodeElem-&gt;getChildNodes();
++            for (XMLSize_t idx = 0; idx &lt; goElChildNodes-&gt;getLength(); idx++)
++            {
++                DOMNode* cur = goElChildNodes-&gt;item(idx);
++                if (cur-&gt;getNodeType() == DOMNode::ENTITY_NODE
++                    &amp;&amp; hasNodeName(cur, &quot;property&quot;))
+                 {
+-                    go-&gt;setProperty(propEntry.first, propEntry.second);
++                    PropertyEntry propEntry = processProperty(static_cast&lt;DOMElement*&gt;(cur));
++                    if (propEntry.first != &quot;&quot;)
++                    {
++                        go-&gt;setProperty(propEntry.first, propEntry.second);
++                    }
+                 }
+-            }
++            } 		    
+         }
+-
+         GameObjectState state = GOS_IN_SCENE;
+-		if (hasAttribute(nodeElem, &quot;state&quot;))
+-		{
+-			Ogre::String stateStr = getAttributeValueAsStdString(nodeElem, &quot;state&quot;);
+-			if (stateStr == &quot;LOADED&quot;)
+-			{
+-				state = GOS_LOADED;
+-			}
+-			else if (stateStr == &quot;HELD&quot;)
+-			{
+-				state = GOS_HELD;
+-			}
+-			else if (stateStr == &quot;IN_POSSESSION&quot;)
+-			{
+-				state = GOS_IN_POSSESSION;
+-			}
+-			else if (stateStr == &quot;IN_SCENE&quot;)
+-			{
+-				state = GOS_IN_SCENE;
+-			}
+-			else if (stateStr == &quot;READY&quot;)
+-			{
+-				state = GOS_READY;
+-			}
+-		}
++        if (hasAttribute(nodeElem, &quot;state&quot;))
++	    {
++		    Ogre::String stateStr = getAttributeValueAsStdString(nodeElem, &quot;state&quot;);
++		    if (stateStr == &quot;LOADED&quot;)
++		    {
++			    state = GOS_LOADED;
++		    }
++		    else if (stateStr == &quot;HELD&quot;)
++		    {
++			    state = GOS_HELD;
++		    }
++		    else if (stateStr == &quot;IN_POSSESSION&quot;)
++		    {
++			    state = GOS_IN_POSSESSION;
++		    }
++		    else if (stateStr == &quot;IN_SCENE&quot;)
++		    {
++			    state = GOS_IN_SCENE;
++		    }
++		    else if (stateStr == &quot;READY&quot;)
++		    {
++			    state = GOS_READY;
++		    }
++	    }
+ 		go-&gt;setState(state);
+ 
+         return true;
+
+Modified: rl/trunk/engine/script/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/script/src/MapLoader.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/src/MapLoader.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -24,6 +24,8 @@
+ #include &quot;EntityNodeProcessor.h&quot;
+ #include &quot;EnvironmentProcessor.h&quot;
+ #include &quot;GameObjectNodeProcessor.h&quot;
++#include &quot;GameObjectManager.h&quot;
++#include &quot;GameObject.h&quot;
+ #include &quot;LightNodeProcessor.h&quot;
+ #include &quot;ParticleSystemNodeProcessor.h&quot;
+ #include &quot;ProgressWindow.h&quot;
+@@ -33,6 +35,8 @@
+ #include &quot;World.h&quot;
+ #include &quot;XmlProcessor.h&quot;
+ #include &quot;ZoneProcessor.h&quot;
++#include &quot;ContentModule.h&quot;
++#include &quot;RubyInterpreter.h&quot;
+ 
+ using namespace Ogre;
+ using namespace XERCES_CPP_NAMESPACE;
+@@ -42,16 +46,22 @@
+ 
+     using XERCES_CPP_NAMESPACE::DOMDocument; //XXX: for VS 2003/2005
+ 
++    const CeGuiString MapLoader::PROPERTY_ACTIVEMAPS = &quot;activemaps&quot;;
++
+     MapLoader::MapLoader(const Ogre::String&amp; resourceGroup)
+         : mRootSceneNode(NULL),
+           mResourceGroup(resourceGroup),
+-          mPercentageWindow(NULL)
++          mPercentageWindow(NULL),
++          ContentLoader(resourceGroup)
+     {
+         mNodeProcessors.push_back(new EntityNodeProcessor(resourceGroup));
+         mNodeProcessors.push_back(new GameObjectNodeProcessor());
+         mNodeProcessors.push_back(new SoundNodeProcessor());
+         mNodeProcessors.push_back(new LightNodeProcessor());
+ 		mNodeProcessors.push_back(new ParticleSystemNodeProcessor());
++
++        RequestedSceneChangeConnection = MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneChangeRequested&gt;(
++            boost::bind(&amp;MapLoader::changeScene, this, _1));
+     }
+ 
+     MapLoader::~MapLoader()
+@@ -64,50 +74,130 @@
+         delete mPercentageWindow;
+     }
+ 
+-    void MapLoader::loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects)
++    void MapLoader::loadContent()
+     {
+-        LOG_MESSAGE(Logger::RULES, &quot;Loading map &quot; + mapresource);
++        if(mLoadedMaps.empty()) // No maps defined to load -&gt; no savegame
++        {
++            loadScene(mDefaultMaps);
++        }
++        else
++        {
++            loadScene(mLoadedMaps);           
++        }
++    }
+ 
+-  		initializeXml();
++    void MapLoader::unloadContent()
++    {
++        unloadAllMaps(false);
++    }
+ 
+-        DOMDocument* doc = loadDocument(mapresource, mResourceGroup);
++    void MapLoader::setDefaultMaps(Ogre::StringVector maps)
++    {
++        mDefaultMaps = maps;
++    }
+ 
+-        if (doc)
++    void MapLoader::loadScene(Ogre::StringVector mapresources, bool loadGameObjects)
++    {
++        for(Ogre::StringVector::const_iterator it = mapresources.begin(); it != mapresources.end(); ++it)
+         {
+-            setRootSceneNode(CoreSubsystem::getSingleton().getWorld()
+-                    -&gt;getSceneManager()-&gt;getRootSceneNode()-&gt;createChildSceneNode(mapresource));
++            loadMap(*it);
++        }
++    }
+ 
+-			CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
+-			///@todo: Window fade jobs don't work if Core is paused, think about solution for: CoreSubsystem::getSingleton().setPaused(true);
++    void MapLoader::loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects)
++    {
++        bool mapLoaded = false;
++        for(Ogre::StringVector::const_iterator it = mLoadedMaps.begin(); it != mLoadedMaps.end(); ++it)
++        {
++            if(*it == mapresource)
++                mapLoaded = true;
++        }
++        if(!mapLoaded)
++        {
++            LOG_MESSAGE(Logger::RULES, &quot;Loading map &quot; + mapresource);
+ 
+-            LOG_MESSAGE(Logger::RULES, &quot;Processing nodes&quot;);
++  		    initializeXml();
+ 
+-            DOMElement* dataDocumentContent = doc-&gt;getDocumentElement();
+-            processSceneNodes(getChildNamed(dataDocumentContent, &quot;nodes&quot;), loadGameObjects);
++            DOMDocument* doc = loadDocument(mapresource, mResourceGroup);
+ 
+-			ZoneProcessor zp;
+-			zp.processNode(getChildNamed(dataDocumentContent, &quot;zones&quot;), loadGameObjects);
++            if (doc)
++            {
++                setRootSceneNode(CoreSubsystem::getSingleton().getWorld()
++                        -&gt;getSceneManager()-&gt;getRootSceneNode()-&gt;createChildSceneNode(mapresource));
+ 
+-			EnvironmentProcessor ep;
+-			ep.processNode(getChildNamed(dataDocumentContent, &quot;environment&quot;), loadGameObjects);
++                if(getAttributeValueAsString(doc-&gt;getDocumentElement(), &quot;formatVersion&quot;) != &quot;0.4.0&quot;)
++                    LOG_ERROR(Logger::SCRIPT, &quot;Map format version doesn't match with the required version&quot;);
+ 
+-			WaypointProcessor wp;
+-			wp.processNode(getChildNamed(dataDocumentContent, &quot;waypoints&quot;), loadGameObjects);
++			    CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
++			    ///@todo: Window fade jobs don't work if Core is paused, think about solution for: CoreSubsystem::getSingleton().setPaused(true);
+ 
+-            doc-&gt;release();
++                LOG_MESSAGE(Logger::RULES, &quot;Processing nodes&quot;);
+ 
+-            LOG_MESSAGE(Logger::RULES, &quot;Map loaded&quot;);
++                DOMElement* dataDocumentContent = doc-&gt;getDocumentElement();
++                processSceneNodes(getChildNamed(dataDocumentContent, &quot;nodes&quot;), loadGameObjects);
+ 
+-			CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
+-			///@todo: Window fade jobs don't work if Core is paused, think about solution for: CoreSubsystem::getSingleton().setPaused(false);
++			    ZoneProcessor zp;
++			    zp.processNode(getChildNamed(dataDocumentContent, &quot;zones&quot;), loadGameObjects);
++
++			    EnvironmentProcessor ep;
++			    ep.processNode(getChildNamed(dataDocumentContent, &quot;environment&quot;), loadGameObjects);
++
++			    WaypointProcessor wp;
++			    wp.processNode(getChildNamed(dataDocumentContent, &quot;waypoints&quot;), loadGameObjects);
++
++                LOG_MESSAGE(Logger::SCRIPT, &quot;Map &quot; + mapresource + &quot; loaded&quot;);
++
++                if(hasAttribute(doc-&gt;getDocumentElement(), &quot;scenescript&quot;))
++                {
++                    if(getAttributeValueAsString(doc-&gt;getDocumentElement(), &quot;scenescript&quot;).length() != 0)
++                    {
++                        if(!CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;executeFile(getAttributeValueAsStdString(doc-&gt;getDocumentElement(), &quot;scenescript&quot;)))
++                            LOG_MESSAGE(Logger::SCRIPT, &quot;Executed init script of map &quot; + mapresource);
++                        else
++                            LOG_ERROR(Logger::SCRIPT, &quot;Error while executing init script of map &quot; + mapresource);
++                    }
++                }
++
++                doc-&gt;release();
++
++			    CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
++			    ///@todo: Window fade jobs don't work if Core is paused, think about solution for: CoreSubsystem::getSingleton().setPaused(false);
++            }
++            else
++            {
++                LOG_ERROR(Logger::RULES, &quot;Map resource '&quot; + mapresource + &quot;' not found&quot;);
++            }
++
++            shutdownXml();
++            
++            mLoadedMaps.push_back(mapresource);
+         }
+         else
+         {
+-            LOG_ERROR(Logger::RULES, &quot;Map resource '&quot; + mapresource + &quot;' not found&quot;);
++            LOG_ERROR(Logger::SCRIPT, &quot;Map is already loaded!&quot;);
+         }
++    }
+ 
++    void MapLoader::requestSceneChange(StringVector mapresources)
++    {
++        LOG_MESSAGE(Logger::SCRIPT, &quot;requested changing scene &quot; + Ogre::StringConverter::toString(mapresources));
++        MessagePump::getSingleton().postMessage&lt;MessageType_SceneChangeRequested&gt;(mapresources);
++    }
+ 
+-        shutdownXml();
++    void MapLoader::unloadAllMaps(bool removeGameObjects)
++    {
++        mLoadedMaps.clear();
++        if(removeGameObjects)
++            GameObjectManager::getSingleton().getAllGameObjects();
++        else
++        {
++            std::list&lt;GameObject*&gt; gos = GameObjectManager::getSingleton().getAllGameObjects();
++            for(std::list&lt;GameObject*&gt;::const_iterator it = gos.begin(); it != gos.end(); ++it)
++            {
++                (*it)-&gt;removeFromScene();
++            }
++        }
++        CoreSubsystem::getSingleton().getWorld()-&gt;clearScene();
+     }
+ 
+     const CeGuiString MapLoader::getClassName() const
+@@ -115,6 +205,42 @@
+         return &quot;MapLoader&quot;;
+     }
+ 
++    const Property MapLoader::getProperty(const CeGuiString&amp; key) const
++    {
++        if(PROPERTY_ACTIVEMAPS == key)
++        {
++            PropertyArray vec;
++            for(Ogre::StringVector::const_iterator it = mLoadedMaps.begin(); it != mLoadedMaps.end(); ++it)
++            {
++                vec.push_back(Property(*it));
++            }
++            return Property(vec);
++        }
++        return ContentLoader::getProperty(key);
++    }
++    
++    void MapLoader::setProperty(const CeGuiString&amp; key, const Property&amp; value)
++    {
++        if(PROPERTY_ACTIVEMAPS == key)
++        {
++            mLoadedMaps.clear();
++            PropertyArray vec(value.toArray());
++            for(PropertyArray::const_iterator it = vec.begin(); it != vec.end(); ++it)
++            {
++                mLoadedMaps.push_back(it-&gt;toString().c_str());
++            }
++        }
++        else
++            ContentLoader::setProperty(key,value);
++    }
++
++    PropertyKeys MapLoader::getAllPropertyKeys() const
++    {
++        PropertyKeys keys = ContentLoader::getAllPropertyKeys();
++        keys.insert(PROPERTY_ACTIVEMAPS);
++        return keys;
++    }
++
+     void MapLoader::processSceneNodes(DOMElement* nodesElem, bool loadGameObjects)
+     {
+ 		if (nodesElem == NULL)
+@@ -191,4 +317,12 @@
+         }
+     }
+ 
++    bool MapLoader::changeScene(Ogre::StringVector mapresources)
++    {
++        LOG_MESSAGE(Logger::SCRIPT, &quot;Changing scene &quot; + Ogre::StringConverter::toString(mapresources));
++        unloadAllMaps(false);
++        loadScene(mapresources);
++        return true;
++    }
++
+ } // namespace rl
+
+Modified: rl/trunk/engine/script/swig/RlCore.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.head.swig	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/swig/RlCore.head.swig	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -49,6 +49,7 @@
+ #include &quot;Trigger.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;World.h&quot;
++#include &quot;ContentLoader.h&quot;
+ #include &quot;ContentModule.h&quot;
+ #include &quot;ListenerObject.h&quot;
+ #include &quot;Sound.h&quot;
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/swig/RlCore.swig	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -725,6 +725,8 @@
+     void hideAll();
+     void toggleAll();
+ };
++  
++class ContentLoader;
+     
+ %feature(&quot;director&quot;) ContentModule; 
+ class ContentModule
+@@ -742,11 +744,27 @@
+ 	virtual const Ogre::StringVector&amp; getTextureLocations() const = 0;
+ 	virtual const Ogre::StringVector&amp; getSoundLocations() const = 0;
+ 	virtual const Ogre::StringVector&amp; getModelLocations() const = 0;
+-	virtual const Ogre::StringVector&amp; getDefaultMaps() const = 0;
+ 
+ 	virtual void start() = 0;
++	
++	void loadContent();
++	
++	void registerContentLoader(rl::ContentLoader* loader);
+ };
+ 
++%feature(&quot;director&quot;) ContentLoader;
++class ContentLoader
++{
++public:
++    ContentLoader(const Ogre::String&amp; resourceGroup);
++    virtual ~ContentLoader();
++
++    virtual void loadContent() = 0;
++    virtual void unloadContent() = 0;
++
++    virtual const CEGUI::String getClassName() const = 0;
++};
++
+ class CoreSubsystem {
+ private:
+ 	CoreSubsystem();
+
+Modified: rl/trunk/engine/script/swig/RlScript.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlScript.head.swig	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/swig/RlScript.head.swig	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -20,4 +20,5 @@
+ #include &quot;ScriptSubsystem.h&quot;
+ #include &quot;TriggerFactory.h&quot;
+ #include &quot;UnifiedFactory.h&quot;
++#include &quot;ContentLoader.h&quot;
+ %}
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/RlScript.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlScript.swig	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/script/swig/RlScript.swig	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -27,11 +27,19 @@
+ 		rl::TriggerFactory* getTriggerFactory() const;
+ 	};
+ 	  
+-    class MapLoader
++    class MapLoader : public rl::ContentLoader
+     {
+     public:
++        virtual ~MapLoader();
+         MapLoader(const Ogre::String&amp; resourceGroup);
+         void loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects = true);
++        void loadContent();
++        void unloadContent();
++        void setDefaultMaps(Ogre::StringVector maps);
++        void loadScene(Ogre::StringVector mapsresources, bool loadGameObjects = true);
++        void unloadAllMaps(bool removeGameObjects);
++        void requestSceneChange(Ogre::StringVector mapsresources);
++        const CEGUI::String getClassName() const;
+     };
+  
+ 	%feature(&quot;director&quot;) TriggerFactory;    
+
+Modified: rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -115,7 +115,7 @@
+     {
+         LOG_MESSAGE(Logger::UI, &quot;Load Button pressed&quot;);
+ 
+-		if(!WindowFactory::getSingleton().isInventoryWindowDestroyed())
++		/*if(!WindowFactory::getSingleton().isInventoryWindowDestroyed())
+ 			WindowFactory::getSingleton().toggleInventoryWindow();
+ 	
+         CeGuiString filename = mFilename-&gt;getText();
+@@ -130,7 +130,7 @@
+                 LOG_ERROR(Logger::UI, &quot;Save Game &quot; + filename + &quot; doesn't exist!&quot;);
+                 WindowFactory::getSingleton().showMessageWindow(&quot;Der Spielstand existiert nicht&quot;);
+             }
+-        }
++        }*/
+ 
+         return true;
+     }
+
+Modified: rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-20 21:29:18 UTC (rev 4304)
++++ rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-20 21:32:52 UTC (rev 4305)
+@@ -104,18 +104,18 @@
+     bool MainMenuLoadWindow::handleLoadEvent()
+     {
+         LOG_MESSAGE(Logger::UI, &quot;Load Button pressed&quot;);
+-        if(mSaveGameTable-&gt;getFirstSelectedItem())
+-		{
+-            setVisible(false);
+-		    mMainMenuWindow-&gt;setVisible(false);
+-		
+-            CeGuiString moduleId = ((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString();
+-			ContentModule* module = NULL;
+-			module = CoreSubsystem::getSingleton().getModule(moduleId.c_str());
+-			assert(module != NULL /*MainMenuLoadWindow::handleLoadEvent()*/);
+-			CoreSubsystem::getSingleton().startAdventureModule(module);
+-			SaveGameManager::getSingleton().loadSaveGameFile(((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getId());
+-		}
++  //      if(mSaveGameTable-&gt;getFirstSelectedItem())
++		//{
++  //          setVisible(false);
++		//    mMainMenuWindow-&gt;setVisible(false);
++		//
++  //          CeGuiString moduleId = ((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString();
++		//	ContentModule* module = NULL;
++		//	module = CoreSubsystem::getSingleton().getModule(moduleId.c_str());
++		//	assert(module != NULL /*MainMenuLoadWindow::handleLoadEvent()*/);
++		//	CoreSubsystem::getSingleton().startAdventureModule(module);
++		//	SaveGameManager::getSingleton().loadSaveGameFile(((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getId());
++		//}
+ 
+         return true;
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001375.html">[Dsa-hl-svn] r4304 - in modules: . kanalisation/scripts	kanalisation/scripts/maps persistenztest	persistenztest/dialogs persistenztest/dsa persistenztest/gui	persistenztest/gui/windows persistenztest/maps	persistenztest/materials persistenztest/materials/textures	persistenztest/models persistenztest/quests	persistenztest/scripts persistenztest/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001377.html">[Dsa-hl-svn] r4306 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1376">[ date ]</a>
+              <a href="thread.html#1376">[ thread ]</a>
+              <a href="subject.html#1376">[ subject ]</a>
+              <a href="author.html#1376">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

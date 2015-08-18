@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4870 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4870%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903291251.n2TCpqJ2019717%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001926.html">
+   <LINK REL="Next"  HREF="001928.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4870 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4870%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903291251.n2TCpqJ2019717%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4870 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 29 14:51:52 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001926.html">[Dsa-hl-svn] r4869 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001928.html">[Dsa-hl-svn] r4871 - in dependencies/OgreNewt:	demos/Demo08_RagdollExample inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1927">[ date ]</a>
+              <a href="thread.html#1927">[ thread ]</a>
+              <a href="subject.html#1927">[ subject ]</a>
+              <a href="author.html#1927">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-29 14:51:50 +0200 (Sun, 29 Mar 2009)
+New Revision: 4870
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+Log:
+- some bugfixes
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-29 12:10:47 UTC (rev 4869)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-29 12:51:50 UTC (rev 4870)
+@@ -37,6 +37,7 @@
+ from ModuleManager import ModuleManager
+ from ModuleExplorer import *
+ from NewModuleWizard import *
++from MovePivot import *
+ from PivotRenderQueueListener import *
+ 
+ import OgreMainWindow
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-29 12:10:47 UTC (rev 4869)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-29 12:51:50 UTC (rev 4870)
+@@ -21,8 +21,19 @@
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+ import ogre.renderer.OGRE as og
+-import ModuleManager 
+ 
++# get the light out of a light node
++def extractLight(node):
++        i = 0
++        num = node.numAttachedObjects()
++        while i &lt; node.numAttachedObjects():
++            c = node.getAttachedObject(i)
++            tp = str(type(c))
++            if tp == &quot;&lt;class 'ogre.renderer.OGRE._ogre_.Light'&gt;&quot;:
++                return c
++            
++            i += 1
++
+ class ExplorerOptionsDlg(QDialog):
+     def __init__(self, lights, gameObjects, entities, zones, parent = None):
+         super(ExplorerOptionsDlg, self).__init__(parent)
+@@ -131,11 +142,21 @@
+     
+     def selectItem(self, so, select):
+         nodeName = so.entity.getParentNode().getName()
+-        items = self.sceneTreeView.findItems(nodeName, Qt.MatchFixedString | Qt.MatchRecursive)
++       
++        items = None
+         
++        if nodeName.startswith(&quot;light_&quot;) and self.showLights: 
++            items = self.sceneTreeView.findItems(extractLight(so.entity.getParentNode()).getName(), Qt.MatchFixedString | Qt.MatchRecursive)    
++        elif nodeName.startswith(&quot;gameobject_&quot;) and self.showGameObjects:
++            go = so.entity.getUserObject()
++            items = self.sceneTreeView.findItems(go.gocName + &quot; id:&quot; + str(go.inWorldId), Qt.MatchFixedString | Qt.MatchRecursive)    
++        elif nodeName.startswith(&quot;entity_&quot;) and self.showEntities:
++            items = self.sceneTreeView.findItems(so.entityName, Qt.MatchFixedString | Qt.MatchRecursive)    
++        
+         if select:
+             for item in items:
+                 self.sceneTreeView.setItemSelected(item, True)
++                self.sceneTreeView.expandItem(item)
+         else:
+             for item in items:
+                 self.sceneTreeView.setItemSelected(item, False)
+@@ -321,7 +342,7 @@
+         while i &lt; map.mapNode.numChildren(): 
+             if map.mapNode.getChild(i).getName().startswith(&quot;light_&quot;) and self.showLights:
+                 childItem2 = QTreeWidgetItem(childItem) 
+-                childItem2.setText(0, ModuleManager.extractLight(map.mapNode.getChild(i)).getName()) 
++                childItem2.setText(0, extractLight(map.mapNode.getChild(i)).getName()) 
+             elif map.mapNode.getChild(i).getName().startswith(&quot;gameobject_&quot;) and self.showGameObjects:
+                 childItem2 = QTreeWidgetItem(childItem) 
+                 go = map.mapNode.getChild(i).getAttachedObject(0).getUserObject()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-29 12:10:47 UTC (rev 4869)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-29 12:51:50 UTC (rev 4870)
+@@ -917,14 +917,14 @@
+             so = self.selectionBuffer.onSelectionClick(screenX, screenY)
+         
+         if so is not None:
+-            if not so.isPivot:
+-                self.propertyWindow.showProperties(so)
+-                
++            if not so.isPivot:                
+                 if not controlDown and not shiftDown:
+                     self.resetSelection()
+                     so.setSelected(True)
+                     self.userSelectionList.append(so)
+-                    self.moduleExplorer.selectItems(self.userSelectionList)
++                    self.propertyWindow.showProperties(so)
++                    self.moduleExplorer.deselectAll()
++                    self.moduleExplorer.selectItem(so, True)
+                     self.updatePivots()
+                 elif controlDown and not shiftDown:
+                     so.setSelected(True)
+@@ -934,6 +934,7 @@
+                             return # object already selected
+ 
+                     self.userSelectionList.append(so)
++                    self.propertyWindow.showProperties(so)
+                     self.moduleExplorer.selectItem(so, True)
+                     self.updatePivots()
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001926.html">[Dsa-hl-svn] r4869 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001928.html">[Dsa-hl-svn] r4871 - in dependencies/OgreNewt:	demos/Demo08_RagdollExample inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1927">[ date ]</a>
+              <a href="thread.html#1927">[ thread ]</a>
+              <a href="subject.html#1927">[ subject ]</a>
+              <a href="author.html#1927">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

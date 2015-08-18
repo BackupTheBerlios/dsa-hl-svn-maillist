@@ -1,0 +1,237 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4744 - in rl/branches/persistence2/engine:	common/include common/src core/include core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4744%20-%20in%20rl/branches/persistence2/engine%3A%0A%09common/include%20common/src%20core/include%20core/src&In-Reply-To=%3C200902081622.n18GMfiF022432%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001800.html">
+   <LINK REL="Next"  HREF="001802.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4744 - in rl/branches/persistence2/engine:	common/include common/src core/include core/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4744%20-%20in%20rl/branches/persistence2/engine%3A%0A%09common/include%20common/src%20core/include%20core/src&In-Reply-To=%3C200902081622.n18GMfiF022432%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4744 - in rl/branches/persistence2/engine:	common/include common/src core/include core/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Feb  8 17:22:41 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001800.html">[Dsa-hl-svn] r4743 - in rl/trunk/editors/Lockenwickler: .	_eric4project src
+</A></li>
+        <LI>Next message: <A HREF="001802.html">[Dsa-hl-svn] r4745 - in modules/ruchin: dsa maps scripts	scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1801">[ date ]</a>
+              <a href="thread.html#1801">[ thread ]</a>
+              <a href="subject.html#1801">[ subject ]</a>
+              <a href="author.html#1801">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2009-02-08 17:22:35 +0100 (Sun, 08 Feb 2009)
+New Revision: 4744
+
+Modified:
+   rl/branches/persistence2/engine/common/include/WriteableDataStreamFormatTarget.h
+   rl/branches/persistence2/engine/common/src/WriteableDataStreamFormatTarget.cpp
+   rl/branches/persistence2/engine/core/include/SaveGameFile.h
+   rl/branches/persistence2/engine/core/src/SaveAbleSerializer.cpp
+   rl/branches/persistence2/engine/core/src/SaveGameFile.cpp
+   rl/branches/persistence2/engine/core/src/SaveGameFileReader.cpp
+Log:
+experimental writing of save game files works now
+
+Modified: rl/branches/persistence2/engine/common/include/WriteableDataStreamFormatTarget.h
+===================================================================
+--- rl/branches/persistence2/engine/common/include/WriteableDataStreamFormatTarget.h	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/common/include/WriteableDataStreamFormatTarget.h	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -25,11 +25,11 @@
+     class _RlCommonExport WriteableDataStreamFormatTarget : public XERCES_CPP_NAMESPACE::XMLFormatTarget
+     {
+     public:
+-        WriteableDataStreamFormatTarget(WriteableDataStreamPtr stream);
++        WriteableDataStreamFormatTarget(WriteableDataStream* stream);
+         virtual void writeChars (const XMLByte *const toWrite, const unsigned int count, XERCES_CPP_NAMESPACE::XMLFormatter *const formatter);
+         virtual void flush ();
+     protected:
+-        WriteableDataStreamPtr mStream;
++        WriteableDataStream* mStream;
+     };
+ }
+ 
+
+Modified: rl/branches/persistence2/engine/common/src/WriteableDataStreamFormatTarget.cpp
+===================================================================
+--- rl/branches/persistence2/engine/common/src/WriteableDataStreamFormatTarget.cpp	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/common/src/WriteableDataStreamFormatTarget.cpp	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -20,29 +20,23 @@
+ 
+ namespace rl
+ {
+-    WriteableDataStreamFormatTarget::WriteableDataStreamFormatTarget(WriteableDataStreamPtr stream)
++    WriteableDataStreamFormatTarget::WriteableDataStreamFormatTarget(WriteableDataStream* stream)
+     {
+         mStream = stream;
+     }
+ 
+     void WriteableDataStreamFormatTarget::writeChars (const XMLByte *const toWrite, const unsigned int count, XERCES_CPP_NAMESPACE::XMLFormatter *const formatter)
+     {
+-        if(dynamic_cast&lt;WriteableDataStream*&gt;(mStream.get()))
+-        {
+-            mStream-&gt;write((char*)toWrite, count);
+-        }
+-        else
+-            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);
++        mStream-&gt;write((char*)toWrite, count);
++        /*else
++            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);*/
+     }
+ 
+     void WriteableDataStreamFormatTarget::flush ()
+     {
+-        if(dynamic_cast&lt;WriteableDataStream*&gt;(mStream.get()))
+-        {
+-            mStream-&gt;flush();
+-        }
+-        else
+-            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);
++        mStream-&gt;flush();
++        /*else
++            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);*/
+     }
+ }
+ 
+
+Modified: rl/branches/persistence2/engine/core/include/SaveGameFile.h
+===================================================================
+--- rl/branches/persistence2/engine/core/include/SaveGameFile.h	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/core/include/SaveGameFile.h	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -39,14 +39,14 @@
+         static const Ogre::String PROPERTY_NAME;
+         static const Ogre::String PROPERTY_MODULENAME;
+ 
+-        SaveGameFile(int id, WriteableDataStreamPtr stream);
++        SaveGameFile(int id, Ogre::DataStreamPtr stream);
+         ~SaveGameFile();
+         CeGuiString getName() const;
+ 		CeGuiString getModuleId() const;
+ 		int getId() const;
+ 
+         //access to file
+-        WriteableDataStreamPtr getDataStream() const;
++        Ogre::DataStreamPtr getDataStream() const;
+         XERCES_CPP_NAMESPACE::XMLFormatTarget* getFormatTarget();
+         void deleteFileFromStorage(); //erwuenscht?
+ 
+@@ -63,7 +63,7 @@
+ 
+         //file access
+         Ogre::StringVector mScriptPatterns;
+-        WriteableDataStreamPtr mStream;
++        Ogre::DataStreamPtr mStream;
+         int mSaveGameId;
+     };
+ }
+
+Modified: rl/branches/persistence2/engine/core/src/SaveAbleSerializer.cpp
+===================================================================
+--- rl/branches/persistence2/engine/core/src/SaveAbleSerializer.cpp	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/core/src/SaveAbleSerializer.cpp	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -64,11 +64,15 @@
+ 
+ 	void SaveAbleSerializer::parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
+ 	{
++        //TODO Error handling
+ 		LOG_MESSAGE(Logger::CORE, &quot;Parsing headers of save game file: &quot; + stream-&gt;getName() + &quot; Resource group: &quot; + groupName);
+-		SaveGameFile* file = new SaveGameFile(Ogre::StringConverter::parseInt(stream-&gt;getName()),(WriteableDataStreamPtr)static_cast&lt;WriteableDataStream*&gt;(stream.get()));
++        int number = Ogre::StringConverter::parseInt(stream-&gt;getName());
++        if(number &lt;= 0 &amp;&amp; number == mHighestSaveGameNumber)
++            number = mHighestSaveGameNumber + 1;
++		SaveGameFile* file = new SaveGameFile(number,stream);
+ 		mReader.parseSaveGameFileHeader(file);
+-		mHighestSaveGameNumber = Ogre::StringConverter::parseInt(stream-&gt;getName()) &gt; mHighestSaveGameNumber ? Ogre::StringConverter::parseInt(stream-&gt;getName()) : mHighestSaveGameNumber;
+-		mSaveGameFiles[Ogre::StringConverter::parseInt(stream-&gt;getName())] = file;
++		mHighestSaveGameNumber = number &gt; mHighestSaveGameNumber ? Ogre::StringConverter::parseInt(stream-&gt;getName()) : mHighestSaveGameNumber;
++		mSaveGameFiles[number] = file;
+ 	}
+ 
+ 	const Ogre::StringVector&amp; SaveAbleSerializer::getScriptPatterns() const
+
+Modified: rl/branches/persistence2/engine/core/src/SaveGameFile.cpp
+===================================================================
+--- rl/branches/persistence2/engine/core/src/SaveGameFile.cpp	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/core/src/SaveGameFile.cpp	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -33,7 +33,7 @@
+     const Ogre::String SaveGameFile::PROPERTY_MODULENAME = &quot;modulename&quot;;
+ 
+ 
+-    SaveGameFile::SaveGameFile(int id, WriteableDataStreamPtr stream) : mStream(stream)
++    SaveGameFile::SaveGameFile(int id, Ogre::DataStreamPtr stream) : mStream(stream)
+     {
+ 		mSaveGameId = id;  
+     }
+@@ -57,7 +57,7 @@
+         return mSaveGameId;
+     }
+ 
+-    WriteableDataStreamPtr SaveGameFile::getDataStream() const
++    Ogre::DataStreamPtr SaveGameFile::getDataStream() const
+     {
+ 		return mStream;
+     }
+@@ -65,7 +65,7 @@
+     XERCES_CPP_NAMESPACE::XMLFormatTarget* SaveGameFile::getFormatTarget()
+     {
+         ///@todo: encryption
+-		return new WriteableDataStreamFormatTarget(mStream);
++        return new WriteableDataStreamFormatTarget(static_cast&lt;WriteableDataStream*&gt;(mStream.get()));
+     }
+ 
+     void SaveGameFile::deleteFileFromStorage()
+
+Modified: rl/branches/persistence2/engine/core/src/SaveGameFileReader.cpp
+===================================================================
+--- rl/branches/persistence2/engine/core/src/SaveGameFileReader.cpp	2009-02-08 15:43:10 UTC (rev 4743)
++++ rl/branches/persistence2/engine/core/src/SaveGameFileReader.cpp	2009-02-08 16:22:35 UTC (rev 4744)
+@@ -61,7 +61,7 @@
+     {
+ 		initializeXml();
+ 
+-		WriteableDataStreamPtr stream = file-&gt;getDataStream();
++        Ogre::DataStreamPtr stream = file-&gt;getDataStream();
+ 
+ 		if(stream-&gt;size())
+ 		{
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001800.html">[Dsa-hl-svn] r4743 - in rl/trunk/editors/Lockenwickler: .	_eric4project src
+</A></li>
+	<LI>Next message: <A HREF="001802.html">[Dsa-hl-svn] r4745 - in modules/ruchin: dsa maps scripts	scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1801">[ date ]</a>
+              <a href="thread.html#1801">[ thread ]</a>
+              <a href="subject.html#1801">[ subject ]</a>
+              <a href="author.html#1801">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,319 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3943 - in rl/trunk/engine: common/include common/src	core/include core/src rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3943%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/include%20core/src%20rules/src&In-Reply-To=%3C200710231945.l9NJj3Lc021294%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001013.html">
+   <LINK REL="Next"  HREF="001015.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3943 - in rl/trunk/engine: common/include common/src	core/include core/src rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3943%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09core/include%20core/src%20rules/src&In-Reply-To=%3C200710231945.l9NJj3Lc021294%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3943 - in rl/trunk/engine: common/include common/src	core/include core/src rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Oct 23 21:45:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001013.html">[Dsa-hl-svn] r3942 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001015.html">[Dsa-hl-svn] r3944 - in modules/kanalisation: . materials	materials/textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1014">[ date ]</a>
+              <a href="thread.html#1014">[ thread ]</a>
+              <a href="subject.html#1014">[ subject ]</a>
+              <a href="author.html#1014">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-23 21:44:45 +0200 (Tue, 23 Oct 2007)
+New Revision: 3943
+
+Modified:
+   rl/trunk/engine/common/include/XmlProcessor.h
+   rl/trunk/engine/common/src/XmlProcessor.cpp
+   rl/trunk/engine/common/src/XmlPropertyWriter.cpp
+   rl/trunk/engine/core/include/SaveGameFile.h
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/SaveGameFile.cpp
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+Log:
+- vector3 is written properly now
+- position loading of a game object
+- the actor is deleted in the destructor of game object
+- simple resolution of crash in actor manager
+
+Modified: rl/trunk/engine/common/include/XmlProcessor.h
+===================================================================
+--- rl/trunk/engine/common/include/XmlProcessor.h	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/common/include/XmlProcessor.h	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -317,7 +317,29 @@
+ 	 */
+     Tripel&lt;int&gt; getAttributeValueAsIntegerTriple(XERCES_CPP_NAMESPACE::DOMElement* element, const char* const name) const;
+ 	
+-	/**
++	
++    /**
++	 * Wandelt einen Vektor in einen Text um und setzt diesen als Attribut 
++	 *
++	 * @param element Das DOM-Element
++	 * @param name Name des Attributes
++     * @param value das zu setzende Vector3
++	 * @return Das DOM-Element
++	 */
++    XERCES_CPP_NAMESPACE::DOMElement* setAttributeValueAsVector3(XERCES_CPP_NAMESPACE::DOMElement* element, const char* const name, Ogre::Vector3 value) const;
++
++    /**
++	 * Ermittelt den Text eines DOMElement-Attributes und parst ihn, 
++	 * um eine Ganzzahltripel daraus zu machen
++	 *
++	 * @param element Das DOM-Element
++	 * @param name Name des Attributes
++     * @return Zahlendubel des Attributes
++	 */
++    Ogre::Vector3 getAttributeValueAsVector3(XERCES_CPP_NAMESPACE::DOMElement* element, const char* const name) const;
++    
++
++    /**
+ 	 * Setzt den Text eines DOMElement-Attributes
+ 	 * 
+ 	 * @param element Das DOM-Element
+
+Modified: rl/trunk/engine/common/src/XmlProcessor.cpp
+===================================================================
+--- rl/trunk/engine/common/src/XmlProcessor.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/common/src/XmlProcessor.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -361,6 +361,38 @@
+     return intTripel;
+ }
+ 
++DOMElement* XmlProcessor::setAttributeValueAsVector3( DOMElement *element, const char* const name, Ogre::Vector3 value) const
++{
++    RlAssert(element != NULL, &quot;XmlProcessor::setAttributeValueAsVector3: Element must not be NULL&quot;);
++	AutoXMLCh attrName(name);
++    CeGuiString temp = Ogre::StringConverter::toString(value.x) + &quot;,&quot; + Ogre::StringConverter::toString(value.y) + &quot;,&quot; + Ogre::StringConverter::toString(value.z);
++    element-&gt;setAttribute(attrName.data(), XMLString::transcode(temp.c_str()));
++    
++    return element;
++}
++
++Ogre::Vector3 XmlProcessor::getAttributeValueAsVector3(DOMElement* element, const char* const name) const
++{
++    RlAssert(element != NULL, &quot;XmlProcessor::getAttributeValueAsVector3: Element must not be NULL&quot;);
++	AutoXMLCh attrName(name);
++	const XMLCh* attribute = element-&gt;getAttribute(attrName.data());
++
++    CeGuiString value = transcodeToString(attribute);
++
++    CeGuiString::size_type comma1 = value.find(&quot;,&quot;);
++    CeGuiString::size_type comma2 = value.find(&quot;,&quot;, comma1 + 1);
++
++    Ogre::Vector3 vec(0,0,0);
++    if (comma1 != CeGuiString::npos &amp;&amp; comma2 != CeGuiString::npos)
++    {
++        vec.x = CEGUI::PropertyHelper::stringToFloat(value.substr(0, comma1));
++        vec.y = CEGUI::PropertyHelper::stringToFloat(value.substr(comma1 + 1, comma2 - comma1 - 1));
++        vec.z = CEGUI::PropertyHelper::stringToFloat(value.substr(comma2 + 1));
++    }
++
++    return vec;
++}
++
+ DOMElement* XmlProcessor::setValueAsVector3( DOMElement *element, Ogre::Vector3 value) const
+ {
+     RlAssert(element != NULL, &quot;XmlProcessor::setValueAsVector3: Element must not be NULL&quot;);
+
+Modified: rl/trunk/engine/common/src/XmlPropertyWriter.cpp
+===================================================================
+--- rl/trunk/engine/common/src/XmlPropertyWriter.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/common/src/XmlPropertyWriter.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -92,7 +92,7 @@
+                 else if(entry.second.isString())
+                     setAttributeValueAsString(element, &quot;data&quot;, entry.second.toString());
+                 else if(entry.second.isVector3())
+-                    setValueAsVector3(element, entry.second.toVector3());
++                    setAttributeValueAsVector3(element, &quot;data&quot;, entry.second.toVector3());
+             }
+         }
+         return element;
+
+Modified: rl/trunk/engine/core/include/SaveGameFile.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameFile.h	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/core/include/SaveGameFile.h	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -32,6 +32,9 @@
+     class _RlCoreExport SaveGameFile : public PropertyHolder, public Ogre::ScriptLoader
+     {
+     public:
++        static const Ogre::String PROPERTY_MODULEID;
++        static const Ogre::String PROPERTY_TIME;
++
+         SaveGameFile(const CeGuiString &amp;name);
+         ~SaveGameFile();
+         CeGuiString buildFilename();
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -66,6 +66,7 @@
+         virtual ~SaveGameManager(void);    
+ 
+         SaveGameEntryMap listSaveGames(void);
++        SaveGameEntryMap listSaveGames(const CeGuiString &amp;moduleName);
+         void saveSaveGameFile(const CeGuiString &amp;name);
+         void loadSaveGameFile(const CeGuiString &amp;name);
+         void deleteSaveGameFile(const CeGuiString &amp;name);
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -111,6 +111,7 @@
+             Throw(IllegalArgumentException, &quot;Argument actor wird nicht vom ActorManager verwaltet.&quot;);
+         }
+         mActors.erase(it);
++        actor-&gt;detachAllChildren(); //just avoiding a crash. is there a better resolution?
+         doDestroyActor(actor);
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFile.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/core/src/SaveGameFile.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -26,7 +26,10 @@
+ 
+ namespace rl
+ {
++    const Ogre::String SaveGameFile::PROPERTY_MODULEID = &quot;moduleid&quot;;
++    const Ogre::String SaveGameFile::PROPERTY_TIME = &quot;time&quot;;
+ 
++
+     SaveGameFile::SaveGameFile(const CeGuiString &amp;name) : mStream((Ogre::DataStream*)NULL)
+     {
+         mName = name;
+@@ -93,9 +96,9 @@
+ 
+     const Property SaveGameFile::getProperty(const Ogre::String&amp; key) const
+     {
+-        if(key == &quot;ModuleID&quot;)
++        if(key == PROPERTY_MODULEID)
+             return Property(mModuleID);
+-        else if(key == &quot;Time&quot;)
++        else if(key == PROPERTY_TIME)
+             return Property(mLocalTime);
+         else
+             return Property();
+@@ -103,12 +106,12 @@
+ 
+     void SaveGameFile::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+     {
+-        if(key == &quot;ModuleID&quot;)
++        if(key == PROPERTY_MODULEID)
+         {
+             if(value.isString())
+                 mModuleID = value.toString();
+         }
+-        else if(key == &quot;Time&quot;)
++        else if(key == PROPERTY_TIME)
+         {
+             if(value.isString())
+                 mLocalTime = value.toString();
+@@ -118,8 +121,8 @@
+     PropertyRecord* SaveGameFile::getAllProperties() const
+     {
+         PropertyRecord* set = new PropertyRecord();
+-        set-&gt;setProperty(&quot;ModuleID&quot;, getProperty(&quot;ModuleID&quot;));
+-        set-&gt;setProperty(&quot;Time&quot;, getProperty(&quot;Time&quot;));
++        set-&gt;setProperty(PROPERTY_MODULEID, getProperty(PROPERTY_MODULEID));
++        set-&gt;setProperty(PROPERTY_TIME, getProperty(PROPERTY_TIME));
+         return set;
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -77,6 +77,19 @@
+         return mSaveGames;
+     }
+ 
++    SaveGameEntryMap SaveGameManager::listSaveGames(const CeGuiString &amp;moduleName)
++    {
++        SaveGameEntryMap entries;
++        for(SaveGameEntryMap::const_iterator iter = mSaveGames.begin(); iter != mSaveGames.end(); iter++)
++        {
++            if(iter-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString() == moduleName)
++            {
++                entries[iter-&gt;first] = iter-&gt;second;
++            }
++        }
++        return entries;
++    }
++
+     void SaveGameManager::saveSaveGameFile(const CeGuiString &amp;name)
+     {
+         time_t rawTime;
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-23 18:13:39 UTC (rev 3942)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-23 19:44:45 UTC (rev 3943)
+@@ -174,7 +174,7 @@
+         {
+             GameObject* go = itr-&gt;second;
+             mGameObjects.erase(itr++);
+-            go-&gt;setActor(NULL);
++            go-&gt;setState(GOS_LOADED);
+             delete go;
+         }
+     }
+@@ -342,7 +342,8 @@
+                         GameObjectState state = (GameObjectState)reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;State&quot;);
+                         PropertyRecord properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlGameObject));
+                         GameObject* object = createGameObject(classID, ID);
+-                        applyProperties(object, &amp;properties);
++                        
++                        applyProperties(object, &amp;properties); 
+                         object-&gt;setState(state);
+                     }
+                 }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001013.html">[Dsa-hl-svn] r3942 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001015.html">[Dsa-hl-svn] r3944 - in modules/kanalisation: . materials	materials/textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1014">[ date ]</a>
+              <a href="thread.html#1014">[ thread ]</a>
+              <a href="subject.html#1014">[ subject ]</a>
+              <a href="author.html#1014">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

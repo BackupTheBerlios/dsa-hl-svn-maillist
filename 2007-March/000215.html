@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3144 - in modules/aitest/scripts: . maps
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3144%20-%20in%20modules/aitest/scripts%3A%20.%20maps&In-Reply-To=%3C200703071658.l27Gw9j1001501%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000214.html">
+   <LINK REL="Next"  HREF="000216.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3144 - in modules/aitest/scripts: . maps</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3144%20-%20in%20modules/aitest/scripts%3A%20.%20maps&In-Reply-To=%3C200703071658.l27Gw9j1001501%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3144 - in modules/aitest/scripts: . maps">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  7 17:58:09 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000214.html">[Dsa-hl-svn] r3143 - in tools/mesh_combiner: . src
+</A></li>
+        <LI>Next message: <A HREF="000216.html">[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#215">[ date ]</a>
+              <a href="thread.html#215">[ thread ]</a>
+              <a href="subject.html#215">[ subject ]</a>
+              <a href="author.html#215">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-07 17:58:04 +0100 (Wed, 07 Mar 2007)
+New Revision: 3144
+
+Added:
+   modules/aitest/scripts/AStarTest1.rb
+Modified:
+   modules/aitest/scripts/maps/aitest.rb
+Log:
+
+
+Added: modules/aitest/scripts/AStarTest1.rb
+===================================================================
+--- modules/aitest/scripts/AStarTest1.rb	2007-03-07 15:40:14 UTC (rev 3143)
++++ modules/aitest/scripts/AStarTest1.rb	2007-03-07 16:58:04 UTC (rev 3144)
+@@ -0,0 +1,77 @@
++class AStarTest1
++    def initialize(center)
++	@WPGraph = $WPGM.createWayPointGraph();
++    end
++    def save()
++	@WPGraph.save(&quot;aitest/maps/graphtest.wpg&quot;)
++    end
++    def load()
++	@WPGraph.load(&quot;aitest/maps/graphtest.wpg&quot;)
++    end
++    def create()
++	# this function defines a waypoint grid
++	height = 0.5;
++	xcoord = -9
++	zcoord = -9
++	xnr = 19
++	znr = 19
++
++	# waypoints
++	xnr.times do
++	    zcoord = -9
++	    znr.times do
++		@WPGraph.addWayPoint([xcoord, height, zcoord],
++				     WayPointNode::WP_EXTERIOR);
++	    	zcoord += 1
++	    end
++	    xcoord += 1
++	end
++
++	# connections (gridlike)
++	
++	znr -= 1
++	xcoord = 0
++	indexx = 0
++	xoffset = 19
++	xnr.times do
++	    znr.times do
++		@WPGraph.addConnection(@WPGraph.getWayPointAt(indexx),
++				       @WPGraph.getWayPointAt(indexx+1));
++		indexx += 1
++	    end
++	    xcoord += 1
++	    indexx = xcoord * xoffset
++	end
++
++	xnr -= 1
++	znr += 1
++	zcoord = 0
++	indexz = 0
++	zoffset = 19
++	znr.times do
++	    xnr.times do
++ 	        @WPGraph.addConnection(@WPGraph.getWayPointAt(indexz),
++		         	       @WPGraph.getWayPointAt(indexz+zoffset));
++		indexz += zoffset
++	    end
++	    zcoord += 1
++	    indexz = zcoord
++	end
++    end
++    def initastar()
++	test = Ogrevec3Vector.new()
++	@astar = AStar.new(AStarCostsDefault.new(ManhattanDistance.new()), @WPGraph, [9.5, 0.5, 9.5], [5, 0.4, -10])
++	@astar.search(test);
++    end
++    def calc()
++	test = Ogrevec3Vector.new()
++	@astar.search(test);
++    end
++    def calcFromTo(p)
++	vec1 = [p[0], 0.5, p[1]]
++	vec2 = [p[2], 0.5, p[3]]
++	test = Ogrevec3Vector.new()
++	@astar.searchFromTo(test, vec1, vec2)
++    end
++end
++
+
+Modified: modules/aitest/scripts/maps/aitest.rb
+===================================================================
+--- modules/aitest/scripts/maps/aitest.rb	2007-03-07 15:40:14 UTC (rev 3143)
++++ modules/aitest/scripts/maps/aitest.rb	2007-03-07 16:58:04 UTC (rev 3144)
+@@ -9,12 +9,14 @@
+ require 'WallSet1.rb'
+ require 'WallSet2.rb'
+ 
+-require 'NpcTest.rb'
+-require 'NpcCapsuleTest.rb'
++#require 'NpcTest.rb'
++#require 'NpcCapsuleTest.rb'
+ 
+ require 'WayPointTest.rb'
+ require 'WayPointTest2.rb'
+ 
++require 'AStarTest1.rb'
++
+ # Physik aktivieren
+ $PM.setEnabled(true)
+ 
+@@ -48,12 +50,15 @@
+ #WallSet1.new([0, 0, 0])
+ WallSet2.new([0, 0, 0])
+ 
+-NpcTest.new([-5, 0, 5])
+-NpcCapsuleTest.new([0, 0, 5])
++#NpcTest.new([-5, 0, 5])
++#NpcCapsuleTest.new([0, 0, 5])
+ 
+ #$MyWPT = WayPointTest.new([0, 0, 0])
+ #$MyWPT.save()
+-$MyWPT = WayPointTest2.new([0, 0, 0])
+-$MyWPT.load()
++#$MyWPT = WayPointTest2.new([0, 0, 0])
++#$MyWPT.load()
++$MyAS = AStarTest1.new([0, 0, 0])
++$MyAS.create()
++$MyAS.calc()
+ 
+ $SCRIPT.log(&quot;tests initialisiert.&quot;);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000214.html">[Dsa-hl-svn] r3143 - in tools/mesh_combiner: . src
+</A></li>
+	<LI>Next message: <A HREF="000216.html">[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#215">[ date ]</a>
+              <a href="thread.html#215">[ thread ]</a>
+              <a href="subject.html#215">[ subject ]</a>
+              <a href="author.html#215">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

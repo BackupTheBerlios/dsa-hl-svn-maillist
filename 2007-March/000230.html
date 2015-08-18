@@ -1,0 +1,226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3159 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3159%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200703091616.l29GGhgV023900%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000229.html">
+   <LINK REL="Next"  HREF="000231.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3159 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3159%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200703091616.l29GGhgV023900%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3159 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar  9 17:16:43 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000229.html">[Dsa-hl-svn] r3158 - in rl/trunk/plugins: fmod4driver	fmod4driver/src openaldriver
+</A></li>
+        <LI>Next message: <A HREF="000231.html">[Dsa-hl-svn] r3160 - in rl/trunk/engine: common/include	core/include core/src dialog/include dialog/src rules/include	script/swig ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#230">[ date ]</a>
+              <a href="thread.html#230">[ thread ]</a>
+              <a href="subject.html#230">[ subject ]</a>
+              <a href="author.html#230">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-03-09 17:16:41 +0100 (Fri, 09 Mar 2007)
+New Revision: 3159
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/src/Creature.cpp
+Log:
+- Some #include cleanup
+- fixes in tactical movement
+
+
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-03-08 18:27:03 UTC (rev 3158)
++++ rl/trunk/engine/rules/include/Creature.h	2007-03-09 16:16:41 UTC (rev 3159)
+@@ -19,19 +19,17 @@
+ #include &quot;RulesPrerequisites.h&quot;
+ 
+ #include &quot;GameObject.h&quot;
++#include &quot;Effect.h&quot;
+ #include &quot;Eigenschaft.h&quot;
+ #include &quot;EigenschaftenStateSet.h&quot;
+ #include &quot;TalentStateSet.h&quot;
+ #include &quot;ZauberStateSet.h&quot;
+ #include &quot;SonderfertigkeitenStateSet.h&quot;
+-#include &quot;EffectManager.h&quot;
+ 
+-//#include &quot;CompositeEffect.h&quot;
+-
+ namespace rl
+ {
+     class Container;
+-    class Effect;
++    class EffectManager;
+     class Inventory;
+     class Item;
+     class Weapon;
+@@ -638,7 +636,7 @@
+              *  Gibt das Inventar der Kreatur zurueck.
+              *  @return Liefert einen Zeiger auf Inventar der Kreatur
+              **/
+-            Inventory* getInventory();
++            Inventory* getInventory() const;
+ 
+ 
+ 
+@@ -1009,7 +1007,7 @@
+             int mMovementType;
+ 
+             /// Verwaltet die Effekte die auf die Kreatur wirken.
+-            EffectManager mEffectManager;
++            EffectManager* mEffectManager;
+             /// Zeigt auf die gerade aktive Waffe.
+             Weapon* mActiveWeapon;
+             EigenschaftMap mEigenschaften;
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-03-08 18:27:03 UTC (rev 3158)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-03-09 16:16:41 UTC (rev 3159)
+@@ -17,7 +17,8 @@
+ 
+ #include &quot;Actor.h&quot;
+ #include &quot;Container.h&quot;
+-#include &quot;DsaManager.h&quot;
++#include &quot;DsaManager.h&quot;
++#include &quot;EffectManager.h&quot;
+ #include &quot;Eigenschaft.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;Inventory.h&quot;
+@@ -62,7 +63,8 @@
+         mSleeping(0),
+         mUnconscious(0),
+         mMovementType(0)
+-    {
++    {
++        mEffectManager = new EffectManager();
+         mQueryFlags = QUERYFLAG_CREATURE;
+ 
+ 		//RlFail(&quot;Test&quot;);
+@@ -97,9 +99,8 @@
+ 
+ 	Creature::~Creature()
+     {
+-		if (mInventory){
+-			delete mInventory;
+-		}
++        delete mInventory;
++	delete mEffectManager;
+ 
+         for( WertMap::iterator it=mWerte.begin();it!=mWerte.end(); it++ )
+             delete it-&gt;second;
+@@ -615,7 +616,7 @@
+ 
+     Effect::Status Creature::getStatus()
+     {
+-      return mEffectManager.getStatus();
++      return mEffectManager-&gt;getStatus();
+     }
+     
+     bool Creature::isBlind()
+@@ -898,7 +899,7 @@
+     }
+ 
+ 	
+-	Inventory* Creature::getInventory()
++	Inventory* Creature::getInventory() const
+ 	{
+ 		return mInventory;
+ 	}
+@@ -1122,13 +1123,13 @@
+ 	void Creature::addEffect(Effect* effect)
+ 	{
+ 		effect-&gt;setOwner(this);
+-		mEffectManager.addEffect(effect);
++		mEffectManager-&gt;addEffect(effect);
+ 	}
+ 
+ 	void Creature::checkEffects()
+ 	{
+ 		/// @todo Nur einmal pro Aktion ausfuehren
+-		mEffectManager.checkEffects();
++		mEffectManager-&gt;checkEffects();
+ 	}
+ 
+     void Creature::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+@@ -1445,13 +1446,13 @@
+ 
+ 
+ 
+-    float Creature::doTaktischeBewegung(int movementType, float time, int&amp; patzer, int probenErschwernis, int modifikatoren)
++    float Creature::doTaktischeBewegung(int movementType, Ogre::Real time, int&amp; patzer, int probenErschwernis, int modifikatoren)
+     {
+         // damit bei einem Sprint immer nur eine Probe gemacht wird!
+-        static float lastProbeTaW = 0;
+-        static int lastProbeTime = 0;
++        static int lastProbeTaW = 0;
++        static Ogre::Real lastProbeTime = 0;
+         static int lastMovementType = 0;
+-        lastProbeTaW -= time;
++        lastProbeTime -= time;
+         bool movementTypeChanged = false;
+         if( movementType != lastMovementType ) // das System l&#228;sst sich durch Zwischendurch nicht rennen austricksen!!!!
+             movementTypeChanged = true;
+@@ -1590,7 +1591,7 @@
+             {
+                 if( lastProbeTime &lt;= 0 || movementTypeChanged)
+                 {
+-                    lastProbeTaW = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
++                	int lastProbeTaW = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+                     patzer = lastProbeTaW;
+                     lastProbeTime = getAuMax();
+                 }
+@@ -1630,7 +1631,7 @@
+                 if( lastProbeTime &lt;= 0 || movementTypeChanged )
+                 {
+                     lastProbeTaW = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+-                    patzer = lastProbeTime;
++                    patzer = lastProbeTaW;
+                     lastProbeTime = Date::ONE_SPIELRUNDE;
+                 }
+                 else
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000229.html">[Dsa-hl-svn] r3158 - in rl/trunk/plugins: fmod4driver	fmod4driver/src openaldriver
+</A></li>
+	<LI>Next message: <A HREF="000231.html">[Dsa-hl-svn] r3160 - in rl/trunk/engine: common/include	core/include core/src dialog/include dialog/src rules/include	script/swig ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#230">[ date ]</a>
+              <a href="thread.html#230">[ thread ]</a>
+              <a href="subject.html#230">[ subject ]</a>
+              <a href="author.html#230">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

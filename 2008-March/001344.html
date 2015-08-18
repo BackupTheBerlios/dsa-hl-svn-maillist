@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4273%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803082049.m28Kn0Vk027195%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001343.html">
+   <LINK REL="Next"  HREF="001345.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4273%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803082049.m28Kn0Vk027195%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 21:49:00 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001343.html">[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+</A></li>
+        <LI>Next message: <A HREF="001345.html">[Dsa-hl-svn] r4274 - in rl/trunk/engine/ai: . include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1344">[ date ]</a>
+              <a href="thread.html#1344">[ thread ]</a>
+              <a href="subject.html#1344">[ subject ]</a>
+              <a href="author.html#1344">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-08 21:48:57 +0100 (Sat, 08 Mar 2008)
+New Revision: 4273
+
+Modified:
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/src/Combat.cpp
+Log:
+Combat reacts on the death of a combatant, but not yet sufficiently.
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-03-08 17:05:59 UTC (rev 4272)
++++ rl/trunk/engine/rules/include/Combat.h	2008-03-08 20:48:57 UTC (rev 4273)
+@@ -21,6 +21,8 @@
+ 
+ #include &quot;JobListener.h&quot;
+ #include &quot;Kampfaktion.h&quot;
++#include &quot;MessagePump.h&quot;
++#include &quot;RulesConstants.h&quot;
+ 
+ #include &lt;set&gt;
+ #include &lt;vector&gt;
+@@ -29,6 +31,7 @@
+ namespace rl
+ {
+     class Combatant;
++	class Creature;
+ 	class JobSet;
+ 
+ 	class _RlRulesExport Combat : public JobListener
+@@ -67,6 +70,10 @@
+ 
+         virtual void jobFinished(unsigned long ticket);
+ 
++		// Message handlers
++
++		bool creatureLifeStateChanged(Creature*, LifeState);
++
+     private:
+ 		typedef enum {ATTACKE, BEWEGEN, FOLGEN} Aktion;
+ 		typedef enum {PARADE, AUSWEICHEN} Reaktion;
+@@ -94,6 +101,8 @@
+ 
+         unsigned short mCurrentRound;
+ 
++		MessagePump::ScopedConnection mLifeStateChangeConnection;
++
+         void beginRound();
+         void executeRound();
+         void endRound();
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 17:05:59 UTC (rev 4272)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 20:48:57 UTC (rev 4273)
+@@ -37,6 +37,7 @@
+ namespace rl
+ {
+     struct InitiativeComparator
++		: std::binary_function&lt;std::pair&lt;int, Combatant*&gt;, std::pair&lt;int, Combatant*&gt;, bool&gt;
+     {
+         /// \todo take into account other values of the combatant according to TDE rules,
+         /// in case initiative is equal.
+@@ -47,6 +48,14 @@
+         }
+     };
+ 
++	struct FindCombatantByCreature : std::binary_function&lt;Combatant*, Creature*, bool&gt;
++    {
++        bool operator()(Combatant* combatant, Creature* creature) const
++        {
++			return combatant-&gt;getCreature() == creature;
++        }
++    };
++
+     Combat::Combat()
+         : mOpponents(),
+           mAllies(),
+@@ -55,6 +64,9 @@
+           mCurrentRound(0),
+ 		  mAnimationSequenceTicket(0)
+     {
++		mLifeStateChangeConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CreatureLifeStateChanged&gt;(
++			    boost::bind(&amp;Combat::creatureLifeStateChanged, this, _1, _2));
+     }
+ 
+     Combat::~Combat()
+@@ -64,12 +76,16 @@
+     void Combat::addOpponent(Combatant* combatant)
+     {
+         mOpponents.insert(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; wurde in einen Kampf verwickelt.&quot;, GET_COMBAT);
+ 		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentEntered&gt;(combatant);
+     }
+ 
+     void Combat::removeOpponent(Combatant* combatant)
+     {
+         mOpponents.erase(combatant);
++		GameEventLog::getSingleton().logEvent(
++			combatant-&gt;getName() + &quot; nimmt nicht mehr am Kampf teil.&quot;, GET_COMBAT);
+ 		MessagePump::getSingleton().sendMessage&lt;MessageType_CombatOpponentLeft&gt;(combatant);
+     }
+ 
+@@ -357,4 +373,50 @@
+ 			endRound();
+ 		}
+ 	}
++
++	bool Combat::creatureLifeStateChanged(Creature* creature, LifeState state)
++	{
++		if (state != LIFESTATE_ALIVE)
++		{
++			// Is a creature in combat affected?
++			for (size_t i = 0; i &lt; mCombatantQueue.size(); ++i)
++			{
++				if (creature == mCombatantQueue[i].second-&gt;getCreature())
++				{
++					// Yes. Log about it and remove it from combat.
++					CeGuiString msg = creature-&gt;getName() + &quot; ist jetzt &quot;;
++					if (state == LIFESTATE_INCAPACITATED)
++					{
++						msg += &quot;kampfunf&#228;hig.&quot;;
++					}
++					else if (state == LIFESTATE_UNCONCIOUS)
++					{
++						msg += &quot;bewusstlos.&quot;;
++					}
++					else
++					{
++						msg += &quot;tot.&quot;;
++					}
++					GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
++
++					CombatantSet::iterator it = std::find_if(mOpponents.begin(), mOpponents.end(),
++						std::bind2nd(FindCombatantByCreature(), creature));
++					if (it != mOpponents.end())
++					{
++						removeOpponent(mCombatantQueue[i].second);
++					}
++					else
++					{
++						CombatantSet::iterator it = std::find_if(mAllies.begin(), mAllies.end(),
++							std::bind2nd(FindCombatantByCreature(), creature));
++						if (it != mOpponents.end())
++						{
++							removeAlly(mCombatantQueue[i].second);
++						}
++					}
++				}
++			}
++		}
++		return true;
++	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001343.html">[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+</A></li>
+	<LI>Next message: <A HREF="001345.html">[Dsa-hl-svn] r4274 - in rl/trunk/engine/ai: . include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1344">[ date ]</a>
+              <a href="thread.html#1344">[ thread ]</a>
+              <a href="subject.html#1344">[ subject ]</a>
+              <a href="author.html#1344">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

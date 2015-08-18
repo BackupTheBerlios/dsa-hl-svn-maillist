@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4046 - in rl/trunk/engine: core/include core/src	rules/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4046%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include&In-Reply-To=%3C200801061443.m06Ehhbp031641%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001116.html">
+   <LINK REL="Next"  HREF="001118.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4046 - in rl/trunk/engine: core/include core/src	rules/include</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4046%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include&In-Reply-To=%3C200801061443.m06Ehhbp031641%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4046 - in rl/trunk/engine: core/include core/src	rules/include">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Jan  6 15:43:43 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001116.html">[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="001118.html">[Dsa-hl-svn] r4047 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1117">[ date ]</a>
+              <a href="thread.html#1117">[ thread ]</a>
+              <a href="subject.html#1117">[ subject ]</a>
+              <a href="author.html#1117">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-01-06 15:43:18 +0100 (Sun, 06 Jan 2008)
+New Revision: 4046
+
+Modified:
+   rl/trunk/engine/core/include/Actor.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/rules/include/GameObject.h
+Log:
+notify gameobject if his actor was deleted
+
+Modified: rl/trunk/engine/core/include/Actor.h
+===================================================================
+--- rl/trunk/engine/core/include/Actor.h	2008-01-06 14:40:32 UTC (rev 4045)
++++ rl/trunk/engine/core/include/Actor.h	2008-01-06 14:43:18 UTC (rev 4046)
+@@ -36,6 +36,14 @@
+     class Actor;
+     class GameAreaEventSource;
+ 
++
++    // this is used to notify a gameobject (which is derived from ActorNotifiedObject) if his actor was deleted
++    class ActorNotifiedObject : public Ogre::UserDefinedObject
++    {
++    public:
++        virtual void setActor(Actor*) = 0;
++    };
++
+     typedef std::map&lt;const Ogre::String,Actor*&gt; ActorMap;
+     typedef std::vector&lt;Actor*&gt; ActorVector;
+     typedef std::pair&lt;const Ogre::String,Actor*&gt; ActorPair;
+@@ -58,7 +66,7 @@
+         Actor(const Ogre::String&amp; name,
+             ActorControlledObject* aco = NULL,
+             PhysicalThing* pt = NULL,
+-            Ogre::UserDefinedObject* go = NULL);
++            ActorNotifiedObject* go = NULL);
+ 
+         /** Dekonstruktor
+         * @remark Nicht direkt aufrufen,
+@@ -70,9 +78,9 @@
+         const Ogre::String&amp; getName() const;
+ 
+         /// Gibt das UserdefinedObject der n&#228;chsten Schicht zur&#252;ck
+-        Ogre::UserDefinedObject* getGameObject() const;
++        ActorNotifiedObject* getGameObject() const;
+         /// Setzt das UserdefinedObject der n&#228;chsten Schicht
+-        void setGameObject(Ogre::UserDefinedObject* uo);
++        void setGameObject(ActorNotifiedObject* uo);
+ 
+         /// Gibt die Physikalische Repr&#228;sentation zur&#252;ck
+         PhysicalThing* getPhysicalThing() const;
+@@ -298,7 +306,7 @@
+         /// Verkn&#252;pfung zur Physikalischen Repr&#228;sentation
+         PhysicalThing* mPhysicalThing;
+         /// Verkn&#252;pfung zur N&#228;chsten Schicht
+-        Ogre::UserDefinedObject* mGameObject;
++        ActorNotifiedObject* mGameObject;
+         /// Verkn&#252;pfung zum kontrollierten Objekt
+         ActorControlledObject* mActorControlledObject;
+         /// Der Parent-Aktor
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2008-01-06 14:40:32 UTC (rev 4045)
++++ rl/trunk/engine/core/src/Actor.cpp	2008-01-06 14:43:18 UTC (rev 4046)
+@@ -37,7 +37,7 @@
+     const Ogre::String Actor::DEFAULT_SLOT_NAME = &quot;SLOT_DEFAULT&quot;;
+ 
+     Actor::Actor(const String&amp; name, ActorControlledObject* aco,
+-        PhysicalThing* pt, UserDefinedObject* go)
++        PhysicalThing* pt, ActorNotifiedObject* go)
+         : mName(name),
+         mPhysicalThing(pt),
+         mGameObject(go),
+@@ -91,6 +91,12 @@
+             mActorControlledObject = NULL;
+         }
+ 
++        if (mGameObject != NULL)
++        {
++            mGameObject-&gt;setActor(NULL);
++            mGameObject = NULL;
++        }
++
+         if (mPhysicalThing != NULL)
+         {
+             mPhysicalThing-&gt;_setActor(0);
+@@ -101,12 +107,12 @@
+         delete mDescription;
+     }
+ 
+-    void Actor::setGameObject(Ogre::UserDefinedObject* uo)
++    void Actor::setGameObject(ActorNotifiedObject* uo)
+     {
+         mGameObject = uo;
+     }
+ 
+-    Ogre::UserDefinedObject* Actor::getGameObject() const
++    ActorNotifiedObject* Actor::getGameObject() const
+     {
+         return mGameObject;
+     }
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-01-06 14:40:32 UTC (rev 4045)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-01-06 14:43:18 UTC (rev 4046)
+@@ -20,6 +20,7 @@
+ #include &quot;RulesPrerequisites.h&quot;
+ 
+ #include &quot;Action.h&quot;
++#include &quot;Actor.h&quot;
+ #include &quot;RulesConstants.h&quot;
+ #include &quot;ObjectStateChangeEventSource.h&quot;
+ #include &quot;Properties.h&quot;
+@@ -27,7 +28,6 @@
+ 
+ namespace rl
+ {
+-    class Actor;
+     class Creature;
+     class Effect;
+     class EffectManager;
+@@ -42,7 +42,7 @@
+     * @todo Ueberlegen, wie man Aktionen situativ aktivierbar macht.
+     */
+     class _RlRulesExport GameObject 
+-        : public Ogre::UserDefinedObject, 
++        : public ActorNotifiedObject, 
+           public ObjectStateChangeEventSource,
+           public PropertyHolder
+     {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001116.html">[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="001118.html">[Dsa-hl-svn] r4047 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1117">[ date ]</a>
+              <a href="thread.html#1117">[ thread ]</a>
+              <a href="subject.html#1117">[ subject ]</a>
+              <a href="author.html#1117">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

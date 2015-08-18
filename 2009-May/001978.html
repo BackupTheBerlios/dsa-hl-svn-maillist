@@ -1,0 +1,759 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4922 - in rl/trunk/editors/Lockenwickler: src ui files
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4922%20-%20in%20rl/trunk/editors/Lockenwickler%3A%20src%20ui%20files&In-Reply-To=%3C200905101157.n4ABv5fF019689%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001977.html">
+   <LINK REL="Next"  HREF="001979.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4922 - in rl/trunk/editors/Lockenwickler: src ui files</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4922%20-%20in%20rl/trunk/editors/Lockenwickler%3A%20src%20ui%20files&In-Reply-To=%3C200905101157.n4ABv5fF019689%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4922 - in rl/trunk/editors/Lockenwickler: src ui files">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun May 10 13:57:05 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001977.html">[Dsa-hl-svn] r4921 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+        <LI>Next message: <A HREF="001979.html">[Dsa-hl-svn] r4923 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1978">[ date ]</a>
+              <a href="thread.html#1978">[ thread ]</a>
+              <a href="subject.html#1978">[ subject ]</a>
+              <a href="author.html#1978">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-05-10 13:57:03 +0200 (Sun, 10 May 2009)
+New Revision: 4922
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py
+   rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py
+   rl/trunk/editors/Lockenwickler/ui files/MyTerrainManagerDock.ui
+Log:
+- added an incomplete terrain smoothing tool
+
+Modified: rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py	2009-05-09 19:18:54 UTC (rev 4921)
++++ rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py	2009-05-10 11:57:03 UTC (rev 4922)
+@@ -16,6 +16,7 @@
+ # along with this program; if not, write to the Free Software
+ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
+ #################################################
++import ctypes
+ 
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+@@ -86,6 +87,8 @@
+         QWidget.connect(self.editIntensitySlider, SIGNAL(&quot;valueChanged( int )&quot;), self.terrainManager.onEditBrushIntensityChanged)
+         QWidget.connect(self.paintBrushSizeSlider, SIGNAL(&quot;valueChanged( int )&quot;), self.terrainManager.onPaintBrushSizeChanged)
+         QWidget.connect(self.paintIntensitySlider, SIGNAL(&quot;valueChanged( int )&quot;), self.terrainManager.onPaintBrushIntensityChanged)
++        QWidget.connect(self.setHeightButton, SIGNAL(&quot;toggled( bool )&quot;), self.onToggleSetHeight)
++        QWidget.connect(self.editSmoothButton, SIGNAL(&quot;toggled( bool )&quot;), self.onEditSmoothToolToggled)
+         
+         self.lastTerrain = None
+         
+@@ -140,6 +143,9 @@
+     
+     def onModeChanged(self, mode):
+         self.terrainManager.setEditMode(mode)
++    
++    def onEditSmoothToolToggled(self, ison):
++        self.terrainManager.setSmoothMode(ison)
+         
+     def onTerrainChanged(self, text):
+         self.terrainManager.setCurrentTerrain(text)
+@@ -165,6 +171,14 @@
+         for terrain in terrainList:
+             self.terrainListComboBox.addItem(terrain.name)
+         
++    def onToggleSetHeight(self, setHeights):
++        if setHeights:
++            box = QMessageBox.information(QApplication.focusWidget(), &quot;&quot;, &quot;Pick the height&quot;, QMessageBox.Ok)
++          
++            self.terrainManager.setTerrainHeightMode(True)
++        else:
++            self.terrainManager.setTerrainHeightMode(False)
++            
+ class Terrain():
+     def __init__(self, sceneManager):
+         self.sceneManager = sceneManager
+@@ -271,28 +285,98 @@
+             print e
+             
+     def deform(self, brush, pos, brushIntensity):
+-        ## translate our cursor position to vertex indexes
+-        x = int( self.terrainManager.getTerrainInfo().posToVertexX(pos.x) )
+-        z = int( self.terrainManager.getTerrainInfo().posToVertexZ(pos.z) )
+-
+-        ## choose a brush intensity, this determines
+-        ## how extreme our brush works on the terrain
+-        ## and tell the ETM to deform the terrain
+-        #brushIntensity = float(evt.timeSinceLastFrame * 0.4 * dr)
++        ## translate our cursor position to vertex indexes
++        x = int( self.terrainManager.getTerrainInfo().posToVertexX(pos.x) )
++        z = int( self.terrainManager.getTerrainInfo().posToVertexZ(pos.z) )
++
++        ## choose a brush intensity, this determines
++        ## how extreme our brush works on the terrain
++        ## and tell the ETM to deform the terrain
+         self.terrainManager.deform(x, z, brush, brushIntensity * 0.0004)
+ 
++    def setHeights(self, brush, pos):
++        ## translate our cursor position to vertex indexes
++        x = int( self.terrainManager.getTerrainInfo().posToVertexX(pos.x) )
++        z = int( self.terrainManager.getTerrainInfo().posToVertexZ(pos.z) )
++
++        self.terrainManager.setHeights(x, z, brush)
++    def getHeights(self, brush, pos):
++        ## translate our cursor position to vertex indexes
++        x = int( self.terrainManager.getTerrainInfo().posToVertexX(pos.x) )
++        z = int( self.terrainManager.getTerrainInfo().posToVertexZ(pos.z) )
++
++        self.terrainManager.getHeights(x, z, brush)
++        
++    def smooth(self, brush, pos, intensity):
++        x = int( self.terrainManager.getTerrainInfo().posToVertexX(pos.x) )
++        z = int( self.terrainManager.getTerrainInfo().posToVertexZ(pos.z) )
++        
++        smooth = self.averageFilter(x, z, brush, intensity)
++        self.terrainManager.setHeights(x, z, smooth)
++        
++    def averageFilter(self, x, z, brush, intensity):
++        #When you're doing a loop possibly thousands of times, it's worth setting these
++        #aside rather than calling a function every iteration.
++        iWidth = brush.getWidth()
++        iHeight = brush.getHeight()
++
++        storageclass = ctypes.c_float * (iWidth * iHeight)
++        vecReturnBuffer =  storageclass()
++        vecHeightBuffer = storageclass()
++       
++        ptr = ctypes.pointer(vecReturnBuffer)
++       
++        brushReturn = ET.Brush(ctypes.pointer(vecReturnBuffer), iWidth, iHeight)
++        brushHeights = ET.Brush(ctypes.pointer(vecHeightBuffer), iWidth, iHeight)
++
++        self.terrainManager.getHeights(x, z, brushHeights)
++
++        fSumHeights = 0.0
++        iNumHeights = iWidth * iHeight
++
++        # Find the sum of all the heights within the sample
++        i = 0
++        j = 0
++        while i &lt; iWidth:
++            while j &lt; iHeight:
++                fSumHeights += brushHeights.at(i, j)
++                j += 1
++            i += 1
++       
++
++        #Find the average height within the sample
++        fAvgHeight = fSumHeights / iNumHeights
++
++        i = 0
++        j = 0
++        while i &lt; iWidth:
++            while j &lt; iHeight:
++                fHeight = brushHeights.at(i, j)
++                fDelta = fHeight - fAvgHeight
++                fShapeMask = shape.at(i, j)
++
++                fDelta = fDelta * fShapeMask * fIntensity
++
++                val = brushReturn.at(i, j) 
++                val = fHeight - fDelta
++                
++                j += 1
++            i += 1
++        return brushReturn
++
++        
+     def updateLightMap(self):
+-        lightmap = og.Image()
+-        ET.createTerrainLightmap(
+-                             self.terrainManager.getTerrainInfo() ,
+-                             lightmap, 128, 128 ,
+-                             og.Vector3(1, -1, 1) ,
+-                             og.ColourValue(1 ,1, 1) ,      
+-                             og.ColourValue(0.3, 0.3,  0.3) )
+-
+-        ## get our dynamic texture and update its contents
+-        tex = og.TextureManager.getSingleton().getByName(&quot;ETLightmap&quot;)
+-        l = lightmap.getPixelBox(0, 0)
++        lightmap = og.Image()
++        ET.createTerrainLightmap(
++                             self.terrainManager.getTerrainInfo() ,
++                             lightmap, 128, 128 ,
++                             og.Vector3(1, -1, 1) ,
++                             og.ColourValue(1 ,1, 1) ,      
++                             og.ColourValue(0.3, 0.3,  0.3) )
++
++        ## get our dynamic texture and update its contents
++        tex = og.TextureManager.getSingleton().getByName(&quot;ETLightmap&quot;)
++        l = lightmap.getPixelBox(0, 0)
+         tex.getBuffer(0, 0).blitFromMemory(lightmap.getPixelBox(0, 0))
+         
+         
+@@ -312,14 +396,14 @@
+         self.currentEditBrush = None
+         self.currentEditBrushName = None
+         self.editBrushes = {}        
+-        self.editBrushSize = 32    
+-        self.editBrushIntensity = 32
++        self.editBrushSize = 2    
++        self.editBrushIntensity = 2
+         
+         self.currentPaintBrush = None
+         self.currentPaintBrushName = None
+         self.paintBrushes = {}
+-        self.paintBrushSize = 32
+-        self.paintBrushIntensity = 32
++        self.paintBrushSize = 2
++        self.paintBrushIntensity = 2
+     
+         self.leftMouseDown = False
+         
+@@ -327,14 +411,18 @@
+         self.mainTimer.start(5)
+     
+         self.setupFinished = False
+-    
++        
++        self.setHeigthMode = False
++        self.setHeigthPickMode = False
++        self.editSmoothMode = False
++        
+         self.ogreMainWindow = None
+ 
+         
+     def createEditingCircle(self):
+         self.editingCircle = self.sceneManager.createManualObject(&quot;TerrainManagerEditingCircle&quot;)
+         self.editingCircle.setDynamic(True)
+-        self.editingCircleAccuracy = 6
++        self.editingCircleAccuracy = 20
+         
+         self.editingCircle.begin(&quot;BaseWhiteNoLighting&quot;, og.RenderOperation.OT_LINE_STRIP)
+         
+@@ -469,15 +557,37 @@
+             self.mainTimer.connect(self.mainTimer, SIGNAL(&quot;timeout()&quot;), self.update)
+         elif self.editMode == 2:
+             self.mainTimer.connect(self.mainTimer, SIGNAL(&quot;timeout()&quot;), self.update)
++    
++    def setSmoothMode(self, ison):
++        self.editSmoothMode = ison
+         
++        if not ison:
++            self.updateEditBrush()
++            
++    def setTerrainHeightMode(self, setHeight):
++        self.setHeigthMode = setHeight
++        self.setHeigthPickMode = setHeight
++        
++        if not setHeight:
++            self.updateEditBrush()
++        
+     def update(self):
+         self.currentRay = self.ogreMainWindow.getCameraToViewportRay()
+         
+         self.updatePointer()
+-            
++        
++        if self.setHeigthPickMode and self.leftMouseDown:
++            self.currentTerrain.getHeights(self.currentEditBrush, self.pointerNode.getPosition())
++            self.setHeigthPickMode = False
++            return
++        
+         if self.editMode == 1 and self.isEditing:
+-            if self.currentEditBrushName is not None and self.editBrushIntensity is not 0 and self.leftMouseDown:
++            if self.currentEditBrushName is not None and self.editBrushIntensity is not 0 and self.leftMouseDown and not self.setHeigthMode and not self.editSmoothMode:
+                 self.currentTerrain.deform(self.currentEditBrush, self.pointerNode.getPosition(), self.editBrushIntensity)
++            elif self.leftMouseDown and self.setHeigthMode:
++                self.currentTerrain.setHeights(self.currentEditBrush, self.pointerNode.getPosition())  
++            elif self.leftMouseDown and self.editSmoothMode:
++                self.currentTerrain.smooth(self.currentEditBrush, self.pointerNode.getPosition(), self.editBrushIntensity)  
+         elif self.editMode == 2 and self.isEditing:
+             if self.currentPaintBrushName is not None :
+                 print self.currentPaintBrushName + &quot; &quot; + str(self.paintBrushSize) + &quot; &quot; + str(self.paintBrushIntensity)
+@@ -488,12 +598,12 @@
+         point_index = 0
+         theta = 0
+         while theta &lt; 2 * og.Math.PI:
+-            x = og.Math.Abs(self.pointerNode.getPosition().x) * og.Math.Cos(theta)
+-            z = og.Math.Abs(self.pointerNode.getPosition().z) * og.Math.Sin(theta)
++            x = self.editBrushSize * og.Math.Cos(theta)
++            z = self.editBrushSize * og.Math.Sin(theta)
+             
+-            y = self.currentTerrain.terrainManager.getTerrainInfo().getHeightAt(x, z)
++            y = self.currentTerrain.terrainManager.getTerrainInfo().getHeightAt(self.pointerNode.getPosition().x + x, self.pointerNode.getPosition().z +  z)
+             
+-            self.editingCircle.position(x, y + 0.3, z)
++            self.editingCircle.position(x, (y - self.pointerNode.getPosition().y) + 0.15, z)
+             self.editingCircle.index(point_index)
+             point_index += 1
+             theta += og.Math.PI / self.editingCircleAccuracy
+@@ -504,16 +614,16 @@
+ 
+     def updatePointer(self):
+         if self.currentTerrain is not None:    #float getHeightAt(float x, float z) const;
+-            result = self.currentTerrain.terrainManager.getTerrainInfo().rayIntersects(self.currentRay)
+-            intersects = result[0]
+-            ## update pointer's position
++            result = self.currentTerrain.terrainManager.getTerrainInfo().rayIntersects(self.currentRay)
++            intersects = result[0]
++            ## update pointer's position
+             if (intersects):
++                self.pointerNode.setVisible(True)
++                x = result[1][0]
++                y = result[1][1]
++                z = result[1][2]
++#                print (&quot;Intersect %f, %f, %f &quot; % ( x, y, z) )
++                self.pointerNode.setPosition(og.Vector3(x, y, z))
+                 self.updateEditingCircle()
+-                self.pointerNode.setVisible(True)
+-                x = result[1][0]
+-                y = result[1][1]
+-                z = result[1][2]
+-#                print (&quot;Intersect %f, %f, %f &quot; % ( x, y, z) )
+-                self.pointerNode.setPosition(og.Vector3(x, y, z))
+             else:
+                 self.pointerNode.setVisible(False)
+
+Modified: rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py	2009-05-09 19:18:54 UTC (rev 4921)
++++ rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py	2009-05-10 11:57:03 UTC (rev 4922)
+@@ -2,7 +2,7 @@
+ 
+ # Form implementation generated from reading ui file '/home/fusion/dev/ui files/MyTerrainManagerDock.ui'
+ #
+-# Created: Sat May  9 18:10:24 2009
++# Created: Sun May 10 12:51:42 2009
+ #      by: PyQt4 UI code generator 4.4.4
+ #
+ # WARNING! All changes made in this file will be lost!
+@@ -12,7 +12,7 @@
+ class Ui_TerrainManagerUi(object):
+     def setupUi(self, TerrainManagerUi):
+         TerrainManagerUi.setObjectName(&quot;TerrainManagerUi&quot;)
+-        TerrainManagerUi.resize(266, 748)
++        TerrainManagerUi.resize(380, 769)
+         self.gridLayout_4 = QtGui.QGridLayout(TerrainManagerUi)
+         self.gridLayout_4.setMargin(1)
+         self.gridLayout_4.setSpacing(1)
+@@ -48,7 +48,7 @@
+ #        self.toolBox.setTabSpacing(1)
+         self.toolBox.setObjectName(&quot;toolBox&quot;)
+         self.page = QtGui.QWidget()
+-        self.page.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.page.setGeometry(QtCore.QRect(0, 0, 378, 655))
+         self.page.setObjectName(&quot;page&quot;)
+         self.gridLayout = QtGui.QGridLayout(self.page)
+         self.gridLayout.setMargin(1)
+@@ -221,20 +221,14 @@
+         self.gridLayout.addItem(spacerItem, 16, 0, 1, 1)
+         self.toolBox.addItem(self.page, &quot;&quot;)
+         self.page_2 = QtGui.QWidget()
+-        self.page_2.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.page_2.setGeometry(QtCore.QRect(0, 0, 378, 655))
+         self.page_2.setObjectName(&quot;page_2&quot;)
+         self.gridLayout_3 = QtGui.QGridLayout(self.page_2)
+         self.gridLayout_3.setMargin(1)
+         self.gridLayout_3.setSpacing(1)
+         self.gridLayout_3.setObjectName(&quot;gridLayout_3&quot;)
+         spacerItem1 = QtGui.QSpacerItem(20, 451, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+-        self.gridLayout_3.addItem(spacerItem1, 4, 1, 1, 1)
+-        self.terrainModToolComboBox = QtGui.QComboBox(self.page_2)
+-        self.terrainModToolComboBox.setObjectName(&quot;terrainModToolComboBox&quot;)
+-        self.terrainModToolComboBox.addItem(QtCore.QString())
+-        self.terrainModToolComboBox.addItem(QtCore.QString())
+-        self.terrainModToolComboBox.addItem(QtCore.QString())
+-        self.gridLayout_3.addWidget(self.terrainModToolComboBox, 0, 0, 1, 3)
++        self.gridLayout_3.addItem(spacerItem1, 6, 1, 1, 1)
+         self.label_12 = QtGui.QLabel(self.page_2)
+         self.label_12.setObjectName(&quot;label_12&quot;)
+         self.gridLayout_3.addWidget(self.label_12, 1, 0, 1, 1)
+@@ -267,14 +261,23 @@
+         self.label_16.setObjectName(&quot;label_16&quot;)
+         self.gridLayout_3.addWidget(self.label_16, 2, 2, 1, 1)
+         self.editBrushSizeSlider = QtGui.QSlider(self.page_2)
++        self.editBrushSizeSlider.setMinimum(1)
+         self.editBrushSizeSlider.setMaximum(50)
+         self.editBrushSizeSlider.setProperty(&quot;value&quot;, QtCore.QVariant(2))
+         self.editBrushSizeSlider.setOrientation(QtCore.Qt.Horizontal)
+         self.editBrushSizeSlider.setObjectName(&quot;editBrushSizeSlider&quot;)
+         self.gridLayout_3.addWidget(self.editBrushSizeSlider, 2, 1, 1, 1)
++        self.setHeightButton = QtGui.QPushButton(self.page_2)
++        self.setHeightButton.setCheckable(True)
++        self.setHeightButton.setObjectName(&quot;setHeightButton&quot;)
++        self.gridLayout_3.addWidget(self.setHeightButton, 4, 0, 1, 3)
++        self.editSmoothButton = QtGui.QPushButton(self.page_2)
++        self.editSmoothButton.setCheckable(True)
++        self.editSmoothButton.setObjectName(&quot;editSmoothButton&quot;)
++        self.gridLayout_3.addWidget(self.editSmoothButton, 5, 0, 1, 3)
+         self.toolBox.addItem(self.page_2, &quot;&quot;)
+         self.page_3 = QtGui.QWidget()
+-        self.page_3.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.page_3.setGeometry(QtCore.QRect(0, 0, 378, 655))
+         self.page_3.setObjectName(&quot;page_3&quot;)
+         self.gridLayout_2 = QtGui.QGridLayout(self.page_3)
+         self.gridLayout_2.setMargin(1)
+@@ -343,8 +346,12 @@
+         QtCore.QObject.connect(self.editBrushSizeSlider, QtCore.SIGNAL(&quot;valueChanged(int)&quot;), self.label_16.setNum)
+         QtCore.QObject.connect(self.paintBrushSizeSlider, QtCore.SIGNAL(&quot;valueChanged(int)&quot;), self.label_17.setNum)
+         QtCore.QObject.connect(self.paintIntensitySlider, QtCore.SIGNAL(&quot;valueChanged(int)&quot;), self.label_21.setNum)
++        QtCore.QObject.connect(self.setHeightButton, QtCore.SIGNAL(&quot;toggled(bool)&quot;), self.editIntensitySlider.setDisabled)
++        QtCore.QObject.connect(self.setHeightButton, QtCore.SIGNAL(&quot;toggled(bool)&quot;), self.editBrushButton.setDisabled)
++        QtCore.QObject.connect(self.setHeightButton, QtCore.SIGNAL(&quot;toggled(bool)&quot;), self.editBrushSizeSlider.setDisabled)
++        QtCore.QObject.connect(self.setHeightButton, QtCore.SIGNAL(&quot;toggled(bool)&quot;), self.editSmoothButton.setDisabled)
++        QtCore.QObject.connect(self.editSmoothButton, QtCore.SIGNAL(&quot;toggled(bool)&quot;), self.setHeightButton.setDisabled)
+         QtCore.QMetaObject.connectSlotsByName(TerrainManagerUi)
+-        TerrainManagerUi.setTabOrder(self.terrainModToolComboBox, self.editIntensitySlider)
+         TerrainManagerUi.setTabOrder(self.editIntensitySlider, self.editBrushButton)
+         TerrainManagerUi.setTabOrder(self.editBrushButton, self.extendsSpinBoxZ)
+         TerrainManagerUi.setTabOrder(self.extendsSpinBoxZ, self.baseNameLineEdit)
+@@ -447,10 +454,6 @@
+         self.numTexturesComboBox.setItemText(5, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;6&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.createTerrainButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.toolBox.setItemText(self.toolBox.indexOf(self.page), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.terrainModToolComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Terrain tools&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.terrainModToolComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Flatten&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.terrainModToolComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Lower&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.terrainModToolComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Raise&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.label_12.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.label_12.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Intensity&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.editIntensitySlider.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
+@@ -464,6 +467,8 @@
+         self.label_16.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The diameter of the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.label_16.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;2&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.editBrushSizeSlider.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The diameter of the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.setHeightButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Set Height&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.editSmoothButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Smooth&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.toolBox.setItemText(self.toolBox.indexOf(self.page_2), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ModifyTerrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.label_21.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
+         self.label_21.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;2&quot;, None, QtGui.QApplication.UnicodeUTF8))
+
+Modified: rl/trunk/editors/Lockenwickler/ui files/MyTerrainManagerDock.ui
+===================================================================
+--- rl/trunk/editors/Lockenwickler/ui files/MyTerrainManagerDock.ui	2009-05-09 19:18:54 UTC (rev 4921)
++++ rl/trunk/editors/Lockenwickler/ui files/MyTerrainManagerDock.ui	2009-05-10 11:57:03 UTC (rev 4922)
+@@ -5,8 +5,8 @@
+    &lt;rect&gt;
+     &lt;x&gt;0&lt;/x&gt;
+     &lt;y&gt;0&lt;/y&gt;
+-    &lt;width&gt;266&lt;/width&gt;
+-    &lt;height&gt;748&lt;/height&gt;
++    &lt;width&gt;380&lt;/width&gt;
++    &lt;height&gt;769&lt;/height&gt;
+    &lt;/rect&gt;
+   &lt;/property&gt;
+   &lt;property name=&quot;windowTitle&quot; &gt;
+@@ -96,8 +96,8 @@
+        &lt;rect&gt;
+         &lt;x&gt;0&lt;/x&gt;
+         &lt;y&gt;0&lt;/y&gt;
+-        &lt;width&gt;264&lt;/width&gt;
+-        &lt;height&gt;634&lt;/height&gt;
++        &lt;width&gt;378&lt;/width&gt;
++        &lt;height&gt;655&lt;/height&gt;
+        &lt;/rect&gt;
+       &lt;/property&gt;
+       &lt;attribute name=&quot;label&quot; &gt;
+@@ -639,8 +639,8 @@
+        &lt;rect&gt;
+         &lt;x&gt;0&lt;/x&gt;
+         &lt;y&gt;0&lt;/y&gt;
+-        &lt;width&gt;264&lt;/width&gt;
+-        &lt;height&gt;634&lt;/height&gt;
++        &lt;width&gt;378&lt;/width&gt;
++        &lt;height&gt;655&lt;/height&gt;
+        &lt;/rect&gt;
+       &lt;/property&gt;
+       &lt;attribute name=&quot;label&quot; &gt;
+@@ -653,7 +653,7 @@
+        &lt;property name=&quot;spacing&quot; &gt;
+         &lt;number&gt;1&lt;/number&gt;
+        &lt;/property&gt;
+-       &lt;item row=&quot;4&quot; column=&quot;1&quot; &gt;
++       &lt;item row=&quot;6&quot; column=&quot;1&quot; &gt;
+         &lt;spacer name=&quot;verticalSpacer&quot; &gt;
+          &lt;property name=&quot;orientation&quot; &gt;
+           &lt;enum&gt;Qt::Vertical&lt;/enum&gt;
+@@ -666,28 +666,6 @@
+          &lt;/property&gt;
+         &lt;/spacer&gt;
+        &lt;/item&gt;
+-       &lt;item row=&quot;0&quot; column=&quot;0&quot; colspan=&quot;3&quot; &gt;
+-        &lt;widget class=&quot;QComboBox&quot; name=&quot;terrainModToolComboBox&quot; &gt;
+-         &lt;property name=&quot;toolTip&quot; &gt;
+-          &lt;string&gt;Terrain tools&lt;/string&gt;
+-         &lt;/property&gt;
+-         &lt;item&gt;
+-          &lt;property name=&quot;text&quot; &gt;
+-           &lt;string&gt;Flatten&lt;/string&gt;
+-          &lt;/property&gt;
+-         &lt;/item&gt;
+-         &lt;item&gt;
+-          &lt;property name=&quot;text&quot; &gt;
+-           &lt;string&gt;Lower&lt;/string&gt;
+-          &lt;/property&gt;
+-         &lt;/item&gt;
+-         &lt;item&gt;
+-          &lt;property name=&quot;text&quot; &gt;
+-           &lt;string&gt;Raise&lt;/string&gt;
+-          &lt;/property&gt;
+-         &lt;/item&gt;
+-        &lt;/widget&gt;
+-       &lt;/item&gt;
+        &lt;item row=&quot;1&quot; column=&quot;0&quot; &gt;
+         &lt;widget class=&quot;QLabel&quot; name=&quot;label_12&quot; &gt;
+          &lt;property name=&quot;toolTip&quot; &gt;
+@@ -790,6 +768,9 @@
+          &lt;property name=&quot;toolTip&quot; &gt;
+           &lt;string&gt;The diameter of the tool&lt;/string&gt;
+          &lt;/property&gt;
++         &lt;property name=&quot;minimum&quot; &gt;
++          &lt;number&gt;1&lt;/number&gt;
++         &lt;/property&gt;
+          &lt;property name=&quot;maximum&quot; &gt;
+           &lt;number&gt;50&lt;/number&gt;
+          &lt;/property&gt;
+@@ -801,6 +782,26 @@
+          &lt;/property&gt;
+         &lt;/widget&gt;
+        &lt;/item&gt;
++       &lt;item row=&quot;4&quot; column=&quot;0&quot; colspan=&quot;3&quot; &gt;
++        &lt;widget class=&quot;QPushButton&quot; name=&quot;setHeightButton&quot; &gt;
++         &lt;property name=&quot;text&quot; &gt;
++          &lt;string&gt;Set Height&lt;/string&gt;
++         &lt;/property&gt;
++         &lt;property name=&quot;checkable&quot; &gt;
++          &lt;bool&gt;true&lt;/bool&gt;
++         &lt;/property&gt;
++        &lt;/widget&gt;
++       &lt;/item&gt;
++       &lt;item row=&quot;5&quot; column=&quot;0&quot; colspan=&quot;3&quot; &gt;
++        &lt;widget class=&quot;QPushButton&quot; name=&quot;editSmoothButton&quot; &gt;
++         &lt;property name=&quot;text&quot; &gt;
++          &lt;string&gt;Smooth&lt;/string&gt;
++         &lt;/property&gt;
++         &lt;property name=&quot;checkable&quot; &gt;
++          &lt;bool&gt;true&lt;/bool&gt;
++         &lt;/property&gt;
++        &lt;/widget&gt;
++       &lt;/item&gt;
+       &lt;/layout&gt;
+      &lt;/widget&gt;
+      &lt;widget class=&quot;QWidget&quot; name=&quot;page_3&quot; &gt;
+@@ -808,8 +809,8 @@
+        &lt;rect&gt;
+         &lt;x&gt;0&lt;/x&gt;
+         &lt;y&gt;0&lt;/y&gt;
+-        &lt;width&gt;264&lt;/width&gt;
+-        &lt;height&gt;634&lt;/height&gt;
++        &lt;width&gt;378&lt;/width&gt;
++        &lt;height&gt;655&lt;/height&gt;
+        &lt;/rect&gt;
+       &lt;/property&gt;
+       &lt;attribute name=&quot;label&quot; &gt;
+@@ -953,9 +954,13 @@
+     &lt;/widget&gt;
+    &lt;/item&gt;
+   &lt;/layout&gt;
++  &lt;zorder&gt;terrainListComboBox&lt;/zorder&gt;
++  &lt;zorder&gt;toggleTerrainVisibilityButton&lt;/zorder&gt;
++  &lt;zorder&gt;editTerrainButton&lt;/zorder&gt;
++  &lt;zorder&gt;deleteTerrainButton&lt;/zorder&gt;
++  &lt;zorder&gt;toolBox&lt;/zorder&gt;
+  &lt;/widget&gt;
+  &lt;tabstops&gt;
+-  &lt;tabstop&gt;terrainModToolComboBox&lt;/tabstop&gt;
+   &lt;tabstop&gt;editIntensitySlider&lt;/tabstop&gt;
+   &lt;tabstop&gt;editBrushButton&lt;/tabstop&gt;
+   &lt;tabstop&gt;extendsSpinBoxZ&lt;/tabstop&gt;
+@@ -987,11 +992,11 @@
+    &lt;hints&gt;
+     &lt;hint type=&quot;sourcelabel&quot; &gt;
+      &lt;x&gt;162&lt;/x&gt;
+-     &lt;y&gt;130&lt;/y&gt;
++     &lt;y&gt;101&lt;/y&gt;
+     &lt;/hint&gt;
+     &lt;hint type=&quot;destinationlabel&quot; &gt;
+-     &lt;x&gt;257&lt;/x&gt;
+-     &lt;y&gt;132&lt;/y&gt;
++     &lt;x&gt;377&lt;/x&gt;
++     &lt;y&gt;103&lt;/y&gt;
+     &lt;/hint&gt;
+    &lt;/hints&gt;
+   &lt;/connection&gt;
+@@ -1003,11 +1008,11 @@
+    &lt;hints&gt;
+     &lt;hint type=&quot;sourcelabel&quot; &gt;
+      &lt;x&gt;160&lt;/x&gt;
+-     &lt;y&gt;141&lt;/y&gt;
++     &lt;y&gt;112&lt;/y&gt;
+     &lt;/hint&gt;
+     &lt;hint type=&quot;destinationlabel&quot; &gt;
+-     &lt;x&gt;258&lt;/x&gt;
+-     &lt;y&gt;143&lt;/y&gt;
++     &lt;x&gt;377&lt;/x&gt;
++     &lt;y&gt;114&lt;/y&gt;
+     &lt;/hint&gt;
+    &lt;/hints&gt;
+   &lt;/connection&gt;
+@@ -1018,12 +1023,12 @@
+    &lt;slot&gt;setNum(int)&lt;/slot&gt;
+    &lt;hints&gt;
+     &lt;hint type=&quot;sourcelabel&quot; &gt;
+-     &lt;x&gt;140&lt;/x&gt;
+-     &lt;y&gt;67&lt;/y&gt;
++     &lt;x&gt;139&lt;/x&gt;
++     &lt;y&gt;148&lt;/y&gt;
+     &lt;/hint&gt;
+     &lt;hint type=&quot;destinationlabel&quot; &gt;
+-     &lt;x&gt;258&lt;/x&gt;
+-     &lt;y&gt;69&lt;/y&gt;
++     &lt;x&gt;371&lt;/x&gt;
++     &lt;y&gt;150&lt;/y&gt;
+     &lt;/hint&gt;
+    &lt;/hints&gt;
+   &lt;/connection&gt;
+@@ -1034,14 +1039,94 @@
+    &lt;slot&gt;setNum(int)&lt;/slot&gt;
+    &lt;hints&gt;
+     &lt;hint type=&quot;sourcelabel&quot; &gt;
+-     &lt;x&gt;172&lt;/x&gt;
+-     &lt;y&gt;48&lt;/y&gt;
++     &lt;x&gt;171&lt;/x&gt;
++     &lt;y&gt;129&lt;/y&gt;
+     &lt;/hint&gt;
+     &lt;hint type=&quot;destinationlabel&quot; &gt;
+-     &lt;x&gt;258&lt;/x&gt;
+-     &lt;y&gt;50&lt;/y&gt;
++     &lt;x&gt;371&lt;/x&gt;
++     &lt;y&gt;131&lt;/y&gt;
+     &lt;/hint&gt;
+    &lt;/hints&gt;
+   &lt;/connection&gt;
++  &lt;connection&gt;
++   &lt;sender&gt;setHeightButton&lt;/sender&gt;
++   &lt;signal&gt;toggled(bool)&lt;/signal&gt;
++   &lt;receiver&gt;editIntensitySlider&lt;/receiver&gt;
++   &lt;slot&gt;setDisabled(bool)&lt;/slot&gt;
++   &lt;hints&gt;
++    &lt;hint type=&quot;sourcelabel&quot; &gt;
++     &lt;x&gt;65&lt;/x&gt;
++     &lt;y&gt;274&lt;/y&gt;
++    &lt;/hint&gt;
++    &lt;hint type=&quot;destinationlabel&quot; &gt;
++     &lt;x&gt;85&lt;/x&gt;
++     &lt;y&gt;94&lt;/y&gt;
++    &lt;/hint&gt;
++   &lt;/hints&gt;
++  &lt;/connection&gt;
++  &lt;connection&gt;
++   &lt;sender&gt;setHeightButton&lt;/sender&gt;
++   &lt;signal&gt;toggled(bool)&lt;/signal&gt;
++   &lt;receiver&gt;editBrushButton&lt;/receiver&gt;
++   &lt;slot&gt;setDisabled(bool)&lt;/slot&gt;
++   &lt;hints&gt;
++    &lt;hint type=&quot;sourcelabel&quot; &gt;
++     &lt;x&gt;109&lt;/x&gt;
++     &lt;y&gt;274&lt;/y&gt;
++    &lt;/hint&gt;
++    &lt;hint type=&quot;destinationlabel&quot; &gt;
++     &lt;x&gt;131&lt;/x&gt;
++     &lt;y&gt;210&lt;/y&gt;
++    &lt;/hint&gt;
++   &lt;/hints&gt;
++  &lt;/connection&gt;
++  &lt;connection&gt;
++   &lt;sender&gt;setHeightButton&lt;/sender&gt;
++   &lt;signal&gt;toggled(bool)&lt;/signal&gt;
++   &lt;receiver&gt;editBrushSizeSlider&lt;/receiver&gt;
++   &lt;slot&gt;setDisabled(bool)&lt;/slot&gt;
++   &lt;hints&gt;
++    &lt;hint type=&quot;sourcelabel&quot; &gt;
++     &lt;x&gt;222&lt;/x&gt;
++     &lt;y&gt;271&lt;/y&gt;
++    &lt;/hint&gt;
++    &lt;hint type=&quot;destinationlabel&quot; &gt;
++     &lt;x&gt;143&lt;/x&gt;
++     &lt;y&gt;113&lt;/y&gt;
++    &lt;/hint&gt;
++   &lt;/hints&gt;
++  &lt;/connection&gt;
++  &lt;connection&gt;
++   &lt;sender&gt;setHeightButton&lt;/sender&gt;
++   &lt;signal&gt;toggled(bool)&lt;/signal&gt;
++   &lt;receiver&gt;editSmoothButton&lt;/receiver&gt;
++   &lt;slot&gt;setDisabled(bool)&lt;/slot&gt;
++   &lt;hints&gt;
++    &lt;hint type=&quot;sourcelabel&quot; &gt;
++     &lt;x&gt;42&lt;/x&gt;
++     &lt;y&gt;271&lt;/y&gt;
++    &lt;/hint&gt;
++    &lt;hint type=&quot;destinationlabel&quot; &gt;
++     &lt;x&gt;39&lt;/x&gt;
++     &lt;y&gt;299&lt;/y&gt;
++    &lt;/hint&gt;
++   &lt;/hints&gt;
++  &lt;/connection&gt;
++  &lt;connection&gt;
++   &lt;sender&gt;editSmoothButton&lt;/sender&gt;
++   &lt;signal&gt;toggled(bool)&lt;/signal&gt;
++   &lt;receiver&gt;setHeightButton&lt;/receiver&gt;
++   &lt;slot&gt;setDisabled(bool)&lt;/slot&gt;
++   &lt;hints&gt;
++    &lt;hint type=&quot;sourcelabel&quot; &gt;
++     &lt;x&gt;101&lt;/x&gt;
++     &lt;y&gt;301&lt;/y&gt;
++    &lt;/hint&gt;
++    &lt;hint type=&quot;destinationlabel&quot; &gt;
++     &lt;x&gt;100&lt;/x&gt;
++     &lt;y&gt;274&lt;/y&gt;
++    &lt;/hint&gt;
++   &lt;/hints&gt;
++  &lt;/connection&gt;
+  &lt;/connections&gt;
+ &lt;/ui&gt;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001977.html">[Dsa-hl-svn] r4921 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+	<LI>Next message: <A HREF="001979.html">[Dsa-hl-svn] r4923 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1978">[ date ]</a>
+              <a href="thread.html#1978">[ thread ]</a>
+              <a href="subject.html#1978">[ subject ]</a>
+              <a href="author.html#1978">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

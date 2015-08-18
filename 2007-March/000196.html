@@ -1,0 +1,726 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3125 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3125%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules%20rules/include%20rules/src%20script/swig&In-Reply-To=%3C200703052256.l25MuBMa021179%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000195.html">
+   <LINK REL="Next"  HREF="000197.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3125 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src script/swig</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3125%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules%20rules/include%20rules/src%20script/swig&In-Reply-To=%3C200703052256.l25MuBMa021179%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3125 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules rules/include rules/src script/swig">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  5 23:56:11 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000195.html">[Dsa-hl-svn] r3124 - modules/aitest/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000197.html">[Dsa-hl-svn] r3126 - in modules: . combattest combattest/dsa	combattest/maps combattest/materials	combattest/materials/textures combattest/models	combattest/scripts combattest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#196">[ date ]</a>
+              <a href="thread.html#196">[ thread ]</a>
+              <a href="subject.html#196">[ subject ]</a>
+              <a href="author.html#196">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-03-05 23:55:49 +0100 (Mon, 05 Mar 2007)
+New Revision: 3125
+
+Modified:
+   rl/trunk/engine/ai/include/Agent.h
+   rl/trunk/engine/ai/include/AgentManager.h
+   rl/trunk/engine/ai/src/Agent.cpp
+   rl/trunk/engine/ai/src/AgentManager.cpp
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/GameLoop.cpp
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/GameObjectManager.h
+   rl/trunk/engine/rules/include/GameObjectState.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+Behaviours in the gof-file are now respected. If a Creature or subclass of it defines one or more behaviors, an Agent is created with said behaviours defined.
+Sadly enough they Wander-Behaviors don't seem to work atm...
+
+Modified: rl/trunk/engine/ai/include/Agent.h
+===================================================================
+--- rl/trunk/engine/ai/include/Agent.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/ai/include/Agent.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -23,8 +23,6 @@
+ namespace rl
+ {
+ 	class SteeringVehicle;
+-	typedef FuzzyState&lt;SteeringVehicle&gt; SteeringBehaviour;
+-
+ 	class SteeringMachine;
+ 	class DialogCharacter;
+ 	class Creature;
+@@ -90,6 +88,8 @@
+ 		 */
+ 		SteeringVehicle* getVehicle();
+ 
++        Creature* getControlledCreature() const;
++
+ //		PerceptionPool* getPerceptionPool();
+ 
+ 		// deprecated - for DialogBot
+
+Modified: rl/trunk/engine/ai/include/AgentManager.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentManager.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/ai/include/AgentManager.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -20,21 +20,35 @@
+ #include &quot;AiPrerequisites.h&quot;
+ //#include &quot;PhysicsController.h&quot;
+ #include &quot;GameTask.h&quot;
++#include &quot;GameObjectStateListener.h&quot;
++#include &quot;FuzzyState.h&quot;
+ 
+ namespace rl
+ {
+-	class Agent;
+ 	class Creature;
+ 	class SteeringVehicle;
+ 	class DialogCharacter;
++    class Agent;
+ 
++    typedef FuzzyState&lt;SteeringVehicle&gt; SteeringBehaviour;
++
++    class _RlAiExport BehaviourFactory
++    {
++    public:
++        BehaviourFactory() {}
++        virtual ~BehaviourFactory() {}
++
++        virtual SteeringBehaviour* createBehaviour(const Ogre::String&amp; classname) = 0;
++    };
++
+ 	/** Executes AI during game as a RL::GameTask.
+ 	 * Each registered Agent gets executed once per gametask in order
+ 	 * to do its ai stuff (path finding, movement, decission making).
+ 	 */
+ 	class _RlAiExport AgentManager
+ 		: protected Ogre::Singleton&lt;AgentManager&gt;,
+-		  public GameTask
++		  public GameTask,
++          public GameObjectStateListener
+   	//	  public PhysicsController,
+ 		  
+ 	{
+@@ -72,6 +86,9 @@
+ 		// Hint: it's deprecated
+ 		Agent* createAgent(DialogCharacter* character);
+ 
++        // Destroys an Agent and all its behaviours. (if any)
++        void destroyAgent(Agent*);
++
+ 		// ??? purpose ??? needed for opensteer ?
+ 
+ 		VehicleList getNeighbors(Agent* agent);
+@@ -88,10 +105,19 @@
+ 		 */
+ 		void removeAllAgents();
+ 
+-		/** Returns the name of this class - AgentManager for debugging purposes.
+-		 */
++		/// Override from GameTask
++		/// Returns the name of this class - AgentManager for debugging purposes.
+         virtual const Ogre::String&amp; getName() const;
++
++        /// Override from GameObjectStateListener.
++        /// Used to create/destroy Agents
++        virtual void gameObjectStateChanged(GameObject* go, GameObjectState oldState,
++            GameObjectState newState);
++
++        /// Set the factory to be used to create behaviours.
++        virtual void setBehaviourFactory(BehaviourFactory*);
+ 	private:
++
+ 		/** Used to register an agent internally.
+ 		 * Adds the given Agent to AgentList and its vehicle to mAllNeighbors.
+ 		 * @param agent Agent to be added
+@@ -100,6 +126,9 @@
+ 
+ 		//! defines a std::list of Agents
+ 		typedef std::vector&lt;Agent*&gt; AgentList;
++
++        /// Factory to create behaviours with.
++        BehaviourFactory* mBehaviourFactory;
+ 		
+ 		//! List of Vehicle objects from the Agents in mAgents (might be needed for opensteer)
+ 		VehicleList mAllNeighbors;
+
+Modified: rl/trunk/engine/ai/src/Agent.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Agent.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/ai/src/Agent.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -142,4 +142,9 @@
+ 	return mDialogBot-&gt;isActive();
+ }
+ 
++Creature* Agent::getControlledCreature() const
++{
++    return mCreature;
+ }
++
++}
+
+Modified: rl/trunk/engine/ai/src/AgentManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentManager.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/ai/src/AgentManager.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -17,6 +17,7 @@
+ #include &quot;Agent.h&quot;
+ #include &quot;PlayerVehicle.h&quot;
+ #include &quot;Creature.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -24,6 +25,14 @@
+ 
+ namespace rl {
+ 
++struct FindAgentByControlledCreature : public std::binary_function&lt;Agent*, Creature*, bool&gt;
++{
++    bool operator()(Agent* agent, Creature* creature) const
++    {
++        return agent-&gt;getControlledCreature() == creature;
++    }
++};
++
+ AgentManager&amp; AgentManager::getSingleton(void)
+ {
+     return Singleton&lt;AgentManager&gt;::getSingleton();
+@@ -34,13 +43,17 @@
+     return Singleton&lt;AgentManager&gt;::getSingletonPtr();
+ }
+ 
+-AgentManager::AgentManager(void) : mAllNeighbors(), mAgents(), mPlayer(NULL)
++AgentManager::AgentManager(void)
++    : mBehaviourFactory(NULL), mAllNeighbors(), mAgents(), mPlayer(NULL)
+ {
+-
++    // Subscribe as listener to the GameObjectManager, in order to attach Agents to
++    // Creatures that are placed into the scene.
++    GameObjectManager::getSingleton().registerGameObjectStateListener(this);
+ }
+ 
+ AgentManager::~AgentManager(void)
+ {
++    GameObjectManager::getSingleton().unregisterGameObjectStateListener(this);
+ 	removeAllAgents();
+ }
+ 
+@@ -69,6 +82,16 @@
+ 	return agent;
+ }
+ 
++void AgentManager::destroyAgent(Agent* agent)
++{
++    AgentList::iterator it = std::find(mAgents.begin(), mAgents.end(), agent);
++    if (it != mAgents.end())
++    {
++        delete *it;
++        mAgents.erase(it);
++    }
++}
++
+ void AgentManager::addAgent(Agent* agent)
+ {
+ 	mAgents.push_back(agent);
+@@ -90,22 +113,11 @@
+ 
+ void AgentManager::run( Ogre::Real elapsedTime ) 
+ {
+-//	update agents
+-	//if the loop below is reactivated, then remove this ...
+-	if(mPlayer != NULL)
+-	{
+-		mPlayer-&gt;update(elapsedTime);
+-	}
+-
+-  /*  for(AgentList::iterator itr = mAgents.begin(); itr != mAgents.end(); ++itr)
++    //	update agents
++    for(AgentList::iterator itr = mAgents.begin(); itr != mAgents.end(); ++itr)
+     {
+-	//  update agents of type &quot;player&quot; only
+-		if((*itr)-&gt;getType() == AGENT_PLAYER)
+-		{
+-			(*itr)-&gt;update(elapsedTime);
+-			break;
+-		}
+-    }*/
++	    (*itr)-&gt;update(elapsedTime);
++    }
+ }
+ 
+ void AgentManager::removeAllAgents()
+@@ -126,4 +138,51 @@
+     return NAME;
+ }
+ 
++void AgentManager::gameObjectStateChanged(GameObject* go, GameObjectState oldState,
++                                          GameObjectState newState)
++{
++    // if the GameObject is not a Creature, we can ignore it
++    Creature* creature = dynamic_cast&lt;Creature*&gt;(go);
++    if (creature == NULL) return;
++
++    if (oldState == GOS_IN_SCENE &amp;&amp; newState != GOS_IN_SCENE)
++    {
++        // Remove the Agent and destroy it. Later we should pool them...
++        AgentList::iterator it = std::find_if(mAgents.begin(), mAgents.end(),
++            std::bind2nd(FindAgentByControlledCreature(), creature));
++        if (it != mAgents.end())
++        {
++            destroyAgent(*it);
++        }
++    }
++    else if (newState == GOS_IN_SCENE)
++    {
++        // Create an Agent and add the behaviours of the creature to it.
++        Property behaviorProperty = creature-&gt;getProperty(Creature::PROPERTY_BEHAVIOURS);
++        if (behaviorProperty.isArray())
++        {
++            std::vector&lt;Property&gt; behaviors = behaviorProperty.toArray();
++            if (!behaviors.empty())
++            {
++                Agent* agent = createAgent(AGENT_STD_NPC, creature);
++                for (std::vector&lt;Property&gt;::const_iterator it = behaviors.begin(),
++                    end = behaviors.end(); it != end; ++it)
++                {
++                    if (it-&gt;isString())
++                    {
++                        SteeringBehaviour* behavior =
++                            mBehaviourFactory-&gt;createBehaviour(it-&gt;toString().c_str());
++                        agent-&gt;addSteeringBehaviour(behavior);
++                    }
++                }
++            }
++        }
++    }
+ }
++
++void AgentManager::setBehaviourFactory(BehaviourFactory* factory)
++{
++    mBehaviourFactory = factory;
++}
++
++}
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -61,7 +61,7 @@
+ 	void quitGame();
+ 
+     /// Returns time since game started in Milliseconds.
+-    unsigned long getClock();
++    unsigned long getClock() const;
+ 
+     /// Main loop of RL.
+     void loop();
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -189,7 +189,7 @@
+             / std::max(mLastTimes.size(), (size_t)1);
+     }
+ 
+-    unsigned long GameLoop::getClock()
++    unsigned long GameLoop::getClock() const
+     {
+         return mGameTime;
+     }
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -519,6 +519,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\GameObjectStateListener.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\Inventory.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/include/Creature.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -110,6 +110,7 @@
+ 		typedef std::map&lt;const CeGuiString, TalentStateSet*&gt; TalentMap;
+ 
+         static const Ogre::String CLASS_NAME;
++        static const Ogre::String PROPERTY_BEHAVIOURS; 
+ 
+         Creature(unsigned int id);
+ 		        
+@@ -1017,6 +1018,8 @@
+         /// Zeigt auf das Inventar der Kreatur.
+ 		Inventory* mInventory;
+ 
++        Property mBehaviours;
++
+         /**
+          *  Sets a the status \a statusVariable. It uses a reference counting
+          *  System to do this, so if for example severeal effects put the creature
+
+Modified: rl/trunk/engine/rules/include/GameObjectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObjectManager.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/include/GameObjectManager.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -18,6 +18,8 @@
+ #define __GAMEOBJECTMANAGER_H__
+ 
+ #include &quot;RulesPrerequisites.h&quot;
++#include &quot;GameObjectStateListener.h&quot;
++
+ #include &lt;OgreScriptLoader.h&gt;
+ #include &lt;OgreSingleton.h&gt;
+ #include &lt;map&gt;
+@@ -38,7 +40,9 @@
+     };
+ 
+     class _RlRulesExport GameObjectManager : 
+-        public Ogre::Singleton&lt;GameObjectManager&gt;, public Ogre::ScriptLoader
++        public Ogre::Singleton&lt;GameObjectManager&gt;,
++        public GameObjectStateListener,
++        public Ogre::ScriptLoader
+     {
+     public:
+         GameObjectManager();
+@@ -54,8 +58,17 @@
+         virtual Ogre::Real getLoadingOrder() const;
+         virtual void parseScript(Ogre::DataStreamPtr&amp; stream, const Ogre::String&amp; groupName);
+ 
++        /// Override from GameObjectStateListener.
++        /// Used to propagate to global GameObjectStateListeners.
++        virtual void gameObjectStateChanged(GameObject* go, GameObjectState oldState,
++            GameObjectState newState);
++
++        void registerGameObjectStateListener(GameObjectStateListener* listener);
++        void unregisterGameObjectStateListener(GameObjectStateListener* listener);
++
+     private:
+         typedef std::map&lt;const Ogre::String, PropertySet*&gt; ClassPropertyMap;
++        typedef std::set&lt;GameObjectStateListener*&gt; GameObjectStateListenerSet;
+ 
+         Ogre::StringVector mScriptPatterns;
+ 
+@@ -64,6 +77,7 @@
+         ClassPropertyMap mClassProperties;
+         unsigned int mGeneratedId;
+         GameObjectFactory* mGameObjectFactory;
++        GameObjectStateListenerSet mGameObjectStateListeners;
+ 
+         unsigned int generateId();
+         PropertySet* getClassProperties(const Ogre::String&amp; classId);
+
+Modified: rl/trunk/engine/rules/include/GameObjectState.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObjectState.h	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/include/GameObjectState.h	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -19,15 +19,17 @@
+ 
+ namespace rl {
+ 
++    /// Basic states, a GameObject can have.
++    /// Values are chosen so, that they are maskable.
+     enum GameObjectState
+     {
+-        GOS_UNDEFINED = 0,
+-        GOS_UNLOADED,
+-        GOS_LOADED,
+-        GOS_IN_POSSESSION,
+-        GOS_IN_SCENE,
+-        GOS_HELD,
+-        GOS_READY
++        GOS_UNDEFINED     =  0, ///!&lt; Nothing known about such a GO.
++        GOS_UNLOADED      =  1, ///!&lt; GO is known, but its actual properties are not loaded yet.
++        GOS_LOADED        =  2, ///!&lt; GO is loaded, unused.
++        GOS_IN_POSSESSION =  4, ///!&lt; GO is owned by another GO. (e.g. inside a chest)
++        GOS_IN_SCENE      =  8, ///!&lt; GO is placed openly in the scene.
++        GOS_HELD          = 16, ///!&lt; GO is held openly by another GO. (e.g. apple in NPC's hand)
++        GOS_READY         = 32  ///!&lt; GO is ready for usage by another GO. (sword in NPC's hand)
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -36,6 +36,7 @@
+ namespace rl
+ {
+     const Ogre::String Creature::CLASS_NAME = &quot;Creature&quot;;
++    const Ogre::String Creature::PROPERTY_BEHAVIOURS = &quot;behaviours&quot;;
+ 
+     Creature::Creature(unsigned int id)
+         : GameObject(id), 
+@@ -1127,30 +1128,30 @@
+ 
+     void Creature::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+     {
+-        //if (key == Creature::PROPERTY_)
+-        //{
+-        //    mImageName = value.toString();
+-        //}
+-        //else
+-        //{
++        if (key == Creature::PROPERTY_BEHAVIOURS)
++        {
++            mBehaviours = value;
++        }
++        else
++        {
+             GameObject::setProperty(key, value);
+-        //}
++        }
+     }
+ 
+     const Property Creature::getProperty(const Ogre::String &amp;key) const
+     {
+-        //if (key == Item::PROPERTY_IMAGENAME)
+-        //{
+-        //    return Property(mImageName);
+-        //}
++        if (key == Creature::PROPERTY_BEHAVIOURS)
++        {
++            return mBehaviours;
++        }
+         //else if (key == Item::PROPERTY_SIZE)
+         //{
+         //    return Property(mSize);
+         //}
+-        //else
+-        //{
++        else
++        {
+             return GameObject::getProperty(key);
+-        //}
++        }
+     }
+ 
+     PropertySet* Creature::getAllProperties() const
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -23,6 +23,7 @@
+ #include &quot;ObjectStateChangeEventSource.h&quot;
+ #include &quot;Property.h&quot;
+ #include &quot;RulesSubsystem.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ using namespace std;
+ 
+@@ -56,7 +57,9 @@
+         // Standardactions registrieren
+ 		Action* defaultAction = ActionManager::getSingleton().getAction(DEFAULT_VIEW_OBJECT_ACTION);
+ 		if (defaultAction != NULL)
+-			addAction(defaultAction);
++        {
++            addAction(defaultAction);
++        }
+ 
+ 		// Eventsource erzeugen
+ 		setObject(this);
+@@ -505,25 +508,35 @@
+ 
+     void GameObject::placeIntoScene()
+     {
+-        Actor* actor = createActor();
++        if (mState != GOS_IN_SCENE)
++        {
++            Actor* actor = createActor();
+ 
+-        actor-&gt;placeIntoScene();
+-        setActor(actor);
++            actor-&gt;placeIntoScene();
++            setActor(actor);
+ 
+-        mState = GOS_IN_SCENE;
++            GameObjectState tmpState = mState;
++            mState = GOS_IN_SCENE;
++            GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
++        }
+     }
+ 
+     void GameObject::removeFromScene()
+     {
+-        Actor* actor = mActor;
+-        mOrientation = actor-&gt;getWorldOrientation();
+-        mPosition = actor-&gt;getWorldPosition();
++        if (mState != GOS_IN_SCENE)
++        {
++            Actor* actor = mActor;
++            mOrientation = actor-&gt;getWorldOrientation();
++            mPosition = actor-&gt;getWorldPosition();
+ 
+-        setActor(NULL);
+-        actor-&gt;removeFromScene();
+-        ActorManager::getSingleton().destroyActor(actor);
++            setActor(NULL);
++            actor-&gt;removeFromScene();
++            ActorManager::getSingleton().destroyActor(actor);
+ 
+-        mState = GOS_LOADED;
++            GameObjectState tmpState = mState;
++            mState = GOS_LOADED;
++            GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
++        }
+     }
+ 
+     void GameObject::setState(GameObjectState targetstate)
+@@ -533,29 +546,16 @@
+             return;
+         }
+ 
+-        bool stateChange = false;
+-
+-        if (targetstate == GOS_LOADED)
++        if (targetstate == GOS_LOADED &amp;&amp; mState == GOS_IN_SCENE)
+         {
+-            if (mState == GOS_IN_SCENE)
+-            {
+-                removeFromScene();
+-                stateChange = true;
+-            }
++            //Statechange-Event is triggered in this function
++            removeFromScene();
+         }
+-        else if (targetstate == GOS_IN_SCENE)
++        else if (targetstate == GOS_IN_SCENE &amp;&amp; mState == GOS_LOADED)
+         {
+-            if (mState == GOS_LOADED)
+-            {
+-                placeIntoScene();
+-                stateChange = true;
+-            }
++            //Statechange-Event is triggered in this function
++            placeIntoScene();
+         }
+-
+-        if (stateChange)
+-        {
+-            mState = targetstate;
+-        }
+     }
+ 
+     GameObjectState GameObject::getState() const
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -155,6 +155,26 @@
+         mGameObjectFactory = gof;
+     }
+ 
++    void GameObjectManager::gameObjectStateChanged(GameObject* go, GameObjectState oldState,
++        GameObjectState newState)
++    {
++        for (GameObjectStateListenerSet::iterator it = mGameObjectStateListeners.begin();
++            it != mGameObjectStateListeners.end(); ++it)
++        {
++            (*it)-&gt;gameObjectStateChanged(go, oldState, newState);
++        }
++    }
++
++    void GameObjectManager::registerGameObjectStateListener(GameObjectStateListener* listener)
++    {
++        mGameObjectStateListeners.insert(listener);
++    }
++
++    void GameObjectManager::unregisterGameObjectStateListener(GameObjectStateListener* listener)
++    {
++        mGameObjectStateListeners.erase(listener);
++    }
++
+     GameObjectFactory::GameObjectFactory()
+     {
+     }
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-03-05 21:36:42 UTC (rev 3124)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-03-05 22:55:49 UTC (rev 3125)
+@@ -86,6 +86,16 @@
+ 		static AiSubsystem&amp; getSingleton(void);
+ 	};
+ 	
++	%feature(&quot;director&quot;) BehaviourFactory;
++    class BehaviourFactory
++    {
++    public:
++        BehaviourFactory();
++        virtual ~BehaviourFactory();
++
++        virtual SteeringBehaviour* createBehaviour(const Ogre::String&amp; classname) = 0;
++    };
++    
+ 	class AgentManager
+ 	{
+ 	public:
+@@ -100,6 +110,8 @@
+ 		static AgentManager&amp; getSingleton(void);
+ 		rl::Agent* createAgent(rl::AgentManager::AgentType type, rl::Creature* character);
+ 		rl::Agent* createAgent(rl::DialogCharacter* character);
++		
++        virtual void setBehaviourFactory(BehaviourFactory* factory);
+ 	};
+ 	
+     class PhysicalObstacle {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000195.html">[Dsa-hl-svn] r3124 - modules/aitest/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000197.html">[Dsa-hl-svn] r3126 - in modules: . combattest combattest/dsa	combattest/maps combattest/materials	combattest/materials/textures combattest/models	combattest/scripts combattest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#196">[ date ]</a>
+              <a href="thread.html#196">[ thread ]</a>
+              <a href="subject.html#196">[ subject ]</a>
+              <a href="author.html#196">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

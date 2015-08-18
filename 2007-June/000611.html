@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3540 - in rl/trunk/engine: core/include core/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3540%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200706202105.l5KL5Ne4016196%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000610.html">
+   <LINK REL="Next"  HREF="000612.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3540 - in rl/trunk/engine: core/include core/src	ui/include ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3540%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200706202105.l5KL5Ne4016196%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3540 - in rl/trunk/engine: core/include core/src	ui/include ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Jun 20 23:05:23 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000610.html">[Dsa-hl-svn] r3539 - modules/regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="000612.html">[Dsa-hl-svn] r3541 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#611">[ date ]</a>
+              <a href="thread.html#611">[ thread ]</a>
+              <a href="subject.html#611">[ subject ]</a>
+              <a href="author.html#611">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-06-20 23:05:16 +0200 (Wed, 20 Jun 2007)
+New Revision: 3540
+
+Modified:
+   rl/trunk/engine/core/include/CameraObject.h
+   rl/trunk/engine/core/src/CameraObject.cpp
+   rl/trunk/engine/ui/include/CombatCharacterController.h
+   rl/trunk/engine/ui/src/CombatCharacterController.cpp
+Log:
+Moved world space -&gt; screen space transformation to CameraObject for reuse
+
+Modified: rl/trunk/engine/core/include/CameraObject.h
+===================================================================
+--- rl/trunk/engine/core/include/CameraObject.h	2007-06-20 08:58:44 UTC (rev 3539)
++++ rl/trunk/engine/core/include/CameraObject.h	2007-06-20 21:05:16 UTC (rev 3540)
+@@ -30,12 +30,29 @@
+         CameraObject(const Ogre::String&amp; name);
+         ~CameraObject();
+ 
+-        /// Wie ActorControlledObject::getMovableObject, nur schon gebrauchsfertig gecastet.
++        /** 
++		 * Returns the Ogre camera
++		 * @return the camera
++		 */
+         Ogre::Camera* getCamera() const;
+ 
++		/**
++		 * Returns the size of the bounding box
++		 * Note: an Ogre camera has no size, this method returns the size of
++		 * the physics proxy to prevent camera vs wall/object collisions
++		 */
+ 		Ogre::AxisAlignedBox getDefaultSize() const;
+ 
+         virtual Ogre::String getObjectType() const;
++
++		/** 
++		 * Transforms a point in world space into the (2D) screen space
++		 * @param worldCoords point in world space
++		 * @return the corresponding position on the screen. x,y are in [0,1].
++		 * The z component is the z value from the eye space, this allows checking
++		 * whether a point was behind the camera (z&gt;0 in this case)
++		 */
++		Ogre::Vector3 getPointOnScreen(const Ogre::Vector3&amp; worldCoords) const;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/core/src/CameraObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CameraObject.cpp	2007-06-20 08:58:44 UTC (rev 3539)
++++ rl/trunk/engine/core/src/CameraObject.cpp	2007-06-20 21:05:16 UTC (rev 3540)
+@@ -55,4 +55,17 @@
+         Real r = getCamera()-&gt;getNearClipDistance();
+         return AxisAlignedBox(2.0*Vector3(-r, -r, -r), 2.0*Vector3(r, r, r));
+     }
++
++	Vector3 CameraObject::getPointOnScreen(const Ogre::Vector3&amp; worldCoords) const
++	{
++		const Camera* camera = getCamera();
++        const Matrix4&amp; viewMatrix = camera-&gt;getViewMatrix(true);
++        const Matrix4&amp; projMatrix = camera-&gt;getProjectionMatrix();
++
++        Vector3 eyeSpacePos = viewMatrix.transformAffine(worldCoords);
++        Vector3 screenSpacePos =  projMatrix * eyeSpacePos;
++		screenSpacePos.z = eyeSpacePos.z;
++
++        return screenSpacePos;
++	}
+ }
+
+Modified: rl/trunk/engine/ui/include/CombatCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatCharacterController.h	2007-06-20 08:58:44 UTC (rev 3539)
++++ rl/trunk/engine/ui/include/CombatCharacterController.h	2007-06-20 21:05:16 UTC (rev 3540)
+@@ -26,6 +26,7 @@
+ 
+ namespace rl {
+ 
++	class CameraObject;
+     class Combat;
+     class CombatManager;
+     class CombatWindow;
+@@ -51,7 +52,7 @@
+         CombatWindow* mCombatWindow;
+         HalfSphereSelector mEnemySelector;
+ 
+-        Ogre::Camera* mCamera;
++        CameraObject* mCamera;
+ 
+         /// Little Helper-MO for visualisation for everything that is difficult with cegui.
+         Ogre::ManualObject* mHud;
+
+Modified: rl/trunk/engine/ui/src/CombatCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-06-20 08:58:44 UTC (rev 3539)
++++ rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-06-20 21:05:16 UTC (rev 3540)
+@@ -17,6 +17,7 @@
+ #include &quot;CombatCharacterController.h&quot;
+ 
+ #include &quot;Actor.h&quot;
++#include &quot;CameraObject.h&quot;
+ #include &quot;Combat.h&quot;
+ #include &quot;CombatManager.h&quot;
+ #include &quot;CombatWindow.h&quot;
+@@ -49,7 +50,7 @@
+         mEnemySelector.setFilter(filter);
+ 
+         mCombatWindow = WindowFactory::getSingleton().getCombatWindow();
+-        mCamera = static_cast&lt;Ogre::Camera*&gt;(mCameraActor-&gt;_getMovableObject());
++        mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
+ 
+         // Initialise HUD-MO. Put it into 2D mode and make sure it is always rendered.
+         SceneManager* sceneMgr = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager();
+@@ -157,20 +158,13 @@
+         // Initialise each to the value of the opposite side, so that min/max work smoothly.
+         Real left = 1.0f, bottom = 1.0f, right = -1.0f, top = -1.0f;
+ 
+-        const Matrix4&amp; viewMatrix = mCamera-&gt;getViewMatrix(true);
+-        const Matrix4&amp; projMatrix = mCamera-&gt;getProjectionMatrix();
+-
+         // Determine screen pos of all corners and widen the rect if needed
+         const Vector3* corners = aabb.getAllCorners();
+         for (size_t i = 0; i &lt; 8; ++i)
+         {
+-            Vector3 eyeSpacePos = viewMatrix.transformAffine(corners[i]);
++			Vector3 screenSpacePos = mCamera-&gt;getPointOnScreen(corners[i]);
++            if (screenSpacePos.z &gt; 0) continue; // Behind camera
+ 
+-            // ignore point, if it is behind the cam.
+-            if (eyeSpacePos.z &gt; 0) continue;
+-
+-            Vector3 screenSpacePos =  projMatrix * eyeSpacePos;
+-
+             left   = std::min(left,   screenSpacePos.x);
+             right  = std::max(right,  screenSpacePos.x);
+             bottom = std::min(bottom, screenSpacePos.y);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000610.html">[Dsa-hl-svn] r3539 - modules/regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="000612.html">[Dsa-hl-svn] r3541 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#611">[ date ]</a>
+              <a href="thread.html#611">[ thread ]</a>
+              <a href="subject.html#611">[ subject ]</a>
+              <a href="author.html#611">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

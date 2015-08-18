@@ -1,0 +1,508 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4558 - in rl/branches/persistence: core/include	core/src rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4558%20-%20in%20rl/branches/persistence%3A%20core/include%0A%09core/src%20rules/include%20rules/src&In-Reply-To=%3C200810191040.m9JAeVfX010651%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001614.html">
+   <LINK REL="Next"  HREF="001616.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4558 - in rl/branches/persistence: core/include	core/src rules/include rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4558%20-%20in%20rl/branches/persistence%3A%20core/include%0A%09core/src%20rules/include%20rules/src&In-Reply-To=%3C200810191040.m9JAeVfX010651%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4558 - in rl/branches/persistence: core/include	core/src rules/include rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Oct 19 12:40:31 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001614.html">[Dsa-hl-svn] r4557 - rl/branches/persistence/core/src
+</A></li>
+        <LI>Next message: <A HREF="001616.html">[Dsa-hl-svn] r4559 - in rl/branches/persistence: common	common/include common/src core core/include core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1615">[ date ]</a>
+              <a href="thread.html#1615">[ thread ]</a>
+              <a href="subject.html#1615">[ subject ]</a>
+              <a href="author.html#1615">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-10-19 12:40:21 +0200 (Sun, 19 Oct 2008)
+New Revision: 4558
+
+Modified:
+   rl/branches/persistence/core/include/Job.h
+   rl/branches/persistence/core/include/JobQueue.h
+   rl/branches/persistence/core/include/JobScheduler.h
+   rl/branches/persistence/core/include/SaveAbleFactory.h
+   rl/branches/persistence/core/src/Job.cpp
+   rl/branches/persistence/core/src/JobQueue.cpp
+   rl/branches/persistence/core/src/JobScheduler.cpp
+   rl/branches/persistence/rules/include/QuestBook.h
+   rl/branches/persistence/rules/src/ApplyDamageJob.cpp
+Log:
+moved persistence from abstractjob to job
+
+Modified: rl/branches/persistence/core/include/Job.h
+===================================================================
+--- rl/branches/persistence/core/include/Job.h	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/include/Job.h	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -25,15 +25,10 @@
+ 
+ namespace rl
+ {
+-    class _RlCoreExport AbstractJob : public SaveAble
++	class _RlCoreExport AbstractJob : public PropertyHolder
+     {
+     public:
+-        enum JobPersistenceType
+-        {
+-            NOT_PERSISTENT,             // the job is not influenced by any save/load - events
+-            PERSISTENT,                 // the job stores data in (and loads from) a savegamefile, the job is deleted (not discarded) before a new game is loaded
+-            FINISH_WHEN_GAME_LOADED     // the job is discarded if it is discardable or deleted, when a new game is loaded
+-        };
++        
+ 
+         /**
+          * Constructor.
+@@ -47,7 +42,7 @@
+          *         Job, after execution is finished. This should usually be the case, but
+          *         sometimes it is sensible to pool a number of Jobs for reuse.
+          */
+-        AbstractJob(const CeGuiString &amp;id, bool isDiscardable, 
++        AbstractJob(bool isDiscardable, 
+             bool destroyWhenDone);
+ 
+         virtual ~AbstractJob();
+@@ -64,9 +59,6 @@
+          */
+         virtual bool execute(Ogre::Real time) = 0;
+ 
+-        /// Returns the Persistence-Type of this job
+-        virtual JobPersistenceType getPersistenceType() const = 0;
+-
+         virtual TimeSource::TimeSourceType getTimeSource() const = 0;
+ 
+         /// Returns whether the job can be removed from the queue by the scheduler,
+@@ -106,9 +98,16 @@
+      *
+      *  This class provides default implementations for most of AbstractJob's methods
+      */
+-    class _RlCoreExport Job : public AbstractJob
++    class _RlCoreExport Job : public AbstractJob, public SaveAble
+     {
+     public:
++		enum JobPersistenceType
++        {
++            NOT_PERSISTENT,             // the job is not influenced by any save/load - events
++            PERSISTENT,                 // the job stores data in (and loads from) a savegamefile, the job is deleted (not discarded) before a new game is loaded
++            FINISH_WHEN_GAME_LOADED     // the job is discarded if it is discardable or deleted, when a new game is loaded
++        };
++
+         /**
+          * Constructor.
+          *
+
+Modified: rl/branches/persistence/core/include/JobQueue.h
+===================================================================
+--- rl/branches/persistence/core/include/JobQueue.h	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/include/JobQueue.h	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -23,7 +23,7 @@
+ namespace rl
+ {
+ 
+-    class _RlCoreExport JobQueue : public AbstractJob
++    class _RlCoreExport JobQueue : public Job
+     {
+     public:
+         JobQueue(const CeGuiString &amp;id);
+@@ -41,7 +41,7 @@
+         TimeSource::TimeSourceType mTimeSource;
+     };
+ 
+-    class _RlCoreExport JobSet : public AbstractJob
++    class _RlCoreExport JobSet : public Job
+     {
+     public:
+         JobSet(const CeGuiString &amp;id);
+
+Modified: rl/branches/persistence/core/include/JobScheduler.h
+===================================================================
+--- rl/branches/persistence/core/include/JobScheduler.h	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/include/JobScheduler.h	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -46,8 +46,7 @@
+      */
+     class _RlCoreExport JobScheduler
+         : public GameTask,
+-          public Ogre::Singleton&lt;JobScheduler&gt;,
+-          public SaveGameData
++          public Ogre::Singleton&lt;JobScheduler&gt;
+     {
+     public:
+         typedef enum {JP_LOW = 10, JP_NORMAL = 20, JP_HIGH = 30} JobPriority;
+@@ -91,15 +90,6 @@
+ 
+         virtual const Ogre::String&amp; getName() const;
+ 
+-
+-        /// Override from SaveGameData
+-        /// Manages saving and loading from the SaveGameFile
+-
+-        virtual CeGuiString getXmlNodeIdentifier() const;
+-        virtual void writeData(SaveGameFileWriter* writer);
+-        virtual void readData(SaveGameFileReader* reader);
+-        virtual int getPriority() const;  // this should probably be one of the last things to load, so the job can access various things (gameobjects etc)
+-
+         typedef AbstractJob*(*JobCreateFunction)(void);
+         static void registerJobClass(const Ogre::String &amp;name, JobCreateFunction);
+     private:
+
+Modified: rl/branches/persistence/core/include/SaveAbleFactory.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleFactory.h	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/include/SaveAbleFactory.h	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -22,7 +22,7 @@
+ 
+ namespace rl
+ {
+-	class _RlCoreExport SaveAbleFactory : public Ogre::Singleton&lt;SaveAbleFactory&gt;
++	class _RlCoreExport SaveAbleFactory : public Ogre::Singleton&lt;SaveAbleFactory&gt;, PropertyHolder
+ 	{
+ 	public:
+ 		virtual SaveAblePtr createSaveAble(PropertyRecordPtr params) = 0;
+
+Modified: rl/branches/persistence/core/src/Job.cpp
+===================================================================
+--- rl/branches/persistence/core/src/Job.cpp	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/src/Job.cpp	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -20,10 +20,9 @@
+ 
+ namespace rl
+ {
+-    AbstractJob::AbstractJob(const CeGuiString &amp;id, bool isDiscardable, bool destroyWhenDone)
++    AbstractJob::AbstractJob(bool isDiscardable, bool destroyWhenDone)
+         : mIsDiscardable(isDiscardable), 
+-        mDestroyWhenDone(destroyWhenDone),
+-		SaveAble(id)
++        mDestroyWhenDone(destroyWhenDone)
+     {
+     }
+ 
+@@ -111,10 +110,13 @@
+     }
+ 
+     Job::Job(const CeGuiString &amp;id, bool isDiscardable, bool destroyWhenDone, TimeSource::TimeSourceType timesource, JobPersistenceType persistence)
+-        : AbstractJob(id, isDiscardable, destroyWhenDone),
++        : AbstractJob(isDiscardable, destroyWhenDone),
+         mTimeSource(timesource),
+-        mPersistence(persistence)
++        mPersistence(persistence),
++		SaveAble(id)
+     {
++		if(persistence != PERSISTENT)
++			setSaveAble(false);
+     }
+ 
+     Job::~Job()
+
+Modified: rl/branches/persistence/core/src/JobQueue.cpp
+===================================================================
+--- rl/branches/persistence/core/src/JobQueue.cpp	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/src/JobQueue.cpp	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -21,7 +21,7 @@
+ {
+ 
+ JobQueue::JobQueue(const CeGuiString &amp;id)
+-: AbstractJob(id, false, true),
++: Job(id, false, true),
+     mTimeSource(TimeSource::REALTIME_CONTINUOUS)
+ {
+ }
+@@ -81,9 +81,9 @@
+     }
+ }
+ 
+-AbstractJob::JobPersistenceType JobQueue::getPersistenceType() const
++Job::JobPersistenceType JobQueue::getPersistenceType() const
+ {
+-    return AbstractJob::PERSISTENT; ///@todo is this correct?
++    return Job::PERSISTENT; ///@todo is this correct?
+ }
+ 
+ TimeSource::TimeSourceType JobQueue::getTimeSource() const 
+@@ -97,7 +97,7 @@
+ }
+ 
+ JobSet::JobSet(const CeGuiString &amp;id)
+-: AbstractJob(id, false, true),
++: Job(id, false, true),
+     mTimeSource(TimeSource::REALTIME_CONTINUOUS)
+ {
+ }
+@@ -182,10 +182,9 @@
+     }
+ }
+ 
+-
+-AbstractJob::JobPersistenceType JobSet::getPersistenceType() const
++Job::JobPersistenceType JobSet::getPersistenceType() const
+ {
+-    return AbstractJob::PERSISTENT; ///@todo is this correct?
++    return Job::PERSISTENT; ///@todo is this correct?
+ }
+ 
+ TimeSource::TimeSourceType JobSet::getTimeSource() const 
+
+Modified: rl/branches/persistence/core/src/JobScheduler.cpp
+===================================================================
+--- rl/branches/persistence/core/src/JobScheduler.cpp	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/core/src/JobScheduler.cpp	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -35,7 +35,6 @@
+         mTokenThreshold(JP_NORMAL), 
+         mTicketCounter(0)
+     {
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     JobScheduler::~JobScheduler()
+@@ -204,7 +203,7 @@
+ 
+     using namespace XERCES_CPP_NAMESPACE;
+ 
+-    void JobScheduler::writeData(SaveGameFileWriter* writer)
++    /*void JobScheduler::writeData(SaveGameFileWriter* writer)
+     {
+         DOMElement* jobSchedulerParentNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+ 
+@@ -225,99 +224,88 @@
+                 writer-&gt;writeEachPropertyToElem(jobNode, map);
+             }
+         }
+-    }
++    }*/
+ 
+-    void JobScheduler::readData(SaveGameFileReader* reader)
+-    {
+-        // delete and discard old jobs
+-        for( JobQueue::iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++ )
+-        {
+-            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT )
+-            {
+-                // delete the job, but do not discard it!
+-                iter-&gt;markedToRemove = true;
+-            }
+-            else if( iter-&gt;job-&gt;getPersistenceType() == Job::FINISH_WHEN_GAME_LOADED )
+-            {
+-                // discard the job, then delete it
+-                if( iter-&gt;job-&gt;isDiscardable() )
+-                    iter-&gt;job-&gt;discard();
+-                iter-&gt;markedToRemove = true;
+-            }
+-        }
++    //void JobScheduler::readData(SaveGameFileReader* reader)
++    //{
++    //    // delete and discard old jobs
++    //    for( JobQueue::iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++ )
++    //    {
++    //        if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT )
++    //        {
++    //            // delete the job, but do not discard it!
++    //            iter-&gt;markedToRemove = true;
++    //        }
++    //        else if( iter-&gt;job-&gt;getPersistenceType() == Job::FINISH_WHEN_GAME_LOADED )
++    //        {
++    //            // discard the job, then delete it
++    //            if( iter-&gt;job-&gt;isDiscardable() )
++    //                iter-&gt;job-&gt;discard();
++    //            iter-&gt;markedToRemove = true;
++    //        }
++    //    }
+ 
+         
+         // load jobs from savegamefile
+ 
+-        reader-&gt;initializeXml();
++    //    reader-&gt;initializeXml();
+ 
+ 
+-        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
+-        
+-        if(rootNodeList-&gt;getLength())
+-        {
+-            DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
+-            if (xmlJobs-&gt;getLength())
+-            {
+-                for (XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
+-                {
+-                    DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
+-                    if (xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-                    {
+-                        DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
+-                        JobPriority priority;
+-                        unsigned short tokens;
+-                        int start, end;
+-                        Time timeLastCall;
+-                        bool called;
+-                        priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
+-                        tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
+-                        start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
+-                        end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
+-                        timeLastCall = reader-&gt;getAttributeValueAsInt64(xmlJob, &quot;timeLastCall&quot;);
+-                        called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
++    //    DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++    //    
++    //    if(rootNodeList-&gt;getLength())
++    //    {
++    //        DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
++    //        if (xmlJobs-&gt;getLength())
++    //        {
++    //            for (XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
++    //            {
++    //                DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
++    //                if (xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++    //                {
++    //                    DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
++    //                    JobPriority priority;
++    //                    unsigned short tokens;
++    //                    int start, end;
++    //                    Time timeLastCall;
++    //                    bool called;
++    //                    priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
++    //                    tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
++    //                    start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
++    //                    end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
++    //                    timeLastCall = reader-&gt;getAttributeValueAsInt64(xmlJob, &quot;timeLastCall&quot;);
++    //                    called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
+ 
+-                        Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
++    //                    Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
+ 
+-                        JobCreationMap::iterator it = mJobCreationMap.find(className);
+-                        if (it == mJobCreationMap.end())
+-                        {
+-                            LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
+-                            continue;
+-                        }
++    //                    JobCreationMap::iterator it = mJobCreationMap.find(className);
++    //                    if (it == mJobCreationMap.end())
++    //                    {
++    //                        LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
++    //                        continue;
++    //                    }
+ 
+-                        AbstractJob* job = it-&gt;second();
+-                        if (job == NULL)
+-                        {
+-                            LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
+-                            continue;
+-                        }
+-                        PropertyRecordPtr properties = reader-&gt;getPropertiesAsRecord(xmlJob);
+-                        job-&gt;setProperties(properties);
+-                        
+-                        
+-                        unsigned long ticket = ++mTicketCounter;
+-                        TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(job-&gt;getTimeSource());
+-                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeLastCall, TimeSource::UNKNOWN, called, false};
+-                        mJobQueue.push_back(entry);
+-                    }
+-                }
+-            }
+-        }
++    //                    AbstractJob* job = it-&gt;second();
++    //                    if (job == NULL)
++    //                    {
++    //                        LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
++    //                        continue;
++    //                    }
++    //                    PropertyRecordPtr properties = reader-&gt;getPropertiesAsRecord(xmlJob);
++    //                    job-&gt;setProperties(properties);
++    //                    
++    //                    
++    //                    unsigned long ticket = ++mTicketCounter;
++    //                    TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(job-&gt;getTimeSource());
++    //                    JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeLastCall, TimeSource::UNKNOWN, called, false};
++    //                    mJobQueue.push_back(entry);
++    //                }
++    //            }
++    //        }
++    //    }
+ 
+-        reader-&gt;shutdownXml();
+-    }
++    //    reader-&gt;shutdownXml();
++    //}
+ 
+-    int JobScheduler::getPriority() const
+-    {
+-        return 0; // must be loaded before triggers!
+-    }
+-
+-    CeGuiString JobScheduler::getXmlNodeIdentifier() const
+-    {
+-        static const CeGuiString name = &quot;jobscheduler&quot;;
+-        return name;
+-    }
+-
+     JobScheduler::JobCreationMap JobScheduler::mJobCreationMap;
+ }
+
+Modified: rl/branches/persistence/rules/include/QuestBook.h
+===================================================================
+--- rl/branches/persistence/rules/include/QuestBook.h	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/rules/include/QuestBook.h	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -38,7 +38,6 @@
+ class _RlRulesExport QuestBook : 
+     public Ogre::ScriptLoader,
+     public EventSource, 
+-    public PropertyHolder, 
+     public XmlProcessor,
+ 	public SaveAbleFactory
+ {
+
+Modified: rl/branches/persistence/rules/src/ApplyDamageJob.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/ApplyDamageJob.cpp	2008-10-18 23:50:04 UTC (rev 4557)
++++ rl/branches/persistence/rules/src/ApplyDamageJob.cpp	2008-10-19 10:40:21 UTC (rev 4558)
+@@ -22,7 +22,7 @@
+ {
+ 
+ ApplyDamageJob::ApplyDamageJob(Creature* target, int tp)
+-:   Job(&quot;&quot;,false, true, TimeSource::GAMETIME, AbstractJob::PERSISTENT),
++:   Job(&quot;&quot;,false, true, TimeSource::GAMETIME, Job::PERSISTENT),
+     mTarget(target), 
+     mTp(tp)
+ {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001614.html">[Dsa-hl-svn] r4557 - rl/branches/persistence/core/src
+</A></li>
+	<LI>Next message: <A HREF="001616.html">[Dsa-hl-svn] r4559 - in rl/branches/persistence: common	common/include common/src core core/include core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1615">[ date ]</a>
+              <a href="thread.html#1615">[ thread ]</a>
+              <a href="subject.html#1615">[ subject ]</a>
+              <a href="author.html#1615">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

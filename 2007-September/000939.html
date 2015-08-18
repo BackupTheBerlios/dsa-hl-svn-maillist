@@ -1,0 +1,307 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3868 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3868%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200709241921.l8OJLL1l024749%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000938.html">
+   <LINK REL="Next"  HREF="000940.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3868 - in rl/trunk/engine/rules: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3868%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200709241921.l8OJLL1l024749%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3868 - in rl/trunk/engine/rules: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Mon Sep 24 21:21:21 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000938.html">[Dsa-hl-svn] r3867 - in rl/trunk/engine/core: . src
+</A></li>
+        <LI>Next message: <A HREF="000940.html">[Dsa-hl-svn] r3869 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#939">[ date ]</a>
+              <a href="thread.html#939">[ thread ]</a>
+              <a href="subject.html#939">[ subject ]</a>
+              <a href="author.html#939">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-24 21:20:35 +0200 (Mon, 24 Sep 2007)
+New Revision: 3868
+
+Modified:
+   rl/trunk/engine/rules/include/SaveGameManager.h
+   rl/trunk/engine/rules/src/SaveGameFile.cpp
+   rl/trunk/engine/rules/src/SaveGameManager.cpp
+Log:
+Now possible to overwrite existing save games
+
+Modified: rl/trunk/engine/rules/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/SaveGameManager.h	2007-09-23 19:44:47 UTC (rev 3867)
++++ rl/trunk/engine/rules/include/SaveGameManager.h	2007-09-24 19:20:35 UTC (rev 3868)
+@@ -27,20 +27,6 @@
+ {
+     typedef std::map&lt;CeGuiString, SaveGameFile*&gt; SaveGameEntryMap;
+ 
+-    /*class SaveGameIndexWriter : public XmlPropertyWriter
+-    {
+-    public: 
+-        SaveGameIndexWriter();
+-        void buildIndexFile(const SaveGameEntryMap &amp;map);
+-    };
+-
+-    class SaveGameIndexReader : public XmlPropertyReader
+-    {
+-    public:
+-        SaveGameIndexReader();
+-        SaveGameEntryMap parseIndexFile(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
+-    };*/
+-
+     class SaveGameHeaderReader : public XmlPropertyReader
+     {
+     public:
+@@ -64,6 +50,8 @@
+         virtual void parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
+         virtual Ogre::Real getLoadingOrder(void) const;
+     protected:
++        void freeSaveGameMap();
++
+         Ogre::StringVector mScriptPatterns;
+         SaveGameEntryMap mSaveGames;
+     };
+
+Modified: rl/trunk/engine/rules/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-23 19:44:47 UTC (rev 3867)
++++ rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-24 19:20:35 UTC (rev 3868)
+@@ -27,13 +27,15 @@
+ namespace rl
+ {
+ 
+-    SaveGameFile::SaveGameFile(const CeGuiString &amp;name)
++    SaveGameFile::SaveGameFile(const CeGuiString &amp;name) : mStream((Ogre::DataStream*)NULL)
+     {
+         mName = name;
+     }
+ 
+     SaveGameFile::~SaveGameFile()
+     {
++        if(mStream.isNull())
++            delete mStream.get();
+     }
+ 
+     CeGuiString SaveGameFile::buildFilename()
+
+Modified: rl/trunk/engine/rules/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameManager.cpp	2007-09-23 19:44:47 UTC (rev 3867)
++++ rl/trunk/engine/rules/src/SaveGameManager.cpp	2007-09-24 19:20:35 UTC (rev 3868)
+@@ -44,127 +44,6 @@
+         return string;
+     }
+ 
+-    //SaveGameIndexWriter::SaveGameIndexWriter()
+-    //{
+-    //}
+-
+-    //void SaveGameIndexWriter::buildIndexFile(const SaveGameEntryMap &amp;map)
+-    //{
+-    //    initializeXml();
+-
+-    //    XMLCh tempStr[256];
+-    //    XMLString::transcode(&quot;LS&quot;, tempStr, 255);
+-    //    mImplementation = DOMImplementationRegistry::getDOMImplementation(tempStr);
+-    //    mWriter = static_cast&lt;DOMImplementationLS*&gt;(mImplementation)-&gt;createDOMWriter();
+-    //    XMLString::transcode(((Ogre::String)(ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/saves/index.saves&quot;)).c_str(), tempStr, 255);
+-    //    mTarget = new LocalFileFormatTarget(tempStr);
+-    //    mDocument = static_cast&lt;DOMImplementation*&gt;(mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameIndexFile&quot;), 0);
+-    //    
+-    //    if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
+-    //        mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
+-
+-    //    if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
+-    //         mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
+-
+-    //    mWriter-&gt;setEncoding(XMLUni::fgISO88591EncodingString);
+-
+-    //    mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameIndexFile&quot;)); //Set name of document root node
+-
+-    //     //Write SaveGameIndexVersion
+-    //    setAttributeValueAsString(mDocument-&gt;getDocumentElement(), &quot;Version&quot;, &quot;0.1&quot;);
+-
+-
+-    //    //write save games
+-    //    SaveGameEntryMap::const_iterator it_saves;
+-
+-    //    for(it_saves = map.begin(); it_saves != map.end(); it_saves++)
+-    //    {
+-    //        DOMElement* saveGame = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;savegame&quot;);
+-    //        setAttributeValueAsString(saveGame, &quot;Name&quot;, it_saves-&gt;second-&gt;getName());
+-
+-    //        PropertyMap map = it_saves-&gt;second-&gt;getAllProperties()-&gt;toPropertyMap();
+-    //        PropertyMap::iterator it_properties;
+-    //        for(it_properties = map.begin(); it_properties != map.end(); it_properties++)
+-    //        {
+-    //            this-&gt;processProperty(saveGame, PropertyEntry(it_properties-&gt;first.c_str(), it_properties-&gt;second));
+-    //        }
+-    //    }        
+-
+-
+-    //    mWriter-&gt;writeNode(mTarget, *mDocument);
+-
+-
+-    //    mWriter-&gt;release();
+-
+-    //    delete mDocument;
+-    //    delete mTarget;
+-
+-    //    shutdownXml();
+-    //}
+-
+-    //SaveGameIndexReader::SaveGameIndexReader()
+-    //{
+-    //}
+-
+-    //SaveGameEntryMap SaveGameIndexReader::parseIndexFile(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
+-    //{
+-    //    SaveGameEntryMap entries;
+-
+-    //    initializeXml();
+-
+-    //    /*Ogre::String fileName = ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/saves/index.saves&quot;;
+-
+-    //    FILE* fileHandle = fopen(fileName.c_str(), &quot;r&quot;);
+-
+-    //    if(fileHandle)
+-    //    {
+-    //        Ogre::DataStreamPtr stream = Ogre::DataStreamPtr(new Ogre::FileHandleDataStream(fileHandle));*/
+-
+-    //        /*char* temp = new char[1024];
+-
+-    //        stream-&gt;read(temp, 1022);
+-
+-    //        LOG_MESSAGE(Logger::RULES, temp);
+-
+-    //        delete[] temp;*/
+-
+-    //        if(stream-&gt;size())
+-    //        {
+-    //            DOMDocument* doc = loadDocument( stream);
+-
+-    //            ///@todo: Right version of save game file index?
+-
+-    //            DOMNodeList* saveGameDefsXml = doc-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(&quot;savegame&quot;).data());
+-    //            for(unsigned int i = 0; i &lt; saveGameDefsXml-&gt;getLength(); i++)
+-    //            {
+-    //                DOMElement* curNode = static_cast&lt;DOMElement*&gt;(saveGameDefsXml-&gt;item(i));
+-    //                SaveGameFile * file = new SaveGameFile(this-&gt;getAttributeValueAsString(curNode, &quot;Name&quot;));
+-    //                
+-    //                DOMNodeList* saveGameDefChildren = curNode-&gt;getChildNodes();
+-    //                for (XMLSize_t childIdx = 0; childIdx &lt; saveGameDefChildren-&gt;getLength(); childIdx++)
+-    //                {
+-    //                    DOMNode* curChild = saveGameDefChildren-&gt;item(childIdx);
+-    //                    if (curChild-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-    //                    {
+-    //                        PropertyEntry entry = processProperty(static_cast&lt;DOMElement*&gt;(curChild));
+-    //                        if (entry.first != &quot;&quot;)
+-    //                        {
+-    //                            file-&gt;setProperty(entry.first, entry.second);
+-    //                        }
+-    //                    }
+-    //                }
+-    //                entries[this-&gt;getAttributeValueAsString(curNode, &quot;Name&quot;).c_str()] = file;
+-    //            }
+-
+-    //            doc-&gt;release();
+-    //        }
+-    //    /*}*/
+-
+-    //    shutdownXml();
+-
+-    //    return entries;
+-    //}
+-
+     SaveGameHeaderReader::SaveGameHeaderReader()
+     {
+     }
+@@ -210,6 +89,7 @@
+         Ogre::ResourceGroupManager::getSingleton().addResourceLocation(ConfigurationManager::getSingleton().getModulesRootDirectory() 
+             + &quot;/saves&quot;, &quot;FileSystem&quot;, &quot;SaveGames&quot;);
+         Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGames&quot;);
++        Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(&quot;SaveGames&quot;); //close all resource files -&gt; make them writable
+     }
+ 
+     SaveGameManager::~SaveGameManager()
+@@ -235,6 +115,11 @@
+ 
+         SaveGameFileWriter writer;
+         writer.buildSaveGameFile(file);
++
++        freeSaveGameMap();
++
++        Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGames&quot;);
++        Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(&quot;SaveGames&quot;); //close all resource files -&gt; make them writable
+     }
+ 
+     void SaveGameManager::loadSaveGameFile(const CeGuiString &amp;name)
+@@ -279,11 +164,23 @@
+         name = name.substr(0, name.length()-5); //delete &quot;.save&quot; at the and of the name
+ 
+         SaveGameFile* file = new SaveGameFile(name);
+-        file-&gt;setDataStream(stream);
++        
+         LOG_MESSAGE(Logger::RULES, &quot;Parsing header of save game: &quot; + name);
+         SaveGameHeaderReader reader;
+         reader.parseHeader(stream, groupName, file);
++
++        Ogre::DataStream* _stream = new Ogre::MemoryDataStream(*stream, false); //making a copy of the data stream. searching for a better alternative
++        file-&gt;setDataStream(Ogre::DataStreamPtr(_stream));
+         
+         mSaveGames[name] = file;
+     }
++
++    void SaveGameManager::freeSaveGameMap()
++    {
++        for(SaveGameEntryMap::const_iterator iter = mSaveGames.begin(); iter != mSaveGames.end(); iter++)
++        {
++            delete iter-&gt;second;
++        }
++        mSaveGames.clear();
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000938.html">[Dsa-hl-svn] r3867 - in rl/trunk/engine/core: . src
+</A></li>
+	<LI>Next message: <A HREF="000940.html">[Dsa-hl-svn] r3869 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#939">[ date ]</a>
+              <a href="thread.html#939">[ thread ]</a>
+              <a href="subject.html#939">[ subject ]</a>
+              <a href="author.html#939">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

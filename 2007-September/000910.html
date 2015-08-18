@@ -1,0 +1,345 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3839 - in rl/trunk/engine: rules rules/include	rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3839%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui/src&In-Reply-To=%3C200709091844.l89IitCT023977%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000909.html">
+   <LINK REL="Next"  HREF="000911.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3839 - in rl/trunk/engine: rules rules/include	rules/src ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3839%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui/src&In-Reply-To=%3C200709091844.l89IitCT023977%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3839 - in rl/trunk/engine: rules rules/include	rules/src ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep  9 20:44:55 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000909.html">[Dsa-hl-svn] r3838 - dependencies/OgreNewt dependencies/aiml	dependencies/opensteer dependencies/opensteer/src rl/trunk	rl/trunk/engine/ai/include rl/trunk/engine/ai/src	rl/trunk/engine/common/include rl/trunk/engine/common/src	rl/trunk/engine/core/include rl/trunk/engine/script/src	rl/trunk/engine/script/swig rl/trunk/engine/startup/src	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000911.html">[Dsa-hl-svn] r3840 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#910">[ date ]</a>
+              <a href="thread.html#910">[ thread ]</a>
+              <a href="subject.html#910">[ subject ]</a>
+              <a href="author.html#910">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-09 20:44:44 +0200 (Sun, 09 Sep 2007)
+New Revision: 3839
+
+Modified:
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/RulesSubsystem.h
+   rl/trunk/engine/rules/include/SaveGameFile.h
+   rl/trunk/engine/rules/src/RulesSubsystem.cpp
+   rl/trunk/engine/rules/src/SaveGameFile.cpp
+   rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+Log:
+- started with building a SaveGameManager. Many features are missing
+- fixed a crash while freeing after writing the data to a xml FileHandleDataStream
+- save game files are not stored in the module folders anymore
+- listing the save games is broken
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -411,6 +411,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\SaveGameManager.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\SelectionHelper.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -645,6 +649,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\SaveGameManager.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\SelectionHelper.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/RulesSubsystem.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesSubsystem.h	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/include/RulesSubsystem.h	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -28,6 +28,7 @@
+     class CombatManager;
+     class DsaManager;
+     class CreatureControllerManager;
++    class SaveGameManager;
+     class XdimlLoader;
+ 
+ 	class _RlRulesExport RulesSubsystem : public Ogre::Singleton&lt;RulesSubsystem&gt;
+@@ -45,6 +46,7 @@
+         CombatManager* mCombatManager;
+         DsaManager* mDsaManager;
+         CreatureControllerManager *mMovingCreatureManager;
++        SaveGameManager* mSaveGameManager;
+         XdimlLoader* mXdimlLoader;
+     };
+ }
+
+Modified: rl/trunk/engine/rules/include/SaveGameFile.h
+===================================================================
+--- rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/include/SaveGameFile.h	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -22,21 +22,30 @@
+ 
+ #include &lt;xercesc/framework/XMLFormatter.hpp&gt;
+ 
++#include &lt;ctime&gt;
++
+ namespace rl
+ {
+     class _RlRulesExport SaveGameFile
+     {
+     public:
+-        SaveGameFile(const CeGuiString &amp;name);
++        SaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleID, tm* localTime);
+         ~SaveGameFile();
+         CeGuiString buildFilename();
+         CeGuiString getName();
+         bool saveGameExists();
+ 
++        tm* getLocalTime();
++        CeGuiString getLocalTimeAsString() const;
++
++        CeGuiString getModuleID();
++
+         Ogre::DataStreamPtr getDataStream();
+         XERCES_CPP_NAMESPACE::XMLFormatTarget* getFormatTarget();
+     protected:
+         CeGuiString mName;
++        CeGuiString mModuleID;
++        tm* mLocalTime;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/RulesSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -24,6 +24,7 @@
+ #include &quot;EffectFactory.h&quot;
+ #include &quot;Logger.h&quot;
+ #include &quot;CreatureControllerManager.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ #include &quot;GameObjectManager.h&quot;
+ #include &quot;QuestBook.h&quot;
+ #include &quot;GameTimeSource.h&quot;
+@@ -56,6 +57,8 @@
+ 		LOG_MESSAGE(Logger::RULES, &quot;DsaManager erzeugt&quot;);
+         mMovingCreatureManager = new CreatureControllerManager();
+ 		LOG_MESSAGE(Logger::RULES, &quot;CreatureControllerManager erzeugt&quot;);
++        mSaveGameManager = new SaveGameManager();
++        LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
+ 		resetQuestBook();
+ 		LOG_MESSAGE(Logger::RULES, &quot;Questverwaltung erzeugt&quot;);
+ 
+@@ -72,6 +75,7 @@
+     {
+         delete mQuestBook;
+         delete mDsaManager;
++        delete mSaveGameManager;
+         delete mMovingCreatureManager;
+         delete mCombatManager;
+         delete mActionManager;
+
+Modified: rl/trunk/engine/rules/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/src/SaveGameFile.cpp	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -27,9 +27,11 @@
+ namespace rl
+ {
+ 
+-    SaveGameFile::SaveGameFile(const CeGuiString &amp;name)
++    SaveGameFile::SaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleID, tm* localTime)
+     {
+         mName = name;
++        mModuleID = moduleID;
++        mLocalTime = localTime;
+     }
+ 
+     SaveGameFile::~SaveGameFile()
+@@ -38,8 +40,8 @@
+ 
+     CeGuiString SaveGameFile::buildFilename()
+     {
+-        return ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/&quot; 
+-            + CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId() + &quot;/saves/&quot; + mName + &quot;.save&quot;;
++        return ConfigurationManager::getSingleton().getModulesRootDirectory() + /*&quot;/&quot; 
++            + CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()*/ + &quot;/saves/&quot; + mName + &quot;.save&quot;;
+     }
+ 
+     CeGuiString SaveGameFile::getName()
+@@ -63,4 +65,25 @@
+     {
+         return !Ogre::DataStreamPtr( new Ogre::FileHandleDataStream(fopen(this-&gt;buildFilename().c_str(), &quot;r&quot;))).isNull();
+     }
++
++    tm* SaveGameFile::getLocalTime()
++    {
++        return mLocalTime;
++    }
++
++    CeGuiString SaveGameFile::getLocalTimeAsString() const
++    {
++        CeGuiString string = ((Ogre::String)(Ogre::StringConverter::toString(mLocalTime-&gt;tm_mday) + &quot;.&quot; 
++            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_mon) + &quot;.&quot;
++            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_year + 1900) + &quot; - &quot; 
++            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_hour) + &quot;:&quot;
++            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_min) + &quot;:&quot; 
++            + Ogre::StringConverter::toString(mLocalTime-&gt;tm_sec))).c_str();
++        return string;
++    }
++
++    CeGuiString SaveGameFile::getModuleID()
++    {
++        return mModuleID;
++    }
+ }
+\ No newline at end of file
+
+Modified: rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -68,12 +68,8 @@
+         //Write date and time
+         DOMElement* timeNode = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;time&quot;);
+         
+-        time_t rawtime;
+-        tm* timeinfo;
++        tm* timeinfo = file-&gt;getLocalTime();
+ 
+-        time ( &amp;rawtime );
+-        timeinfo = localtime ( &amp;rawtime );
+-
+         setAttributeValueAsInteger(timeNode, &quot;day&quot;, timeinfo-&gt;tm_mday);
+         setAttributeValueAsInteger(timeNode, &quot;month&quot;, timeinfo-&gt;tm_mon);
+         setAttributeValueAsInteger(timeNode, &quot;year&quot;, timeinfo-&gt;tm_year+1900);
+@@ -126,11 +122,13 @@
+ 
+         mWriter-&gt;writeNode(mTarget, *mDocument);
+ 
++        //mDocument-&gt;release();
++        
++
+         mWriter-&gt;release();
+-        delete mTarget;
+ 
+-        mDocument-&gt;release();
+         delete mDocument;
++        delete mTarget;
+ 
+         shutdownXml();
+     }
+
+Modified: rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-09-09 00:16:08 UTC (rev 3838)
++++ rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-09-09 18:44:44 UTC (rev 3839)
+@@ -31,11 +31,8 @@
+ #include &lt;OgreResourceGroupManager.h&gt;
+ 
+ #include &quot;SaveLoadWindow.h&quot;
+-#include &quot;SaveGameFile.h&quot;
+-#include &quot;SaveGameFileWriter.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;ContentModule.h&quot;
+ #include &quot;ConfigurationManager.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ 
+ using namespace CEGUI;
+ 
+@@ -118,7 +115,7 @@
+ 
+         LOG_MESSAGE(Logger::UI, &quot;Create a SaveGameFile&quot;);
+ 
+-        SaveGameFile saveGameFile(mFilename-&gt;getText());
++        //SaveGameFile saveGameFile(mFilename-&gt;getText());
+ 
+         /*std::list&lt;const GameObject*&gt;::const_iterator it;
+         std::list&lt;const GameObject*&gt; gos;
+@@ -129,10 +126,12 @@
+         {
+             sets.push_back((*it)-&gt;getAllProperties());
+         }*/
+-        SaveGameFileWriter saveGameFileWriter;
++        //SaveGameFileWriter saveGameFileWriter;
+         //saveGameFileWriter.setPropertySets(sets);
+-        saveGameFileWriter.buildSaveGameFile(&amp;saveGameFile);
++        //saveGameFileWriter.buildSaveGameFile(&amp;saveGameFile);
+ 
++        SaveGameManager::getSingleton().saveSaveGameFile(mFilename-&gt;getText());
++
+         LOG_MESSAGE(Logger::UI, &quot;Created save game&quot;);
+ 
+         listSaveGames();
+@@ -150,7 +149,7 @@
+ 
+     void SaveLoadWindow::listSaveGames()
+     {
+-        Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGames&quot;);
++        /*Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGames&quot;);
+         Ogre::ResourceGroupManager::getSingleton().addResourceLocation(ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/&quot;
+             + Ogre::String(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId().c_str()) + &quot;/saves&quot;, &quot;FileSystem&quot;, &quot;SaveGames&quot;);
+         Ogre::StringVectorPtr saveGames = Ogre::ResourceGroupManager::getSingleton().listResourceNames(&quot;SaveGames&quot;);
+@@ -169,7 +168,7 @@
+             saveGameNum++;
+         }
+ 
+-        Ogre::ResourceGroupManager::getSingleton().destroyResourceGroup(&quot;SaveGames&quot;);
++        Ogre::ResourceGroupManager::getSingleton().destroyResourceGroup(&quot;SaveGames&quot;);*/
+     }
+ 
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000909.html">[Dsa-hl-svn] r3838 - dependencies/OgreNewt dependencies/aiml	dependencies/opensteer dependencies/opensteer/src rl/trunk	rl/trunk/engine/ai/include rl/trunk/engine/ai/src	rl/trunk/engine/common/include rl/trunk/engine/common/src	rl/trunk/engine/core/include rl/trunk/engine/script/src	rl/trunk/engine/script/swig rl/trunk/engine/startup/src	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000911.html">[Dsa-hl-svn] r3840 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#910">[ date ]</a>
+              <a href="thread.html#910">[ thread ]</a>
+              <a href="subject.html#910">[ subject ]</a>
+              <a href="author.html#910">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

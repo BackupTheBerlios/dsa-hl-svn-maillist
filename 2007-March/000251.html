@@ -1,0 +1,856 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3180 - in rl/trunk/engine: ai/include ai/src	core/include core/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3180%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20ui/src&In-Reply-To=%3C200703150003.l2F03kH7024895%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000250.html">
+   <LINK REL="Next"  HREF="000252.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3180 - in rl/trunk/engine: ai/include ai/src	core/include core/src ui/src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3180%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20ui/src&In-Reply-To=%3C200703150003.l2F03kH7024895%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3180 - in rl/trunk/engine: ai/include ai/src	core/include core/src ui/src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar 15 01:03:46 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000250.html">[Dsa-hl-svn] r3179 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+        <LI>Next message: <A HREF="000252.html">[Dsa-hl-svn] r3181 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#251">[ date ]</a>
+              <a href="thread.html#251">[ thread ]</a>
+              <a href="subject.html#251">[ subject ]</a>
+              <a href="author.html#251">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-15 01:03:20 +0100 (Thu, 15 Mar 2007)
+New Revision: 3180
+
+Modified:
+   rl/trunk/engine/ai/include/AiWorld.h
+   rl/trunk/engine/ai/src/Agent.cpp
+   rl/trunk/engine/ai/src/AiWorld.cpp
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/include/PhysicsController.h
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/core/src/SceneQuery.cpp
+   rl/trunk/engine/ui/src/CharacterController.cpp
+   rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+Major API fix for PhysicsManager which introduces a better material handling of OgreNewts materials and materialpairs. Additionally the PhysicsController is now known in PhysicalThing and has been removed from PhysicsManager.
+Summarizing: the NPCs collision detection works again properly, because they are not set to 'character' material anymore, but instead to default.
+
+
+Modified: rl/trunk/engine/ai/include/AiWorld.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiWorld.h	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ai/include/AiWorld.h	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -75,7 +75,7 @@
+             BOTTOM
+         };
+ 		//! newton material id
+-        OgreNewt::MaterialID *mLevelMaterial;
++        const OgreNewt::MaterialID *mLevelMaterial;
+ 		//! newton world
+         OgreNewt::World *mNewtonWorld;
+     };
+
+Modified: rl/trunk/engine/ai/src/Agent.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Agent.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ai/src/Agent.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -59,8 +59,7 @@
+ Agent::~Agent(void)
+ {
+     if(mType == AgentManager::AGENT_STD_NPC)
+-        PhysicsManager::getSingleton().
+-			setPhysicsController( mCreature-&gt;getActor()-&gt;getPhysicalThing(), NULL );
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController( NULL );
+ 
+     delete mVehicle;
+     delete mBehaviour;
+@@ -94,8 +93,7 @@
+ //  the steering force with the help of different steering behaviours
+ 	if(mType == AgentManager::AGENT_STD_NPC)
+ 	{
+-		PhysicsManager::getSingleton().
+-			setPhysicsController(mCreature-&gt;getActor()-&gt;getPhysicalThing(), this);
++		mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+         LOG_MESSAGE(Logger::AI, 
+ 			&quot;added Agent to PhysicsManager as PhysicsController&quot;);
+ 	}
+
+Modified: rl/trunk/engine/ai/src/AiWorld.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiWorld.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ai/src/AiWorld.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -73,7 +73,7 @@
+ 
+ NewtonWorldAsObstacle::NewtonWorldAsObstacle(void)
+ {
+-    mLevelMaterial = PhysicsManager::getSingleton()._getLevelMaterialID();
++    mLevelMaterial = PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;);
+     mNewtonWorld = PhysicsManager::getSingleton()._getNewtonWorld();
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -145,6 +145,28 @@
+         void setContactListener(PhysicsContactListener* listener);
+         PhysicsContactListener* getContactListener() const;
+ 
++        /** Retrieves the PhysicsController of this object.
++         * @returns the responsible PhysicsController object reacting on force/torque updates
++         */
++        PhysicsController* getPhysicsController() const;
++        /** Sets the PhysicsController for this object.
++         * When the given controller object is NULL, then this removes only
++         * removes the previous controller object.
++         * @param controller is the responsible PhysicsController object reacting on force/torque updates
++         * @param materialid of the material to use for this physical object
++         */
++        void setPhysicsController(PhysicsController* controller);
++
++        /** Sets the material id for this OgreNewt Body.
++         * @param materialid to set to.
++         */
++        void setMaterialID(const OgreNewt::MaterialID* materialid);
++        /** Retrieves the material id for the OgreNewt Body.
++         * @returns materialid of the OgreNewt body.
++         */
++        const OgreNewt::MaterialID* getMaterialID() const;
++
++    protected:
+ 		void prepareUserControl(OgreNewt::MaterialID* material);
+         void unprepareUserControl();
+ 
+@@ -180,6 +202,9 @@
+ 		PhysicalObject* mPhysicalObject;
+ 		bool mHullModifier;
+ 
++        //! the responsible PhysicsController object reacting on force/torque updates
++        PhysicsController* mPhysicsController;
++
+ 		/** returns the geometrytype of the collision primitiv.
+ 		 * That is normally box, sphere, ellipsoid, capsule, convexhull or mesh.
+ 		 * question: is mesh also userdefined ?
+
+Modified: rl/trunk/engine/core/include/PhysicsController.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsController.h	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/include/PhysicsController.h	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -8,7 +8,7 @@
+ {
+ 	/** abstract baseclass for PhysicalObject with an external force/torque control.
+ 	 * Derived objects register with PhysicalManager. Whenever force/torque is
+-	 * going to be applied to the an object controlled by a PhysicsController, the
++	 * going to be applied to the object controlled by a PhysicsController, the
+ 	 * associated PhysicsControllers OnApplyForceAndTorque gets executed.
+ 	 * So the applied force/torque can be modified before it is applied to the
+ 	 * associated PhysicalThing.
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -44,12 +44,25 @@
+     class PhysicsGenericContactCallback;
+     class World;
+ 
++    /** Management class for the physical properties of game world objects.
++     * This class utilizes OgreNewt (and therefore indirectly Newton) for handling
++     * the physics of RL. It sets up OgreNewt and realizes the timestepping for Newton.
++     * Additionally it manages materials which are needed for handling different kinds
++     * of object collisions. It also installs a basic forcefeedback function per object,
++     * in a way that is perhaps not the quickest one, but removes the need for a per object
++     * registration.
++     * So basically this class handles the global settings and things related 
++     * to the object world.
++     * It also manages a list of physical controllers (that are objects that
++     * modify physical properties of a specific object).
++     */
+     class _RlCoreExport PhysicsManager
+         :   public GameTask,
+             protected Ogre::Singleton&lt;PhysicsManager&gt;
+     {
+     public:
+ 
++        //! differentiates between the different collision primitives
+         enum GeometryType {
+             GT_NONE = -1,
+             GT_BOX = 0,
+@@ -62,7 +75,11 @@
+ 
+         static const Ogre::Real NEWTON_GRID_WIDTH;
+         
++        //! default constructor
+         PhysicsManager();
++        /** explicit virtual destructor.
++         * frees any acquired memory.
++         */
+         virtual ~PhysicsManager();
+ 
+         virtual void run( Ogre::Real elapsedTime );
+@@ -112,34 +129,6 @@
+ 		void toggleDebugMode();
+         bool isDebugMode() const;
+ 
+-        PhysicsController* getPhysicsController(PhysicalThing* thing) const;
+-        /**
+-         * @param thing, the PhysicalThing to be controlled by controller
+-         * @param controller, the controller may be NULL.
+-         *        In this case, thing is not controlled anymore
+-         */
+-        void setPhysicsController(PhysicalThing* thing, PhysicsController* controller);
+-
+-        /**
+-         * Sets the special contact callback for character-level-interaction.
+-         * This is handled specifically
+-         * @todo If other special cases are identified, the interface for
+-         * material handling has to be generalised.
+-         * @ param callback, the new contact callback. Can be NULL, in this case the default
+-         *   callback is set.
+-         */
+-        void setCharLevelContactCallback(PhysicsGenericContactCallback* callback);
+-
+-        /**
+-         * Sets the special contact callback for character-interaction with any other
+-         * material, that has not yet a specialised handler defined.
+-         * @todo If other special cases are identified, the interface for
+-         * material handling has to be generalised.
+-         * @ param callback, the new contact callback. Can be NULL, in this case the default
+-         *   callback is set.
+-         */
+-        void setCharDefaultContactCallback(PhysicsGenericContactCallback* callback);
+-
+         // Newton callbacks ...
+         /// generic force callback. Gravity is applied and the force,
+         /// applied via PhysicalThing interface.
+@@ -150,9 +139,6 @@
+         static void controlledForceCallback(OgreNewt::Body* body);
+ 
+         OgreNewt::World* _getNewtonWorld() const;
+-        OgreNewt::MaterialID* _getLevelMaterialID() const;
+-        OgreNewt::MaterialID* _getCharMaterialID() const;
+-		const OgreNewt::MaterialID* _getDefaultMaterialID() const;
+ 
+         virtual const Ogre::String&amp; getName() const;
+ 
+@@ -170,16 +156,57 @@
+         {
+             return mMaxTimestep;
+         }
++
++        // Material handling (for different types of collision)
++        /** retrieves a material by name.
++         * @param materialname string identifying the material
++         * @returns the specified material object
++         */
++        const OgreNewt::MaterialID* getMaterialID(const Ogre::String&amp; materialname) const;
++        /** creates a material by name.
++         * Whenever the material exists already, the existing object is returned.
++         * @param materialname string identifying the material
++         * @returns the newly created material object (or the already present one)
++         */
++        const OgreNewt::MaterialID* createMaterialID(const Ogre::String&amp; materialname);
++
++        /** creates a materialpair.
++         * Whenever the materialpair exists already, the existing object is returned.
++         * @param M1 material id of first material
++         * @param M2 material id of second material
++         * @returns the created materialpair object (or the already present one)
++         */
++        OgreNewt::MaterialPair* createMaterialPair(const OgreNewt::MaterialID* M1,
++            const OgreNewt::MaterialID* M2);
++        /** retrieves a material by name.
++         * @param M1 material id of first material
++         * @param M2 material id of second material
++         * @returns the specified materialpair object
++         */
++        OgreNewt::MaterialPair* getMaterialPair(const OgreNewt::MaterialID* M1,
++            const OgreNewt::MaterialID* M2) const;
++        /** reset MaterialPair to default.
++         * @param M1 material id of first material
++         * @param M2 material id of second material
++         */
++        void resetMaterialPair( const OgreNewt::MaterialID* M1,
++            const OgreNewt::MaterialID* M2);
++
++        /** converts a string identifying a collision property into an enum.
++         * Mainly for making string definitions of the collision property
++         * possible in .gof files.
++         * @param geomTypeString giving the collision primitiv.
++         */
+ 		static GeometryType convertStringToGeometryType(const Ogre::String&amp; geomTypeString);
+ 
+     private:
+-        typedef std::map&lt;PhysicalThing*, PhysicsController*&gt; ControllerMap;
++        //typedef std::map&lt;PhysicalThing*, PhysicsController*&gt; ControllerMap;
++        //ControllerMap mControlledThings;
+ 
+         bool mEnabled;
+         OgreNewt::World* mWorld;
+         OgreNewt::Debugger* mNewtonDebugger;
+         std::vector&lt;PhysicalThing*&gt; mPhysicalThings;
+-        ControllerMap mControlledThings;
+         std::vector&lt;OgreNewt::Body*&gt; mLevelBodies;
+         bool mDebugMode;
+         Ogre::Vector3 mGravity;
+@@ -188,12 +215,46 @@
+         Ogre::Real mMinTimestep;
+         Ogre::Real mMaxTimestep;
+ 
++        // Material handling needed for different types of collisions
++        //! shortens the type definition for maps of materials
++        typedef std::map&lt;const Ogre::String, const OgreNewt::MaterialID*&gt; MaterialMap;
++        //! shortens the creation of pair types for the stl map
++        typedef std::pair&lt;const Ogre::String, const OgreNewt::MaterialID*&gt; MaterialMapPair;
++
++        //! defines a pair of MaterialIDs
++        typedef std::pair&lt; const OgreNewt::MaterialID*, const OgreNewt::MaterialID* &gt; PairOfMaterials;
++
++        //! defines a comparison operator for pairs of MaterialIDs
++        struct ltPairOfMaterials
++        {
++            bool operator()(const PairOfMaterials P1, const PairOfMaterials P2) const
++            {
++                if (P1.first-&gt;getID() == P2.first-&gt;getID())
++                    return (P1.second-&gt;getID() &lt; P2.second-&gt;getID());
++
++                return (P1.first-&gt;getID() &lt; P2.first-&gt;getID());
++            }
++        };
++
++        //! shortens the type definition for maps of materialpairs
++        typedef std::multimap&lt; PairOfMaterials, OgreNewt::MaterialPair*, ltPairOfMaterials &gt; MaterialPairMap;
++        //! shortens the type definition for pairs for the stl multimap
++        typedef std::pair&lt; PairOfMaterials, OgreNewt::MaterialPair* &gt; MaterialPairMapPair;
++
++        //! contains a list materials with string id as a key
++        MaterialMap mMaterials;
++        //! contains a list of materialpairs (for different collisionhandling)
++        MaterialPairMap mMaterialPairs;
++
++        /*
+         OgreNewt::MaterialID* mLevelID;
+         OgreNewt::MaterialID* mCharacterID;
+         OgreNewt::MaterialPair* mDefaultPair;
+         OgreNewt::MaterialPair* mCharLevelPair;
+         OgreNewt::MaterialPair* mCharCharPair;
+         OgreNewt::MaterialPair* mCharDefaultPair;
++        */
++
+         PhysicsGenericContactCallback* mGenericCallback;
+     };
+ }
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -300,7 +300,7 @@
+                 100.0f, true);
+             PhysicsManager::getSingleton().createPhysicsProxy(pt, NULL);
+ 			pt-&gt;_getBody()-&gt;setMaterialGroupID(
+-				PhysicsManager::getSingleton()._getCharMaterialID());
++                PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+             actor = new Actor(uniquename, co, pt);
+ 
+             mActors.insert(ActorPtrPair(uniquename,actor)); 
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -45,17 +45,16 @@
+ 		mGeometryType(geomType),
+ 		mPhysicalObject(po),
+ 		mMass(mass),
+-		mHullModifier(hullModifier)
++		mHullModifier(hullModifier),
++        mPhysicsController(NULL)
+ 	{
+ 	}
+ 
+     PhysicalThing::~PhysicalThing()
+ 	{
+-        PhysicsManager::getSingleton().setPhysicsController( this, NULL );
+ 		// missing removal of list of collision objects here ...
+ 		delete mBody;
+ 		mBody = NULL;
+-
+     }
+ 
+     Ogre::Vector3 PhysicalThing::getPosition() const
+@@ -605,24 +604,45 @@
+         }
+ 	}
+ 
+-	void PhysicalThing::prepareUserControl(OgreNewt::MaterialID* material)
++    PhysicsController* PhysicalThing::getPhysicsController() const
+     {
+-        mBody-&gt;setMaterialGroupID(material);
+-        mBody-&gt;setAutoFreeze(0);
+-        mBody-&gt;unFreeze();
+-        mBody-&gt;setLinearDamping(0.0f);
+-        mBody-&gt;setAngularDamping(Vector3::ZERO);
++        return mPhysicsController;
++    }
+ 
+-        mBody-&gt;setCustomForceAndTorqueCallback( PhysicsManager::controlledForceCallback );
++    void PhysicalThing::setPhysicsController(PhysicsController* controller)
++    {
++        if (mPhysicsController)
++        {
++            // if there is an old controller, remove it
++            mBody-&gt;setCustomForceAndTorqueCallback( PhysicsManager::genericForceCallback );
++            setUpConstraint(Vector3::ZERO);
++            mPhysicsController = NULL;
++        }
+ 
+-        // Set up-vector, so force application doesn't let the char fall over
+-        setUpConstraint(Vector3::UNIT_Y);
++        if(controller)
++        {
++            // prepare for control
++            mPhysicsController = controller;
++            mBody-&gt;setAutoFreeze(0);
++            mBody-&gt;unFreeze();
++            mBody-&gt;setLinearDamping(0.0f);
++            mBody-&gt;setAngularDamping(Vector3::ZERO);
++
++            mBody-&gt;setCustomForceAndTorqueCallback( PhysicsManager::controlledForceCallback );
++
++            // Set up-vector, so force application doesn't let the char fall over
++            setUpConstraint(Vector3::UNIT_Y);
++        }
+     }
+ 
+-    void PhysicalThing::unprepareUserControl()
++    void PhysicalThing::setMaterialID(const OgreNewt::MaterialID* materialid)
+     {
+-		mBody-&gt;setMaterialGroupID(PhysicsManager::getSingleton()._getDefaultMaterialID());
+-        mBody-&gt;setCustomForceAndTorqueCallback( PhysicsManager::genericForceCallback );
+-        setUpConstraint(Vector3::ZERO);
++        mBody-&gt;setMaterialGroupID(materialid);
+     }
++
++    const OgreNewt::MaterialID* PhysicalThing::getMaterialID() const
++    {
++        return mBody-&gt;getMaterialGroupID();
++    }
++
+ }
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -51,18 +51,18 @@
+         : mEnabled(false),
+         mNewtonDebugger(),
+         mPhysicalThings(),
+-        mControlledThings(),
++        //mControlledThings(),
+         mDebugMode(false),
+         mGravity(0, -9.81, 0),
+         mWorldAABB(Vector3(-100, -100, -100), Vector3(100, 100, 100)),
+         mElapsed(0.0f),
+         mMinTimestep(1.0f/600.0f),
+         mMaxTimestep(1.0f/30.0f),
+-        mLevelID(),
+-        mCharacterID(),
+-        mDefaultPair(),
+-        mCharLevelPair(),
+-        mCharCharPair(),
++        //mLevelID(),
++        //mCharacterID(),
++        //mDefaultPair(),
++        //mCharLevelPair(),
++        //mCharCharPair(),
+         mGenericCallback()
+     {
+ 		mWorld = new OgreNewt::World();
+@@ -72,35 +72,40 @@
+ 
+         // setup materials: default&lt;-&gt;default
+         const OgreNewt::MaterialID* defaultID = mWorld-&gt;getDefaultMaterialID();
+-        mDefaultPair = new OgreNewt::MaterialPair(
+-            mWorld, defaultID, defaultID);
++        mMaterials.insert(MaterialMapPair(&quot;default&quot;, defaultID));
++
++        OgreNewt::MaterialPair* mDefaultPair = createMaterialPair( defaultID, defaultID );
+         mGenericCallback = new PhysicsGenericContactCallback();
+         mDefaultPair-&gt;setContactCallback(mGenericCallback);
+         mDefaultPair-&gt;setDefaultFriction(0.85f, 0.80f);
+ 
+-        // setup materials: character/cam&lt;-&gt;level
+-        mLevelID = new OgreNewt::MaterialID(mWorld);
+-        mCharacterID = new OgreNewt::MaterialID(mWorld);
+-        mCharLevelPair = new OgreNewt::MaterialPair(mWorld, mCharacterID, mLevelID);
+-        mCharLevelPair-&gt;setDefaultFriction(0, 0);
++        // setup level material
++        createMaterialID(&quot;level&quot;);
+ 
+-        mCharDefaultPair = new OgreNewt::MaterialPair(mWorld, mCharacterID, defaultID);
+-        mCharDefaultPair-&gt;setDefaultFriction(0, 0);
++        // below here starts 'old' stale fix code that should be removed
+ 
+-        // setup material: char&lt;-&gt;cam. there should be no collision
+-        mCharCharPair = new OgreNewt::MaterialPair(mWorld, mCharacterID, mCharacterID);
+-        mCharCharPair-&gt;setDefaultCollidable(0);
++        // setup camera material (actually not needed)
++        //createMaterialID(&quot;camera&quot;);
++
++        // setup character material
++        // actually this is needed here, because the actor is created in advance before the
++        // character controller who actually does create 'character' material too.
++        createMaterialID(&quot;character&quot;);      
+     }
+ 
+     PhysicsManager::~PhysicsManager()
+     {
++        // remove all materials
++        for (MaterialMap::iterator it = mMaterials.begin(); it != mMaterials.end(); it++)
++        {
++            // default material has been provided by OgreNewt, therefore it
++            // it must not be deleted here
++            if ((*it).first != &quot;default&quot;) 
++                delete (*it).second;
++        }
++        mMaterials.clear();
++
+         delete mGenericCallback;
+-        delete mCharCharPair;
+-		delete mCharDefaultPair;
+-        delete mCharLevelPair;
+-        delete mCharacterID;
+-        delete mLevelID;
+-        delete mDefaultPair;
+         delete mWorld;
+     }
+ 
+@@ -222,7 +227,7 @@
+             body-&gt;attachToNode(node);
+             body-&gt;setPositionOrientation(node-&gt;getWorldPosition(),
+                 node-&gt;getWorldOrientation());
+-            body-&gt;setMaterialGroupID(mLevelID);
++            body-&gt;setMaterialGroupID(getMaterialID(&quot;level&quot;));
+ 
+             mLevelBodies.push_back(body);
+         }
+@@ -272,10 +277,9 @@
+         PhysicalThing* thing =
+             static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
+ 
+-        ControllerMap::const_iterator it = getSingleton().mControlledThings.find(thing);
+-        if (it != getSingleton().mControlledThings.end())
++        if (thing-&gt;getPhysicsController())
+         {
+-            (*it).second-&gt;OnApplyForceAndTorque(thing);
++            thing-&gt;getPhysicsController()-&gt;OnApplyForceAndTorque(thing);
+         }
+         else
+         {
+@@ -284,93 +288,77 @@
+         }
+     }
+ 
++    OgreNewt::World* PhysicsManager::_getNewtonWorld() const
++    {
++        return mWorld;
++    }
+ 
+-    PhysicsController* PhysicsManager::getPhysicsController(PhysicalThing* thing) const
++    const Ogre::String&amp; PhysicsManager::getName() const
+     {
+-        PhysicsController* rval = 0;
++        static String NAME = &quot;PhysicsManager&quot;;
+ 
+-        ControllerMap::const_iterator it = mControlledThings.find(thing);
+-        if (it != mControlledThings.end())
+-        {
+-            rval = (*it).second;
+-        }
+-
+-        return rval;
++        return NAME;
+     }
+ 
+-    void PhysicsManager::setPhysicsController(PhysicalThing* thing,
+-        PhysicsController* controller)
++    const OgreNewt::MaterialID* PhysicsManager::getMaterialID(const Ogre::String&amp; materialname) const
+     {
+-        RlAssert1(thing);
++        MaterialMap::const_iterator it;
+ 
+-        // first see, if the thing has another controller already
+-        PhysicsController* oldController = getPhysicsController(thing);
+-        if (oldController)
++        it = mMaterials.find(materialname);
++        if (it != mMaterials.end())
+         {
+-            // if so, remove it
+-            thing-&gt;unprepareUserControl();
+-            mControlledThings.erase(thing);
++            return (*it).second;
+         }
+ 
+-        if(controller)
+-        {
+-            // add it to the map and prepare it for control
+-            mControlledThings[thing] = controller;
+-			thing-&gt;prepareUserControl(mCharacterID); /** @TODO: Nicht immer nur Char-Material nehmen */
+-        }
++        return NULL;
+     }
+ 
+-    void PhysicsManager::setCharLevelContactCallback(PhysicsGenericContactCallback* callback)
++    const OgreNewt::MaterialID* PhysicsManager::createMaterialID(const Ogre::String&amp; materialname)
+     {
+-        if (callback != NULL)
++        const OgreNewt::MaterialID* materialid = NULL;
++
++        if ((materialid = getMaterialID(materialname)) == NULL)
+         {
+-            mCharLevelPair-&gt;setContactCallback(callback);
++            materialid = new OgreNewt::MaterialID(mWorld);
++            mMaterials.insert( MaterialMapPair(materialname, materialid) );
+         }
+-        else
+-        {
+-            mCharLevelPair-&gt;setContactCallback(PhysicsManager::mGenericCallback);
+-        }
++        return materialid;
+     }
+ 
+-    void PhysicsManager::setCharDefaultContactCallback(PhysicsGenericContactCallback* callback)
++    OgreNewt::MaterialPair* PhysicsManager::createMaterialPair(const OgreNewt::MaterialID* M1,
++        const OgreNewt::MaterialID* M2)
+     {
+-        if (callback != NULL)
++        OgreNewt::MaterialPair* materialpair = NULL;
++
++        if ((materialpair = getMaterialPair(M1, M2)) == NULL)
+         {
+-            mCharDefaultPair-&gt;setContactCallback(callback);
++            materialpair = new OgreNewt::MaterialPair(mWorld, M1, M2);
++            mMaterialPairs.insert(
++                MaterialPairMapPair( PairOfMaterials(M1,M2), materialpair ));
+         }
+-        else
+-        {
+-            mCharDefaultPair-&gt;setContactCallback(PhysicsManager::mGenericCallback);
+-        }
++        return materialpair;
+     }
+ 
+-    OgreNewt::World* PhysicsManager::_getNewtonWorld() const
++    OgreNewt::MaterialPair* PhysicsManager::getMaterialPair(const OgreNewt::MaterialID* M1,
++            const OgreNewt::MaterialID* M2) const
+     {
+-        return mWorld;
+-    }
++        MaterialPairMap::const_iterator it;
+ 
+-    OgreNewt::MaterialID* PhysicsManager::_getLevelMaterialID() const
+-    {
+-        return mLevelID;
+-    }
++        it = mMaterialPairs.find(PairOfMaterials(M1,M2));
++        if (it != mMaterialPairs.end())
++        {
++            return (*it).second;
++        }
+ 
+-	OgreNewt::MaterialID* PhysicsManager::_getCharMaterialID() const
+-    {
+-        return mCharacterID;
++        return NULL;
+     }
+ 
+-	const OgreNewt::MaterialID* PhysicsManager::_getDefaultMaterialID() const
++    void PhysicsManager::resetMaterialPair( const OgreNewt::MaterialID* M1,
++            const OgreNewt::MaterialID* M2)
+     {
+-        return 	mWorld-&gt;getDefaultMaterialID();
++        getMaterialPair(M1,M2)-&gt;setContactCallback(mGenericCallback);
+     }
+ 
+-    const Ogre::String&amp; PhysicsManager::getName() const
+-    {
+-        static String NAME = &quot;PhysicsManager&quot;;
+-
+-        return NAME;
+-    }
+-
+ 	PhysicsManager::GeometryType PhysicsManager::convertStringToGeometryType(const Ogre::String&amp; geomTypeString)
+ 	{
+ 		if (geomTypeString == &quot;box&quot;)
+
+Modified: rl/trunk/engine/core/src/SceneQuery.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SceneQuery.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/core/src/SceneQuery.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -98,7 +98,7 @@
+         OgreNewt::BasicRaycast raycast = OgreNewt::BasicRaycast(
+             PhysicsManager::getSingleton()._getNewtonWorld(), mRayStart, mRayEnd, true);
+ 
+-	    OgreNewt::MaterialID* levelId = PhysicsManager::getSingleton()._getLevelMaterialID();
++	    const OgreNewt::MaterialID* levelId = PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;);
+ 
+         // Collect results
+         for (int i = 0, num = raycast.getHitCount(); i &lt; num; ++i)
+
+Modified: rl/trunk/engine/ui/src/CharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CharacterController.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ui/src/CharacterController.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -75,6 +75,20 @@
+ 		ogreCam-&gt;setOrientation(Quaternion::IDENTITY);
+ 
+ 		mCameraActor-&gt;_getSceneNode()-&gt;setFixedYawAxis(true);
++
++        PhysicsManager::getSingleton().createMaterialID(&quot;character&quot;);
++
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setDefaultFriction(0,0);
++
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setDefaultFriction(0,0);
++
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setDefaultCollidable(0);
+ 	}
+     
+     CharacterController::~CharacterController()
+
+Modified: rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -56,13 +56,16 @@
+ 
+         // The actor should be controlled manually,
+         // so let the PM prepare it accordingly
+-        PhysicsManager::getSingleton().setPhysicsController(
+-            mCameraActor-&gt;getPhysicalThing(), this);
++        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+         // We also handle char&lt;-&gt;level, char&lt;-&gt;default collision from now on (camera=char!)
+-        PhysicsManager::getSingleton().setCharLevelContactCallback(this);
+-        PhysicsManager::getSingleton().setCharDefaultContactCallback(this);
++        PhysicsManager::getSingleton().getMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setContactCallback(this);
++        PhysicsManager::getSingleton().getMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setContactCallback(this);
+ 
+-		MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
++        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
+         if( mesh != NULL )
+         {
+ 		    mesh-&gt;stopAllAnimations();
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-14 21:46:04 UTC (rev 3179)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-15 00:03:20 UTC (rev 3180)
+@@ -132,13 +132,20 @@
+ 
+         // The actor should be controlled manually,
+         // so let the PM prepare it accordingly
+-        PhysicsManager::getSingleton().setPhysicsController(
+-            mCharacterActor-&gt;getPhysicalThing(), this);
+-        PhysicsManager::getSingleton().setPhysicsController(
+-            mCameraActor-&gt;getPhysicalThing(), this);
++        mCharacterActor-&gt;getPhysicalThing()-&gt;setMaterialID(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++        mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
++        mCameraActor-&gt;getPhysicalThing()-&gt;setMaterialID(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+         // We also handle char&lt;-&gt;level, char&lt;-&gt;default collision from now on
+-        PhysicsManager::getSingleton().setCharLevelContactCallback(this);
+-        PhysicsManager::getSingleton().setCharDefaultContactCallback(this);
++        PhysicsManager::getSingleton().getMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setContactCallback(this);
++        PhysicsManager::getSingleton().getMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setContactCallback(this);
++        
+         // Fit Collision proxy to idle anim
+         mCharacterActor-&gt;getPhysicalThing()-&gt;fitToPose(&quot;idle&quot;);
+ 
+@@ -157,14 +164,16 @@
+     {
+         delete mRaycast;
+         // actors aren't controlled anymore
+-        PhysicsManager::getSingleton().setPhysicsController(
+-            mCharacterActor-&gt;getPhysicalThing(), NULL);
+-        PhysicsManager::getSingleton().setPhysicsController(
+-            mCameraActor-&gt;getPhysicalThing(), NULL);
++        mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
++        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+         // Char&lt;-&gt;Level collision back to default
+-        PhysicsManager::getSingleton().setCharLevelContactCallback(NULL);
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+         // Char&lt;-&gt;Default collision back to default
+-        PhysicsManager::getSingleton().setCharDefaultContactCallback(NULL);
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+ 
+         if (DebugWindow::getSingletonPtr())
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000250.html">[Dsa-hl-svn] r3179 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+	<LI>Next message: <A HREF="000252.html">[Dsa-hl-svn] r3181 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#251">[ date ]</a>
+              <a href="thread.html#251">[ thread ]</a>
+              <a href="subject.html#251">[ subject ]</a>
+              <a href="author.html#251">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

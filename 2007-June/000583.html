@@ -1,0 +1,546 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3512 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3512%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706061954.l56Js26t029229%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000582.html">
+   <LINK REL="Next"  HREF="000584.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3512 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3512%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706061954.l56Js26t029229%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3512 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Jun  6 21:54:02 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000582.html">[Dsa-hl-svn] r3511 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="000584.html">[Dsa-hl-svn] r3513 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#583">[ date ]</a>
+              <a href="thread.html#583">[ thread ]</a>
+              <a href="subject.html#583">[ subject ]</a>
+              <a href="author.html#583">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-06-06 21:53:56 +0200 (Wed, 06 Jun 2007)
+New Revision: 3512
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+Log:
+Move EffectManager from Creature to GameObject
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-06-06 19:50:05 UTC (rev 3511)
++++ rl/trunk/engine/rules/include/Creature.h	2007-06-06 19:53:56 UTC (rev 3512)
+@@ -29,7 +29,6 @@
+ namespace rl
+ {
+     class Container;
+-    class EffectManager;
+     class Inventory;
+     class Item;
+     class Weapon;
+@@ -675,14 +674,6 @@
+              **/
+             void regenerateAu(int modifier = 0, float factor = 1, float time = Date::ONE_SPIELRUNDE);
+ 
+-            /**
+-             * Laesst einen Effekt auf der Kreatur wirken.
+-             * @param effect Zeiger auf den Effekt.
+-             * @ingroup CreatureRubyExports
+-             **/
+-            void addEffect(Effect* effect);
+-            void addEffectWithCheckTime(Effect* effect, RL_LONGLONG time);
+-            void addEffectWithCheckDate(Effect* effect, RL_LONGLONG date);
+ 
+             virtual const Property getProperty(const Ogre::String&amp; key) const;
+             virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+@@ -715,10 +706,6 @@
+             virtual int getCurrentBe();
+ 
+ 
+-            /**
+-             * Ueberprueft die wirkenden Effekte auf Lebendigkeit
+-             **/
+-            void checkEffects();
+ 
+         private:
+ ///////////////////////////////////////////////////////////////////////////////
+@@ -779,8 +766,6 @@
+             /// Zuletzt zugewiesene Bewegungsart
+             int mMovementType;
+ 
+-            /// Verwaltet die Effekte die auf die Kreatur wirken.
+-            EffectManager* mEffectManager;
+             /// Zeigt auf die gerade aktive Waffe.
+             EigenschaftMap mEigenschaften;
+             TalentMap mTalente;
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2007-06-06 19:50:05 UTC (rev 3511)
++++ rl/trunk/engine/rules/include/GameObject.h	2007-06-06 19:53:56 UTC (rev 3512)
+@@ -29,6 +29,8 @@
+ {
+     class Actor;
+     class Creature;
++    class Effect;
++    class EffectManager;
+ 
+     /**
+     * \brief Basisklasse aller spielrelevanten Objekte in RL.
+@@ -70,8 +72,6 @@
+         GameObject(unsigned int id);
+         virtual ~GameObject();
+ 
+-        virtual GameObject* clone();
+-
+         int getId() const;
+ 
+         const Ogre::String getClassId() const;
+@@ -158,6 +158,16 @@
+ 
+         virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
+ 
++        /**
++         * Laesst einen Effekt auf der Kreatur wirken.
++         * @param effect Zeiger auf den Effekt.
++         * @ingroup CreatureRubyExports
++         **/
++        void addEffect(Effect* effect);
++        void addEffectWithCheckTime(Effect* effect, RL_LONGLONG time);
++        void addEffectWithCheckDate(Effect* effect, RL_LONGLONG date);
++        void removeEffect(Effect* effect);
++
+     protected:
+         int mId;
+         GameObjectState mState;
+@@ -176,12 +186,20 @@
+         /// Soll das GameObject &#252;berhaupt leuchten?
+         bool mHighlightingEnabled;
+ 
++        /// Verwaltet die Effekte die auf die Kreatur wirken.
++        EffectManager* mEffectManager;
++
+         Actor* createActor();
+         void destroyActor();
+ 
+         void doPlaceIntoScene();
+         void doRemoveFromScene();
+ 
++        /**
++         * Ueberprueft die wirkenden Effekte auf Lebendigkeit
++         **/
++        void checkEffects();
++
+     private:
+         static int sNextGameObjectId;    
+ 
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-06-06 19:50:05 UTC (rev 3511)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-06-06 19:53:56 UTC (rev 3512)
+@@ -18,8 +18,8 @@
+ #include &quot;Actor.h&quot;
+ #include &quot;Container.h&quot;
+ #include &quot;DsaManager.h&quot;
+-#include &quot;EffectManager.h&quot;
+ #include &quot;Eigenschaft.h&quot;
++#include &quot;EffectManager.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Kampftechnik.h&quot;
+@@ -90,10 +90,8 @@
+         mMovementType(0),
+         mAlignment(ALIGNMENT_NEUTRAL)
+     {
+-        mEffectManager = new EffectManager();
+         mQueryFlags |= QUERYFLAG_CREATURE;
+ 
+-		//RlFail(&quot;Test&quot;);
+ 		setWert(WERT_MOD_AE, 0);
+ 		setWert(WERT_MOD_LE, 0);
+ 		setWert(WERT_MOD_AU, 0);
+@@ -109,15 +107,12 @@
+ 		mEigenschaften[E_KONSTITUTION] = 0;
+ 		mEigenschaften[E_KOERPERKRAFT] = 0;
+ 
+-        mEffectManager = new EffectManager();
+-
+ 		mInventory = new Inventory(this);
+     }
+ 
+ 	Creature::~Creature()
+     {
+         delete mInventory;
+-	delete mEffectManager;
+ 
+         for( SonderfertigkeitMap::iterator it=mSonderfertigkeiten.begin();it!=mSonderfertigkeiten.end(); it++ )
+             delete it-&gt;second;
+@@ -931,9 +926,6 @@
+                 modifyAu((regeneratedAu-modifier)*factor);
+             }
+ 
+-
+-
+-
+             if( getAu() == getAuMax() )
+             {
+                 lastSpielrunde = 0;
+@@ -946,30 +938,6 @@
+         modifyAu(regeneratedAuPerTime*factor);
+     }
+ 
+-	void Creature::addEffect(Effect* effect)
+-	{
+-		mEffectManager-&gt;addEffect(effect);
+-	}
+-    
+-    void Creature::addEffectWithCheckTime(Effect* effect, RL_LONGLONG time)
+-    {
+-      addEffect(effect);
+-      mEffectManager-&gt;addTimeCheck(time, effect);
+-    }
+-    
+-    void Creature::addEffectWithCheckDate(Effect* effect, RL_LONGLONG date)
+-    {
+-      addEffect(effect);
+-      mEffectManager-&gt;addDateCheck(date, effect);
+-    }
+-
+-
+-	void Creature::checkEffects()
+-	{
+-		/// @todo Nur einmal pro Aktion ausfuehren
+-		mEffectManager-&gt;checkEffects();
+-	}
+-
+     void Creature::setAlignment(Creature::Alignment alignment)
+     {
+         mAlignment = alignment;
+@@ -994,65 +962,65 @@
+         {
+             mCurrentLe = value.toInt();
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_AE)
+-        {
+-            mCurrentAe = value.toInt();
++        else if (key == Creature::PROPERTY_CURRENT_AE)
++        {
++            mCurrentAe = value.toInt();
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_AU)
+-        {
+-            mCurrentAu = value.toInt();
++        else if (key == Creature::PROPERTY_CURRENT_AU)
++        {
++            mCurrentAu = value.toInt();
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
+-        {
+-            mErschoepfung = value.toInt();
++        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
++        {
++            mErschoepfung = value.toInt();
+         }
+-        //else if (key == Creature::PROPERTY_EFFECTS)
+-        //{
+-        //    mEffectManager-&gt;setProperty(Creature::PROPERTY_EFFECTS, value);
++        //else if (key == Creature::PROPERTY_EFFECTS)
++        //{
++        //    mEffectManager-&gt;setProperty(Creature::PROPERTY_EFFECTS, value);
+         //}
+-        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
+-        {
+-            mEigenschaften.clear();
+-            convertToMap(value.toMap(), mEigenschaften);
++        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
++        {
++            mEigenschaften.clear();
++            convertToMap(value.toMap(), mEigenschaften);
+         }
+-        else if (key == Creature::PROPERTY_TALENTE)
+-        {
+-            mTalente.clear();
+-            convertToMap(value.toMap(), mTalente);
++        else if (key == Creature::PROPERTY_TALENTE)
++        {
++            mTalente.clear();
++            convertToMap(value.toMap(), mTalente);
+         }
+-        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
+-        {
+-            mKampftechniken.clear();
+-            convertToMap(value.toMap(), mKampftechniken);
++        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
++        {
++            mKampftechniken.clear();
++            convertToMap(value.toMap(), mKampftechniken);
+         }
+-        else if (key == Creature::PROPERTY_VORTEILE)
+-        {
+-            mVorteile.clear();
+-            convertToMap(value.toMap(), mVorteile);
++        else if (key == Creature::PROPERTY_VORTEILE)
++        {
++            mVorteile.clear();
++            convertToMap(value.toMap(), mVorteile);
+         }
+-        else if (key == Creature::PROPERTY_NACHTEILE)
+-        {
+-            mNachteile.clear();
+-            convertToMap(value.toMap(), mNachteile);
++        else if (key == Creature::PROPERTY_NACHTEILE)
++        {
++            mNachteile.clear();
++            convertToMap(value.toMap(), mNachteile);
+         }
+-//        else if (key == Creature::PROPERTY_SF)
+-//        {
++//        else if (key == Creature::PROPERTY_SF)
++//        {
+             ///@todo Sonderfertigkeiten
+ //        }
+-        else if (key == Creature::PROPERTY_WERTE)
+-        {
+-            mWerte.clear();
+-            convertToMap(value.toMap(), mWerte);
++        else if (key == Creature::PROPERTY_WERTE)
++        {
++            mWerte.clear();
++            convertToMap(value.toMap(), mWerte);
+         }
+-        else if (key == Creature::PROPERTY_AP)
+-        {
+-            IntPair ip = value.toIntPair();
+-            mAp.total = ip.first;
+-            mAp.used = ip.second;
++        else if (key == Creature::PROPERTY_AP)
++        {
++            IntPair ip = value.toIntPair();
++            mAp.total = ip.first;
++            mAp.used = ip.second;
+         }
+-        else if (key == Creature::PROPERTY_INVENTORY)
+-        {
+-            mInventory-&gt;setProperty(Inventory::PROPERTY_CONTENT, value);
++        else if (key == Creature::PROPERTY_INVENTORY)
++        {
++            mInventory-&gt;setProperty(Inventory::PROPERTY_CONTENT, value);
+         }
+         else
+         {
+@@ -1074,63 +1042,63 @@
+         {
+             return Property(mCurrentLe);
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_AE)
+-        {
++        else if (key == Creature::PROPERTY_CURRENT_AE)
++        {
+             return Property(mCurrentAe);
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_AU)
+-        {
++        else if (key == Creature::PROPERTY_CURRENT_AU)
++        {
+             return Property(mCurrentAu);
+         }
+-        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
+-        {
++        else if (key == Creature::PROPERTY_CURRENT_FATIGUE)
++        {
+             return Property(mErschoepfung);
+         }
+-        //else if (key == Creature::PROPERTY_EFFECTS)
+-        //{
++        //else if (key == Creature::PROPERTY_EFFECTS)
++        //{
+         //    return Property(mEffectManager-&gt;getProperty(Creature::PROPERTY_EFFECTS));
+         //}
+-        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mEigenschaften);
++        else if (key == Creature::PROPERTY_EIGENSCHAFTEN)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mEigenschaften);
+             return Property(map);
+         }
+-        else if (key == Creature::PROPERTY_TALENTE)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mTalente);
++        else if (key == Creature::PROPERTY_TALENTE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mTalente);
+             return Property(map);
+         }
+-        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mKampftechniken);
++        else if (key == Creature::PROPERTY_KAMPFTECHNIKEN)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mKampftechniken);
+             return Property(map);
+         }
+-        else if (key == Creature::PROPERTY_VORTEILE)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mVorteile);
++        else if (key == Creature::PROPERTY_VORTEILE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mVorteile);
+             return Property(map);
+         }
+-        else if (key == Creature::PROPERTY_NACHTEILE)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mNachteile);
++        else if (key == Creature::PROPERTY_NACHTEILE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mNachteile);
+             return Property(map);
+         }
+-//        else if (key == Creature::PROPERTY_SF)
+-//        {
++//        else if (key == Creature::PROPERTY_SF)
++//        {
+             ///@todo Sonderfertigkeiten
+ //        }
+-        else if (key == Creature::PROPERTY_WERTE)
+-        {
+-            PropertyMap map = rl::convertToPropertyMap(mWerte);
++        else if (key == Creature::PROPERTY_WERTE)
++        {
++            PropertyMap map = rl::convertToPropertyMap(mWerte);
+             return Property(map);
+         }
+-        else if (key == Creature::PROPERTY_AP)
+-        {
++        else if (key == Creature::PROPERTY_AP)
++        {
+             return Property(make_pair(mAp.total, mAp.used));
+         }
+-        else if (key == Creature::PROPERTY_INVENTORY)
+-        {
+-            return mInventory-&gt;getProperty(Inventory::PROPERTY_CONTENT);
++        else if (key == Creature::PROPERTY_INVENTORY)
++        {
++            return mInventory-&gt;getProperty(Inventory::PROPERTY_CONTENT);
+         }
+         else
+         {
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-06-06 19:50:05 UTC (rev 3511)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-06-06 19:53:56 UTC (rev 3512)
+@@ -19,6 +19,7 @@
+ #include &quot;ActionManager.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
++#include &quot;EffectManager.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;ObjectStateChangeEventSource.h&quot;
+ #include &quot;Property.h&quot;
+@@ -66,6 +67,8 @@
+             mDefaultAction(DEFAULT_VIEW_OBJECT_ACTION),
+             mState(GOS_LOADED)
+     {
++        mEffectManager = new EffectManager();
++
+         // Standardactions registrieren
+         Action* defaultAction = ActionManager::getSingleton().getAction(DEFAULT_VIEW_OBJECT_ACTION);
+         if (defaultAction != NULL)
+@@ -90,13 +93,9 @@
+ 
+     GameObject::~GameObject(void)
+     {
++    	delete mEffectManager;
+     }
+ 
+-    GameObject* GameObject::clone()
+-    {
+-        Throw(OperationNotSupportedException, &quot;clone not yet implemented.&quot;);
+-    }
+-
+     int GameObject::getId() const
+     {
+         return mId;
+@@ -401,6 +400,34 @@
+         mMass = mass;
+     }
+ 
++    void GameObject::addEffect(Effect* effect)
++	{
++		mEffectManager-&gt;addEffect(effect);
++	}
++    
++    void GameObject::addEffectWithCheckTime(Effect* effect, RL_LONGLONG time)
++    {
++      addEffect(effect);
++      mEffectManager-&gt;addTimeCheck(time, effect);
++    }
++    
++    void GameObject::addEffectWithCheckDate(Effect* effect, RL_LONGLONG date)
++    {
++      addEffect(effect);
++      mEffectManager-&gt;addDateCheck(date, effect);
++    }
++
++	void GameObject::checkEffects()
++	{
++		/// @todo Nur einmal pro Aktion ausfuehren
++		mEffectManager-&gt;checkEffects();
++	}
++
++    void GameObject::removeEffect(Effect* effect)
++	{
++		mEffectManager-&gt;removeEffect(effect);
++	}
++    
+     const Property GameObject::getProperty(const Ogre::String&amp; key) const
+     {
+         Property prop;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000582.html">[Dsa-hl-svn] r3511 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="000584.html">[Dsa-hl-svn] r3513 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#583">[ date ]</a>
+              <a href="thread.html#583">[ thread ]</a>
+              <a href="subject.html#583">[ subject ]</a>
+              <a href="author.html#583">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

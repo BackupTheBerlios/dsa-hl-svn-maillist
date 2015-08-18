@@ -1,0 +1,416 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4478 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4478%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20rules/include%20rules/src%20ui/src&In-Reply-To=%3C200808231239.m7NCdNEp027324%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001534.html">
+   <LINK REL="Next"  HREF="001536.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4478 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4478%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20rules/include%20rules/src%20ui/src&In-Reply-To=%3C200808231239.m7NCdNEp027324%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4478 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Aug 23 14:39:23 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001534.html">[Dsa-hl-svn] r4477 - rl/trunk/engine/script/src
+</A></li>
+        <LI>Next message: <A HREF="001536.html">[Dsa-hl-svn] r4479 - in modules/common/scripts: . jobs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1535">[ date ]</a>
+              <a href="thread.html#1535">[ thread ]</a>
+              <a href="subject.html#1535">[ subject ]</a>
+              <a href="author.html#1535">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-08-23 14:39:18 +0200 (Sat, 23 Aug 2008)
+New Revision: 4478
+
+Modified:
+   rl/branches/newton20/engine/core/include/Actor.h
+   rl/branches/newton20/engine/core/include/SoundManager.h
+   rl/branches/newton20/engine/core/src/Actor.cpp
+   rl/branches/newton20/engine/core/src/ListenerObject.cpp
+   rl/branches/newton20/engine/core/src/PhysicalThing.cpp
+   rl/branches/newton20/engine/core/src/SoundObject.cpp
+   rl/branches/newton20/engine/rules/include/CreatureController.h
+   rl/branches/newton20/engine/rules/src/CreatureController.cpp
+   rl/branches/newton20/engine/rules/src/GoToJob.cpp
+   rl/branches/newton20/engine/rules/src/RotateMovement.cpp
+   rl/branches/newton20/engine/ui/src/InputManager.cpp
+Log:
+-fixed GoToJob
+-set Position of SoundObject correctly when using the default-slot (still? problem with actor and slot with the torch in regressiontest)
+-some small changes to the movement-system
+
+
+
+Modified: rl/branches/newton20/engine/core/include/Actor.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/Actor.h	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/include/Actor.h	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -144,6 +144,9 @@
+         /// Gibt die aktuelle Position des Aktors relativ zur Welt zur&#252;ck
+         const Ogre::Vector3&amp; getWorldPosition(void) const;
+ 
++        /// Ermittelt die aktuelle Geschwindigkeit des Actors, falls moeglich
++        const Ogre::Vector3 getVelocity() const;
++
+         /// Setzt die Position des Aktors relativ zu seinem Parent
+         void setPosition(const Ogre::Vector3&amp; vec);
+         /// Setzt die Position des Aktors relativ zu seinem Parent
+
+Modified: rl/branches/newton20/engine/core/include/SoundManager.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/SoundManager.h	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/include/SoundManager.h	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -83,7 +83,7 @@
+         Ogre::NameValuePairList getSettings() const;
+ 
+         /// 3D-Sound aktualisieren.
+-        void update();
++        //void update(); // there is no implementation of this function and it is never used!
+         /// Den aktiven Treiber zurckgeben.
+         SoundDriver* getActiveDriver() const;
+         /// Den aktiven Treiber setzen.
+
+Modified: rl/branches/newton20/engine/core/src/Actor.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/Actor.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/src/Actor.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -317,6 +317,10 @@
+         {
+             return mBone-&gt;getPosition();
+         }
++        else if (mParent)
++        {
++            return mParent-&gt;getPosition();
++        }
+         else
+         {
+             return Vector3::ZERO;
+@@ -326,6 +330,22 @@
+         }
+     }
+ 
++    const Vector3 Actor::getVelocity() const
++    {
++        if (mPhysicalThing)
++        {
++            return mPhysicalThing-&gt;getVelocity();
++        }
++        else if ( mParent )
++        {
++            return mParent-&gt;getVelocity();
++        }
++        else
++        {
++            return Vector3::ZERO;
++        }
++    }
++
+     const Quaternion&amp; Actor::getOrientation(void) const
+     {
+         if (mSceneNode)
+@@ -336,6 +356,10 @@
+         {
+             return mBone-&gt;getOrientation();
+         }
++        else if (mParent)
++        {
++            return mParent-&gt;getOrientation();
++        }
+         else
+         {
+             return Quaternion::IDENTITY;
+@@ -355,6 +379,10 @@
+         {
+             return mBone-&gt;_getDerivedPosition();
+         }
++        else if (mParent)
++        {
++            return mParent-&gt;getWorldPosition();
++        }
+         else
+         {
+             return Vector3::ZERO;
+@@ -417,6 +445,10 @@
+         {
+             return mBone-&gt;_getDerivedOrientation();
+         }
++        else if (mParent)
++        {
++            return mParent-&gt;getWorldOrientation();
++        }
+         else
+         {
+             Throw(IllegalStateException,
+@@ -533,6 +565,7 @@
+         // Erst danach Parent/Child wirklich zuweisen, falls es eine Exception gibt.
+         actor-&gt;mParent = this;
+         mChildren.insert(actor);
++        actor-&gt;_update();
+     }
+ 
+     void Actor::attachToSlotAxisRot(
+
+Modified: rl/branches/newton20/engine/core/src/ListenerObject.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/ListenerObject.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/src/ListenerObject.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -71,7 +71,8 @@
+         return;
+     }
+     listener-&gt;setPosition(actor-&gt;getWorldPosition());
+-	listener-&gt;setOrientation(actor-&gt;getWorldOrientation());
++    listener-&gt;setOrientation(actor-&gt;getWorldOrientation());
++    listener-&gt;setVelocity(actor-&gt;getVelocity());
+     LOG_DEBUG(Logger::CORE, &quot;Pos Listener: &quot;
+         + StringConverter::toString(actor-&gt;getWorldPosition().x) + &quot; &quot;
+         + StringConverter::toString(actor-&gt;getWorldPosition().y) + &quot; &quot;
+@@ -81,8 +82,6 @@
+         + StringConverter::toString(actor-&gt;getWorldOrientation().x) + &quot; &quot;
+         + StringConverter::toString(actor-&gt;getWorldOrientation().y) + &quot;, &quot;
+         + StringConverter::toString(actor-&gt;getWorldOrientation().z));
+-//    listener-&gt;setOrientation(*temp1, *temp1);
+-    // TODO Orientation korrigieren
+ }
+ 
+ /**
+
+Modified: rl/branches/newton20/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicalThing.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/src/PhysicalThing.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -199,7 +199,7 @@
+ 
+     void PhysicalThing::addForce(const Ogre::Vector3&amp; force)
+     {
+-        //mBody-&gt;unFreeze();
++        mBody-&gt;unFreeze();
+         mPendingForce += force;
+     }
+ 
+@@ -308,12 +308,12 @@
+ 
+     void PhysicalThing::freeze()
+     {
+-        //mBody-&gt;freeze();
++        mBody-&gt;freeze();
+     }
+ 
+     void PhysicalThing::unfreeze()
+     {
+-        //mBody-&gt;unFreeze();
++        mBody-&gt;unFreeze();
+     }
+ 
+     void PhysicalThing::setContactListener(PhysicsContactListener* listener)
+@@ -485,9 +485,9 @@
+             // prepare for control
+             mPhysicsController = controller;
+             //mBody-&gt;setAutoFreeze(0);
+-            //mBody-&gt;unFreeze();
+-            //mBody-&gt;setLinearDamping(0.0f);
+-            //mBody-&gt;setAngularDamping(Vector3::ZERO);
++            mBody-&gt;unFreeze();
++            mBody-&gt;setLinearDamping(0.0f);
++            mBody-&gt;setAngularDamping(Vector3::ZERO);
+ 
+             mBody-&gt;setCustomForceAndTorqueCallback( PhysicsManager::controlledForceCallback );
+ 
+
+Modified: rl/branches/newton20/engine/core/src/SoundObject.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/SoundObject.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/core/src/SoundObject.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -144,6 +144,7 @@
+ void SoundObject::set3d( bool is3d )
+ {
+ 	getSound()-&gt;set3d(is3d);
++        _update(); // do we need this here?
+ }
+ 
+ void SoundObject::load()
+
+Modified: rl/branches/newton20/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/branches/newton20/engine/rules/include/CreatureController.h	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/rules/include/CreatureController.h	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -114,7 +114,7 @@
+          * @param direction This is the movement direction in local space.
+ 		 *                  If the direction isn't possible (see AbstractMovement::isDirectionPossible),
+ 		 *                  only a &quot;part&quot; of the direction is applied.
+-         * @param rotation like above
++         * @param rotation like above (in radians)
+          * @retval false signifies that the change to this movement was not possible (possibly because the present movement forbade it)
+          */
+         bool setMovement(MovementType type, Ogre::Vector3 direction, Ogre::Vector3 rotation);
+
+Modified: rl/branches/newton20/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/CreatureController.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/rules/src/CreatureController.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -445,7 +445,7 @@
+ //getContactTangentDirections(vec1, vec2);
+ //oss &lt;&lt; &quot;  \t Tangent-Directions: &quot; &lt;&lt; vec1 &lt;&lt; &quot; &quot; &lt;&lt; vec2;
+ //LOG_MESSAGE(Logger::RULES, oss.str());
+-/*
++
+         setContactFrictionState(0,0);
+         setContactFrictionState(0,1);
+ 
+@@ -483,7 +483,6 @@
+                 setContactFrictionState(0,1);
+             }
+         }
+-*/
+ 
+         if(mMovement != NULL)
+         {
+
+Modified: rl/branches/newton20/engine/rules/src/GoToJob.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/GoToJob.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/rules/src/GoToJob.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -34,6 +34,8 @@
+ 		  mTimeLeft(duration)
+ 	{
+ 		mActor = CreatureControllerManager::getSingleton().getCreatureController(actor);
++                if( mActor == NULL )
++                    Throw(NullPointerException, &quot;Couldn't get a CreatureController!&quot;);
+ 	}
+ 
+ 	GoToJob::GoToJob(Creature* actor, GameObject* target, Real maxDistance, Real duration)
+@@ -45,6 +47,10 @@
+ 		  mTimeLeft(duration)
+ 	{
+ 		mActor = CreatureControllerManager::getSingleton().getCreatureController(actor);
++                if( mActor == NULL )
++                    Throw(NullPointerException, &quot;Couldn't get a CreatureController!&quot;);
++                if( mTarget == NULL )
++                    Throw(NullPointerException, &quot;Argument GameObject* target cannot be NULL!&quot;);
+ 	}
+ 
+     GoToJob::~GoToJob()
+@@ -60,15 +66,25 @@
+ 			mActor-&gt;setMovement(CreatureController::MT_STEHEN, Vector3::ZERO, Vector3::ZERO);
+ 			return true;
+ 		}
++
++                Ogre::Real distance = 0;
++
+ 		// update target position
+ 		if (mTarget)
+ 		{
+ 			mTargetPos = mTarget-&gt;getPosition();
++		        // Are we there now?
++		        distance = MathUtil::distance(mTarget-&gt;getWorldBoundingBox(),
++			    mActor-&gt;getCreature()-&gt;getWorldBoundingBox());
+ 		}
++                else
++                {
++                    if( mActor-&gt;getCreature()-&gt;getWorldBoundingBox().intersects(mTargetPos) )
++                        distance = 0;
++                    else
++                        distance = (mTargetPos - mActor-&gt;getCreature()-&gt;getPosition()).length();
++                }
+ 
+-		// Are we there now?
+-		Ogre::Real distance = MathUtil::distance(mTarget-&gt;getWorldBoundingBox(),
+-			mActor-&gt;getCreature()-&gt;getWorldBoundingBox());
+ 		if (distance &lt; mMaxDistance)
+ 		{
+ 			// Stay put where ever we are.
+@@ -76,6 +92,8 @@
+ 			return true;
+ 		}
+ 
++
++                /*
+ 		// Hard set orientation.
+ 		/// @todo Use CreatureController properly to turn smoothly
+ 		Vector3 pos = mActor-&gt;getCreature()-&gt;getPosition();
+@@ -84,8 +102,13 @@
+ 		targetPos.y = 0;
+ 		mActor-&gt;getCreature()-&gt;setOrientation(Vector3::NEGATIVE_UNIT_Z.getRotationTo(targetPos - pos));
+ 		mActor-&gt;setMovement(CreatureController::MT_LAUFEN, Vector3::NEGATIVE_UNIT_Z, Vector3::ZERO);
++                */
++		Vector3 pos = mActor-&gt;getCreature()-&gt;getPosition();
++                Radian yawDiff = Vector3::NEGATIVE_UNIT_Z.getRotationTo(mTargetPos-pos, Vector3::UNIT_Y).getYaw() - mActor-&gt;getYaw();
++                Vector3 rotation = Vector3::UNIT_Y*yawDiff.valueRadians();
++		mActor-&gt;setMovement(CreatureController::MT_LAUFEN, Vector3::NEGATIVE_UNIT_Z, rotation);
+ 
+-		mTimeLeft  -= time;
++                mTimeLeft  -= time;
+ 		return false;
+ 	}
+ }
+
+Modified: rl/branches/newton20/engine/rules/src/RotateMovement.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/RotateMovement.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/rules/src/RotateMovement.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -28,7 +28,7 @@
+     RotateMovement::RotateMovement(CreatureController *creature) : AbstractMovement(creature), mYaw(0)
+     {
+         mRotLinearSpringK = 600.0f;
+-        Real relationCoefficient = 1.1f;
++        Real relationCoefficient = 1.0f;
+         mRotLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mRotLinearSpringK);
+     }
+ 
+
+Modified: rl/branches/newton20/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/InputManager.cpp	2008-08-19 10:03:38 UTC (rev 4477)
++++ rl/branches/newton20/engine/ui/src/InputManager.cpp	2008-08-23 12:39:18 UTC (rev 4478)
+@@ -121,8 +121,8 @@
+             pl.insert(std::make_pair(std::string(&quot;w32_keyboard&quot;), std::string(&quot;DISCL_EXCLUSIVE&quot;)));
+             pl.insert(std::make_pair(std::string(&quot;w32_keyboard&quot;), std::string(&quot;DISCL_FOREGROUND&quot;)));
+         #elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX &amp; defined DEBUG
+-//            pl.insert(std::make_pair(std::string(&quot;x11_mouse_grab&quot;), std::string(&quot;false&quot;)));
+-//            pl.insert(std::make_pair(std::string(&quot;x11_keyboard_grab&quot;), std::string(&quot;false&quot;)));
++            pl.insert(std::make_pair(std::string(&quot;x11_mouse_grab&quot;), std::string(&quot;false&quot;)));
++            pl.insert(std::make_pair(std::string(&quot;x11_keyboard_grab&quot;), std::string(&quot;false&quot;)));
+         #endif
+ 
+         std::ostringstream windowHndStr;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001534.html">[Dsa-hl-svn] r4477 - rl/trunk/engine/script/src
+</A></li>
+	<LI>Next message: <A HREF="001536.html">[Dsa-hl-svn] r4479 - in modules/common/scripts: . jobs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1535">[ date ]</a>
+              <a href="thread.html#1535">[ thread ]</a>
+              <a href="subject.html#1535">[ subject ]</a>
+              <a href="author.html#1535">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

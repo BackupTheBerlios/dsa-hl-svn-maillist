@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4033 - in modules/common/scripts: . triggers
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4033%20-%20in%20modules/common/scripts%3A%20.%20triggers&In-Reply-To=%3C200712191932.lBJJW07b018676%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001103.html">
+   <LINK REL="Next"  HREF="001105.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4033 - in modules/common/scripts: . triggers</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4033%20-%20in%20modules/common/scripts%3A%20.%20triggers&In-Reply-To=%3C200712191932.lBJJW07b018676%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4033 - in modules/common/scripts: . triggers">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Dec 19 20:32:00 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001103.html">[Dsa-hl-svn] r4032 - in rl/trunk/engine: common/include common/src	core/include core/src ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="001105.html">[Dsa-hl-svn] r4034 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1104">[ date ]</a>
+              <a href="thread.html#1104">[ thread ]</a>
+              <a href="subject.html#1104">[ subject ]</a>
+              <a href="author.html#1104">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-12-19 20:31:48 +0100 (Wed, 19 Dec 2007)
+New Revision: 4033
+
+Modified:
+   modules/common/scripts/areahelper.rb
+   modules/common/scripts/triggers/limitedtimestrigger.rb
+Log:
+_Create*Trigger now uses a string as argument instead of a Proc, because procs cannot be serialized. So the code can now be saved and loaded
+
+Modified: modules/common/scripts/areahelper.rb
+===================================================================
+--- modules/common/scripts/areahelper.rb	2007-12-19 19:06:01 UTC (rev 4032)
++++ modules/common/scripts/areahelper.rb	2007-12-19 19:31:48 UTC (rev 4033)
+@@ -1,7 +1,9 @@
+ require &quot;triggers/limitedtimestrigger.rb&quot;
+ 
+ # creates a zone with a trigger, that is destroyed if actived 'times' of times
+-# Example: _CreateLimitedTimesTrigger(&quot;uniquename&quot;, PhysicsManager::GT_SPHERE, [-20,0,5], [1,0,0,0], [2,2,2], 5, Proc.new{print &quot;entered&quot;}, Proc.new{print &quot;left&quot;})
++# Example: _CreateLimitedTimesTrigger(&quot;uniquename&quot;, PhysicsManager::GT_SPHERE, [-20,0,5], [1,0,0,0], [2,2,2], 5, %q{print &quot;entered&quot;}, %q{print &quot;left&quot;})
++# the enter- and leaveproc must be given as string, because there is no other way to serialize them if
++# the trigger will be saved
+ def _CreateLimitedTimesTrigger(name, geom_type, pos, orientation, size, times, enter_proc, leave_proc = nil)
+   unless ( ZoneManager.getSingleton().getZone(&quot;limitedTimesTriggerZone_&quot; + name) == nil )
+     raise ArgumentError, &quot;A limitedTimesTrigger with name &quot; + name + &quot; already exists!&quot;, caller
+@@ -13,8 +15,8 @@
+     &quot;limitedTimesTriggerZone_&quot; + name, 
+     size, geom_type, pos, [0,0,0], orientation, 0.2, RlScript::QUERYFLAG_PLAYER);
+   trigger.setProperty(&quot;number&quot;, times);
+-  trigger.setEnterCode( &amp;enter_proc );
+-  trigger.setLeaveCode( &amp;leave_proc );
++  trigger.setEnterCode( enter_proc );
++  trigger.setLeaveCode( leave_proc );
+   trigger.setProperty(&quot;zone&quot;, &quot;limitedTimesTriggerZone_&quot; + name )
+   zone.addTrigger(trigger)
+   return trigger
+
+Modified: modules/common/scripts/triggers/limitedtimestrigger.rb
+===================================================================
+--- modules/common/scripts/triggers/limitedtimestrigger.rb	2007-12-19 19:06:01 UTC (rev 4032)
++++ modules/common/scripts/triggers/limitedtimestrigger.rb	2007-12-19 19:31:48 UTC (rev 4033)
+@@ -1,5 +1,12 @@
+ # this trigger is intended to be used by areahelper
+ # a trigger, that saves an command the appropriate zone and deletes it when finished
++# 
++# In order to save the trigger, we need the code for enter- and leave-command to
++# be a string, because Proc's cannot be serialized
++# The string will be transformed to a Proc, so local variables etc can be used
++#
++# Example:
++# tr.setEnterCode( %q{ print &quot;hello&quot;} )
+ class LimitedTimesTrigger &lt; Trigger
+   def initialize(classname, name)
+     super(classname, name, true);
+@@ -7,12 +14,24 @@
+     @_prop_leave_command = nil;
+     @_prop_zone = &quot;&quot;;
+     @_prop_number = 0; # 0 infty, -1 once, -2 deactivated
++    @_prop_enter_command_string = nil;
++    @_prop_leave_command_string = nil;
+   end
+-  def setEnterCode(&amp;code)
+-    @_prop_enter_command = code
++  def setEnterCode(code)
++    if( code == nil )
++      @_prop_enter_command = nil
++    else	
++      @_prop_enter_command_string = code
++    end
++    @_prop_enter_command = eval &quot;Proc.new{ #{code} }&quot;
+   end
+-  def setLeaveCode(&amp;code)
+-    @_prop_leave_command = code
++  def setLeaveCode(code)
++    if( code == nil )
++      @_prop_leave_command = nil
++    else
++      @_prop_leave_command_string = code
++    end
++    @_prop_leave_command = eval &quot;Proc.new{ #{code} }&quot;
+   end
+ 
+   def activate()
+@@ -58,7 +77,11 @@
+     if (name == &quot;number&quot;)
+       @_prop_number = value;
+     elsif (name == &quot;zone&quot;)
+-      @_prop_zone = value
++      @_prop_zone = value;
++    elsif (name == &quot;enter_code&quot;)
++      setEnterCode(value);
++    elsif (name = &quot;leave_code&quot;)
++      setLeaveCode(value);
+     else
+       super(name, value)
+     end
+@@ -68,6 +91,10 @@
+       return @_prop_zone
+     elsif (name == &quot;number&quot;)
+       return @_prop_number
++    elsif (name == &quot;enter_code&quot;)
++      return @_prop_enter_command_string
++    elsif (name == &quot;leave_code&quot;)
++      return @_prop_leave_command_string
+     else
+       super(name)
+     end
+@@ -76,6 +103,8 @@
+     ps = super();
+     ps.setProperty(&quot;zone&quot;, @_prop_zone)
+     ps.setProperty(&quot;number&quot;, @_prop_number)
++    ps.setProperty(&quot;enter_code&quot;, @_prop_enter_command_string)
++    ps.setProperty(&quot;leave_code&quot;, @_prop_leave_command_string)
+     return ps
+   end
+ end
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001103.html">[Dsa-hl-svn] r4032 - in rl/trunk/engine: common/include common/src	core/include core/src ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="001105.html">[Dsa-hl-svn] r4034 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1104">[ date ]</a>
+              <a href="thread.html#1104">[ thread ]</a>
+              <a href="subject.html#1104">[ subject ]</a>
+              <a href="author.html#1104">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3913 - in rl/trunk/engine: core/src rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3913%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200710142257.l9EMvuEr013554%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000983.html">
+   <LINK REL="Next"  HREF="000985.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3913 - in rl/trunk/engine: core/src rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3913%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200710142257.l9EMvuEr013554%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3913 - in rl/trunk/engine: core/src rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Mon Oct 15 00:57:56 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000983.html">[Dsa-hl-svn] r3912 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="000985.html">[Dsa-hl-svn] r3914 - in rl/trunk/engine: core/include core/src	rules/include rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#984">[ date ]</a>
+              <a href="thread.html#984">[ thread ]</a>
+              <a href="subject.html#984">[ subject ]</a>
+              <a href="author.html#984">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-15 00:57:42 +0200 (Mon, 15 Oct 2007)
+New Revision: 3913
+
+Modified:
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/rules/src/QuestBook.cpp
+Log:
+fixed pure virtual error
+
+- loading is broken yet
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-14 22:35:52 UTC (rev 3912)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-14 22:57:42 UTC (rev 3913)
+@@ -35,12 +35,12 @@
+ {
+     SaveGameData::SaveGameData()
+     {
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
++        
+     }
+ 
+     SaveGameData::~SaveGameData()
+     {
+-        SaveGameManager::getSingleton().unregisterSaveGameData(this);
++        
+     }
+ 
+     CeGuiString printTimeAsString(tm* time)
+@@ -152,7 +152,7 @@
+ 
+     void SaveGameManager::registerSaveGameData(SaveGameData* data)
+     {
+-        mSaveGameDataOrderMap.insert(SaveGameDataOrderMap::value_type(data-&gt;getPriority(),data));
++        mSaveGameDataOrderMap.insert(std::make_pair(data-&gt;getPriority(),data));
+     }
+ 
+     void SaveGameManager::unregisterSaveGameData(SaveGameData* data)
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-14 22:35:52 UTC (rev 3912)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-14 22:57:42 UTC (rev 3913)
+@@ -51,10 +51,14 @@
+         physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0,0);
+ 
+         physicsManager-&gt;getNewtonDebugger()-&gt;setMaterialColor(char_mat, Ogre::ColourValue::Red);
++
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+     {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
++
+         PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
+         const OgreNewt::MaterialID *char_mat = physicsManager-&gt;getMaterialID(&quot;character&quot;);
+ 
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-14 22:35:52 UTC (rev 3912)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-14 22:57:42 UTC (rev 3913)
+@@ -46,10 +46,12 @@
+ 
+         mScriptPatterns.push_back(&quot;*.gof&quot;);
+         Ogre::ResourceGroupManager::getSingleton()._registerScriptLoader(this);
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     GameObjectManager::~GameObjectManager()
+     {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+         unregisterAllGameObjectStateListener();
+         deleteAllGameObjects();
+         ///@todo: Delete all game objects, delete all class properties
+
+Modified: rl/trunk/engine/rules/src/QuestBook.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-14 22:35:52 UTC (rev 3912)
++++ rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-14 22:57:42 UTC (rev 3913)
+@@ -32,10 +32,12 @@
+ 	    mJournalEventCaster()
+     {
+         createRoot();
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     QuestBook::~QuestBook()
+     {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+ 	    delete mRootQuest;
+         for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
+             it != mJournalEntries.end(); it++ )
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000983.html">[Dsa-hl-svn] r3912 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="000985.html">[Dsa-hl-svn] r3914 - in rl/trunk/engine: core/include core/src	rules/include rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#984">[ date ]</a>
+              <a href="thread.html#984">[ thread ]</a>
+              <a href="subject.html#984">[ subject ]</a>
+              <a href="author.html#984">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

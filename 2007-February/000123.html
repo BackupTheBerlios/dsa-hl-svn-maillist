@@ -1,0 +1,592 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3052 - in rl/trunk: engine/core/include	engine/core/src plugins/fmod4driver/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3052%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/src%20plugins/fmod4driver/src&In-Reply-To=%3C200702162136.l1GLa674014292%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000122.html">
+   <LINK REL="Next"  HREF="000124.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3052 - in rl/trunk: engine/core/include	engine/core/src plugins/fmod4driver/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3052%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/src%20plugins/fmod4driver/src&In-Reply-To=%3C200702162136.l1GLa674014292%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3052 - in rl/trunk: engine/core/include	engine/core/src plugins/fmod4driver/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Fri Feb 16 22:36:06 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000122.html">[Dsa-hl-svn] r3051 - in rl/trunk/engine: core/include core/src	ui/src
+</A></li>
+        <LI>Next message: <A HREF="000124.html">[Dsa-hl-svn] r3053 - rl/trunk
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#123">[ date ]</a>
+              <a href="thread.html#123">[ thread ]</a>
+              <a href="subject.html#123">[ subject ]</a>
+              <a href="author.html#123">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-02-16 22:35:47 +0100 (Fri, 16 Feb 2007)
+New Revision: 3052
+
+Modified:
+   rl/trunk/engine/core/include/SoundDriver.h
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/SoundDriver.cpp
+   rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+Log:
+SoundDriver now has overloaded createXXX functions, that load the resources themselves.
+Made comments in Sound classes MSVC compatible.
+
+Modified: rl/trunk/engine/core/include/SoundDriver.h
+===================================================================
+--- rl/trunk/engine/core/include/SoundDriver.h	2007-02-15 18:25:06 UTC (rev 3051)
++++ rl/trunk/engine/core/include/SoundDriver.h	2007-02-16 21:35:47 UTC (rev 3052)
+@@ -24,12 +24,7 @@
+ {
+     class ListenerMovable;
+ 
+-    /**
+-     * Diese Klasse dient zur Definition einer Schnittstelle
+-     * zu den m&#239;&#191;&#189;glichen Soundbibliotheken. Sie geben Preis, ob
+-     * ein Treiber vorhanden ist oder nicht. Der Nulltreiber
+-     * existiert dabei immer.
+-     */
++    /// Abstract super class of all API specific sound drivers.
+     class _RlCoreExport SoundDriver
+     {
+     public:
+@@ -37,7 +32,8 @@
+         SoundDriver(Ogre::ResourceManager* soundResourceManager);
+         /// Der Destruktor
+         virtual ~SoundDriver();
+-        /// Zeigt an, ob der Treiber funktionsf&#239;&#191;&#189;hig ist.
++
++        /// returns true, if the driver can work on the current system. False else.
+         virtual bool isDriverAvailable() = 0;
+ 
+         /** Initialize driver
+@@ -53,9 +49,12 @@
+         virtual void update() = 0;
+         /// Einen Sound-Stream mit Resource erzeugen
+         virtual Sound* createStream(const SoundResourcePtr &amp;res);
++        virtual Sound* createStream(const Ogre::String&amp; name);
+         /// Einen Sound-Sample mit Resource erzeugen
+         virtual Sound* createSample(const SoundResourcePtr &amp;res);
++        virtual Sound* createSample(const Ogre::String&amp; name);
+ 
++
+         /// Destroy a sound created by this driver. Do not call the Sound destructor yourself!
+         virtual void destroySound(Sound*);
+ 
+@@ -63,20 +62,18 @@
+         virtual ListenerMovable *createListener(const Ogre::String &amp;name) = 0;
+ 
+ 
+-        /// Setzt den Faktor f, mit der die Lautst&#239;&#191;&#189;rke nach der Formel 1/(f*Entfernung) abnimmt
++        /// Set attenuation of the volume with distance. f influences
++        /// volume like this: relative volume = 1/(f*distance)
+         virtual void setRolloffFactor(const Ogre::Real&amp; f) = 0;
+         virtual const Ogre::Real getRolloffFactor() = 0;
+-        /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik einstellen
++
+         void setDefaultMusicVolume(const Ogre::Real&amp; vol);
+-        /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik zur&#239;&#191;&#189;ckgeben.
+         const Ogre::Real getDefaultMusicVolume() const;
+-        /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik einstellen
++
+         void setDefaultSoundVolume(const Ogre::Real&amp; vol);
+-        /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik zur&#239;&#191;&#189;ckgeben.
+         const Ogre::Real getDefaultSoundVolume() const;
+-        /// Die Lautst&#239;&#191;&#189;rke aller Sounds
++
+         virtual void setMasterVolume(const Ogre::Real&amp; vol);
+-        /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik zur&#239;&#191;&#189;ckgeben.
+         const Ogre::Real getMasterVolume() const;
+ 
+         /**
+@@ -95,7 +92,7 @@
+         virtual void applySettings(const Ogre::NameValuePairList&amp; settings);
+ 
+     protected:
+-        static Ogre::ResourceManager* sSoundResourceManager;
++        Ogre::ResourceManager* mSoundResourceManager;
+ 
+         SoundSet mStreamSet;
+         SoundSet mSampleSet;
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2007-02-15 18:25:06 UTC (rev 3051)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2007-02-16 21:35:47 UTC (rev 3052)
+@@ -192,9 +192,7 @@
+         Actor* actor = 0;
+         try
+         {
+-            Sound* sm = SoundManager::getSingleton().
+-				getActiveDriver()-&gt;createSample(SoundManager::getSingleton().load(soundfile,
+-                    ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME));
++            Sound* sm = SoundManager::getSingleton().getActiveDriver()-&gt;createSample(soundfile);
+             SoundObject* so = new SoundObject(sm, soundfile);
+             actor = new Actor(uniquename, so);
+             mActors.insert(ActorPtrPair(uniquename,actor));  
+@@ -222,9 +220,7 @@
+         Actor* actor = 0;
+         try
+         {
+-            Sound* sm = SoundManager::getSingleton().
+-                getActiveDriver()-&gt;createStream(SoundManager::getSingleton().load(soundfile,
+-                    ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME));
++            Sound* sm = SoundManager::getSingleton().getActiveDriver()-&gt;createStream(soundfile);
+             SoundObject* so = new SoundObject(sm, soundfile);
+ 
+             actor = new Actor(uniquename, so);
+
+Modified: rl/trunk/engine/core/src/SoundDriver.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SoundDriver.cpp	2007-02-15 18:25:06 UTC (rev 3051)
++++ rl/trunk/engine/core/src/SoundDriver.cpp	2007-02-16 21:35:47 UTC (rev 3052)
+@@ -1,176 +1,197 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;SoundDriver.h&quot;
+-#include &quot;ConfigFile.h&quot;
+-#include &lt;OgreStringConverter.h&gt;
+-
+-using namespace Ogre;
+-
+-namespace rl
+-{
+-
+-Ogre::ResourceManager* SoundDriver::sSoundResourceManager = NULL;
+-
+-SoundDriver::SoundDriver(ResourceManager* soundResourceManager)
+- :  mStreamSet(),
+-    mSampleSet(),
+-    mDefaultMusicVolume(40),
+-    mDefaultSoundVolume(100),
+-    mMasterVolume(100)
+-{
+-    sSoundResourceManager = soundResourceManager;
+-}
+-
+-SoundDriver::~SoundDriver()
+-{
+-    SoundSet sounds;
+-    sounds.insert(mSampleSet.begin(), mSampleSet.end());
+-    sounds.insert(mSampleSet.begin(), mSampleSet.end());
+-    for (SoundSet::iterator it = sounds.begin(); it != sounds.end(); ++it)
+-    {
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;SoundDriver.h&quot;
++#include &quot;ConfigFile.h&quot;
++
++#include &lt;OgreStringConverter.h&gt;
++
++using namespace Ogre;
++
++namespace rl
++{
++
++SoundDriver::SoundDriver(ResourceManager* soundResourceManager)
++ :  mSoundResourceManager(soundResourceManager),
++    mStreamSet(),
++    mSampleSet(),
++    mDefaultMusicVolume(40),
++    mDefaultSoundVolume(100),
++    mMasterVolume(100)
++{
++}
++
++SoundDriver::~SoundDriver()
++{
++    SoundSet sounds;
++    sounds.insert(mSampleSet.begin(), mSampleSet.end());
++    sounds.insert(mSampleSet.begin(), mSampleSet.end());
++    for (SoundSet::iterator it = sounds.begin(); it != sounds.end(); ++it)
++    {
+         if ((*it)-&gt;isPlaying())
+         {
+             (*it)-&gt;stop();
+-        }
+-        delete *it;
+-    }
+-}
+-
+-/// Die Standardlautst&#228;rke f&#252;r Musik einstellen
+-void SoundDriver::setDefaultMusicVolume(const Ogre::Real&amp; vol)
+-{
+-    mDefaultMusicVolume = vol;
+-    SoundSet::iterator it;
+-    for(it = mStreamSet.begin(); it != mStreamSet.end(); it++)
+-    {
+-        (*it)-&gt;setVolume(vol);
+-    }
+-}
+-
+-/// Die Standardlautst&#228;rke f&#252;r Musik zur&#252;ckgeben.
+-const Ogre::Real SoundDriver::getDefaultMusicVolume() const
+-{
+-    return mDefaultMusicVolume;
+-}
+-
+-/// Die Standardlautst&#228;rke f&#252;r Musik einstellen
+-void SoundDriver::setDefaultSoundVolume(const Ogre::Real&amp; vol)
+-{
+-    mDefaultSoundVolume = vol;
+-    SoundSet::iterator it;
+-    for(it = mSampleSet.begin(); it != mSampleSet.end(); it++)
+-    {
+-        (*it)-&gt;setVolume(vol);
+-    }
+-}
+-
+-/// Die Standardlautst&#228;rke f&#252;r Musik zur&#252;ckgeben.
+-const Ogre::Real SoundDriver::getDefaultSoundVolume() const
+-{
+-    return mDefaultSoundVolume;
+-}
+-
+-void SoundDriver::setMasterVolume(const Ogre::Real&amp; vol)
+-{
+-    mMasterVolume = vol;
+-}
+-
+-const Ogre::Real SoundDriver::getMasterVolume() const
+-{
+-    return mMasterVolume;
+-}
+-
+-    Ogre::NameValuePairList SoundDriver::getSettings() const
+-    {
+-        Ogre::NameValuePairList SoundSettings;
+-
+-        // Append the settings to the list
+-        SoundSettings.insert(make_pair(&quot;MasterVolume&quot;, Ogre::StringConverter::toString(mMasterVolume)));
+-        SoundSettings.insert(make_pair(&quot;DefaultMusicVolume&quot;, Ogre::StringConverter::toString(mDefaultMusicVolume)));
+-        SoundSettings.insert(make_pair(&quot;DefaultSoundVolume&quot;, Ogre::StringConverter::toString(mDefaultSoundVolume)));
+-
+-        return SoundSettings;
+-    }
+-
+-    void SoundDriver::applySettings(const Ogre::NameValuePairList&amp; settings)
+-    {
+-        Ogre::NameValuePairList::const_iterator it;
+-
+-        // Set the Master volume
+-        if ((it = settings.find(&quot;MasterVolume&quot;)) == settings.end())
+-        {
+-            // Set a sane default value
+-            setMasterVolume(Real(1.0));
+-        }
+-        else
+-        {
+-            setMasterVolume(Ogre::StringConverter::parseReal(it-&gt;second));
+-        }
+-
+-        // Set the Default Music Volume
+-        if ((it = settings.find(&quot;DefaultMusicVolume&quot;)) == settings.end())
+-        {
+-            // Set a sane default value
+-            setDefaultMusicVolume(Real(0.3));
+-        }
+-        else
+-        {
+-            setDefaultMusicVolume(Ogre::StringConverter::parseReal(it-&gt;second));
+-        }
+-
+-        // Set the Default Sound Volume
+-        if ((it = settings.find(&quot;DefaultSoundVolume&quot;)) == settings.end())
+-        {
+-            // Set a sane default value
+-            setDefaultSoundVolume(Real(1.0));
+-        }
+-        else
+-        {
+-            setDefaultSoundVolume(Ogre::StringConverter::parseReal(it-&gt;second));
+-        }
+-    }
+-
+-    Sound* SoundDriver::createStream(const SoundResourcePtr &amp;res)
+-    {
+-        Sound* sound = createStreamImpl(res);
+-        if (sound != NULL)
+-        {
+-            mStreamSet.insert(sound);
+-        }
+-        return sound;
+-    }
+-
+-    Sound* SoundDriver::createSample(const SoundResourcePtr &amp;res)
+-    {
+-        Sound* sound = createSampleImpl(res);
+-        if (sound != NULL)
+-        {
+-            mSampleSet.insert(sound);
+-        }
+-        return sound;
+-    }
+-
+-    void SoundDriver::destroySound(Sound* sound)
+-    {
++        }
++        delete *it;
++    }
++}
++
++/// Die Standardlautst&#228;rke f&#252;r Musik einstellen
++void SoundDriver::setDefaultMusicVolume(const Ogre::Real&amp; vol)
++{
++    mDefaultMusicVolume = vol;
++    SoundSet::iterator it;
++    for(it = mStreamSet.begin(); it != mStreamSet.end(); it++)
++    {
++        (*it)-&gt;setVolume(vol);
++    }
++}
++
++/// Die Standardlautst&#228;rke f&#252;r Musik zur&#252;ckgeben.
++const Ogre::Real SoundDriver::getDefaultMusicVolume() const
++{
++    return mDefaultMusicVolume;
++}
++
++/// Die Standardlautst&#228;rke f&#252;r Musik einstellen
++void SoundDriver::setDefaultSoundVolume(const Ogre::Real&amp; vol)
++{
++    mDefaultSoundVolume = vol;
++    SoundSet::iterator it;
++    for(it = mSampleSet.begin(); it != mSampleSet.end(); it++)
++    {
++        (*it)-&gt;setVolume(vol);
++    }
++}
++
++/// Die Standardlautst&#228;rke f&#252;r Musik zur&#252;ckgeben.
++const Ogre::Real SoundDriver::getDefaultSoundVolume() const
++{
++    return mDefaultSoundVolume;
++}
++
++void SoundDriver::setMasterVolume(const Ogre::Real&amp; vol)
++{
++    mMasterVolume = vol;
++}
++
++const Ogre::Real SoundDriver::getMasterVolume() const
++{
++    return mMasterVolume;
++}
++
++    Ogre::NameValuePairList SoundDriver::getSettings() const
++    {
++        Ogre::NameValuePairList SoundSettings;
++
++        // Append the settings to the list
++        SoundSettings.insert(make_pair(&quot;MasterVolume&quot;, Ogre::StringConverter::toString(mMasterVolume)));
++        SoundSettings.insert(make_pair(&quot;DefaultMusicVolume&quot;, Ogre::StringConverter::toString(mDefaultMusicVolume)));
++        SoundSettings.insert(make_pair(&quot;DefaultSoundVolume&quot;, Ogre::StringConverter::toString(mDefaultSoundVolume)));
++
++        return SoundSettings;
++    }
++
++    void SoundDriver::applySettings(const Ogre::NameValuePairList&amp; settings)
++    {
++        Ogre::NameValuePairList::const_iterator it;
++
++        // Set the Master volume
++        if ((it = settings.find(&quot;MasterVolume&quot;)) == settings.end())
++        {
++            // Set a sane default value
++            setMasterVolume(Real(1.0));
++        }
++        else
++        {
++            setMasterVolume(Ogre::StringConverter::parseReal(it-&gt;second));
++        }
++
++        // Set the Default Music Volume
++        if ((it = settings.find(&quot;DefaultMusicVolume&quot;)) == settings.end())
++        {
++            // Set a sane default value
++            setDefaultMusicVolume(Real(0.3));
++        }
++        else
++        {
++            setDefaultMusicVolume(Ogre::StringConverter::parseReal(it-&gt;second));
++        }
++
++        // Set the Default Sound Volume
++        if ((it = settings.find(&quot;DefaultSoundVolume&quot;)) == settings.end())
++        {
++            // Set a sane default value
++            setDefaultSoundVolume(Real(1.0));
++        }
++        else
++        {
++            setDefaultSoundVolume(Ogre::StringConverter::parseReal(it-&gt;second));
++        }
++    }
++
++    Sound* SoundDriver::createStream(const Ogre::String&amp; name)
++    {
++        SoundResourcePtr ptr = mSoundResourceManager-&gt;load(name,
++            ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
++        if (ptr.isNull())
++        {
++            Throw(IllegalArgumentException, &quot;Sound &quot; + name + &quot;nicht gefunden&quot;);
++        }
++        return createStream(ptr);
++    }
++
++    Sound* SoundDriver::createStream(const SoundResourcePtr &amp;res)
++    {
++        Sound* sound = createStreamImpl(res);
++        if (sound != NULL)
++        {
++            mStreamSet.insert(sound);
++        }
++        return sound;
++    }
++
++    Sound* SoundDriver::createSample(const Ogre::String&amp; name)
++    {
++        SoundResourcePtr ptr = mSoundResourceManager-&gt;load(name,
++            ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
++        if (ptr.isNull())
++        {
++            Throw(IllegalArgumentException, &quot;Sound &quot; + name + &quot;nicht gefunden&quot;);
++        }
++        return createSample(ptr);
++    }
++
++    Sound* SoundDriver::createSample(const SoundResourcePtr &amp;res)
++    {
++        Sound* sound = createSampleImpl(res);
++        if (sound != NULL)
++        {
++            mSampleSet.insert(sound);
++        }
++        return sound;
++    }
++
++    void SoundDriver::destroySound(Sound* sound)
++    {
+         if (sound-&gt;isPlaying())
+         {
+             sound-&gt;stop();
+         }
+-        mStreamSet.erase(sound);
+-        mSampleSet.erase(sound);
+-        delete sound;
+-    }
+-}
++        mStreamSet.erase(sound);
++        mSampleSet.erase(sound);
++        delete sound;
++    }
++}
+
+Modified: rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+===================================================================
+--- rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-02-15 18:25:06 UTC (rev 3051)
++++ rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-02-16 21:35:47 UTC (rev 3052)
+@@ -24,12 +24,16 @@
+ 
+ namespace rl
+ {
++    // Used by FMOD-Callbacks, which are not C++-functions, but C-functions.
++    Ogre::ResourceManager* gSoundResourceManager = NULL;
++
+     String Fmod4Driver::NAME = &quot;RlFmod4Driver&quot;;
+ 
+     Fmod4Driver::Fmod4Driver(Ogre::ResourceManager *soundResourceManager)
+         : SoundDriver(soundResourceManager),
+         mMasterChannelGroup(NULL)
+     {
++        gSoundResourceManager = soundResourceManager;
+     }
+ 
+     Fmod4Driver::~Fmod4Driver()
+@@ -258,7 +262,7 @@
+         void **  handle,
+         void **  userdata)
+     {
+-        SoundResourcePtr* res = new SoundResourcePtr(sSoundResourceManager-&gt;getByName(name));
++        SoundResourcePtr* res = new SoundResourcePtr(gSoundResourceManager-&gt;getByName(name));
+         LOG_DEBUG(Logger::MULTIMEDIA,
+             &quot;Opened stream &quot; + (*res)-&gt;getName());
+         (*res)-&gt;load();
+@@ -340,10 +344,8 @@
+     void Fmod4Driver::setMasterVolume(const Ogre::Real&amp; vol)
+     {
+         SoundDriver::setMasterVolume(vol);
+-        /**@todo: Lautst&#239;&#191;&#189;rke setzen, geht m&#239;&#191;&#189;glicherweise nur &#239;&#191;&#189;ber channelgroups*/
+     }
+ 
+-    /// Setzt den Faktor f, mit der die Lautst&#239;&#191;&#189;rke nach der Formel 1/(f*Entfernung) abnimmt
+     void Fmod4Driver::setRolloffFactor(const Ogre::Real&amp; factor)
+     {
+         float dopplerScale;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000122.html">[Dsa-hl-svn] r3051 - in rl/trunk/engine: core/include core/src	ui/src
+</A></li>
+	<LI>Next message: <A HREF="000124.html">[Dsa-hl-svn] r3053 - rl/trunk
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#123">[ date ]</a>
+              <a href="thread.html#123">[ thread ]</a>
+              <a href="subject.html#123">[ subject ]</a>
+              <a href="author.html#123">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

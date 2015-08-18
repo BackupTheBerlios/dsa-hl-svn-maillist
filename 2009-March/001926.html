@@ -1,0 +1,350 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4869 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4869%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903291210.n2TCArqU002224%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001925.html">
+   <LINK REL="Next"  HREF="001927.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4869 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4869%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903291210.n2TCArqU002224%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4869 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 29 14:10:53 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001925.html">[Dsa-hl-svn] r4868 - dependencies/OgreNewt/inc
+</A></li>
+        <LI>Next message: <A HREF="001927.html">[Dsa-hl-svn] r4870 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1926">[ date ]</a>
+              <a href="thread.html#1926">[ thread ]</a>
+              <a href="subject.html#1926">[ subject ]</a>
+              <a href="author.html#1926">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-29 14:10:47 +0200 (Sun, 29 Mar 2009)
+New Revision: 4869
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+Log:
+- added more functionality to the ModuleExplorer
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-24 23:17:18 UTC (rev 4868)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-29 12:10:47 UTC (rev 4869)
+@@ -34,7 +34,7 @@
+ from MaterialSelectionDialog import *
+ from GameObjectClassView import *
+ from ConsoleWindow import *
+-from ModuleManager import *
++from ModuleManager import ModuleManager
+ from ModuleExplorer import *
+ from NewModuleWizard import *
+ from PivotRenderQueueListener import *
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-24 23:17:18 UTC (rev 4868)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-29 12:10:47 UTC (rev 4869)
+@@ -21,6 +21,7 @@
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+ import ogre.renderer.OGRE as og
++import ModuleManager 
+ 
+ class ExplorerOptionsDlg(QDialog):
+     def __init__(self, lights, gameObjects, entities, zones, parent = None):
+@@ -78,6 +79,7 @@
+         self.setAnimated(True)
+ 
+         self.setHeaderLabels([&quot;Structure&quot;, &quot;Visibility&quot;])
++        self.setSelectionMode(3)
+         
+     def setMenuCallback(self, callback):
+         self.onMenuCallback = callback
+@@ -92,7 +94,8 @@
+         
+         self.sceneTreeView.setMenuCallback(self.onMenu)
+         self.connect(self.sceneTreeView, SIGNAL(&quot;itemClicked (QTreeWidgetItem *,int)&quot;), self.onClick)
+-        
++        self.connect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
++
+         vBoxLayout = QVBoxLayout()
+         vBoxLayout.addWidget(self.sceneTreeView)
+         vBoxLayout.setContentsMargins(0, 0, 0, 0)
+@@ -104,6 +107,7 @@
+         
+         self.moduleManager = None
+         self.mapSelectedCallback = None
++        self.mapItems = []
+         
+         self.lastSelectedMap = None
+         self.onMenuPoint = None
+@@ -112,7 +116,38 @@
+         self.showGameObjects = True
+         self.showEntities = True
+         self.showZones = True
++
++    def selectItems(self, selectedItems):
++        self.deselectAll()
+         
++        if selectedItems is None:
++            return
++        
++        for so in selectedItems:
++            nodeName = so.entity.getParentNode().getName()
++            items = self.sceneTreeView.findItems(nodeName, Qt.MatchFixedString | Qt.MatchRecursive)
++            for item in items:
++                self.sceneTreeView.setItemSelected(item, True)
++    
++    def selectItem(self, so, select):
++        nodeName = so.entity.getParentNode().getName()
++        items = self.sceneTreeView.findItems(nodeName, Qt.MatchFixedString | Qt.MatchRecursive)
++        
++        if select:
++            for item in items:
++                self.sceneTreeView.setItemSelected(item, True)
++        else:
++            for item in items:
++                self.sceneTreeView.setItemSelected(item, False)
++                
++    def onSelectionChanged(self):
++        pass
++
++    def deselectAll(self):
++        for item in self.sceneTreeView.selectedItems():
++            self.sceneTreeView.setItemSelected(item, False)
++
++
+     def onClick(self, item, column):
+         if self.mapSelectedCallback is None:
+             return
+@@ -126,15 +161,7 @@
+                 else:
+                     item.setIcon(1 , QIcon(&quot;media/icons/14_layer_invisible.png&quot;))
+                     self.module.getMap(name.replace(&quot;Map: &quot;, &quot;&quot;)).hide()
+-                    
+-            self.mapSelectedCallback(str(item.parent().text(0)).replace(&quot;Scene: &quot;, &quot;&quot;), name.replace(&quot;Map: &quot;, &quot;&quot;))
+-            self.lastSelectedMap = name
+-        elif name.startswith(&quot;Scene: &quot;):
+-            if item.childCount &gt; 0:
+-                self.mapSelectedCallback(name.replace(&quot;Scene: &quot;, &quot;&quot;), None)
+-                return
+-            self.mapSelectedCallback(name.replace(&quot;Scene: &quot;, &quot;&quot;), str(item.child(0).text(0)).replace(&quot;Map: &quot;, &quot;&quot;))
+-            self.lastSelectedMap = name
++            
+         elif name.startswith(&quot;Zone: &quot;):
+             if self.moduleManager and column == 1:
+                 if self.moduleManager.zoneManager.getZone(name.replace(&quot;Zone: &quot;, &quot;&quot;)).isHidden:
+@@ -143,10 +170,6 @@
+                 else:
+                     item.setIcon(1 , QIcon(&quot;media/icons/14_layer_invisible.png&quot;))
+                     self.moduleManager.zoneManager.getZone(name.replace(&quot;Zone: &quot;, &quot;&quot;)).hide()
+-                
+-        else:
+-            self.mapSelectedCallback(str(item.parent().parent().text(0)).replace(&quot;Scene: &quot;, &quot;&quot;), str(item.parent().text(0)).replace(&quot;Map: &quot;, &quot;&quot;))
+-            self.lastSelectedMap = name
+             
+     def onMenu(self, point):
+         if self.moduleManager is not None:
+@@ -175,6 +198,9 @@
+                 revealMapAction = QAction(&quot;Show&quot;,  self)
+                 menu.addAction(revealMapAction)
+                 self.connect(revealMapAction, SIGNAL(&quot;triggered()&quot;), self.onShowMap)
++                setActiveMapAction = QAction(&quot;Set Active&quot;,  self)
++                menu.addAction(setActiveMapAction)
++                self.connect(setActiveMapAction, SIGNAL(&quot;triggered()&quot;), self.onSetActiveMap)
+                 
+             deleteAction= QAction(&quot;Delete&quot;,  self)
+             menu.addAction(deleteAction)
+@@ -237,8 +263,31 @@
+     
+     def onDelete(self):
+         print &quot;delete&quot;
+-      
++        
++    def paintLastSelectedMapBlue(self):
++        print self.lastSelectedMap
++        for item in self.mapItems:
++            if str(item.text(0)) == self.lastSelectedMap:
++                brush = item.foreground(0)
++                brush.setColor(QColor(&quot;blue&quot;))
++                item.setForeground(0, brush)
++                item.setIcon(0, QIcon(&quot;media/icons/2rightarrow.png&quot;))
++            else:
++                brush = item.foreground(0)
++                brush.setColor(QColor(&quot;black&quot;))
++                item.setForeground(0, brush)
++                item.setIcon(0, QIcon())
++                
++    def onSetActiveMap(self):
++        item = self.sceneTreeView.currentItem()
++        self.lastSelectedMap = str(item.text(0))
++        self.paintLastSelectedMapBlue()
++        sceneName = str(item.parent().text(0).replace(&quot;Scene: &quot;, &quot;&quot;))
++        mapName = str(item.text(0).replace(&quot;Map: &quot;, &quot;&quot;))
++        self.mapSelectedCallback(sceneName, mapName)
++        
+     def updateView(self):
++        self.mapItems = []
+         self.sceneTreeView.clear()
+         
+         for s in self.module.scenes:
+@@ -247,10 +296,12 @@
+             
+             for m in s.mapFiles:
+                 self.parseMap(m, sceneRootItem)
++        
++        self.paintLastSelectedMapBlue()
+ 
+-
+     def parseMap(self, map, sceneRootItem):
+         childItem =  QTreeWidgetItem(sceneRootItem)
++        self.mapItems.append(childItem)
+         sceneRootItem.setExpanded(True)
+         mn = &quot;Map: &quot; + map.mapName
+         
+@@ -270,13 +321,14 @@
+         while i &lt; map.mapNode.numChildren(): 
+             if map.mapNode.getChild(i).getName().startswith(&quot;light_&quot;) and self.showLights:
+                 childItem2 = QTreeWidgetItem(childItem) 
+-                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
++                childItem2.setText(0, ModuleManager.extractLight(map.mapNode.getChild(i)).getName()) 
+             elif map.mapNode.getChild(i).getName().startswith(&quot;gameobject_&quot;) and self.showGameObjects:
+                 childItem2 = QTreeWidgetItem(childItem) 
+-                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
++                go = map.mapNode.getChild(i).getAttachedObject(0).getUserObject()
++                childItem2.setText(0, go.gocName + &quot; id:&quot; + str(go.inWorldId)) 
+             elif map.mapNode.getChild(i).getName().startswith(&quot;entity_&quot;) and self.showEntities:
+                 childItem2 = QTreeWidgetItem(childItem) 
+-                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
++                childItem2.setText(0, map.mapNode.getChild(i).getAttachedObject(0).getName()) 
+             i = i+1
+ 
+         
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-24 23:17:18 UTC (rev 4868)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-29 12:10:47 UTC (rev 4869)
+@@ -904,6 +904,7 @@
+             if self.modelSelectionDialog.listWidget.currentItem() is not None:
+                 meshFile = str(self.modelSelectionDialog.listWidget.currentItem().text())
+                 self.startDropModelAction(meshFile, ray)
++                self.moduleExplorer.updateView()
+                 return
+             else:
+                 print &quot;Warning: OneClickEntityPlacement still runing on without any selected mesh!&quot;
+@@ -923,6 +924,7 @@
+                     self.resetSelection()
+                     so.setSelected(True)
+                     self.userSelectionList.append(so)
++                    self.moduleExplorer.selectItems(self.userSelectionList)
+                     self.updatePivots()
+                 elif controlDown and not shiftDown:
+                     so.setSelected(True)
+@@ -932,6 +934,7 @@
+                             return # object already selected
+ 
+                     self.userSelectionList.append(so)
++                    self.moduleExplorer.selectItem(so, True)
+                     self.updatePivots()
+ 
+ 
+@@ -940,12 +943,15 @@
+                         if so == selo:
+                             so.setSelected(False)
+                             self.userSelectionList.remove(selo)
++                            self.moduleExplorer.selectItem(selo, False)
+                     self.updatePivots()
++                
+             else:
+                 #so.entity is the pivot direction that was clicked
+                 self.pivot.startTransforming(so.entity,  self.userSelectionList)
+         else:
+             self.resetSelection() # click in empty space, deselect everything
++            self.moduleExplorer.selectItems(None)
+             self.propertyWindow.clear()
+             if self.pivot is not None:
+                 self.pivot.hide()
+@@ -1140,6 +1146,7 @@
+             self.dropGO.setPosition(ray.getPoint(50))
+ 
+     def finishDropGameObjectAction(self, ray):
++        self.moduleExplorer.updateView()
+         self.dropGO = None
+         return
+ 
+@@ -1175,6 +1182,7 @@
+             self.dropNode.setPosition(ray.getPoint(50))
+     
+     def finishDropModelAction(self, ray):
++        self.moduleExplorer.updateView()
+         return
+ 
+     def startDropMaterialAction(self, text):
+@@ -1246,6 +1254,7 @@
+         n.attachObject(light)
+         n.attachObject(e)
+         n.setPosition(pos)
++        self.moduleExplorer.updateView()
+         
+     def addSpotLight(self):
+         if self.currentMap is None:
+@@ -1269,10 +1278,12 @@
+         n.attachObject(light)
+         n.attachObject(e)
+         n.setPosition(pos)
++        self.moduleExplorer.updateView()
+         
+     def addZoneToMap(self, name):
+         self.zoneManager.createZone(name)
+-    
++        self.moduleExplorer.updateView()
++        
+     def setPlayerStart(self):
+         self.mainModule.playerStart = str(self.playerStartGameObjectId)
+         print &quot;setting Player Start to &quot; + str(self.playerStartGameObjectId)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001925.html">[Dsa-hl-svn] r4868 - dependencies/OgreNewt/inc
+</A></li>
+	<LI>Next message: <A HREF="001927.html">[Dsa-hl-svn] r4870 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1926">[ date ]</a>
+              <a href="thread.html#1926">[ thread ]</a>
+              <a href="subject.html#1926">[ subject ]</a>
+              <a href="author.html#1926">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4481 - rl/branches/newton20/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4481%20-%20rl/branches/newton20/engine/rules/src&In-Reply-To=%3C200808231519.m7NFJX7Y014036%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001537.html">
+   <LINK REL="Next"  HREF="001539.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4481 - rl/branches/newton20/engine/rules/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4481%20-%20rl/branches/newton20/engine/rules/src&In-Reply-To=%3C200808231519.m7NFJX7Y014036%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4481 - rl/branches/newton20/engine/rules/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Aug 23 17:19:33 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001537.html">[Dsa-hl-svn] r4480 - in rl/branches/newton20/engine/script: include	src
+</A></li>
+        <LI>Next message: <A HREF="001539.html">[Dsa-hl-svn] r4482 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1538">[ date ]</a>
+              <a href="thread.html#1538">[ thread ]</a>
+              <a href="subject.html#1538">[ subject ]</a>
+              <a href="author.html#1538">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-08-23 17:19:32 +0200 (Sat, 23 Aug 2008)
+New Revision: 4481
+
+Modified:
+   rl/branches/newton20/engine/rules/src/CreatureController.cpp
+   rl/branches/newton20/engine/rules/src/JumpHighMovement.cpp
+   rl/branches/newton20/engine/rules/src/JumpLongMovement.cpp
+Log:
+-fixed some minor movement bug
+-TODO: use NewtonInverseDynamics functions!
+
+
+Modified: rl/branches/newton20/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/CreatureController.cpp	2008-08-23 12:51:20 UTC (rev 4480)
++++ rl/branches/newton20/engine/rules/src/CreatureController.cpp	2008-08-23 15:19:32 UTC (rev 4481)
+@@ -175,7 +175,7 @@
+     {
+         int act_gs = mCreature-&gt;getWert(Creature::WERT_GS);
+         ///@todo wy does this not work
+-        //act_gs -= mCreature-&gt;getWert(Creature::WERT_BE);
++        act_gs -= mCreature-&gt;getWert(Creature::WERT_BE);
+         return max(act_gs,1);
+     }
+ 
+@@ -302,7 +302,7 @@
+         {
+             // find a reason why we now are AL_FLOOR
+             if( timeSinceLastFloorContact &lt; Time(Date::ONE_SECOND)*0.19 &amp;&amp;
+-                -speed.y &lt; 0.6 )
++                abs(speed.y) &lt; 0.6 )
+             {
+                 setAbstractLocation(AL_FLOOR);
+             }
+@@ -311,7 +311,7 @@
+         {
+             // find a reason why we now are AL_AIRBORNE
+             if( timeSinceLastFloorContact &gt;= Time(Date::ONE_SECOND)*0.2 &amp;&amp; // 2 seconds?
+-                -speed.y &gt; 0.6 )
++                abs(speed.y) &gt; 0.6 )
+             {
+                 //std::ostringstream oss;
+                 //oss &lt;&lt; &quot;Raycast for floor: speed.y: &quot; &lt;&lt; speed.y &lt;&lt; &quot;      timeSinceLastFloorContact: &quot; &lt;&lt; timeSinceLastFloorContact;
+
+Modified: rl/branches/newton20/engine/rules/src/JumpHighMovement.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/JumpHighMovement.cpp	2008-08-23 12:51:20 UTC (rev 4480)
++++ rl/branches/newton20/engine/rules/src/JumpHighMovement.cpp	2008-08-23 15:19:32 UTC (rev 4481)
+@@ -147,7 +147,7 @@
+         }
+ 
+         Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+-        torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * mass;
++        torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * inertia;
+     }
+ 
+     bool JumpHighMovement::run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+
+Modified: rl/branches/newton20/engine/rules/src/JumpLongMovement.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/JumpLongMovement.cpp	2008-08-23 12:51:20 UTC (rev 4480)
++++ rl/branches/newton20/engine/rules/src/JumpLongMovement.cpp	2008-08-23 15:19:32 UTC (rev 4481)
+@@ -186,7 +186,7 @@
+         }
+ 
+         Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+-        torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * mass;
++        torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * inertia;
+     }
+ 
+     bool JumpLongMovement::run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001537.html">[Dsa-hl-svn] r4480 - in rl/branches/newton20/engine/script: include	src
+</A></li>
+	<LI>Next message: <A HREF="001539.html">[Dsa-hl-svn] r4482 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1538">[ date ]</a>
+              <a href="thread.html#1538">[ thread ]</a>
+              <a href="subject.html#1538">[ subject ]</a>
+              <a href="author.html#1538">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

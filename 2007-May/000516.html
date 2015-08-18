@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3445 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3445%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200705151851.l4FIpQVW018924%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000515.html">
+   <LINK REL="Next"  HREF="000517.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3445 - in rl/trunk/engine/ui: include src</H1>
+    <B>vincent22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3445%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200705151851.l4FIpQVW018924%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3445 - in rl/trunk/engine/ui: include src">vincent22 at mail.berlios.de
+       </A><BR>
+    <I>Tue May 15 20:51:26 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000515.html">[Dsa-hl-svn] r3444 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000517.html">[Dsa-hl-svn] r3446 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#516">[ date ]</a>
+              <a href="thread.html#516">[ thread ]</a>
+              <a href="subject.html#516">[ subject ]</a>
+              <a href="author.html#516">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: vincent22
+Date: 2007-05-15 20:51:23 +0200 (Tue, 15 May 2007)
+New Revision: 3445
+
+Modified:
+   rl/trunk/engine/ui/include/SaveLoadWindow.h
+   rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+Log:
+If the Save button is pressed all gameobjects that must be saved are printed into the logfile.
+
+Modified: rl/trunk/engine/ui/include/SaveLoadWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/SaveLoadWindow.h	2007-05-15 18:50:07 UTC (rev 3444)
++++ rl/trunk/engine/ui/include/SaveLoadWindow.h	2007-05-15 18:51:23 UTC (rev 3445)
+@@ -56,6 +56,10 @@
+         virtual void initialize();
+         
+     private:
++        bool handleLoadEvent();
++        bool handleSaveEvent();
++        bool handleDeleteEvent();
++        
+         CEGUI::MultiColumnList     *mSaveGameTable;     //!&lt; SaveGame table
+         CEGUI::Editbox             *mFilename;         //!&lt; Filename for the savegame 
+     };
+
+Modified: rl/trunk/engine/ui/src/SaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-05-15 18:50:07 UTC (rev 3444)
++++ rl/trunk/engine/ui/src/SaveLoadWindow.cpp	2007-05-15 18:51:23 UTC (rev 3445)
+@@ -24,6 +24,8 @@
+ #include &lt;CEGUIWindowManager.h&gt;
+ #include &lt;elements/CEGUIListboxTextItem.h&gt;
+ #include &lt;Exception.h&gt;
++#include &lt;GameObjectManager.h&gt;
++#include &lt;GameObject.h&gt;
+ 
+ #include &quot;SaveLoadWindow.h&quot;
+ 
+@@ -49,6 +51,27 @@
+         
+         centerWindow();
+ 
++        getPushButton(&quot;SaveLoadWindow/ButtonSheet/LoadButton&quot;)-&gt;subscribeEvent(
++        CEGUI::Window::EventMouseClick,
++        boost::bind(
++            &amp;SaveLoadWindow::handleLoadEvent,
++            this
++        ));
++        
++        getPushButton(&quot;SaveLoadWindow/ButtonSheet/SaveButton&quot;)-&gt;subscribeEvent(
++        CEGUI::Window::EventMouseClick,
++        boost::bind(
++            &amp;SaveLoadWindow::handleSaveEvent,
++            this
++        ));
++        
++        getPushButton(&quot;SaveLoadWindow/ButtonSheet/DeleteButton&quot;)-&gt;subscribeEvent(
++        CEGUI::Window::EventMouseClick,
++        boost::bind(
++            &amp;SaveLoadWindow::handleDeleteEvent,
++            this
++        ));
++        
+         bindDestroyWindowToXButton();
+         bindDestroyWindowToClick(getWindow(&quot;SaveLoadWindow/ButtonSheet/CancelButton&quot;));
+         
+@@ -67,5 +90,42 @@
+         //mSaveGameTable-&gt;autoSizeColumnHeader(0);
+         //mSaveGameTable-&gt;autoSizeColumnHeader(1);
+     }
++    
++    //------------------------------------------------------- LoadEvent
+ 
++    bool SaveLoadWindow::handleLoadEvent() 
++    {
++        LOG_MESSAGE(Logger::UI, &quot;Load Button pressed&quot;);
++        return true;        
++    }
++    
++    //------------------------------------------------------- SaveEvent
++
++    bool SaveLoadWindow::handleSaveEvent() 
++    {
++        LOG_MESSAGE(Logger::UI, &quot;Save Button pressed&quot;);
++        
++        std::list&lt;const GameObject*&gt;::const_iterator it;
++        std::list&lt;const GameObject*&gt; gos;
++        gos = GameObjectManager::getSingleton().getAllGameObjects();
++        
++        LOG_MESSAGE(Logger::UI, &quot;Following GOs must be saved:&quot;);
++        for( it=gos.begin(); it!=gos.end(); ++it )
++        {
++            //const CeGuiString test = (*it)-&gt;getName();
++            LOG_MESSAGE(Logger::UI, &quot;Class: &quot; + (*it)-&gt;getClassName() +
++                &quot; Name: &quot; + (*it)-&gt;getName());    
++        }
++        
++        return true;        
++    }
++
++    //------------------------------------------------------- DeleteEvent
++
++    bool SaveLoadWindow::handleDeleteEvent() 
++    {
++        LOG_MESSAGE(Logger::UI, &quot;Delete Button pressed&quot;);
++        return true;
++    }
++
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000515.html">[Dsa-hl-svn] r3444 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000517.html">[Dsa-hl-svn] r3446 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#516">[ date ]</a>
+              <a href="thread.html#516">[ thread ]</a>
+              <a href="subject.html#516">[ subject ]</a>
+              <a href="author.html#516">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

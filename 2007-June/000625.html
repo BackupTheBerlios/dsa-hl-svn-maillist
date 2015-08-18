@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3554 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3554%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200706272201.l5RM1Qvi007744%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000624.html">
+   <LINK REL="Next"  HREF="000626.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3554 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3554%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200706272201.l5RM1Qvi007744%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3554 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Jun 28 00:01:26 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000624.html">[Dsa-hl-svn] r3553 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="000626.html">[Dsa-hl-svn] r3555 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#625">[ date ]</a>
+              <a href="thread.html#625">[ thread ]</a>
+              <a href="subject.html#625">[ subject ]</a>
+              <a href="author.html#625">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-06-28 00:01:20 +0200 (Thu, 28 Jun 2007)
+New Revision: 3554
+
+Modified:
+   rl/trunk/engine/core/include/CameraObject.h
+   rl/trunk/engine/core/src/CameraObject.cpp
+Log:
+Methods for getting CEGUI coordinates from world coordinates
+
+Modified: rl/trunk/engine/core/include/CameraObject.h
+===================================================================
+--- rl/trunk/engine/core/include/CameraObject.h	2007-06-27 21:58:01 UTC (rev 3553)
++++ rl/trunk/engine/core/include/CameraObject.h	2007-06-27 22:01:20 UTC (rev 3554)
+@@ -48,11 +48,33 @@
+ 		/** 
+ 		 * Transforms a point in world space into the (2D) screen space
+ 		 * @param worldCoords point in world space
+-		 * @return the corresponding position on the screen. x,y are in [0,1].
++		 * @return the corresponding position on the screen in Ogre screen coordinates; x,y are in [-1,1].
+ 		 * The z component is the z value from the eye space, this allows checking
+ 		 * whether a point was behind the camera (z&gt;0 in this case)
+ 		 */
+ 		Ogre::Vector3 getPointOnScreen(const Ogre::Vector3&amp; worldCoords) const;
+-    };
++	
++		/** 
++		 * Transforms a point in world space into the (2D) screen space
++		 * @param worldCoords point in world space
++		 * @return the corresponding position on the screen in CEGUI screen coordinates. x,y are in [0,1].
++		 * The z component is the z value from the eye space, this allows checking
++		 * whether a point was behind the camera (z&gt;0 in this case)
++		 */
++		Ogre::Vector3 getPointOnCeGuiScreen(const Ogre::Vector3&amp; worldCoords) const;
++
++		/**
++		 * Calculates the direction of the ray originating at the camera and 
++		 * directing at a point on the screen
++		 * @param x x coordinate on screen
++		 * @param y y coordinate on screen
++		 * @return the ray direction
++		 */
++		Ogre::Vector3 CameraObject::getDirectionFromScreenPosition(
++			const Ogre::Real&amp; x, const Ogre::Real&amp; y) const;
++
++		Ogre::Ray getCameraToViewportRay(
++			const Ogre::Real&amp; x, const Ogre::Real&amp; y) const;
++	};
+ }
+ #endif
+
+Modified: rl/trunk/engine/core/src/CameraObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CameraObject.cpp	2007-06-27 21:58:01 UTC (rev 3553)
++++ rl/trunk/engine/core/src/CameraObject.cpp	2007-06-27 22:01:20 UTC (rev 3554)
+@@ -15,6 +15,9 @@
+ */
+ 
+ #include &quot;CameraObject.h&quot;
++
++#include &lt;OgreRay.h&gt;
++
+ #include &quot;Actor.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;World.h&quot;
+@@ -68,4 +71,31 @@
+ 
+         return screenSpacePos;
+ 	}
++
++	Vector3 CameraObject::getPointOnCeGuiScreen(const Ogre::Vector3&amp; worldCoords) const
++	{
++		//see Ogre::Camera::getCameraToViewportRay(Real, Real)
++		//		Real nx = (2.0f * screenX) - 1.0f;
++		//		Real ny = 1.0f - (2.0f * screenY);
++		// -&gt; screenX = (nx + 1.0f) / 2.0f
++		// -&gt; screenY = (1.0f - ny) / 2.0f
++
++		Vector3 screenSpacePos = getPointOnScreen(worldCoords);
++		screenSpacePos.x = (screenSpacePos.x + 1.0f) / 2.0f;
++		screenSpacePos.y = (1.0f - screenSpacePos.y) / 2.0f;
++		return screenSpacePos;
++	}
++
++	Vector3 CameraObject::getDirectionFromScreenPosition(
++		const Real&amp; x, const Real&amp; y) const
++	{
++		Ray ray = getCamera()-&gt;getCameraToViewportRay(x, y);
++		return ray.getDirection();
++	}
++
++	Ray CameraObject::getCameraToViewportRay(
++		const Real&amp; x, const Real&amp; y) const
++	{
++		return getCamera()-&gt;getCameraToViewportRay(x, y);
++	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000624.html">[Dsa-hl-svn] r3553 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="000626.html">[Dsa-hl-svn] r3555 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#625">[ date ]</a>
+              <a href="thread.html#625">[ thread ]</a>
+              <a href="subject.html#625">[ subject ]</a>
+              <a href="author.html#625">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

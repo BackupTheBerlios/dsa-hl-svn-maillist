@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4954 - in dependencies/OgreNewt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4954%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200908221425.n7MEPJvw031446%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="002009.html">
+   <LINK REL="Next"  HREF="002011.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4954 - in dependencies/OgreNewt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4954%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200908221425.n7MEPJvw031446%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4954 - in dependencies/OgreNewt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Aug 22 16:25:19 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="002009.html">[Dsa-hl-svn] r4952 - in dependencies/OgreNewt: demos	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample	demos/Demo09_PlayerController inc src
+</A></li>
+        <LI>Next message: <A HREF="002011.html">[Dsa-hl-svn] r4955 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2010">[ date ]</a>
+              <a href="thread.html#2010">[ thread ]</a>
+              <a href="subject.html#2010">[ subject ]</a>
+              <a href="author.html#2010">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-08-22 16:25:07 +0200 (Sat, 22 Aug 2009)
+New Revision: 4954
+
+Modified:
+   dependencies/OgreNewt/inc/OgreNewt.h
+   dependencies/OgreNewt/inc/OgreNewt_RayCast.h
+   dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+   dependencies/OgreNewt/src/OgreNewt_RayCast.cpp
+Log:
+some work on the player controller and some minor changes
+
+
+Modified: dependencies/OgreNewt/inc/OgreNewt.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt.h	2009-08-21 16:33:32 UTC (rev 4953)
++++ dependencies/OgreNewt/inc/OgreNewt.h	2009-08-22 14:25:07 UTC (rev 4954)
+@@ -67,6 +67,8 @@
+     \section new New in this version
+ 
+     New in this version
++        - ConvexCast:
++            - added &quot;NormalOnHitPoint&quot;
+         - CustomJoint:
+             - added globalToLocal function
+             - feedbackCollector callback
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_RayCast.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_RayCast.h	2009-08-21 16:33:32 UTC (rev 4953)
++++ dependencies/OgreNewt/inc/OgreNewt_RayCast.h	2009-08-22 14:25:07 UTC (rev 4954)
+@@ -227,12 +227,13 @@
+     class _OgreNewtExport ConvexcastContactInfo
+     {
+     public:
+-        //Ogre::Real              mDistance;              //!&lt; dist from point1 of the raycast, in range [0,1].
+-        OgreNewt::Body*         mBody;                  //!&lt; pointer to body intersected with
+-        int                     mCollisionID;           //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
+-        Ogre::Vector3           mContactNormal;         //!&lt; normal of intersection.
+-        Ogre::Vector3           mContactPoint;          //!&lt; point of the contact in global space
+-        Ogre::Real              mContactPenetration;    //!&lt; contact penetration at collision point
++        //Ogre::Real              mDistance;                  //!&lt; dist from point1 of the raycast, in range [0,1].
++        OgreNewt::Body*         mBody;                      //!&lt; pointer to body intersected with
++        int                     mCollisionID;               //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
++        Ogre::Vector3           mContactNormal;             //!&lt; normal of intersection.
++        Ogre::Vector3           mContactNormalOnHitPoint;   //!&lt; surface normal at the surface of the hit body
++        Ogre::Vector3           mContactPoint;              //!&lt; point of the contact in global space
++        Ogre::Real              mContactPenetration;        //!&lt; contact penetration at collision point
+ 
+         ConvexcastContactInfo();
+         ~ConvexcastContactInfo();
+
+Modified: dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-08-21 16:33:32 UTC (rev 4953)
++++ dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-08-22 14:25:07 UTC (rev 4954)
+@@ -127,8 +127,7 @@
+     Ogre::Vector3 inertia;
+     body-&gt;getMassMatrix(mass, inertia);
+ 
+-    //if( mass != 0.0f || body == m_body )
+-    if( body == m_body )
++    if( mass != 0.0f || body == m_body )
+         return false;
+ 
+     for( int i = 0; i &lt; filterBodies.size(); i++ )
+@@ -500,7 +499,7 @@
+         targetVel -= m_gravity*timestep;
+         Ogre::Vector3 floorNormal = staticConvexCast.getInfoAt(0).mContactNormal;
+         Ogre::Vector3 gravityForce = m_gravity - floorNormal*(floorNormal.dotProduct(m_gravity));
+-        targetVel -= floorNormal * floorNormal.dotProduct(m_gravity) + gravityForce * timestep;
++        targetVel += gravityForce*timestep - floorNormal * floorNormal.dotProduct(targetVel);
+     }
+ 
+     // make sure the body velocity will not penetrate other bodies
+@@ -586,8 +585,8 @@
+ 
+             Ogre::Vector3 floorNormal = allBodyConvexCast.getInfoAt(0).mContactNormal;
+ 
+-            isFuturePosInRamp = upDir.angleBetween(floorNormal) &gt; m_maxSlope;
+-            if( !isFuturePosInRamp )
++            isFuturePosInRamp = upDir.angleBetween(floorNormal) &lt; m_maxSlope;
++            if( isFuturePosInRamp )
+             {
+                 AllBodyConvexCast allBodyConvexCast2(this);
+                 Ogre::Vector3 castStart2, castTarget2;
+@@ -599,7 +598,7 @@
+                 
+                 allBodyConvexCast2.go(m_bodyFloorSensorShape, castStart2, ori, castTarget2, 1, threadIndex, filterBodies);
+ 
+-                if( distanceToFirstHit &lt; allBodyConvexCast2.getDistanceToFirstHit() &amp;&amp; allBodyConvexCast2.getContactsCount() &gt; 0 )
++                if( distanceToFirstHit &gt;= allBodyConvexCast2.getDistanceToFirstHit() &amp;&amp; allBodyConvexCast2.getContactsCount() &gt; 0 )
+                 {
+                     setPlayerState(PS_ONILLEGALRAMP);
+                 }
+@@ -610,7 +609,7 @@
+                     int iterations, contactCount = 1;
+                     Ogre::Vector3 savedTargetVel;
+                     savedTargetVel = targetVel;
+-                    for( iterations = 0; iterations &lt; m_maxCollisionsIteration &amp;&amp; contactCount; iterations++ )
++                    for( iterations = 0; (iterations &lt; m_maxCollisionsIteration) &amp;&amp; contactCount; iterations++ )
+                     {
+                         Ogre::Real projectVel;
+                         Ogre::Vector3 castStart3, castTarget3;
+@@ -658,14 +657,14 @@
+                             targetVel = targetVel1;
+                             distanceToFirstHit = 0.0f;
+                             step = Ogre::Vector3::ZERO;
+-                            pos -= upDir*m_kinematicCushion;
++                            castStart -= upDir*m_kinematicCushion;
+                         }
+                     }
+                     
+                 }
+             }
+ 
+-            Ogre::Vector3 newPos = pos + (castTarget - castStart)*distanceToFirstHit + upDir*m_kinematicCushion;
++            Ogre::Vector3 newPos = castStart + (castTarget - castStart)*distanceToFirstHit + upDir*m_kinematicCushion;
+             newPos -= step;
+             m_body-&gt;setPositionOrientation(newPos, ori);
+ 
+
+Modified: dependencies/OgreNewt/src/OgreNewt_RayCast.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_RayCast.cpp	2009-08-21 16:33:32 UTC (rev 4953)
++++ dependencies/OgreNewt/src/OgreNewt_RayCast.cpp	2009-08-22 14:25:07 UTC (rev 4954)
+@@ -312,6 +312,9 @@
+             info.mContactNormal.x = mReturnInfoList[hitnum].m_normal[0];
+             info.mContactNormal.y = mReturnInfoList[hitnum].m_normal[1];
+             info.mContactNormal.z = mReturnInfoList[hitnum].m_normal[2];
++            info.mContactNormalOnHitPoint.x = mReturnInfoList[hitnum].m_normalOnHitPoint[0];
++            info.mContactNormalOnHitPoint.y = mReturnInfoList[hitnum].m_normalOnHitPoint[1];
++            info.mContactNormalOnHitPoint.z = mReturnInfoList[hitnum].m_normalOnHitPoint[2];
+             info.mContactPoint.x = mReturnInfoList[hitnum].m_point[0];
+             info.mContactPoint.y = mReturnInfoList[hitnum].m_point[1];
+             info.mContactPoint.z = mReturnInfoList[hitnum].m_point[2];
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="002009.html">[Dsa-hl-svn] r4952 - in dependencies/OgreNewt: demos	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample	demos/Demo09_PlayerController inc src
+</A></li>
+	<LI>Next message: <A HREF="002011.html">[Dsa-hl-svn] r4955 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2010">[ date ]</a>
+              <a href="thread.html#2010">[ thread ]</a>
+              <a href="subject.html#2010">[ subject ]</a>
+              <a href="author.html#2010">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

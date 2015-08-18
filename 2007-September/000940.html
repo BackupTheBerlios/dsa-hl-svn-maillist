@@ -1,0 +1,237 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3869 - in rl/trunk/engine: core/include core/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3869%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200709241925.l8OJPEiZ025096%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000939.html">
+   <LINK REL="Next"  HREF="000941.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3869 - in rl/trunk/engine: core/include core/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3869%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200709241925.l8OJPEiZ025096%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3869 - in rl/trunk/engine: core/include core/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Sep 24 21:25:14 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000939.html">[Dsa-hl-svn] r3868 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000941.html">[Dsa-hl-svn] r3870 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#940">[ date ]</a>
+              <a href="thread.html#940">[ thread ]</a>
+              <a href="subject.html#940">[ subject ]</a>
+              <a href="author.html#940">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-24 21:25:03 +0200 (Mon, 24 Sep 2007)
+New Revision: 3869
+
+Modified:
+   rl/trunk/engine/core/include/GameAreaEventSource.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/GameEventManager.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlScript.swig
+Log:
+-zones can now be destroyed correctly (deferred deletion, used gameareas are deleted too)
+-added overloaded function for ZoneManager::addAreaToZone with size as vector (not aab) for scripting
+
+Modified: rl/trunk/engine/core/include/GameAreaEventSource.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaEventSource.h	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/core/include/GameAreaEventSource.h	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -76,6 +76,8 @@
+     const ActorMap&amp; getInsideAreaList() const { return mInsideAreaList; };
+     /// Gibt den Actor zur&#252;ck, den das Areal umgibt
+     Actor* getActor() const { return mActor; };
++    /// gibt an ob die ga gel&#246;scht werden kann, wenn die dazugeh&#246;rige zone gel&#246;scht wird
++    virtual bool destroyIfZoneDestroyed() const {return true;}
+ protected:
+     /// helps the zonemanager to associate zones with areas
+     friend class ZoneManager;
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/core/include/ZoneManager.h	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -44,12 +44,32 @@
+             Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
+             Ogre::Real transitionDistance,
+             unsigned long queryflags);
++        void addAreaToZone(const Ogre::String&amp; name, 
++            Ogre::Vector3 size, GeometryType geom,
++            Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
++            Ogre::Real transitionDistance,
++            unsigned long queryflags)
++        {
++            addAreaToZone(
++                name, Ogre::AxisAlignedBox(- 0.5 * size, 0.5 *size ), geom, position, offset, orientation,
++                transitionDistance, queryflags);
++        }
+         /// subtracts an area from the zone (it must ly in another area in this zone, else the beaviour is not defined)
+         void subtractAreaFromZone(const Ogre::String&amp; name, 
+             Ogre::AxisAlignedBox aabb, GeometryType geom,
+             Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
+             Ogre::Real transitionDistance,
+             unsigned long queryflags);
++        void subtractAreaFromZone(const Ogre::String&amp; name, 
++            Ogre::Vector3 size, GeometryType geom,
++            Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
++            Ogre::Real transitionDistance,
++            unsigned long queryflags)
++        {
++            subtractAreaFromZone(
++                name, Ogre::AxisAlignedBox(- 0.5 * size, 0.5 *size ), geom, position, offset, orientation,
++                transitionDistance, queryflags);
++        }
+         /// Adds a new mesh area to the zone
+         void addMeshAreaToZone(const Ogre::String&amp; name,
+             const Ogre::String&amp; meshname, GeometryType geom,
+
+Modified: rl/trunk/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameEventManager.cpp	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/core/src/GameEventManager.cpp	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -248,7 +248,6 @@
+                     mBodyGameAreaMap.erase(it);
+             }
+ 
+-			ScriptWrapper::getSingleton().deleted( gam );
+ 			// Die Area-Art l&#246;schen
+ 			delete gam-&gt;getGameAreaType();
+ 			// Das Objekt l&#246;schen
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -117,6 +117,7 @@
+         if( it_ != mZonesIdMap.end() )
+             mZonesIdMap.erase(it_);
+ 
++
+         mZonesToDelete.push_back(zone);
+     }
+ 
+@@ -126,10 +127,12 @@
+         GameAreaEventSourceList::iterator iter = zone-&gt;getEventSources().begin();
+         for( ; iter != zone-&gt;getEventSources().end(); iter++ )
+         {
+-            // we have our own actors, remove them
+-            ActorManager::getSingleton().destroyActor( (*iter)-&gt;getActor() );
+-		    GameEventManager::getSingleton().removeAreaEventSource(
+-                (*iter));
++            // if we have our own actors, remove them
++            if( (*iter)-&gt;getActor() )
++                ActorManager::getSingleton().destroyActor( (*iter)-&gt;getActor() ); // this also removes all areaeventsources
++            else
++		        GameEventManager::getSingleton().removeAreaEventSource(
++                    (*iter));
+         }
+ 
+         // ask all triggers if they want to be deleted
+@@ -185,6 +188,7 @@
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId(zone-&gt;getId());
++        zone-&gt;addEventSource(gam);
+     }
+     
+     void ZoneManager::subtractAreaFromZone(const Ogre::String&amp; name, 
+@@ -203,6 +207,7 @@
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId( - (zone-&gt;getId())); // a negative id indicates to subtract this area from the zone
++        zone-&gt;addEventSource(gam);
+     }
+ 
+     void ZoneManager::addMeshAreaToZone(const Ogre::String&amp; name,
+@@ -230,6 +235,7 @@
+ 
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+             -&gt;getSceneManager()-&gt;destroyEntity(entity);
++        zone-&gt;addEventSource(gam);
+     }
+ 
+     void ZoneManager::subtractMeshAreaFromZone(const Ogre::String&amp; name,
+@@ -258,6 +264,7 @@
+ 
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+             -&gt;getSceneManager()-&gt;destroyEntity(entity);
++        zone-&gt;addEventSource(gam);
+     }
+ 
+ 	void ZoneManager::areaLeft(GameAreaEvent* gae)
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -915,13 +915,13 @@
+     void destroyZone(const Ogre::String&amp; name);
+ 
+     void addAreaToZone(const Ogre::String&amp; name, 
+-        Ogre::AxisAlignedBox aabb, rl::GeometryType geom,
++        Ogre::Vector3 size, rl::GeometryType geom,
+         Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
+         Ogre::Real transitionDistance,
+         unsigned long queryflags);
+ 
+     void subtractAreaFromZone(const Ogre::String&amp; name, 
+-        Ogre::AxisAlignedBox aabb, rl::GeometryType geom,
++        Ogre::Vector3 size, rl::GeometryType geom,
+         Ogre::Vector3 position, Ogre::Vector3 offset, Ogre::Quaternion orientation,
+         Ogre::Real transitionDistance,
+         unsigned long queryflags);
+
+Modified: rl/trunk/engine/script/swig/RlScript.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlScript.swig	2007-09-24 19:20:35 UTC (rev 3868)
++++ rl/trunk/engine/script/swig/RlScript.swig	2007-09-24 19:25:03 UTC (rev 3869)
+@@ -24,6 +24,7 @@
+ 		void log(const rl::CeGuiString&amp; message);
+         void logError(const rl::CeGuiString&amp; message);
+ 		void setTriggerFactory(rl::TriggerFactory* factory);
++		rl::TriggerFactory* getTriggerFactory() const;
+ 	};
+ 	  
+     class MapLoader
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000939.html">[Dsa-hl-svn] r3868 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000941.html">[Dsa-hl-svn] r3870 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#940">[ date ]</a>
+              <a href="thread.html#940">[ thread ]</a>
+              <a href="subject.html#940">[ subject ]</a>
+              <a href="author.html#940">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,1020 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4888 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4888%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904071735.n37HZjLT025923%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001944.html">
+   <LINK REL="Next"  HREF="001946.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4888 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4888%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904071735.n37HZjLT025923%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4888 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Tue Apr  7 19:35:45 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001944.html">[Dsa-hl-svn] r4887 - in dependencies/OgreNewt: inc src
+</A></li>
+        <LI>Next message: <A HREF="001946.html">[Dsa-hl-svn] r4889 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1945">[ date ]</a>
+              <a href="thread.html#1945">[ thread ]</a>
+              <a href="subject.html#1945">[ subject ]</a>
+              <a href="author.html#1945">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-04-07 19:35:36 +0200 (Tue, 07 Apr 2009)
+New Revision: 4888
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- add and remove lights to zones with drag and drop in the Module Explorer
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-06 13:04:06 UTC (rev 4887)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-07 17:35:36 UTC (rev 4888)
+@@ -35,7 +35,7 @@
+             i += 1
+ 
+ class ExplorerOptionsDlg(QDialog):
+-    def __init__(self, lights, gameObjects, entities, zones, parent = None):
++    def __init__(self, lights, gameObjects, entities, zones, zonelights, parent = None):
+         super(ExplorerOptionsDlg, self).__init__(parent)
+         
+         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+@@ -57,6 +57,10 @@
+         self.zonesCheckBox.setChecked(zones)        
+         layout.addWidget(self.zonesCheckBox)
+         
++        self.zoneslightsCheckBox = QCheckBox(&quot;Show Zonelights&quot;)
++        self.zoneslightsCheckBox.setChecked(zonelights)        
++        layout.addWidget(self.zoneslightsCheckBox)
++        
+         layout.addWidget(buttonBox)
+         layout.setContentsMargins(2, 2, 2, 2)
+         self.setLayout(layout)
+@@ -83,9 +87,13 @@
+     def __init__(self, parent = None):
+         super(ModuleTreeWidget, self).__init__(parent)
+         
++        self.moduleManager = None
+         self.setContextMenuPolicy(Qt.CustomContextMenu)        
+         self.connect(self, SIGNAL(&quot;customContextMenuRequested(const QPoint &amp;)&quot;), self.doMenu)
+-
++        
++        self.setDragEnabled(True)
++        self.setAcceptDrops(True)
++        
+         self.onMenuCallback = None
+         self.setAnimated(True)
+ 
+@@ -98,7 +106,78 @@
+     def doMenu(self, point):
+         self.onMenuCallback(point)
+ 
++    def startDrag(self, lvi):
++        relMousePos = self.mapFromGlobal(QPoint(QCursor.pos().x(), QCursor.pos().y() - self.header().height()))
++        item = self.itemAt(relMousePos)
++        if item is not None and not str(item.data(0, Qt.UserRole).toString()).startswith(&quot;light_&quot;) and not item.data(0, Qt.UserRole).toInt()[0] == ModuleExplorer.LIGHT_IN_ZONE:
++            return
++        
++        data = QByteArray()
++        stream = QDataStream(data,  QIODevice.WriteOnly)
++        stream &lt;&lt; self.currentItem().text(0)
++        mimeData = QMimeData()
++        mimeData.setData(&quot;application/light&quot;, data)
++        drag = QDrag(self)
++        drag.setMimeData(mimeData)
++        drag.start(Qt.CopyAction)
++
++    def dragEnterEvent(self, event):
++        print &quot;enter&quot;
++        if event.mimeData().hasFormat(&quot;application/light&quot;):
++            event.accept()
++            
++            items = self.selectedItems()
++            
++            if items[0].data(0, Qt.UserRole).toInt()[0] == ModuleExplorer.LIGHT_IN_ZONE:
++                zone = self.zoneManager.getZone(str(items[0].parent().parent().text(0)).replace(&quot;Zone: &quot;, &quot;&quot;))
++                zone.lightList.remove(str(items[0].text(0)))
++                
++                items[0].parent().removeChild(items[0])
++                
++    def dragMoveEvent (self, event):
++        relMousePos = self.mapFromGlobal(QPoint(QCursor.pos().x(), QCursor.pos().y() - self.header().height()))
++        item = self.itemAt(relMousePos)
++        if item is not None and str(item.text(0)).startswith(&quot;Zone: &quot;):
++            event.accept()
++        else:
++            event.ignore()
++            
++
++    def dropEvent(self, event):
++        if event.mimeData().hasFormat(&quot;application/light&quot;):
++            data = event.mimeData().data(&quot;application/light&quot;)
++            stream = QDataStream(data, QIODevice.ReadOnly)
++            text = QString()
++            stream &gt;&gt; text
++
++            event.setDropAction(Qt.CopyAction)
++            event.accept()
++        
++            relMousePos = self.mapFromGlobal(QPoint(QCursor.pos().x(), QCursor.pos().y() - self.header().height()))
++            item = self.itemAt(relMousePos)
++            str(item.data(0, Qt.UserRole).toString())
++            
++            items = self.findItems(&quot;Lights&quot;, Qt.MatchFixedString | Qt.MatchRecursive)
++            for iitem in items:
++                if iitem.parent() is item:
++                    zoneName = str(item.text(0)).replace(&quot;Zone: &quot;, &quot;&quot;)
++                    zone = self.zoneManager.getZone(zoneName)
++                    
++                    for light in zone.lightList:
++                        if str(light) == str(text):
++                            print &quot;Zone \&quot;&quot; + zoneName + &quot;\&quot; already has Light \&quot;&quot; + str(light) + &quot;\&quot; attached!&quot;
++                            return
++                    
++                    zone.lightList.append(text)
++                    child = QTreeWidgetItem(iitem)
++                    child.setText(0, text)
++                    child.setData(0, Qt.UserRole, QVariant(ModuleExplorer.LIGHT_IN_ZONE))
++
++
++
+ class ModuleExplorer(QWidget):
++    LIGHT_IN_ZONE = 99
++    
+     def __init__(self, parent=None):
+         QWidget.__init__(self, parent)
+         self.sceneTreeView = ModuleTreeWidget()
+@@ -125,6 +204,7 @@
+         self.onMenuPoint = None
+         
+         self.showLights = True
++        self.showZoneLights = True
+         self.showGameObjects = True
+         self.showEntities = True
+         self.showZones = True
+@@ -174,6 +254,13 @@
+         if self.selectionChangedCallback is None:
+             return
+ 
++        #get all selected items
++        items = self.sceneTreeView.selectedItems()
++        if len(items) == 1:
++            if str(items[0].parent().text(0)) == &quot;Lights&quot; and str(items[0].parent().parent().text(0)).startswith(&quot;Zone: &quot;):
++                return
++        
++        
+         nodeNames = {}
+         
+         # get all maps and add them as a key to the dictionary
+@@ -188,8 +275,7 @@
+         for item in items:
+             nodeNames[str(item.text(0))] = []
+         
+-        #get all selected items
+-        items = self.sceneTreeView.selectedItems()
++
+         
+         #end remove all the things from the list we actually don't want to be selected
+         for item in items:
+@@ -286,7 +372,7 @@
+             menu.exec_(QCursor().pos())
+     
+     def onOptions(self):
+-        dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self)
++        dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self.showZoneLights, self)
+         if dlg.exec_():
+             self.showLights = dlg.lightCheckBox.isChecked()
+             self.showGameObjects = dlg.gameObjectsCheckBox.isChecked()
+@@ -328,7 +414,10 @@
+     
+     def onDelete(self):
+         print &quot;delete&quot;
+-        
++
++    def keyPressEvent(self, event):
++        print &quot;key!!!!!!!!!!!!!!&quot;
++    
+     def paintLastSelectedMapBlue(self):
+         print self.lastSelectedMap
+         for item in self.mapItems:
+@@ -436,13 +525,23 @@
+                 childItem2.setText(0, &quot;Area &quot; + str(area.id))
+                 childItem2.setData(0, Qt.UserRole, QVariant(area.areaNode.getName()))
+                 i += 1
++             
++            if self.showZoneLights:
++                lightsItem = QTreeWidgetItem(childItem)
++                lightsItem.setText(0, &quot;Lights&quot;)
+                 
++                for lightName in zone.lightList:
++                    childItem2 = QTreeWidgetItem(lightsItem)
++                    childItem2.setText(0, lightName)
++                    childItem2.setData(0, Qt.UserRole, QVariant(ModuleExplorer.LIGHT_IN_ZONE))
++                    
+     def setCurrentModule(self, module):
+         self.module = module
+         self.updateView()
+ 
+     def setModuleManager(self, moduleManager):
+         self.moduleManager = moduleManager
++        self.sceneTreeView.zoneManager = self.moduleManager.zoneManager
+         
+     def setMapSelectedCallback(self, callback):
+         self.mapSelectedCallback = callback
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-04-06 13:04:06 UTC (rev 4887)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-04-07 17:35:36 UTC (rev 4888)
+@@ -898,6 +898,14 @@
+     def selectionChangedCallback(self, items):
+         self.resetSelection()
+         self.userSelectionList = self.selectionBuffer.manualSelectObjects(items)
++        
++        if len(self.userSelectionList) &gt; 1:
++            self.propertyWindow.clear()
++        elif len(self.userSelectionList) == 1:
++            self.propertyWindow.showProperties(self.userSelectionList[0])
++        else:
++            return
++            
+         self.updatePivots()
+         
+     def selectMapCallback(self, sceneName, mapName):
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-06 13:04:06 UTC (rev 4887)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-07 17:35:36 UTC (rev 4888)
+@@ -1,363 +1,363 @@
+-#################################################
+-# This source file is part of Rastullahs Lockenwickler.
+-# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-#
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2 of the License, or
+-# (at your option) any later version.
+-#
+-# This program is distributed in the hope that it will be useful,
+-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-#
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
+- #################################################
+-
+-import functools
+-import xml.etree.cElementTree as xml
+-
+-from PyQt4.QtCore import *
+-from PyQt4.QtGui import *
+- 
+-import ogre.renderer.OGRE as og
+- 
+-from ModuleExplorer import NameInputDlg
+- 
+-#                &lt;zone name=&quot;Testzone&quot;&gt;
+-#                        &lt;area type=&quot;sphere&quot;&gt;
+-#                                &lt;position x=&quot;-10&quot; y=&quot;0&quot; z=&quot;-5&quot;/&gt;
+-#                                &lt;scale x=&quot;6&quot; y=&quot;6&quot; z=&quot;6&quot;/&gt;
+-#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
+-#                        &lt;/area&gt;
+-#                        &lt;area type=&quot;mesh&quot; meshfile=&quot;arc_UnbHaus_07.mesh&quot;&gt;
+-#                                &lt;position x=&quot;25&quot; y=&quot;0&quot; z=&quot;-50&quot;/&gt;
+-#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
+-#                        &lt;/area&gt;
+-#                        &lt;area type=&quot;sphere&quot; subtract=&quot;true&quot;&gt;
+-#                                &lt;position x=&quot;-11&quot; y=&quot;0&quot; z=&quot;-4&quot;/&gt;
+-#                                &lt;scale x=&quot;2&quot; y=&quot;2&quot; z=&quot;2&quot;/&gt;
+-#                        &lt;/area&gt;
+-#                        &lt;light name=&quot;red pointlight&quot;/&gt;
+-#                        &lt;light name=&quot;green spotlight&quot;/&gt;
+-#                        &lt;sound name=&quot;ruchin001.ogg&quot;/&gt;
+-#                        &lt;trigger name=&quot;test&quot; classname=&quot;TestTrigger&quot;&gt;
+-#                                &lt;property name=&quot;message&quot; type=&quot;STRING&quot; data=&quot;You triggered the dooms day device!&quot; /&gt;
+-#                        &lt;/trigger&gt;
+-#                &lt;/zone&gt;
+- 
+-class Area(og.UserDefinedObject):
+-    def __init__(self,sceneManager, type, parentZone, id, position, orientation, scale, meshFile = None, transitiondistance = &quot;0.5&quot;, subtract = False):
+-        og.UserDefinedObject.__init__(self)
+-        self.type = type
+-        self.parentZone = parentZone
+-        if not parentZone:
+-           raise Exception(&quot;No parentZone&quot;)
+-
+-        self.id = id # editor internal id for entity and node creation
+-        self.areaNode = parentZone.zoneNode.createChildSceneNode(&quot;area_&quot; + parentZone.name + &quot; &quot; + str(id))
+-        self.meshFile = meshFile
+-        self.areaEntity = None
+-        self.transitiondistance = transitiondistance
+-        self.__subtract = subtract
+-        self.sceneManager = sceneManager
+-        
+-        if type == &quot;box&quot;:
+-            self.areaEntity = self.sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, &quot;UniCube.mesh&quot;)
+-        elif type == &quot;sphere&quot;:
+-            self.areaEntity = self.sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, &quot;UniSphere.mesh&quot;)        
+-        elif type == &quot;ellipsoid&quot;:
+-            print &quot;not yet&quot;
+-        elif type == &quot;capsule&quot;:
+-            print &quot;not yet&quot;
+-        elif type == &quot;pyramid&quot;:
+-            print &quot;not yet&quot;
+-        elif type == &quot;mesh&quot;:
+-            try:
+-                self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
+-            except:
+-                print &quot;Mesh &quot; + self.meshFile + &quot; not found!&quot;
+-                return None
+-                
+-        self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
+-        if self.__subtract:
+-            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
+-            
+-        self.areaEntity.setUserObject(self)
+-        self.areaNode.attachObject(self.areaEntity)
+-        self.areaNode.setPosition(position)
+-        if orientation is not None:
+-            self.areaNode.setOrientation(orientation.w, orientation.x, orientation.y, orientation.z)
+-        if scale is not None:
+-            self.areaNode.setScale(scale)
+-    
+-    def __del__(self):
+-        self.areaNode.detachAllObjects()
+-        self.areaNode.getParent().removeAndDestroyChild(self.areaNode.getName())
+-        self.sceneManager.destroyEntity(self.areaEntity.getName())
+-    
+-    def getsubtract(self):
+-        return self.__subtract
+-        
+-    def setsubtract(self, val):
+-        if not val:
+-            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
+-        else:
+-            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
+-        
+-        self.__subtract = val
+-        
+-    subtract = property(getsubtract, setsubtract)
+-    
+-class Zone():
+-    def __init__(self,sceneManager, map, name):
+-        self.map = map
+-        self.name = name
+-        self.areaList = []
+-        self.lightList = []
+-        self.soundList = []
+-        self.triggerList = []
+-        self.areaCounter = 0
+-        self.sceneManager = sceneManager
+-        self.isHidden = False
+-        
+-        self.zoneNode =  self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;zone_&quot; + name + &quot;_node&quot;)
+-        
+-    def addArea(self, type, position, orientation, scale, meshFile = None):
+-        area = Area(self.sceneManager, type, self, self.areaCounter, position, orientation, scale, meshFile)
+-        if area is not None:
+-            self.areaList.append(area)
+-            self.areaCounter = self.areaCounter + 1
+-    
+-    def deleteArea(self, area):
+-        for a in self.areaList:
+-            if a.id == area.id:
+-                self.areaList.remove(a)
+-                del a
+-    
+-    def hide(self):
+-        self.sceneManager.getRootSceneNode().removeChild(self.zoneNode)
+-        self.isHidden = True
+-    
+-    def show(self):
+-        self.sceneManager.getRootSceneNode().addChild(self.zoneNode)
+-        self.isHidden = False
+-        
+-        
+-class ZoneManager():
+-    def __init__(self, sceneManager):
+-        self.currentMap = None
+-        self.zoneList = []
+-        self.menuList = []
+-        self.entityUnderMouse = None
+-        self.newAreaPosition = None
+-        self.sceneManager = sceneManager
+-        
+-    def createZone(self, name):
+-        if self.currentMap == None:
+-            print &quot;No map selected!&quot;
+-            return
+-            
+-        z = Zone(self.sceneManager, self.currentMap, name)
+-        self.zoneList.append(z)
+-        self.currentMap.zoneList.append(z)
+-        return z
+-        
+-    def parseZonesFromXml(self, zoneXmlNode, map):
+-        if zoneXmlNode is None:
+-            return
+-        
+-        self.currentMap = map
+-        
+-        zoneNodes = zoneXmlNode.getiterator(&quot;zone&quot;)
+-        for zone in zoneNodes:
+-            zoneName = zone.attrib[&quot;name&quot;]
+-            z = self.createZone(zoneName)
+-            
+-            areaNodes = zone.getiterator(&quot;area&quot;)
+-            for area in areaNodes:
+-                type = area.attrib[&quot;type&quot;]
+-                meshFile = None
+-                if type == &quot;mesh&quot;:
+-                    meshFile = area.attrib[&quot;meshfile&quot;]
+-                
+-                pos = og.Vector3()
+-                qw = qx = qy = qz = 0
+-                scale = None
+-                hasRotation = False
+-                
+-                transformations = area.getiterator()
+-                for t in transformations:
+-                    if t.tag == &quot;position&quot;:
+-                        posx = float(t.attrib[&quot;x&quot;])
+-                        posy = float(t.attrib[&quot;y&quot;])
+-                        posz = float(t.attrib[&quot;z&quot;])
+-                        pos = og.Vector3(posx, posy, posz)
+-                    elif t.tag == &quot;rotation&quot;:
+-                        qw = float(t.attrib[&quot;qw&quot;])
+-                        qx = float(t.attrib[&quot;qx&quot;])
+-                        qy = float(t.attrib[&quot;qy&quot;])
+-                        qz = float(t.attrib[&quot;qz&quot;])
+-                        hasRotation = True
+-                    elif type == &quot;mesh&quot; and t.tag == &quot;scale&quot;:
+-                        scalex = float(t.attrib[&quot;x&quot;])
+-                        scaley = float(t.attrib[&quot;y&quot;])
+-                        scalez = float(t.attrib[&quot;z&quot;])
+-                        scale = og.Vector3(scalex, scaley, scalez)
+-                    elif t.tag == &quot;size&quot;:
+-                        scalex = float(t.attrib[&quot;x&quot;])
+-                        scaley = float(t.attrib[&quot;y&quot;])
+-                        scalez = float(t.attrib[&quot;z&quot;])
+-                        scale = og.Vector3(scalex, scaley, scalez)
+-                
+-                rot = None
+-                if hasRotation:
+-                    rot = og.Quaternion(qw, qx, qy, qz)
+-                    
+-                z.addArea(type, pos, rot, scale, meshFile)
+-            
+-            
+-            lightNodes = zone.getiterator(&quot;light&quot;)
+-            for light in lightNodes:
+-                name = light.attrib[&quot;name&quot;]
+-                z.lightList.append(name)
+-                
+-            soundNodes = zone.getiterator(&quot;sound&quot;)
+-            for sound in soundNodes:
+-                name = sound.attrib[&quot;name&quot;]
+-                z.soundList.append(name)
+-            
+-
+-    def saveZonesToXml(self, root, map):
+-        if len(map.zoneList) == 0:
+-            return
+-        
+-        rootZonesElem = xml.SubElement(root, &quot;zones&quot;)
+-        for zone in map.zoneList:
+-            zoneElem = xml.SubElement(rootZonesElem, &quot;zone&quot;)
+-            zoneElem.attrib[&quot;name&quot;] = zone.name
+-            
+-            for area in zone.areaList:
+-                areaElem = xml.SubElement(zoneElem, &quot;area&quot;)
+-                areaElem.attrib[&quot;type&quot;] = area.type
+-                print &quot;Saving Zone: &quot; + zone.name + &quot; - Area &quot; + str(area.id)
+-                if area.type == &quot;mesh&quot; and area.meshFile is not None:
+-                    areaElem.attrib[&quot;meshfile&quot;] = area.meshFile
+-                    
+-                posElem = xml.SubElement(areaElem, &quot;position&quot;)
+-                posElem.attrib[&quot;x&quot;] = str(area.areaNode.getPosition().x)
+-                posElem.attrib[&quot;y&quot;] = str(area.areaNode.getPosition().y)
+-                posElem.attrib[&quot;z&quot;] = str(area.areaNode.getPosition().z)
+-                
+-                rotElem = xml.SubElement(areaElem, &quot;rotation&quot;)
+-                rotElem.attrib[&quot;qw&quot;] = str(area.areaNode.getOrientation().w)
+-                rotElem.attrib[&quot;qx&quot;] = str(area.areaNode.getOrientation().x)
+-                rotElem.attrib[&quot;qy&quot;] = str(area.areaNode.getOrientation().y)
+-                rotElem.attrib[&quot;qz&quot;] = str(area.areaNode.getOrientation().z)
+-                
+-                scaleElem = None
+-                if area.type == &quot;mesh&quot;:
+-                    scaleElem = xml.SubElement(areaElem, &quot;scale&quot;)
+-                else:
+-                    scaleElem = xml.SubElement(areaElem, &quot;size&quot;)
+-
+-                scaleElem.attrib[&quot;x&quot;] = str(area.areaNode.getScale().x)
+-                scaleElem.attrib[&quot;y&quot;] = str(area.areaNode.getScale().y)
+-                scaleElem.attrib[&quot;z&quot;] = str(area.areaNode.getScale().z)
+-                
+-            for lightName in zone.lightList:
+-                lightElem = xml.SubElement(zoneElem, &quot;light&quot;)
+-                lightElem.attrib[&quot;name&quot;] = lightName
+-            
+-            for soundName in zone.soundList:
+-                soundElem = xml.SubElement(zoneElem, &quot;sound&quot;)
+-                soundElem.attrib[&quot;name&quot;] = soundName
+-                
+-    def deleteArea(self, area):
+-        for z in self.zoneList:
+-            for a in z.areaList:
+-                if a.id == area.id:
+-                    z.deleteArea(area)
+-    
+-    def getZoneMenu(self):
+-        self.menuList = []
+-        menu = QMenu(&quot;Add Area&quot;)
+-        
+-        for zone in self.zoneList:
+-            m = QMenu(zone.name)
+-            self.menuList.append(m)
+-            menu.addMenu(m)
+-            
+-            boxAction = self.createAction(&quot;box&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;box&quot;))
+-            self.menuList.append(boxAction)
+-            m.addAction(boxAction)
+-            
+-            sphereAction = self.createAction(&quot;sphere&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;sphere&quot;))
+-            self.menuList.append(sphereAction)
+-            m.addAction(sphereAction)
+-            
+-            ellipsoidAction = self.createAction(&quot;ellipsoid&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;ellipsoid&quot;))
+-            self.menuList.append(ellipsoidAction)
+-            m.addAction(ellipsoidAction)
+-            
+-            capsuleAction = self.createAction(&quot;capsule&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;capsule&quot;))
+-            self.menuList.append(capsuleAction)
+-            m.addAction(capsuleAction)
+-            
+-            pyramidAction = self.createAction(&quot;pyramid&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;pyramid&quot;))
+-            self.menuList.append(pyramidAction)
+-            m.addAction(pyramidAction)
+-            
+-            meshAction = self.createAction(&quot;mesh&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;mesh&quot;))
+-            self.menuList.append(meshAction)
+-            m.addAction(meshAction)
+-            
+-        return menu
+-        
+-    def onZoneNameTriggered(self, zone, type):
+-        if self.newAreaPosition is not None:
+-            if type == &quot;box&quot;:
+-                zone.addArea(&quot;box&quot;, self.newAreaPosition, None, None)
+-            elif type == &quot;sphere&quot;:
+-                zone.addArea(&quot;sphere&quot;, self.newAreaPosition, None, None)
+-            elif type == &quot;mesh&quot;:
+-                dlg = NameInputDlg(QApplication.focusWidget())
+-                resName = &quot;&quot;
+-                if dlg.exec_():
+-                    resName = str(dlg.nameInput.text())
+-
+-                zone.addArea(&quot;mesh&quot;, self.newAreaPosition, None, None, resName)
+-                
+-    def getZone(self, name):
+-        for zone in self.zoneList:
+-            if zone.name == name:
+-                return zone
+-        
+-    def getZoneList(self):
+-        list = []
+-        for zone in self.zoneList:
+-            list.append(zone.name)
+-            
+-        return list
+-        
+-    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
+-        action = QAction(text, None)
+-        if icon is not None:
+-            action.setIcon(QIcon(&quot;media/icons/%s&quot; % icon))
+-        if shortcut is not None:
+-            action.setShortcut(shortcut)
+-        if tip is not None:
+-            action.setToolTip(tip)
+-            action.setStatusTip(tip)
+-        if slot is not None:
+-            QWidget.connect(action, SIGNAL(signal), slot)
+-
+-        action.setCheckable(checkable)
+-
+-        return action
+-        
+-        
+-        
++#################################################
++# This source file is part of Rastullahs Lockenwickler.
++# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++#  but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
++ #################################################
++
++import functools
++import xml.etree.cElementTree as xml
++
++from PyQt4.QtCore import *
++from PyQt4.QtGui import *
++ 
++import ogre.renderer.OGRE as og
++ 
++from ModuleExplorer import NameInputDlg
++ 
++#                &lt;zone name=&quot;Testzone&quot;&gt;
++#                        &lt;area type=&quot;sphere&quot;&gt;
++#                                &lt;position x=&quot;-10&quot; y=&quot;0&quot; z=&quot;-5&quot;/&gt;
++#                                &lt;scale x=&quot;6&quot; y=&quot;6&quot; z=&quot;6&quot;/&gt;
++#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
++#                        &lt;/area&gt;
++#                        &lt;area type=&quot;mesh&quot; meshfile=&quot;arc_UnbHaus_07.mesh&quot;&gt;
++#                                &lt;position x=&quot;25&quot; y=&quot;0&quot; z=&quot;-50&quot;/&gt;
++#                                &lt;transition_distance&gt;0.5&lt;/transition_distance&gt;
++#                        &lt;/area&gt;
++#                        &lt;area type=&quot;sphere&quot; subtract=&quot;true&quot;&gt;
++#                                &lt;position x=&quot;-11&quot; y=&quot;0&quot; z=&quot;-4&quot;/&gt;
++#                                &lt;scale x=&quot;2&quot; y=&quot;2&quot; z=&quot;2&quot;/&gt;
++#                        &lt;/area&gt;
++#                        &lt;light name=&quot;red pointlight&quot;/&gt;
++#                        &lt;light name=&quot;green spotlight&quot;/&gt;
++#                        &lt;sound name=&quot;ruchin001.ogg&quot;/&gt;
++#                        &lt;trigger name=&quot;test&quot; classname=&quot;TestTrigger&quot;&gt;
++#                                &lt;property name=&quot;message&quot; type=&quot;STRING&quot; data=&quot;You triggered the dooms day device!&quot; /&gt;
++#                        &lt;/trigger&gt;
++#                &lt;/zone&gt;
++ 
++class Area(og.UserDefinedObject):
++    def __init__(self,sceneManager, type, parentZone, id, position, orientation, scale, meshFile = None, transitiondistance = &quot;0.5&quot;, subtract = False):
++        og.UserDefinedObject.__init__(self)
++        self.type = type
++        self.parentZone = parentZone
++        if not parentZone:
++           raise Exception(&quot;No parentZone&quot;)
++
++        self.id = id # editor internal id for entity and node creation
++        self.areaNode = parentZone.zoneNode.createChildSceneNode(&quot;area_&quot; + parentZone.name + &quot; &quot; + str(id))
++        self.meshFile = meshFile
++        self.areaEntity = None
++        self.transitiondistance = transitiondistance
++        self.__subtract = subtract
++        self.sceneManager = sceneManager
++        
++        if type == &quot;box&quot;:
++            self.areaEntity = self.sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, &quot;UniCube.mesh&quot;)
++        elif type == &quot;sphere&quot;:
++            self.areaEntity = self.sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, &quot;UniSphere.mesh&quot;)        
++        elif type == &quot;ellipsoid&quot;:
++            print &quot;not yet&quot;
++        elif type == &quot;capsule&quot;:
++            print &quot;not yet&quot;
++        elif type == &quot;pyramid&quot;:
++            print &quot;not yet&quot;
++        elif type == &quot;mesh&quot;:
++            try:
++                self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
++            except:
++                print &quot;Mesh &quot; + self.meshFile + &quot; not found!&quot;
++                return None
++                
++        self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
++        if self.__subtract:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
++            
++        self.areaEntity.setUserObject(self)
++        self.areaNode.attachObject(self.areaEntity)
++        self.areaNode.setPosition(position)
++        if orientation is not None:
++            self.areaNode.setOrientation(orientation.w, orientation.x, orientation.y, orientation.z)
++        if scale is not None:
++            self.areaNode.setScale(scale)
++    
++    def __del__(self):
++        self.areaNode.detachAllObjects()
++        self.areaNode.getParent().removeAndDestroyChild(self.areaNode.getName())
++        self.sceneManager.destroyEntity(self.areaEntity.getName())
++    
++    def getsubtract(self):
++        return self.__subtract
++        
++    def setsubtract(self, val):
++        if not val:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
++        else:
++            self.areaEntity.setMaterialName(&quot;Lockenwickler_Area_Subtract&quot;)
++        
++        self.__subtract = val
++        
++    subtract = property(getsubtract, setsubtract)
++    
++class Zone():
++    def __init__(self,sceneManager, map, name):
++        self.map = map
++        self.name = name
++        self.areaList = []
++        self.lightList = []
++        self.soundList = []
++        self.triggerList = []
++        self.areaCounter = 0
++        self.sceneManager = sceneManager
++        self.isHidden = False
++        
++        self.zoneNode =  self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;zone_&quot; + name + &quot;_node&quot;)
++        
++    def addArea(self, type, position, orientation, scale, meshFile = None):
++        area = Area(self.sceneManager, type, self, self.areaCounter, position, orientation, scale, meshFile)
++        if area is not None:
++            self.areaList.append(area)
++            self.areaCounter = self.areaCounter + 1
++    
++    def deleteArea(self, area):
++        for a in self.areaList:
++            if a.id == area.id:
++                self.areaList.remove(a)
++                del a
++    
++    def hide(self):
++        self.sceneManager.getRootSceneNode().removeChild(self.zoneNode)
++        self.isHidden = True
++    
++    def show(self):
++        self.sceneManager.getRootSceneNode().addChild(self.zoneNode)
++        self.isHidden = False
++        
++        
++class ZoneManager():
++    def __init__(self, sceneManager):
++        self.currentMap = None
++        self.zoneList = []
++        self.menuList = []
++        self.entityUnderMouse = None
++        self.newAreaPosition = None
++        self.sceneManager = sceneManager
++        
++    def createZone(self, name):
++        if self.currentMap == None:
++            print &quot;No map selected!&quot;
++            return
++            
++        z = Zone(self.sceneManager, self.currentMap, name)
++        self.zoneList.append(z)
++        self.currentMap.zoneList.append(z)
++        return z
++        
++    def parseZonesFromXml(self, zoneXmlNode, map):
++        if zoneXmlNode is None:
++            return
++        
++        self.currentMap = map
++        
++        zoneNodes = zoneXmlNode.getiterator(&quot;zone&quot;)
++        for zone in zoneNodes:
++            zoneName = zone.attrib[&quot;name&quot;]
++            z = self.createZone(zoneName)
++            
++            areaNodes = zone.getiterator(&quot;area&quot;)
++            for area in areaNodes:
++                type = area.attrib[&quot;type&quot;]
++                meshFile = None
++                if type == &quot;mesh&quot;:
++                    meshFile = area.attrib[&quot;meshfile&quot;]
++                
++                pos = og.Vector3()
++                qw = qx = qy = qz = 0
++                scale = None
++                hasRotation = False
++                
++                transformations = area.getiterator()
++                for t in transformations:
++                    if t.tag == &quot;position&quot;:
++                        posx = float(t.attrib[&quot;x&quot;])
++                        posy = float(t.attrib[&quot;y&quot;])
++                        posz = float(t.attrib[&quot;z&quot;])
++                        pos = og.Vector3(posx, posy, posz)
++                    elif t.tag == &quot;rotation&quot;:
++                        qw = float(t.attrib[&quot;qw&quot;])
++                        qx = float(t.attrib[&quot;qx&quot;])
++                        qy = float(t.attrib[&quot;qy&quot;])
++                        qz = float(t.attrib[&quot;qz&quot;])
++                        hasRotation = True
++                    elif type == &quot;mesh&quot; and t.tag == &quot;scale&quot;:
++                        scalex = float(t.attrib[&quot;x&quot;])
++                        scaley = float(t.attrib[&quot;y&quot;])
++                        scalez = float(t.attrib[&quot;z&quot;])
++                        scale = og.Vector3(scalex, scaley, scalez)
++                    elif t.tag == &quot;size&quot;:
++                        scalex = float(t.attrib[&quot;x&quot;])
++                        scaley = float(t.attrib[&quot;y&quot;])
++                        scalez = float(t.attrib[&quot;z&quot;])
++                        scale = og.Vector3(scalex, scaley, scalez)
++                
++                rot = None
++                if hasRotation:
++                    rot = og.Quaternion(qw, qx, qy, qz)
++                    
++                z.addArea(type, pos, rot, scale, meshFile)
++            
++            
++            lightNodes = zone.getiterator(&quot;light&quot;)
++            for light in lightNodes:
++                name = light.attrib[&quot;name&quot;]
++                z.lightList.append(name)
++                
++            soundNodes = zone.getiterator(&quot;sound&quot;)
++            for sound in soundNodes:
++                name = sound.attrib[&quot;name&quot;]
++                z.soundList.append(name)
++            
++
++    def saveZonesToXml(self, root, map):
++        if len(map.zoneList) == 0:
++            return
++        
++        rootZonesElem = xml.SubElement(root, &quot;zones&quot;)
++        for zone in map.zoneList:
++            zoneElem = xml.SubElement(rootZonesElem, &quot;zone&quot;)
++            zoneElem.attrib[&quot;name&quot;] = zone.name
++            
++            for area in zone.areaList:
++                areaElem = xml.SubElement(zoneElem, &quot;area&quot;)
++                areaElem.attrib[&quot;type&quot;] = area.type
++                print &quot;Saving Zone: &quot; + zone.name + &quot; - Area &quot; + str(area.id)
++                if area.type == &quot;mesh&quot; and area.meshFile is not None:
++                    areaElem.attrib[&quot;meshfile&quot;] = area.meshFile
++                    
++                posElem = xml.SubElement(areaElem, &quot;position&quot;)
++                posElem.attrib[&quot;x&quot;] = str(area.areaNode.getPosition().x)
++                posElem.attrib[&quot;y&quot;] = str(area.areaNode.getPosition().y)
++                posElem.attrib[&quot;z&quot;] = str(area.areaNode.getPosition().z)
++                
++                rotElem = xml.SubElement(areaElem, &quot;rotation&quot;)
++                rotElem.attrib[&quot;qw&quot;] = str(area.areaNode.getOrientation().w)
++                rotElem.attrib[&quot;qx&quot;] = str(area.areaNode.getOrientation().x)
++                rotElem.attrib[&quot;qy&quot;] = str(area.areaNode.getOrientation().y)
++                rotElem.attrib[&quot;qz&quot;] = str(area.areaNode.getOrientation().z)
++                
++                scaleElem = None
++                if area.type == &quot;mesh&quot;:
++                    scaleElem = xml.SubElement(areaElem, &quot;scale&quot;)
++                else:
++                    scaleElem = xml.SubElement(areaElem, &quot;size&quot;)
++
++                scaleElem.attrib[&quot;x&quot;] = str(area.areaNode.getScale().x)
++                scaleElem.attrib[&quot;y&quot;] = str(area.areaNode.getScale().y)
++                scaleElem.attrib[&quot;z&quot;] = str(area.areaNode.getScale().z)
++                
++            for lightName in zone.lightList:
++                lightElem = xml.SubElement(zoneElem, &quot;light&quot;)
++                lightElem.attrib[&quot;name&quot;] = lightName
++            
++            for soundName in zone.soundList:
++                soundElem = xml.SubElement(zoneElem, &quot;sound&quot;)
++                soundElem.attrib[&quot;name&quot;] = soundName
++                
++    def deleteArea(self, area):
++        for z in self.zoneList:
++            for a in z.areaList:
++                if a.id == area.id:
++                    z.deleteArea(area)
++    
++    def getZoneMenu(self):
++        self.menuList = []
++        menu = QMenu(&quot;Add Area&quot;)
++        
++        for zone in self.zoneList:
++            m = QMenu(zone.name)
++            self.menuList.append(m)
++            menu.addMenu(m)
++            
++            boxAction = self.createAction(&quot;box&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;box&quot;))
++            self.menuList.append(boxAction)
++            m.addAction(boxAction)
++            
++            sphereAction = self.createAction(&quot;sphere&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;sphere&quot;))
++            self.menuList.append(sphereAction)
++            m.addAction(sphereAction)
++            
++            ellipsoidAction = self.createAction(&quot;ellipsoid&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;ellipsoid&quot;))
++            self.menuList.append(ellipsoidAction)
++            m.addAction(ellipsoidAction)
++            
++            capsuleAction = self.createAction(&quot;capsule&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;capsule&quot;))
++            self.menuList.append(capsuleAction)
++            m.addAction(capsuleAction)
++            
++            pyramidAction = self.createAction(&quot;pyramid&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;pyramid&quot;))
++            self.menuList.append(pyramidAction)
++            m.addAction(pyramidAction)
++            
++            meshAction = self.createAction(&quot;mesh&quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;mesh&quot;))
++            self.menuList.append(meshAction)
++            m.addAction(meshAction)
++            
++        return menu
++        
++    def onZoneNameTriggered(self, zone, type):
++        if self.newAreaPosition is not None:
++            if type == &quot;box&quot;:
++                zone.addArea(&quot;box&quot;, self.newAreaPosition, None, None)
++            elif type == &quot;sphere&quot;:
++                zone.addArea(&quot;sphere&quot;, self.newAreaPosition, None, None)
++            elif type == &quot;mesh&quot;:
++                dlg = NameInputDlg(QApplication.focusWidget())
++                resName = &quot;&quot;
++                if dlg.exec_():
++                    resName = str(dlg.nameInput.text())
++
++                zone.addArea(&quot;mesh&quot;, self.newAreaPosition, None, None, resName)
++                
++    def getZone(self, name):
++        for zone in self.zoneList:
++            if zone.name == name:
++                return zone
++        
++    def getZoneList(self):
++        list = []
++        for zone in self.zoneList:
++            list.append(zone.name)
++            
++        return list
++        
++    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
++        action = QAction(text, None)
++        if icon is not None:
++            action.setIcon(QIcon(&quot;media/icons/%s&quot; % icon))
++        if shortcut is not None:
++            action.setShortcut(shortcut)
++        if tip is not None:
++            action.setToolTip(tip)
++            action.setStatusTip(tip)
++        if slot is not None:
++            QWidget.connect(action, SIGNAL(signal), slot)
++
++        action.setCheckable(checkable)
++
++        return action
++        
++        
++        
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001944.html">[Dsa-hl-svn] r4887 - in dependencies/OgreNewt: inc src
+</A></li>
+	<LI>Next message: <A HREF="001946.html">[Dsa-hl-svn] r4889 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo05_SimpleVehicle demos/Demo06_SimpleBuoyancy	demos/Demo07_CustomJoints demos/Demo08_RagdollExample inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1945">[ date ]</a>
+              <a href="thread.html#1945">[ thread ]</a>
+              <a href="subject.html#1945">[ subject ]</a>
+              <a href="author.html#1945">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

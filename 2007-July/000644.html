@@ -1,0 +1,398 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3573 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3573%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200707022008.l62K88P2008308%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000643.html">
+   <LINK REL="Next"  HREF="000645.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3573 - rl/trunk/engine/ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3573%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200707022008.l62K88P2008308%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3573 - rl/trunk/engine/ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Mon Jul  2 22:08:08 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000643.html">[Dsa-hl-svn] r3572 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000645.html">[Dsa-hl-svn] r3574 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#644">[ date ]</a>
+              <a href="thread.html#644">[ thread ]</a>
+              <a href="subject.html#644">[ subject ]</a>
+              <a href="author.html#644">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-07-02 22:08:00 +0200 (Mon, 02 Jul 2007)
+New Revision: 3573
+
+Added:
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+Removed:
+   rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+Log:
+Renamed remotely
+
+Deleted: rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-07-02 20:07:19 UTC (rev 3572)
++++ rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-07-02 20:08:00 UTC (rev 3573)
+@@ -1,318 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Perl Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Perl Artistic License for more details.
+-*
+-*  You should have received a copy of the Perl Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+-*/
+-
+-#include &quot;FreeflightControlState.h&quot;
+-
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;ConfigurationManager.h&quot;
+-#include &quot;Exception.h&quot;
+-#include &quot;Actor.h&quot;
+-#include &quot;PhysicalThing.h&quot;
+-#include &quot;World.h&quot;
+-#include &quot;CameraObject.h&quot;
+-#include &quot;InputManager.h&quot;
+-#include &quot;CommandMapper.h&quot;
+-#include &quot;MeshObject.h&quot;
+-
+-#include &lt;OgreSceneManager.h&gt;
+-
+-using namespace Ogre;
+-
+-namespace rl {
+-
+-	FreeflightControlState::FreeflightControlState(CommandMapper* cmdMapper,
+-        Actor* camera, Person* character)
+-		: ControlState(cmdMapper, camera, character, CST_FREEFLIGHT),
+-		mMovementSpeed(5.0f),
+-		mSpeedRange(0.03f, 90.0f),
+-		mSpeedIncrement(0.02f),
+-		mRotationSpeed(4.0f),
+-		mCurrentMovementState(0),
+-        mDesiredVelocity(Vector3::ZERO),
+-        mCollisionsEnabled(false),
+-        mPitchRange(Degree(-89), Degree(89)),
+-        mCameraUpConstraint(Vector3::ZERO),
+-        mYaw(Degree(0)),
+-        mPitch(Degree(0))
+-	{
+-        mMouseSensitivity = ConfigurationManager::getSingleton().getIntSetting(&quot;Input&quot;, &quot;Mouse Sensitivity&quot;);
+-        mInvertedMouse = ConfigurationManager::getSingleton().getBoolSetting(&quot;Input&quot;, &quot;Mouse Invert&quot;);
+-	}
+-
+-	FreeflightControlState::~FreeflightControlState()
+-	{
+-	}
+-
+-    void FreeflightControlState::pause()
+-    {
+-		mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        if(mCameraUpConstraint != Vector3::ZERO)
+-            mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(mCameraUpConstraint);
+-		mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+-
+-        // Char&lt;-&gt;Level collision back to default
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+-        // Char&lt;-&gt;Default collision back to default
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+-        PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+-    }
+-
+-    void FreeflightControlState::resume()
+-    {
+-        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-        mCameraUpConstraint = mCameraActor-&gt;getPhysicalThing()-&gt;getUpConstraint();
+-		mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+-
+-        resetCamera();
+-
+-        // The actor should be controlled manually,
+-        // so let the PM prepare it accordingly
+-        mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+-        // We also handle char&lt;-&gt;level, char&lt;-&gt;default collision from now on (camera=char!)
+-        PhysicsManager::getSingleton().getMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setContactCallback(this);
+-        PhysicsManager::getSingleton().getMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setContactCallback(this);
+-        PhysicsManager::getSingleton().getMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setContactCallback(this);
+-    }
+-
+-	void FreeflightControlState::run(Real elapsedTime)
+-	{
+-        if (isCeguiActive()) return;
+-
+-		InputManager* im = InputManager::getSingletonPtr();
+-
+-		// Fetch current movement state
+-		mDesiredVelocity = Vector3::ZERO;
+-
+-		int movement = mCurrentMovementState;
+-
+-		// Determine character's control state based on user input
+-		if (movement &amp; MOVE_FORWARD)
+-        {
+-			mDesiredVelocity.z = -mMovementSpeed;
+-        }
+-
+-		if (movement &amp; MOVE_BACKWARD)
+-        {
+-            mDesiredVelocity.z = mMovementSpeed;
+-        }
+-
+-		if (movement &amp; MOVE_RIGHT)
+-        {
+-			mDesiredVelocity.x = mMovementSpeed;
+-        }
+-
+-		if (movement &amp; MOVE_LEFT)
+-        {
+-			mDesiredVelocity.x = -mMovementSpeed;
+-        }
+-
+-		if (movement &amp; MOVE_RUN)
+-        {
+-			mDesiredVelocity *= 10.0;
+-        }
+-
+-        if (movement &amp; MOVE_JUMP)
+-        {
+-            // put character here
+-            if( mCharacterActor != NULL )
+-            {
+-                mCharacterActor-&gt;setPosition(
+-                    mCameraActor-&gt;getPosition()
+-                    + mCameraActor-&gt;getWorldOrientation() * Vector3::NEGATIVE_UNIT_Z * 2 
+-                    - 1.5 * Vector3::UNIT_Y);
+-            }
+-        }
+-
+-		mMovementSpeed += im-&gt;getMouseRelativeZ() * mSpeedIncrement;
+-		if (mMovementSpeed &lt; mSpeedRange.first)
+-		{
+-			mMovementSpeed = mSpeedRange.first;
+-		}
+-		if (mMovementSpeed &gt; mSpeedRange.second)
+-		{
+-			mMovementSpeed = mSpeedRange.second;
+-		}
+-
+-
+-        if (movement &amp; TURN_LEFT)
+-            mYaw += elapsedTime * Degree(120.0f);
+-        if (movement &amp; TURN_RIGHT)
+-            mYaw -= elapsedTime * Degree(120.0f);
+-
+-        // mouse
+-        if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
+-        {
+-            mYaw -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
+-        }
+-        while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+-        while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+-
+-
+-        if (mInvertedMouse)
+-            mPitch += mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+-        else
+-            mPitch -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+-
+-        while (mPitch.valueDegrees() &gt; 360.0f) mPitch -= Degree(360.0f);
+-        while (mPitch.valueDegrees() &lt; -360.0f) mPitch += Degree(360.0f);
+-        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+-        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
+-
+-        mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+-        mCameraActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
+-        mCameraActor-&gt;yaw(mYaw.valueDegrees());
+-        mCameraActor-&gt;pitch(mPitch.valueDegrees());
+-    }
+-
+-	void FreeflightControlState::toggleCameraCollision()
+-	{
+-		// with or without collision?
+-        // be careful to enable collision if beeing in another collision
+-        mCollisionsEnabled = !mCollisionsEnabled;
+-	}
+-
+-	void FreeflightControlState::resetCamera()
+-	{
+-		// Position camera at char position
+-        if( mCharacterActor != NULL )
+-        {
+-            mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+-            Vector3 newPos = mCharacterActor-&gt;getWorldPosition();
+-            if( mCharacterActor-&gt;getControlledObject()-&gt;isMeshObject() )
+-            {
+-                MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
+-                newPos.y += mo-&gt;getDefaultSize().getMaximum().y;
+-            }
+-		    mCameraActor-&gt;_getSceneNode()-&gt;setPosition( newPos );
+-        }
+-        else
+-        {
+-		    mCameraActor-&gt;setOrientation( Quaternion::IDENTITY );
+-            mCameraActor-&gt;setPosition( Vector3::ZERO );
+-        }
+-        mYaw = Degree(0);
+-        mPitch = Degree(0);
+-	}
+-
+-    bool FreeflightControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+-	{
+-        int movement = mCommandMapper-&gt;getMovement(evt.key);
+-
+-		if (movement != MOVE_NONE)
+-		{
+-			mCurrentMovementState |= movement;
+-			return true;
+-		}
+-
+-		return false;
+-	}
+-
+-    bool FreeflightControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+-	{
+-        int movement = mCommandMapper-&gt;getMovement(evt.key);
+-
+-		if (movement != MOVE_NONE)
+-		{
+-			mCurrentMovementState &amp;= ~movement;
+-			return true;
+-		}
+-        else
+-        {
+-            InputManager* im = InputManager::getSingletonPtr();
+-            int keycode = CommandMapper::encodeKey(evt.key, im-&gt;getModifierCode());
+-            CeGuiString command = mCommandMapper-&gt;getControlStateAction(keycode, CST_FREEFLIGHT);
+-            if (command == &quot;back_to_character_movement&quot;)
+-            {
+-                InputManager::getSingleton().popControlState();
+-                return true;
+-            }
+-            if (command == &quot;toggle_camera_collision&quot;)
+-            {
+-                toggleCameraCollision();
+-                return true;
+-            }
+-            else 
+-            {
+-                return ControlState::keyReleased(evt);
+-            }
+-        }
+-	}
+-
+-    int FreeflightControlState::userProcess()
+-    {
+-        if (m_body0 == mCamBody || m_body1 == mCamBody)
+-        {
+-            // this is camera collision
+-
+-            if( !mCollisionsEnabled )
+-                return 0;
+-
+-            setContactSoftness(1.0f);  // &quot;weiche&quot; Collision
+-            setContactElasticity(0.0f);
+-
+-            return 1;
+-        }
+-
+-        // return one to tell Newton we want to accept this contact
+-        return 1;
+-    }
+-
+-
+-
+-    void FreeflightControlState::OnApplyForceAndTorque(PhysicalThing* thing)
+-    {
+-        OgreNewt::World* world = PhysicsManager::getSingleton()._getNewtonWorld();
+-        OgreNewt::Body* body = thing-&gt;_getBody();
+-
+-        // Get the current world timestep
+-        Real timestep = world-&gt;getTimeStep();
+-
+-        if (body == mCamBody)
+-        {
+-            // apply camera force
+-            Vector3 position;
+-            Quaternion orientation;
+-            body-&gt;getPositionOrientation(position, orientation);
+-
+-            // get the camera mass
+-            Real mass;
+-            Vector3 inertia;
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-
+-            // Get the velocity vector
+-            Vector3 currentVel = body-&gt;getVelocity();
+-            Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep();
+-            Vector3 force = mass*(orientation * mDesiredVelocity - currentVel) / delay;
+-
+-            body-&gt;setForce(force);
+-        }
+-    }
+-
+-}
+
+Copied: rl/trunk/engine/ui/src/FreeflightControlState.cpp (from rev 3572, rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000643.html">[Dsa-hl-svn] r3572 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000645.html">[Dsa-hl-svn] r3574 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#644">[ date ]</a>
+              <a href="thread.html#644">[ thread ]</a>
+              <a href="subject.html#644">[ subject ]</a>
+              <a href="author.html#644">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

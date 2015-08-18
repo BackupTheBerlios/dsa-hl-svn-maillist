@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4696 - in dependencies/OgreNewt_ngt: cmake inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4696%20-%20in%20dependencies/OgreNewt_ngt%3A%20cmake%20inc%20src&In-Reply-To=%3C200901071125.n07BPDuP029973%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001752.html">
+   <LINK REL="Next"  HREF="001754.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4696 - in dependencies/OgreNewt_ngt: cmake inc src</H1>
+    <B>chrber at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4696%20-%20in%20dependencies/OgreNewt_ngt%3A%20cmake%20inc%20src&In-Reply-To=%3C200901071125.n07BPDuP029973%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4696 - in dependencies/OgreNewt_ngt: cmake inc src">chrber at mail.berlios.de
+       </A><BR>
+    <I>Wed Jan  7 12:25:13 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001752.html">[Dsa-hl-svn] r4695 - rl/branches/persistence
+</A></li>
+        <LI>Next message: <A HREF="001754.html">[Dsa-hl-svn] r4697 - in modules/common/gui: imagesets schemes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1753">[ date ]</a>
+              <a href="thread.html#1753">[ thread ]</a>
+              <a href="subject.html#1753">[ subject ]</a>
+              <a href="author.html#1753">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: chrber
+Date: 2009-01-07 12:25:11 +0100 (Wed, 07 Jan 2009)
+New Revision: 4696
+
+Modified:
+   dependencies/OgreNewt_ngt/cmake/FindNewton.cmake
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_CollisionSerializer.cpp
+Log:
+Added a check for the Newton beta19 (as we only support this version now)
+Adapted Newton 2.0-beta19 API changes
+
+
+Modified: dependencies/OgreNewt_ngt/cmake/FindNewton.cmake
+===================================================================
+--- dependencies/OgreNewt_ngt/cmake/FindNewton.cmake	2009-01-06 15:35:32 UTC (rev 4695)
++++ dependencies/OgreNewt_ngt/cmake/FindNewton.cmake	2009-01-07 11:25:11 UTC (rev 4696)
+@@ -65,6 +65,15 @@
+ 		STRING(REGEX REPLACE &quot;.*#define NEWTON_MINOR_VERSION ([0-9]+).*&quot; &quot;\\1&quot;
+ 		       NEWTON_MINOR_VERSION &quot;${_NEWTON_NEWTON_H_CONTENTS}&quot;)
+ 		SET(NEWTON_VERSION &quot;${NEWTON_MAJOR_VERSION}.${NEWTON_MINOR_VERSION}&quot;)
++
++		# Newton API beta version checks
++		STRING(REGEX MATCH &quot;NewtonCollisionGetUserID&quot;
++		       NEWTON_BETA19_API &quot;${_NEWTON_NEWTON_H_CONTENTS}&quot;)
++		IF(NOT &quot;${NEWTON_BETA19_API}&quot; STREQUAL &quot;NewtonCollisionGetUserID&quot;)
++			MESSAGE(SEND_ERROR &quot;Newton 2.0 versions before beta19 are not supported.&quot;)
++		ELSE(NOT &quot;${NEWTON_BETA19_API}&quot; STREQUAL &quot;NewtonCollisionGetUserID&quot;)
++			SET(NEWTON_VERSION &quot;${NEWTON_VERSION}-beta19&quot;)
++		ENDIF(NOT &quot;${NEWTON_BETA19_API}&quot; STREQUAL &quot;NewtonCollisionGetUserID&quot;)
+ 	ELSE(&quot;${NEWTON_VERSION_EXISTS}&quot; STREQUAL &quot;NEWTON_MAJOR_VERSION&quot;)
+ 		# We assume Newton 1.53
+ 		SET(NEWTON_VERSION &quot;1.53&quot;)
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2009-01-06 15:35:32 UTC (rev 4695)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Collision.h	2009-01-07 11:25:11 UTC (rev 4696)
+@@ -54,10 +54,10 @@
+ 		you can set different IDs for each piece in a compound collision object, and then use these IDs in a collision callback to
+ 		determine which part is currently colliding.
+ 	*/
+-	void setUserID( unsigned id ) const { NewtonConvexCollisionSetUserID( m_col, id); }
++	void setUserID( unsigned id ) const { NewtonCollisionSetUserID( m_col, id); }
+ 
+ 	//! get user ID, for collision callback identification
+-	unsigned getUserID() const { return NewtonConvexCollisionGetUserID( m_col ); }
++	unsigned getUserID() const { return NewtonCollisionGetUserID( m_col ); }
+ 
+ 	//! make unique
+ 	void makeUnique() { NewtonCollisionMakeUnique( m_world-&gt;getNewtonWorld(), m_col ); }
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_CollisionSerializer.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_CollisionSerializer.cpp	2009-01-06 15:35:32 UTC (rev 4695)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_CollisionSerializer.cpp	2009-01-07 11:25:11 UTC (rev 4696)
+@@ -22,7 +22,7 @@
+     {
+       OGRE_EXCEPT(Ogre::Exception::ERR_INVALIDPARAMS, &quot;Unable to open file &quot; + filename + &quot; for writing&quot;,&quot;CollisionSerializer::exportTreeCollision&quot;);
+     }
+-    NewtonCollisionSerialize(collision-&gt;getNewtonCollision(), &amp;CollisionSerializer::_newtonSerializeCallback, this);
++    NewtonCollisionSerialize(collision-&gt;getWorld()-&gt;getNewtonWorld(), collision-&gt;getNewtonCollision(), &amp;CollisionSerializer::_newtonSerializeCallback, this);
+   }
+ 
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001752.html">[Dsa-hl-svn] r4695 - rl/branches/persistence
+</A></li>
+	<LI>Next message: <A HREF="001754.html">[Dsa-hl-svn] r4697 - in modules/common/gui: imagesets schemes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1753">[ date ]</a>
+              <a href="thread.html#1753">[ thread ]</a>
+              <a href="subject.html#1753">[ subject ]</a>
+              <a href="author.html#1753">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

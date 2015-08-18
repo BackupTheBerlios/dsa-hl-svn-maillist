@@ -1,0 +1,260 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4932 - in rl/trunk/engine: core/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4932%20-%20in%20rl/trunk/engine%3A%20core/src%20ui/include%20ui/src&In-Reply-To=%3C200905200009.n4K09WSl011576%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001987.html">
+   <LINK REL="Next"  HREF="001989.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4932 - in rl/trunk/engine: core/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4932%20-%20in%20rl/trunk/engine%3A%20core/src%20ui/include%20ui/src&In-Reply-To=%3C200905200009.n4K09WSl011576%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4932 - in rl/trunk/engine: core/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed May 20 02:09:32 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001987.html">[Dsa-hl-svn] r4931 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001989.html">[Dsa-hl-svn] r4933 - in rl/trunk/engine: ai/include ai/src	script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1988">[ date ]</a>
+              <a href="thread.html#1988">[ thread ]</a>
+              <a href="subject.html#1988">[ subject ]</a>
+              <a href="author.html#1988">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-05-20 02:09:27 +0200 (Wed, 20 May 2009)
+New Revision: 4932
+
+Modified:
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/ui/include/CommandMapper.h
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/CommandMapper.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+implemented a rear view (&quot;ueber die Schulter nach hinten gucken um eventuelle Verfolger zu sehen&quot;)
+
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2009-05-19 22:59:28 UTC (rev 4931)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2009-05-20 00:09:27 UTC (rev 4932)
+@@ -97,6 +97,7 @@
+         addSetting(&quot;Movement keys&quot;, &quot;run&quot;, &quot;Umschalt links&quot;);
+         addSetting(&quot;Movement keys&quot;, &quot;sneak&quot;, &quot;Strg links&quot;);
+         addSetting(&quot;Movement keys&quot;, &quot;run_lock&quot;, &quot;&lt; | &gt;&quot;);
++        addSetting(&quot;Movement keys&quot;, &quot;rear_view&quot;, &quot;T&quot;);
+ 
+         addSetting(&quot;Action keys&quot;, &quot;quitgame&quot;, &quot;Ctrl+X&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;closecurrentwindow&quot;, &quot;Escape&quot;);
+
+Modified: rl/trunk/engine/ui/include/CommandMapper.h
+===================================================================
+--- rl/trunk/engine/ui/include/CommandMapper.h	2009-05-19 22:59:28 UTC (rev 4931)
++++ rl/trunk/engine/ui/include/CommandMapper.h	2009-05-20 00:09:27 UTC (rev 4932)
+@@ -35,7 +35,8 @@
+         MOVE_RUN = 1&lt;&lt;6,
+         MOVE_SNEAK = 1&lt;&lt;7,
+         MOVE_JUMP = 1&lt;&lt;8,
+-        MOVE_RUN_LOCK = 1&lt;&lt;9
++        MOVE_RUN_LOCK = 1&lt;&lt;9,
++        REAR_VIEW = 1&lt;&lt;10
+     };
+ 
+     const int CMDMAP_NO_MAPPING = -9999999;
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2009-05-19 22:59:28 UTC (rev 4931)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2009-05-20 00:09:27 UTC (rev 4932)
+@@ -112,6 +112,7 @@
+         std::pair&lt;Ogre::Real, Ogre::Real&gt; mDistanceRange;
+         Ogre::Degree mCamYaw; // f&#252;r VM_FREE_CAMERA
+         Ogre::Degree mCamVirtualYaw; // helps to simulate strafe+forward/backward movement
++        Ogre::Degree mCamRearViewYaw; // helps to create smooth rear view effect
+         Ogre::Degree mNewCamVirtualYaw; // s.o.
+         Ogre::Degree mPitch;
+         Ogre::Degree mRoll;
+
+Modified: rl/trunk/engine/ui/src/CommandMapper.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CommandMapper.cpp	2009-05-19 22:59:28 UTC (rev 4931)
++++ rl/trunk/engine/ui/src/CommandMapper.cpp	2009-05-20 00:09:27 UTC (rev 4932)
+@@ -252,6 +252,10 @@
+         {
+             return MOVE_RUN_LOCK;
+         }
++        else if (movementDescription == &quot;rear_view&quot;)
++        {
++            return REAR_VIEW;
++        }
+ 
+         return MOVE_NONE;
+     }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-05-19 22:59:28 UTC (rev 4931)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-05-20 00:09:27 UTC (rev 4932)
+@@ -73,6 +73,7 @@
+         mCamYaw(0),
+         mCamVirtualYaw(0),
+         mNewCamVirtualYaw(0),
++        mCamRearViewYaw(0),
+         mPitch(20),
+         mRoll(0),
+         mPitchRange(Degree(-75), Degree(85)),
+@@ -307,9 +308,9 @@
+     void MovementControlState::updateCharacter(Ogre::Real elapsedTime)
+     {
+         InputManager* im = InputManager::getSingletonPtr();
++        int movement = mCharacterState.mCurrentMovementState;
+         if( mController != NULL )
+         {
+-            int movement = mCharacterState.mCurrentMovementState;
+             Degree rotation(0);
+ 
+             AbstractMovement *drehen = mController-&gt;getMovementFromId(CreatureController::MT_DREHEN);
+@@ -341,7 +342,7 @@
+                 }
+ 
+ 
+-                if( mViewMode != VM_PNYX_MODE  &amp;&amp; mViewMode != VM_FIRST_PERSON )
++                if( mViewMode != VM_PNYX_MODE  )//&amp;&amp; mViewMode != VM_FIRST_PERSON )
+                 {
+                     // virtual yaw
+                     if( mCamVirtualYaw != mNewCamVirtualYaw )
+@@ -360,14 +361,14 @@
+                     }
+                     else
+                     {
+-                        mNewCamVirtualYaw =Degree(0);
++                        mNewCamVirtualYaw = Degree(0);
+                     }
+                     if( mCamVirtualYaw != mNewCamVirtualYaw )
+                     {
+                         rotation += mCamVirtualYaw - mNewCamVirtualYaw;
+                     }
+                 }
+-
++/*
+                 if( mViewMode == VM_FIRST_PERSON )
+                 {
+                     if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) ||
+@@ -400,6 +401,7 @@
+                         }
+                     }
+                 }
++*/
+             }
+ 
+ 
+@@ -583,6 +585,23 @@
+                 }
+             }
+         }
++
++
++        if ( movement &amp; REAR_VIEW )
++        {
++            if( mCamRearViewYaw &lt; Degree(180) )
++                mCamRearViewYaw += elapsedTime*Degree(2*360);
++            if( mCamRearViewYaw &gt; Degree(180) )
++                mCamRearViewYaw = Degree(180);
++        }
++        else
++        {
++            if( mCamRearViewYaw &gt; Degree(0) )
++                mCamRearViewYaw -= elapsedTime*Degree(2*360);
++            if( mCamRearViewYaw &lt; Degree(0) )
++                mCamRearViewYaw = Degree(0);
++        }
++
+     }
+ 
+     // ------------------------------------------------------------------------
+@@ -618,7 +637,7 @@
+         charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
+         Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+-        virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
++        virtualCamOri.FromAngleAxis(mCamVirtualYaw+mCamRearViewYaw, Vector3::UNIT_Y);
+ 
+ 
+         // Kamera-Gr&#239;&#191;&#189;e beziehen
+@@ -643,8 +662,8 @@
+         {
+            cameraNode-&gt;lookAt(
+                 charPos
+-                + charOri * /* virtualCamOri * */  mLookAtOffset
+-                + charOri * /* virtualCamOri * */ (-Vector3::UNIT_Z*radius),   // doesn't work smoothly with strafe+forward
++                + charOri * virtualCamOri *  mLookAtOffset
++                + charOri * virtualCamOri *  (-Vector3::UNIT_Z*radius),   // doesn't work smoothly with strafe+forward
+                 Node::TS_WORLD);
+ 
+         }
+@@ -750,7 +769,7 @@
+         Vector3 charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
+         Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+-        virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
++        virtualCamOri.FromAngleAxis(mCamVirtualYaw+mCamRearViewYaw, Vector3::UNIT_Y);
+ 
+ 
+         Vector3 camPos;
+@@ -979,7 +998,7 @@
+         //Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion charOri (mController-&gt;getYaw(), Vector3::UNIT_Y);
+         Quaternion virtualCamOri;
+-        virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
++        virtualCamOri.FromAngleAxis(mCamVirtualYaw+mCamRearViewYaw, Vector3::UNIT_Y);
+         // get camera size
+         CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
+                 mCameraActor-&gt;getControlledObject());
+@@ -1305,6 +1324,7 @@
+         mCamBody-&gt;setPositionOrientation(calculateOptimalCameraPosition(false, 0.0f), camOri);
+         mCamVirtualYaw = Degree(0);
+         mNewCamVirtualYaw = Degree(0);
++        mCamRearViewYaw = Degree(0);
+         mLastCameraCollision = 0;
+         if(mViewMode == VM_FIRST_PERSON)
+             mCharacterActor-&gt;setVisible(false);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001987.html">[Dsa-hl-svn] r4931 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001989.html">[Dsa-hl-svn] r4933 - in rl/trunk/engine: ai/include ai/src	script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1988">[ date ]</a>
+              <a href="thread.html#1988">[ thread ]</a>
+              <a href="subject.html#1988">[ subject ]</a>
+              <a href="author.html#1988">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

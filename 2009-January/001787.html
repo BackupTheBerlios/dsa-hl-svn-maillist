@@ -1,0 +1,743 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4730 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4730%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200901310110.n0V1AMLk005496%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001786.html">
+   <LINK REL="Next"  HREF="001788.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4730 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4730%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200901310110.n0V1AMLk005496%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4730 - in rl/branches/newton20/engine: core/include	core/src rules/include rules/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Jan 31 02:10:22 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001786.html">[Dsa-hl-svn] r4729 - in dependencies/OgreNewt_ngt: . inc src
+</A></li>
+        <LI>Next message: <A HREF="001788.html">[Dsa-hl-svn] r4731 - in rl/branches/newton20/engine: core/include	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1787">[ date ]</a>
+              <a href="thread.html#1787">[ thread ]</a>
+              <a href="subject.html#1787">[ subject ]</a>
+              <a href="author.html#1787">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-01-31 02:10:13 +0100 (Sat, 31 Jan 2009)
+New Revision: 4730
+
+Modified:
+   rl/branches/newton20/engine/core/include/GameEventManager.h
+   rl/branches/newton20/engine/core/include/PhysicsGenericContactCallback.h
+   rl/branches/newton20/engine/core/src/GameEventManager.cpp
+   rl/branches/newton20/engine/core/src/PhysicsGenericContactCallback.cpp
+   rl/branches/newton20/engine/core/src/PhysicsManager.cpp
+   rl/branches/newton20/engine/rules/include/AbstractMovement.h
+   rl/branches/newton20/engine/rules/include/CreatureController.h
+   rl/branches/newton20/engine/rules/include/CreatureControllerManager.h
+   rl/branches/newton20/engine/rules/src/CreatureController.cpp
+   rl/branches/newton20/engine/rules/src/CreatureControllerManager.cpp
+   rl/branches/newton20/engine/ui/include/CombatControlState.h
+   rl/branches/newton20/engine/ui/include/FreeflightControlState.h
+   rl/branches/newton20/engine/ui/include/MovementControlState.h
+   rl/branches/newton20/engine/ui/src/CombatControlState.cpp
+   rl/branches/newton20/engine/ui/src/FreeflightControlState.cpp
+   rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+Log:
+-implemented changes from OgreNewt in rastullah...
+(you can use the latest revision from OgreNewt again,
+..this was easier than I thought...)
+
+
+Modified: rl/branches/newton20/engine/core/include/GameEventManager.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/GameEventManager.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/core/include/GameEventManager.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -131,8 +131,7 @@
+ 
+ 
+     /// newton collision callback functions
+-    //int onAABBOverlap(int threadid);
+-    int userProcess(Ogre::Real timestep, int threadid);
++    void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadid);
+ 
+     /// notify about newton world update
+     void notifyNewtonWorldUpdate();
+
+Modified: rl/branches/newton20/engine/core/include/PhysicsGenericContactCallback.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/PhysicsGenericContactCallback.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/core/include/PhysicsGenericContactCallback.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -31,21 +31,20 @@
+     class _RlCoreExport PhysicsGenericContactCallback : public OgreNewt::ContactCallback
+     {
+     public:
+-        //! this function must not be overwritten!
+-        int contactProcess( Ogre::Real timeStep, int threadid );
+-
+         /*!
+          * this function is called, when the aabbs of two bodies overlap, return 0 to indicate, that no contact calculation
+          * should be initiated.
+          * ATTENTION: if 0 is returned, the contact-listeners cannot be called!
+         */
+-        int onAABBOverlap(int threadindex);
++        int onAABBOverlap(int threadindex) { return 1; }
+ 
+         /*!
+          * process user defined contact forces (etc) here
+         */
+-        virtual int userProcess( Ogre::Real timeStep, int threadid);
+-    private:
++        virtual void userProcess( OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timeStep, int threadid) {}
++
++        //! this function must not be overwritten!
++        void contactsProcess( OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timeStep, int threadid );
+     };
+ }
+ 
+
+Modified: rl/branches/newton20/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/GameEventManager.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/core/src/GameEventManager.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -274,46 +274,29 @@
+ 
+         return NAME;
+     }
+-/*
+-    int GameEventManager::onAABBOverlap(int)
++
++    void GameEventManager::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int)
+     {
+-        NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.find(m_body0);
+-        if( it != mBodyGameAreaMap.end() )
+-        {
+-            it-&gt;second-&gt;foundCollision(bodyToActor(m_body1));
+-            return 0;
+-        }
++        OgreNewt::Body* body0 = contactJoint.getBody0();
++        OgreNewt::Body* body1 = contactJoint.getBody1();
+ 
+-        it = mBodyGameAreaMap.find(m_body1);
++        NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.find(body0);
+         if( it != mBodyGameAreaMap.end() )
+         {
+-            it-&gt;second-&gt;foundCollision(bodyToActor(m_body0));
+-            return 0;
++            it-&gt;second-&gt;foundCollision(bodyToActor(body1));
++            return;
+         }
+ 
+-        LOG_WARNING(Logger::CORE, &quot;Der Kollisionsk&#246;rper konnte keiner GameArea zugeordnet werden!&quot;);
+-        return 0;
+-    }
+-*/
+-    int GameEventManager::userProcess(Real timestep, int)
+-    {
+-        NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.find(m_body0);
++        it = mBodyGameAreaMap.find(body1);
+         if( it != mBodyGameAreaMap.end() )
+         {
+-            it-&gt;second-&gt;foundCollision(bodyToActor(m_body1));
+-            return 0;
++            it-&gt;second-&gt;foundCollision(bodyToActor(body0));
++            return;
+         }
+ 
+-        it = mBodyGameAreaMap.find(m_body1);
+-        if( it != mBodyGameAreaMap.end() )
+-        {
+-            it-&gt;second-&gt;foundCollision(bodyToActor(m_body0));
+-            return 0;
+-        }
+-
+         LOG_WARNING(Logger::CORE, &quot;Der Kollisionsk&#246;rper konnte keiner GameArea zugeordnet werden!&quot;);
+ 
+-        return 0;
++        // there should be no contacts (trigger-volume!), so we don't need to do anything here!
+     }
+ 
+     void GameEventManager::notifyNewtonWorldUpdate()
+
+Modified: rl/branches/newton20/engine/core/src/PhysicsGenericContactCallback.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicsGenericContactCallback.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/core/src/PhysicsGenericContactCallback.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -25,22 +25,12 @@
+ 
+ namespace rl
+ {
+-    int PhysicsGenericContactCallback::onAABBOverlap(int threadindex)
++    void PhysicsGenericContactCallback::contactsProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int threadid)
+     {
+-        return 1;
+-    }
++        userProcess(contactJoint, timestep, threadid);
+ 
+-    int PhysicsGenericContactCallback::userProcess(Real timeStep, int)
+-    {
+-        return 1;
+-    }
+-
+-    int PhysicsGenericContactCallback::contactProcess(Real timestep, int threadid)
+-    {
+-        int retval = userProcess(timestep, threadid);
+-
+-        Actor* a1 = static_cast&lt;Actor*&gt;(m_body0-&gt;getUserData());
+-        Actor* a2 = static_cast&lt;Actor*&gt;(m_body1-&gt;getUserData());
++        Actor* a1 = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
++        Actor* a2 = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
+         if (a1 &amp;&amp; a1-&gt;getPhysicalThing()-&gt;getContactListener())
+         {
+             a1-&gt;getPhysicalThing()-&gt;getContactListener()-&gt;
+@@ -51,7 +41,5 @@
+             a2-&gt;getPhysicalThing()-&gt;getContactListener()-&gt;
+                 contactOccured(a2-&gt;getPhysicalThing(), a1-&gt;getPhysicalThing());
+         }
+-
+-        return retval;
+     }
+ }
+
+Modified: rl/branches/newton20/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicsManager.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/core/src/PhysicsManager.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -500,7 +500,15 @@
+     void PhysicsManager::resetMaterialPair(const OgreNewt::MaterialID* M1,
+             const OgreNewt::MaterialID* M2)
+     {
+-        getMaterialPair(M1,M2)-&gt;setContactCallback(mGenericCallback);
++        OgreNewt::MaterialPair *mat_pair = getMaterialPair(M1,M2);
++        mat_pair-&gt;setContactCallback(mGenericCallback);
++        mat_pair-&gt;setContinuousCollisionMode(0);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultElasticity(0.4f);
++        mat_pair-&gt;setDefaultSoftness(0.1f);
++        mat_pair-&gt;setDefaultFriction(0.9f, 0.5f);
++        //! TODO find a good value here, until now I hope nobody is changing the default from newton :-P
++        //mat_pair-&gt;setDefaultSurfaceThickness(); 
+     }
+ 
+     OgreNewt::CollisionPtr PhysicsManager::createCollision(
+
+Modified: rl/branches/newton20/engine/rules/include/AbstractMovement.h
+===================================================================
+--- rl/branches/newton20/engine/rules/include/AbstractMovement.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/rules/include/AbstractMovement.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -26,8 +26,7 @@
+ namespace rl
+ {
+     /// this is the base class of all movements and provides a general interface for movements
+-    class AbstractMovement : 
+-        public PhysicsGenericContactCallback
++    class AbstractMovement // : public PhysicsGenericContactCallback
+     {
+     public:
+         AbstractMovement(CreatureController *movingCreature) : mMovingCreature(movingCreature), mActive(false) {}
+@@ -55,7 +54,7 @@
+          * this method is called, when this movement is currently used to enable 
+          * an individual procession of collisions contacts for each movement
+          */
+-        virtual int userProcess(OgreNewt::Body *body0, OgreNewt::Body *body1) {return 1;}
++        virtual void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadid) {}
+ 
+         /**
+          * this method is called by OnApplyTorqueAndForceCallback of the CreatureController
+
+Modified: rl/branches/newton20/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/branches/newton20/engine/rules/include/CreatureController.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/rules/include/CreatureController.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -20,7 +20,6 @@
+ 
+ #include &quot;RulesPrerequisites.h&quot;
+ #include &quot;PhysicsController.h&quot;
+-#include &quot;PhysicsGenericContactCallback.h&quot;
+ #include &quot;PhysicsMaterialRaycast.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;Actor.h&quot;
+@@ -40,8 +39,7 @@
+      * It handles all nessessary things like animations and calculates the movement speed.
+      */
+     class _RlRulesExport CreatureController :
+-        public PhysicsController,
+-        public PhysicsGenericContactCallback
++        public PhysicsController
+     {
+     public:
+         static const Ogre::String PROPERTY_CREATUREID;
+@@ -55,7 +53,7 @@
+         void OnApplyForceAndTorque(PhysicalThing* thing, float timestep);
+ 
+         /// Newton contact callback called by the movingCreatureManager
+-        int userProcess(Ogre::Real timestep, int threadid);
++        void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadid);
+ 
+         Creature* getCreature() {return mCreature;}
+         bool refetchCreature();
+
+Modified: rl/branches/newton20/engine/rules/include/CreatureControllerManager.h
+===================================================================
+--- rl/branches/newton20/engine/rules/include/CreatureControllerManager.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/rules/include/CreatureControllerManager.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -60,7 +60,7 @@
+         const Ogre::String&amp; getName() const;
+ 
+         // Newton Contact Callback
+-        int userProcess(Ogre::Real timestep, int threadid);
++        void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadid);
+     protected:
+         typedef std::map&lt;Creature*, CreatureController*&gt; ControllerMap;
+         ControllerMap mControllers;
+
+Modified: rl/branches/newton20/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/CreatureController.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/rules/src/CreatureController.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -391,13 +391,15 @@
+         body-&gt;setTorque(torque);
+     }
+ 
+-    int CreatureController::userProcess(Real timestep, int threadid)
++    void CreatureController::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int threadid)
+     {
++for(OgreNewt::Contact contact = contactJoint.getFirstContact(); contact; contact = contact.getNext() )
++{
+ 
+         // own collision handling (floor, in order to get information for mAbstractLocation)
+         Vector3 point;
+         Vector3 normal;
+-        getContactPositionAndNormal(point, normal);
++        contact.getPositionAndNormal(point, normal);
+ 
+         // determine if this contact is with the floor.
+         // Meaning the contact normal has an angle to UNIT_Y of 20 or less.
+@@ -446,9 +448,9 @@
+ //oss &lt;&lt; &quot;  \t Tangent-Directions: &quot; &lt;&lt; vec1 &lt;&lt; &quot; &quot; &lt;&lt; vec2;
+ //LOG_MESSAGE(Logger::RULES, oss.str());
+ 
+-        rotateTangentDirections(/*charOri*mDirection + */Vector3::UNIT_Y);
+-        setContactFrictionState(1,0);
+-        setContactFrictionState(0,1);
++        contact.rotateTangentDirections(/*charOri*mDirection + */Vector3::UNIT_Y);
++        contact.setFrictionState(1,0);
++        contact.setFrictionState(0,1);
+ 
+         if( stepHeight &lt; 0.4 )
+         {
+@@ -457,7 +459,7 @@
+                                    // too high means the creature stops if moving slowly onto a step because of the friction
+             {
+                 //setContactNormalAcceleration(5);
+-                setContactTangentAcceleration(5,0);
++                contact.setTangentAcceleration(5,0);
+                 //setContactFrictionState(1,0);
+                 //setContactFrictionState(1,1);
+             }
+@@ -483,20 +485,13 @@
+                 //setContactFrictionState(0,1);
+             }
+         }
++}
+ 
+         if(mMovement != NULL)
+         {
+-            // @XXX Evil code!
+-            // Protected members from type OgreNewt::ContactCallback have to be overridden in order
+-            // for the movements to work. This is because these members are used by OgreNewt functions
+-            // for processing this contact. Should probably be solved in OgreNewt directly.
+-            PhysicsGenericContactCallback *movement = mMovement;
+-            *movement = (PhysicsGenericContactCallback)(*this);
+-            return movement-&gt;userProcess(timestep, threadid);
++            // give the movement a chance to modify the contact
++            mMovement-&gt;userProcess(contactJoint, timestep, threadid);
+         }
+-
+-        // return one to tell Newton we want to accept this contact
+-        return 1;
+     }
+ 
+     AbstractMovement *CreatureController::getMovementFromId(CreatureController::MovementType id)
+
+Modified: rl/branches/newton20/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/rules/src/CreatureControllerManager.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/rules/src/CreatureControllerManager.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -164,27 +164,34 @@
+         }
+     }
+ 
+-    int CreatureControllerManager::userProcess(Real timestep, int threadid)
++    void CreatureControllerManager::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int threadid)
+     {
+-        Actor *actor = static_cast&lt;Actor*&gt;(m_body0-&gt;getUserData());
++        Actor *actor = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+         if( actor != NULL )
+         {
+             ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
+             if (it != mControllers.end())
+             {
+-                // @XXX Evil code!
+-                // Protected members from type OgreNewt::ContactCallback have to be overridden in order
+-                // for the controllers to work. This is because these members are used by OgreNewt functions
+-                // for processing this contact. Should probably be solved in OgreNewt directly.
+-                PhysicsGenericContactCallback* controller = it-&gt;second;
+-               *controller = (PhysicsGenericContactCallback)(*this);
+-                return controller-&gt;userProcess(timestep, threadid);
++                it-&gt;second-&gt;userProcess(contactJoint, timestep, threadid);
++                return;
+             }
+         }
+ 
++        // if the controlled body is the second body...
++        actor = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
++        if( actor != NULL )
++        {
++            ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
++            if (it != mControllers.end())
++            {
++                it-&gt;second-&gt;userProcess(contactJoint, timestep, threadid);
++                return;
++            }
++        }
++
++
+         LOG_ERROR(Logger::RULES,
+             &quot;Der Kollisionsk&#246;rper konnte keinem CreatureController zugeordnet werden.&quot;);
+-        return 1;
+     }
+ 
+     const Ogre::String&amp; CreatureControllerManager::getName() const
+
+Modified: rl/branches/newton20/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/branches/newton20/engine/ui/include/CombatControlState.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/include/CombatControlState.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -73,7 +73,7 @@
+ 
+         // camera collision: OgreNewt::ContactCallback overides
+         int onAABBOverlap(int threadIndex);
+-        int userProcess(Ogre::Real timestep, int threadIndex);
++        void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadIndex);
+ 
+         // camera movement: Newton force and torque callback
+         void OnApplyForceAndTorque(PhysicalThing *pt, float timstep);
+
+Modified: rl/branches/newton20/engine/ui/include/FreeflightControlState.h
+===================================================================
+--- rl/branches/newton20/engine/ui/include/FreeflightControlState.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/include/FreeflightControlState.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -20,12 +20,12 @@
+ #include &quot;UiPrerequisites.h&quot;
+ #include &quot;ControlState.h&quot;
+ #include &quot;PhysicsController.h&quot;
+-#include &quot;PhysicsGenericContactCallback.h&quot;
+ 
+ #ifdef __APPLE__
+ #   include &lt;OgreNewt/OgreNewt.h&gt;
+ #else
+ #   include &lt;OgreNewt.h&gt;
++#   include &lt;OgreNewt_PlayerController.h&gt;
+ #endif
+ 
+ namespace rl {
+@@ -35,8 +35,7 @@
+ 	*/
+ 	class _RlUiExport FreeflightControlState : 
+         public ControlState,
+-        public PhysicsController,
+-        public PhysicsGenericContactCallback
++        public PhysicsController
+ 	{
+ 	public:
+ 		/**
+@@ -57,10 +56,6 @@
+ 	    void toggleCameraCollision();
+ 	    void resetCamera();
+ 
+-        /// This is the OgreNewt contact process callback for the combination
+-        /// Character &lt;-&gt; Level
+-        int userProcess(Ogre::Real timestep, int threadid);
+-
+         /// Newton force and torque callback
+         void OnApplyForceAndTorque(PhysicalThing* thing, float timestep);
+ 
+@@ -78,6 +73,8 @@
+         Ogre::Real mMouseSensitivity;
+         bool mInvertedMouse;
+         std::pair&lt;Ogre::Degree, Ogre::Degree&gt; mPitchRange;
++
++        OgreNewt::PlayerController *mOgreNewtPlayerController;
+ 	};
+ }
+ #endif
+
+Modified: rl/branches/newton20/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/branches/newton20/engine/ui/include/MovementControlState.h	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/include/MovementControlState.h	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -60,7 +60,8 @@
+ 
+         /// This is the OgreNewt contact process callback for the combination
+         /// Character &lt;-&gt; Level
+-        int userProcess(Ogre::Real timestep, int threadid);
++        int onAABBOverlap( OgreNewt::Body* body0, OgreNewt::Body* body1, int threadIndex );
++        void userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadid);
+ 
+         /// Newton force and torque callback
+         void OnApplyForceAndTorque(PhysicalThing* thing, float timestep);
+
+Modified: rl/branches/newton20/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/CombatControlState.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/src/CombatControlState.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -520,10 +520,9 @@
+         return 0;
+     }
+    
+-    int CombatControlState::userProcess(Ogre::Real timestep, int threadIndex)
++    void CombatControlState::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Ogre::Real timestep, int threadIndex)
+     {
+         // TODO handle camera collisions here
+-        return 0;
+     }
+ 
+     Ogre::String CombatControlState::getCombatantTypeName() const
+
+Modified: rl/branches/newton20/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/FreeflightControlState.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/src/FreeflightControlState.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -46,7 +46,8 @@
+         mCollisionsEnabled(false),
+         mPitchRange(Degree(-89), Degree(89)),
+         mYaw(Degree(0)),
+-        mPitch(Degree(0))
++        mPitch(Degree(0)),
++        mOgreNewtPlayerController(NULL)
+ 	{
+         mMouseSensitivity = ConfigurationManager::getSingleton().getIntSetting(&quot;Input&quot;, &quot;Mouse Sensitivity&quot;);
+         mInvertedMouse = ConfigurationManager::getSingleton().getBoolSetting(&quot;Input&quot;, &quot;Mouse Invert&quot;);
+@@ -59,7 +60,10 @@
+     void FreeflightControlState::pause()
+     {
+ 		mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-		mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++		//mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        delete mOgreNewtPlayerController;
++        mOgreNewtPlayerController = NULL;
++        mCharacterActor-&gt;getPhysicalThing()-&gt;setUpConstraint();
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+ 
+         // Char&lt;-&gt;Level collision back to default
+@@ -78,7 +82,9 @@
+     void FreeflightControlState::resume()
+     {
+         mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-		mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
++		//mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
++        mCharacterActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
++        mOgreNewtPlayerController = new OgreNewt::PlayerController(mCharBody);
+ 
+         resetCamera();
+ 
+@@ -92,20 +98,23 @@
+         mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+                     PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+                     PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+-        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setContactCallback(NULL);
+         mat_pair-&gt;setContinuousCollisionMode(1);
++        mat_pair-&gt;setDefaultSoftness(1.0f);
+         mat_pair-&gt;setDefaultCollidable(1);
+         mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+                     PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+                     PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+-        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setContactCallback(NULL);
+         mat_pair-&gt;setContinuousCollisionMode(1);
++        mat_pair-&gt;setDefaultSoftness(1.0f);
+         mat_pair-&gt;setDefaultCollidable(1);
+         mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+                     PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+                     PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+-        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setContactCallback(NULL);
+         mat_pair-&gt;setContinuousCollisionMode(1);
++        mat_pair-&gt;setDefaultSoftness(1.0f);
+         mat_pair-&gt;setDefaultCollidable(1);
+     }
+ 
+@@ -198,9 +207,14 @@
+         if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+         if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
+ 
++if( mCollisionsEnabled )
++    mOgreNewtPlayerController-&gt;setVelocity(mDesiredVelocity.z, mDesiredVelocity.x, mYaw);
++else
++{
+         mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+         mCameraActor-&gt;yaw(mYaw.valueDegrees());
+         mCameraActor-&gt;pitch(mPitch.valueDegrees());
++}
+     }
+ 
+ 	void FreeflightControlState::toggleCameraCollision()
+@@ -208,6 +222,11 @@
+ 		// with or without collision?
+         // be careful to enable collision if beeing in another collision
+         mCollisionsEnabled = !mCollisionsEnabled;
++
++        const OgreNewt::ConvexCollision *camCol = dynamic_cast&lt;const OgreNewt::ConvexCollision *&gt;( mCamBody-&gt;getCollision() );
++
++        // simple way to ignore camera-collision!
++        const_cast&lt;OgreNewt::ConvexCollision*&gt;(camCol)-&gt;setAsTriggerVolume( !mCollisionsEnabled );
+ 	}
+ 
+ 	void FreeflightControlState::resetCamera()
+@@ -286,27 +305,7 @@
+         return retval;
+ 	}
+ 
+-    int FreeflightControlState::userProcess(Real timestep, int)
+-    {
+-        if (m_body0 == mCamBody || m_body1 == mCamBody)
+-        {
+-            // this is camera collision
+ 
+-            if( !mCollisionsEnabled )
+-                return 0;
+-
+-            setContactSoftness(1.0f);  // &quot;weiche&quot; Collision
+-            setContactElasticity(0.0f);
+-
+-            return 1;
+-        }
+-
+-        // return one to tell Newton we want to accept this contact
+-        return 1;
+-    }
+-
+-
+-
+     void FreeflightControlState::OnApplyForceAndTorque(PhysicalThing* thing, float timestep)
+     {
+         OgreNewt::World* world = PhysicsManager::getSingleton()._getNewtonWorld();
+@@ -329,7 +328,7 @@
+             Vector3 currentVel = body-&gt;getVelocity();
+             Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep();
+             Vector3 force = mass*(orientation * mDesiredVelocity - currentVel) / delay;
+-
++if( !mCollisionsEnabled )
+             body-&gt;setForce(force);
+         }
+     }
+
+Modified: rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2009-01-31 01:08:04 UTC (rev 4729)
++++ rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2009-01-31 01:10:13 UTC (rev 4730)
+@@ -249,21 +249,24 @@
+         mat_pair-&gt;setContactCallback(this);
+         mat_pair-&gt;setDefaultCollidable(1);
+         mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
++        mat_pair-&gt;setDefaultSoftness(0.8f);
++        mat_pair-&gt;setDefaultElasticity(0.4f);
+         mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+         mat_pair-&gt;setContactCallback(this);
+         mat_pair-&gt;setDefaultCollidable(1);
+         mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
++        mat_pair-&gt;setDefaultSoftness(0.8f);
++        mat_pair-&gt;setDefaultElasticity(0.4f);
+         mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+         mat_pair-&gt;setContactCallback(this);
+         mat_pair-&gt;setDefaultCollidable(1);
+         mat_pair-&gt;setDefaultFriction(0,0);
+-        mat_pair-&gt;setDefaultFriction(0,1);
++        mat_pair-&gt;setDefaultSoftness(0.8f);
++        mat_pair-&gt;setDefaultElasticity(0.4f);
+ 
+         mCharacterState.mCurrentMovementState = MOVE_NONE;
+ 
+@@ -688,27 +691,27 @@
+         mCameraActor-&gt;setOrientation(cameraNode-&gt;getOrientation());
+     }
+ 
+-    // -------------------------------------------------------------
+-    // character collision moved to CreatureController(Manager)
+-    int MovementControlState::userProcess(Real timestep, int)
++
++    int MovementControlState::onAABBOverlap( OgreNewt::Body* body0, OgreNewt::Body* body1, int threadIndex )
+     {
+         if( mViewMode == VM_FIRST_PERSON )
+             return 0;
+ 
+         // test if this is cam-player-collide
+-        if( ( m_body0 == mCamBody &amp;&amp; m_body1 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) ||
+-            ( m_body1 == mCamBody &amp;&amp; m_body0 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) )
++        if( ( body0 == mCamBody &amp;&amp; body1 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) ||
++            ( body1 == mCamBody &amp;&amp; body0 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) )
+         {
+             return 0;
+         }
+ 
+-        setContactSoftness(0.8f);
+-        setContactElasticity(0.4f);
+-        mLastCameraCollision = 0;
+-
+         return 1;
+     }
+ 
++    void MovementControlState::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int)
++    {
++        mLastCameraCollision = 0;
++    }
++
+     //------------------------------------------------------------------------
+     // character callback moved to CreatureController
+     void MovementControlState::OnApplyForceAndTorque(PhysicalThing* thing, float timestep)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001786.html">[Dsa-hl-svn] r4729 - in dependencies/OgreNewt_ngt: . inc src
+</A></li>
+	<LI>Next message: <A HREF="001788.html">[Dsa-hl-svn] r4731 - in rl/branches/newton20/engine: core/include	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1787">[ date ]</a>
+              <a href="thread.html#1787">[ thread ]</a>
+              <a href="subject.html#1787">[ subject ]</a>
+              <a href="author.html#1787">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

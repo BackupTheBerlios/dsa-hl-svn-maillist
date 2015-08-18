@@ -1,0 +1,269 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2980 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2980%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200701132142.l0DLg95r027911%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000050.html">
+   <LINK REL="Next"  HREF="000052.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2980 - in rl/trunk/engine/core: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2980%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200701132142.l0DLg95r027911%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2980 - in rl/trunk/engine/core: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Jan 13 22:42:09 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000050.html">[Dsa-hl-svn] r2979 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="000052.html">[Dsa-hl-svn] r2981 - rl/trunk/docs/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#51">[ date ]</a>
+              <a href="thread.html#51">[ thread ]</a>
+              <a href="subject.html#51">[ subject ]</a>
+              <a href="author.html#51">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-01-13 22:42:06 +0100 (Sat, 13 Jan 2007)
+New Revision: 2980
+
+Modified:
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/GameLoop.cpp
+Log:
+addTask, removeTask are now more robust. Tasks are not added/removed immediately, but after all tasks for a frame are processed.
+
+Improved class documentation for GameLoop.
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-01-13 19:54:58 UTC (rev 2979)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-01-13 21:42:06 UTC (rev 2980)
+@@ -28,15 +28,34 @@
+ 
+ class GameTask;
+ 
++/// This class encapsulates the top level game loop.
++/// GameLoop::loop is called immediately after RL has been initialised.
++/// GameLoop is dumb, it only calls added tasks in the set order.
++/// No game logic whatsoever is handled here.
+ class _RlCoreExport GameLoop : protected Ogre::Singleton&lt;GameLoop&gt;
+ {
+ public:
+-    typedef enum {TG_PHYSICS, TG_INPUT, TG_LOGIC, TG_GRAPHICS, TG_SOUND} TaskGroup;
++    /// Groups a task can belong to. Tasks are executed in the order listed.
++    typedef enum {TG_PHYSICS,  ///&lt; Tasks that update physics
++                  TG_INPUT,    ///&lt; Tasks that handle user input
++                  TG_LOGIC,    ///&lt; Tasks that control game play. (AI, Triggers, etc..)
++                  TG_GRAPHICS, ///&lt; Tasks that update graphics
++                  TG_SOUND     ///&lt; Tasks that update sound
++                 } TaskGroup;
+ 
+ 	GameLoop();
+ 	virtual ~GameLoop();
+ 
++    /// Adds a task to the game loop. It will not be executed immediately,
++    /// but in the next loop.
++    /// @param newTask task to added.
++    /// @param group tasks are executed in order, they are listed in TaskGroup enum. Choose
++    ///        the group, that best fits the purpose of the task.
++    /// @sa GameLoop::TaskGroup
+     void addTask(GameTask* newTask, TaskGroup group);
++
++    /// Removes a task to the game loop.
++    /// The removal is delayed till before the next frame is rendered.
+ 	void removeTask(GameTask* oldTask);
+ 
+ 	/// Request the game to quit. The current task loop will finish though.
+@@ -50,17 +69,25 @@
+ 
+ private:
+     typedef std::list&lt;GameTask*&gt; GameTaskList;
++    typedef std::list&lt;std::pair&lt;TaskGroup, GameTask*&gt; &gt; GroupTaskList;
+ 
+     std::vector&lt;GameTaskList*&gt; mTaskLists;
++    GroupTaskList mAddedTasks;
++    GameTaskList mRemovedTasks;
++
+     std::deque&lt;unsigned long&gt; mLastTimes;
+     /// In milliseconds, because Ogre's timer works this way.
+     unsigned long mSmoothPeriod;
++    /// Time cap for frame time, to prevent interpolation problems during spikes.
+     Ogre::Real mMaxFrameTime;
+ 	bool mQuitRequested;
+ 
+     /// Averages frame rate over mSmoothPeriod milliseconds.
+     /// Steadies Controls and Physics a bit.
+     unsigned long smoothTime(unsigned long time);
++
++    /// Processes queued additions and removals of tasks.
++    void updateTaskList();
+ };
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-01-13 19:54:58 UTC (rev 2979)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-01-13 21:42:06 UTC (rev 2980)
+@@ -40,9 +40,11 @@
+ 
+     GameLoop::GameLoop()
+         : mTaskLists(),
++          mAddedTasks(),
++          mRemovedTasks(),
+           mLastTimes(),
+-          mSmoothPeriod(5000),
+-          mMaxFrameTime(0.5f),
++          mSmoothPeriod(500),
++          mMaxFrameTime(0.250f),
+           mQuitRequested(false)
+     {
+         // create five task lists, one for each taskgroup
+@@ -64,21 +66,12 @@
+ 
+     void GameLoop::addTask(GameTask* task, TaskGroup group)
+     {
+-        mTaskLists[group]-&gt;push_back(task);
++        mAddedTasks.push_back(std::make_pair(group, task));
+     }
+ 
+     void GameLoop::removeTask(GameTask* task)
+     {
+-        for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
+-        {
+-            GameTaskList* tasks = mTaskLists[i];
+-            GameTaskList::iterator it = std::find(tasks-&gt;begin(), tasks-&gt;end(), task);
+-            if (it != tasks-&gt;end())
+-            {
+-                tasks-&gt;erase(it);
+-                break;
+-            }
+-        }
++        mRemovedTasks.push_back(task);
+     }
+ 
+     void GameLoop::quitGame()
+@@ -90,17 +83,24 @@
+     {
+         Timer* timer = Root::getSingleton().getTimer();
+         // A sensible start value
+-        unsigned long timeSinceLastLoop = timer-&gt;getMilliseconds() - 50; 
++        unsigned long timeSinceLastLoop = timer-&gt;getMilliseconds() - 50;
++
++        // Loop until game exit is requested.
+         while (!mQuitRequested)
+         {
++            // Calculate frame time. This time is smoothed and capped.
+             unsigned long elapsedTime = timer-&gt;getMilliseconds();
+             Real frameTime = 0.001f * (Real) smoothTime(elapsedTime - timeSinceLastLoop);
+             timeSinceLastLoop = elapsedTime;
+             if (frameTime &gt; mMaxFrameTime) frameTime = mMaxFrameTime;
+ 
+-			WindowEventUtilities::messagePump();
++			// Let Ogre handle Windows/XServer events.
++            WindowEventUtilities::messagePump();
++
++            // Render the next frame
+             Root::getSingleton().renderOneFrame();
+ 
++            // Execute all tasks in order.
+             for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
+             {
+                 GameTaskList* tasks = mTaskLists[i];
+@@ -112,15 +112,47 @@
+                     }
+                 }
+             }
++
++            // Update task list, if needed.
++            updateTaskList();
+         }
+     }
+ 
++    void GameLoop::updateTaskList()
++    {        
++        // Remove removed tasks.
++        for (GameTaskList::iterator it = mRemovedTasks.begin(); it != mRemovedTasks.end(); ++it)
++        {
++            for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
++            {
++                GameTaskList* tasks = mTaskLists[i];
++                GameTaskList::iterator find_it = std::find(tasks-&gt;begin(), tasks-&gt;end(), *it);
++                if (find_it != tasks-&gt;end())
++                {
++                    tasks-&gt;erase(find_it);
++                    break;
++                }
++            }
++        }
++        mRemovedTasks.clear();
++
++        // Add new ones.
++        for (GroupTaskList::iterator it = mAddedTasks.begin(); it != mAddedTasks.end(); ++it)
++        {
++            mTaskLists[(*it).first]-&gt;push_back((*it).second);
++        }
++        mAddedTasks.clear();
++    }
++
+     // Idea taken from Ogre, but implementation by us.
+     // smooths time step over the period mSmoothPeriod.
+     unsigned long GameLoop::smoothTime(unsigned long time)
+     {
++        // First add time for this frame
+         mLastTimes.push_back(time);
+ 
++        // Starting from the end of the queue, determine the element, that
++        // is just over the threshold mSmoothPeriod.
+         unsigned long limit = 0;
+         std::deque&lt;unsigned long&gt;::reverse_iterator i = mLastTimes.rbegin();
+         while (i != mLastTimes.rend() &amp;&amp; limit &lt; mSmoothPeriod)
+@@ -128,8 +160,10 @@
+             limit += *i;
+             ++i;
+         }
++        // Erase all times, that are over.
+         mLastTimes.erase(mLastTimes.begin(), mLastTimes.begin() + (mLastTimes.rend() - i));
+ 
++        // Return the mean of the remaining times.
+         return std::accumulate(mLastTimes.begin(), mLastTimes.end(), 0)
+             / std::max(mLastTimes.size(), (size_t)1);
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000050.html">[Dsa-hl-svn] r2979 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="000052.html">[Dsa-hl-svn] r2981 - rl/trunk/docs/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#51">[ date ]</a>
+              <a href="thread.html#51">[ thread ]</a>
+              <a href="subject.html#51">[ subject ]</a>
+              <a href="author.html#51">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

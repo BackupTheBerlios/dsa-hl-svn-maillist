@@ -1,0 +1,313 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3623 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3623%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200707191715.l6JHF6ak022323%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000693.html">
+   <LINK REL="Next"  HREF="000695.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3623 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3623%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200707191715.l6JHF6ak022323%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3623 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Jul 19 19:15:06 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000693.html">[Dsa-hl-svn] r3622 - modules/ruchin/scripts
+</A></li>
+        <LI>Next message: <A HREF="000695.html">[Dsa-hl-svn] r3624 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#694">[ date ]</a>
+              <a href="thread.html#694">[ thread ]</a>
+              <a href="subject.html#694">[ subject ]</a>
+              <a href="author.html#694">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-07-19 19:14:44 +0200 (Thu, 19 Jul 2007)
+New Revision: 3623
+
+Modified:
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+Removed &quot;static&quot; variables (removed problems that occured, when this class is destroyed and recreated)
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2007-07-19 11:43:04 UTC (rev 3622)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2007-07-19 17:14:44 UTC (rev 3623)
+@@ -151,6 +151,16 @@
+         //void interpolateAnimationLookAtOffset(std::string actAnim, std::string newAnim, Ogre::Real factor);
+ 
+ 
++        // only used in the two functions above
++        std::vector&lt;Ogre::Vector3&gt; mCharPositionsBuffer;
++        size_t mCharPositionsBufferIdx;
++        Ogre::Real mCharacterOccludedTime;
++        unsigned int mCharacterOccludedFrameCount;
++        Ogre::Real mLastDistance;
++        Ogre::Real mTimeOfLastCollision;
++        bool mIsPathfinding;
++        unsigned int mLastReachableBufPos;
++
+         /** Does all camera-stuff, moves the camera to the right position 
+         * and does pathfinding (in a very simple way)
+         * @warning this does only work well, if the character's material is not used for other objects!
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-07-19 11:43:04 UTC (rev 3622)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-07-19 17:14:44 UTC (rev 3623)
+@@ -95,7 +95,15 @@
+         mRaycast(new PhysicsMaterialRaycast()),
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+-            QUERYFLAG_CREATURE)
++            QUERYFLAG_CREATURE),
++        mCharPositionsBuffer(20),
++        mCharPositionsBufferIdx(-1),
++        mCharacterOccludedTime(0),
++        mCharacterOccludedFrameCount(0),
++        mLastDistance(0.0f),
++        mTimeOfLastCollision(0.0f),
++        mIsPathfinding (false),
++        mLastReachableBufPos(1)
+     {
+         DebugWindow::getSingleton().registerPage(msDebugWindowPageName);
+ 
+@@ -572,35 +580,15 @@
+         mCamBody-&gt;getPositionOrientation(camPos, camOri);
+         SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
+ 
+-/*
+-        // Ringbuffer mit Positionen der Kamera
+-        static std::vector&lt;Ogre::Vector3&gt; camPositionsBuffer(20);
+-        static size_t camPositionsBufferIdx = -1;
+-        camPositionsBufferIdx = (camPositionsBufferIdx + 1) % camPositionsBuffer.size();
+-        camPositionsBuffer[camPositionsBufferIdx] = camPos;
+ 
+-        // Ringbuffer mit optimalen Positionen der Kamera
+-        static std::vector&lt;Ogre::Vector3&gt; camOptPositionsBuffer(20);
+-        static size_t camOptPositionsBufferIdx = -1;
+-        camOptPositionsBufferIdx = (camOptPositionsBufferIdx + 1) % camOptPositionsBuffer.size();
+-*/
+         Vector3 optimalCamPos = calculateOptimalCameraPosition(true, timestep);
+         charPos = charPos + charOri * virtualCamOri * mLookAtOffset;
+-//        camOptPositionsBuffer[camOptPositionsBufferIdx] = optimalCamPos;
+ 
+-
+         // Ringbuffer mit Positionen des Characters
+-        static std::vector&lt;Ogre::Vector3&gt; charPositionsBuffer(20);
+-        static size_t charPositionsBufferIdx = -1;
+-        charPositionsBufferIdx = (charPositionsBufferIdx + 1) % charPositionsBuffer.size();
+-        charPositionsBuffer[charPositionsBufferIdx] = charPos;
++        mCharPositionsBufferIdx = (mCharPositionsBufferIdx + 1) % mCharPositionsBuffer.size();
++        mCharPositionsBuffer[mCharPositionsBufferIdx] = charPos;
+ 
+ 
+-        static Real characterOccludedTime = 0;
+-        static unsigned int characterOccludedFrameCount = 0;
+-
+-
+-
+         // Kamera-Gr&#65533;e beziehen
+         CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
+             mCameraActor-&gt;getControlledObject());
+@@ -647,11 +635,11 @@
+             Real maxdistance = Math::Pow(1.5f * mDesiredDistance + 1.4f, 2);
+             if( infoCastChar.mBody || (camPos - charPos).squaredLength() &gt; maxdistance)
+             {
+-                characterOccludedTime += timestep;
+-                characterOccludedFrameCount++;
++                mCharacterOccludedTime += timestep;
++                mCharacterOccludedFrameCount++;
+ 
+                 // falls zu lange, Kamera resetten:
+-                if( characterOccludedTime &gt; 0.500f &amp;&amp; characterOccludedFrameCount &gt; 10 )
++                if( mCharacterOccludedTime &gt; 0.500f &amp;&amp; mCharacterOccludedFrameCount &gt; 10 )
+                 {
+                     resetCamera();
+                     return;
+@@ -659,7 +647,7 @@
+ 
+             }
+             else
+-                characterOccludedTime = 0;
++                mCharacterOccludedTime = 0;
+ 
+             if( infoCastOptPos.mBody )
+             {
+@@ -701,8 +689,6 @@
+             }
+ 
+ 
+-            static bool isPathfinding (false);
+-            static unsigned int lastReachableBufPos;
+             // gibt an, ob schon gebufferte Daten fr den
+             // neuen Weg existieren und dort weitergemacht werden kann,
+             // oder ob neu nach einem Weg gesucht werden muss!
+@@ -715,9 +701,9 @@
+                 // durch das spring-Acc-Damping System sollten die Bewegungen trotzdem flssig
+                 // und weich (keine scharfen Kurven) erscheinen
+ 
+-                size_t buffSize = charPositionsBuffer.size();
++                size_t buffSize = mCharPositionsBuffer.size();
+ 
+-                if( !isPathfinding )
++                if( !mIsPathfinding )
+                 {
+                     LOG_DEBUG(Logger::UI, &quot; Pathfinding der Kamera sollte jetzt anfangen!&quot;);
+ 
+@@ -731,7 +717,7 @@
+                             world,
+                             &amp;materialVector,
+                             camPos,
+-                            charPositionsBuffer[ (charPositionsBufferIdx - delta) % buffSize ],
++                            mCharPositionsBuffer[ (mCharPositionsBufferIdx - delta) % buffSize ],
+                             true);
+ 
+                         if( !info.mBody )
+@@ -742,14 +728,14 @@
+                     {
+                         // is wohl irgendwas schiefgegangen!
+                         LOG_MESSAGE(Logger::UI, &quot; Der Ringbuffer mit den Player-Positionen scheint zu klein zu sein; Pathfinding der Kamera fehlgeschlagen! &quot;);
+-                        isPathfinding = false;
++                        mIsPathfinding = false;
+                         resetCamera();
+                         return;
+                     }
+-                    lastReachableBufPos = delta;
++                    mLastReachableBufPos = delta;
+ 
+                     // auf zu der ermittelten Position!
+-                    optimalCamPos = charPositionsBuffer[ (charPositionsBufferIdx - lastReachableBufPos) % buffSize ];
++                    optimalCamPos = mCharPositionsBuffer[ (mCharPositionsBufferIdx - mLastReachableBufPos) % buffSize ];
+                 }
+                 else
+                 {
+@@ -757,30 +743,30 @@
+ 
+ 
+                     // suche von lastReachableBufPos aus der letzten Frame nach neuen erreichbaren Buffer-Positionen
+-                    unsigned int delta = lastReachableBufPos; // das ist die von der letzten Frame!
++                    unsigned int delta = mLastReachableBufPos; // das ist die von der letzten Frame!
+                     while ( delta &gt; 0 ) // delta = 0 braucht nicht berprft zu werden, wurde oben schon ausgeschlossen!
+                     {
+                         RaycastInfo info = mRaycast-&gt;execute(
+                             world,
+                             &amp;materialVector,
+                             camPos,
+-                            charPositionsBuffer[ (charPositionsBufferIdx - delta) % buffSize ],
++                            mCharPositionsBuffer[ (mCharPositionsBufferIdx - delta) % buffSize ],
+                             true);
+ 
+                         if( info.mBody )
+                             break;
+                         delta--;
+                     }
+-                    lastReachableBufPos = delta + 1;
++                    mLastReachableBufPos = delta + 1;
+ 
+                     // auf zu der ermittelten Position!
+-                    optimalCamPos = charPositionsBuffer[ (charPositionsBufferIdx - lastReachableBufPos) % buffSize ];
++                    optimalCamPos = mCharPositionsBuffer[ (mCharPositionsBufferIdx - mLastReachableBufPos) % buffSize ];
+                 }
+-                isPathfinding = true; // so zum Testen noch keine Optimierung (doppelte Prfung gleicher sachen)
++                mIsPathfinding = true; // so zum Testen noch keine Optimierung (doppelte Prfung gleicher sachen)
+             }
+             else
+             {
+-                isPathfinding = false;
++                mIsPathfinding = false;
+             }
+ 
+             Vector3 diff = camPos - optimalCamPos;
+@@ -910,12 +896,10 @@
+             }
+ 
+             // Langsames Entfernen vom Char:
+-            static Real lastDistance(0.0f);
+-            static Real TimeOfLastCollision(0.0f);
+             if( CollisionFound )
+-                TimeOfLastCollision = 0.0f;
++                mTimeOfLastCollision = 0.0f;
+             else
+-                TimeOfLastCollision += timestep;
++                mTimeOfLastCollision += timestep;
+ 
+ 
+             Real desiredDistance = diff.length();
+@@ -924,7 +908,7 @@
+             mCamBody-&gt;getPositionOrientation(camPos, camOri);
+ 
+             if( SlowlyMoveBackward &amp;&amp;
+-                desiredDistance &gt; lastDistance )
++                desiredDistance &gt; mLastDistance )
+             {
+ 
+                 diff.normalise();
+@@ -932,21 +916,21 @@
+                 Vector3 actDiff = camPos - charPos;
+                 actDiff.normalise();
+ 
+-                if( TimeOfLastCollision &gt; mCamMoveAwayStartTime ||
++                if( mTimeOfLastCollision &gt; mCamMoveAwayStartTime ||
+                     diff.directionEquals(actDiff, mCamMoveAwayRange*timestep) )
+-                    newDistance = lastDistance + mCamMoveAwayVelocity*timestep;
++                    newDistance = mLastDistance + mCamMoveAwayVelocity*timestep;
+                 else
+-                    newDistance = lastDistance;
++                    newDistance = mLastDistance;
+ 
+                 if( newDistance &gt; desiredDistance )
+                     newDistance = desiredDistance;
+ 
+                 diff = diff*newDistance;
+ 
+-                lastDistance = newDistance;
++                mLastDistance = newDistance;
+             }
+             else
+-                lastDistance = desiredDistance;
++                mLastDistance = desiredDistance;
+ 
+ 
+             targetCamPos = charPos + diff;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000693.html">[Dsa-hl-svn] r3622 - modules/ruchin/scripts
+</A></li>
+	<LI>Next message: <A HREF="000695.html">[Dsa-hl-svn] r3624 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#694">[ date ]</a>
+              <a href="thread.html#694">[ thread ]</a>
+              <a href="subject.html#694">[ subject ]</a>
+              <a href="author.html#694">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

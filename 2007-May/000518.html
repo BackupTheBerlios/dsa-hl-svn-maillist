@@ -1,0 +1,247 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3447 - in rl/trunk/engine: common/include common/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3447%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09ui/src&In-Reply-To=%3C200705160933.l4G9Xu4m011142%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000517.html">
+   <LINK REL="Next"  HREF="000519.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3447 - in rl/trunk/engine: common/include common/src	ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3447%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09ui/src&In-Reply-To=%3C200705160933.l4G9Xu4m011142%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3447 - in rl/trunk/engine: common/include common/src	ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed May 16 11:33:56 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000517.html">[Dsa-hl-svn] r3446 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+        <LI>Next message: <A HREF="000519.html">[Dsa-hl-svn] r3448 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#518">[ date ]</a>
+              <a href="thread.html#518">[ thread ]</a>
+              <a href="subject.html#518">[ subject ]</a>
+              <a href="author.html#518">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-16 11:33:40 +0200 (Wed, 16 May 2007)
+New Revision: 3447
+
+Modified:
+   rl/trunk/engine/common/include/Properties.h
+   rl/trunk/engine/common/include/Property.h
+   rl/trunk/engine/common/src/Properties.cpp
+   rl/trunk/engine/common/src/PropertyReader.cpp
+   rl/trunk/engine/ui/src/GameObjectPropsWindow.cpp
+Log:
+Provide associative arrays (maps) as properties (key is CEGUI string, value is any property), needed to rename PropertyMap since its keys are Ogre::String
+
+
+Modified: rl/trunk/engine/common/include/Properties.h
+===================================================================
+--- rl/trunk/engine/common/include/Properties.h	2007-05-15 19:36:57 UTC (rev 3446)
++++ rl/trunk/engine/common/include/Properties.h	2007-05-16 09:33:40 UTC (rev 3447)
+@@ -18,13 +18,14 @@
+ 
+ #include &quot;CommonPrerequisites.h&quot;
+ #include &quot;Property.h&quot;
+-
++ 
+ namespace rl {
+ 
+     class PropertySet;
+     class PropertySetPtr;
+-    typedef std::map&lt;const Ogre::String, Property&gt; PropertyMap;
+ 
++    typedef std::map&lt;const Ogre::String, Property&gt; PropertySetMap;
++
+     class _RlCommonExport PropertyHolder
+     {
+     public:
+@@ -43,11 +44,11 @@
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertySet* getAllProperties() const;
+-        const PropertyMap::const_iterator begin() const;
+-        const PropertyMap::const_iterator end() const;
++        const PropertySetMap::const_iterator begin() const;
++        const PropertySetMap::const_iterator end() const;
+         
+     private:
+-        PropertyMap mProperties;
++        PropertySetMap mProperties;
+ 	};
+ 
+     class _RlCommonExport PropertySetPtr :
+
+Modified: rl/trunk/engine/common/include/Property.h
+===================================================================
+--- rl/trunk/engine/common/include/Property.h	2007-05-15 19:36:57 UTC (rev 3446)
++++ rl/trunk/engine/common/include/Property.h	2007-05-16 09:33:40 UTC (rev 3447)
+@@ -20,6 +20,7 @@
+ 
+ #include &lt;boost/any.hpp&gt;
+ #include &lt;OgreSharedPtr.h&gt;
++#include &lt;map&gt;
+ 
+ #include &quot;Exception.h&quot;
+ #include &quot;Tripel.h&quot;
+@@ -64,11 +65,14 @@
+         } \
+     }
+ 
++	class Property;
+ 
++	typedef std::map&lt;CeGuiString, Property&gt; PropertyMap;
++
+     class _RlCommonExport Property
+     {
+     public:
+-        Property();
++		Property();
+ 
+         PropertyMethod(Bool, const bool&amp;);
+         PropertyMethod(String, const CeGuiString&amp;);
+@@ -79,6 +83,7 @@
+         PropertyMethod(IntTriple, const Tripel&lt;int&gt;);
+         PropertyMethod(IntPair, const IntPair);
+ 		PropertyMethod(Array, const std::vector&lt;Property&gt;);
++		PropertyMethod(Map, const PropertyMap);
+ 
+     private:
+         boost::any mValue;
+
+Modified: rl/trunk/engine/common/src/Properties.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Properties.cpp	2007-05-15 19:36:57 UTC (rev 3446)
++++ rl/trunk/engine/common/src/Properties.cpp	2007-05-16 09:33:40 UTC (rev 3447)
+@@ -25,7 +25,7 @@
+ 
+     void PropertyHolder::setProperties(const PropertySet* props)
+     {
+-        for (PropertyMap::const_iterator it = props-&gt;begin();
++        for (PropertySetMap::const_iterator it = props-&gt;begin();
+             it != props-&gt;end(); it++)
+         {
+             setProperty((*it).first, (*it).second);
+@@ -47,7 +47,7 @@
+ 
+     const Property PropertySet::getProperty(const Ogre::String&amp; key) const
+     {
+-        PropertyMap::const_iterator it = mProperties.find(key);
++        PropertySetMap::const_iterator it = mProperties.find(key);
+         if (it == mProperties.end())
+         {
+             Throw(rl::RuntimeException, &quot;Property &quot;+key+&quot; not found.&quot;);
+@@ -66,12 +66,12 @@
+         return new PropertySet(this);
+     }
+ 
+-    const PropertyMap::const_iterator PropertySet::begin() const
++    const PropertySetMap::const_iterator PropertySet::begin() const
+     {
+         return mProperties.begin();
+     }
+ 
+-    const PropertyMap::const_iterator PropertySet::end() const
++    const PropertySetMap::const_iterator PropertySet::end() const
+     {
+         return mProperties.end();
+     }
+
+Modified: rl/trunk/engine/common/src/PropertyReader.cpp
+===================================================================
+--- rl/trunk/engine/common/src/PropertyReader.cpp	2007-05-15 19:36:57 UTC (rev 3446)
++++ rl/trunk/engine/common/src/PropertyReader.cpp	2007-05-16 09:33:40 UTC (rev 3447)
+@@ -193,16 +193,14 @@
+ 	else if (type == &quot;ARRAY&quot;)
+ 	{
+ 		std::vector&lt;Property&gt; vecVal;
+-		DOMNode* curChild = domElem-&gt;getFirstChild();
+-		while (curChild != NULL)
++		for (DOMNode* curChild  = domElem-&gt;getFirstChild(); curChild != NULL;
++			curChild = curChild-&gt;getNextSibling())
+ 		{
+ 			if (curChild-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+ 			{
+ 				PropertyEntry entry = processProperty(static_cast&lt;DOMElement*&gt;(curChild));
+ 				vecVal.push_back(entry.second);
+ 			}
+-
+-			curChild = curChild-&gt;getNextSibling();
+ 		}
+ 		prop = Property(vecVal);
+ 	}
+@@ -219,6 +217,21 @@
+         }
+         prop = Property(intpairVal);
+     }
++	else if (type == &quot;MAP&quot;)
++	{
++		PropertyMap mapVal;
++		for (DOMNode* curChild  = domElem-&gt;getFirstChild(); curChild != NULL;
++			curChild = curChild-&gt;getNextSibling());
++		{
++			if (curChild-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++			{
++				CeGuiString key = XmlHelper::getAttributeValueAsString(curChild, &quot;name&quot;);
++				PropertyEntry entry = processProperty(static_cast&lt;DOMElement*&gt;(curChild));
++				mapVal[key] = entry.second;
++			}
++		}
++		prop = Property(mapVal);
++	}
+ 
+     return std::make_pair(key, prop);
+ }
+
+Modified: rl/trunk/engine/ui/src/GameObjectPropsWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameObjectPropsWindow.cpp	2007-05-15 19:36:57 UTC (rev 3446)
++++ rl/trunk/engine/ui/src/GameObjectPropsWindow.cpp	2007-05-16 09:33:40 UTC (rev 3447)
+@@ -75,7 +75,7 @@
+         int row = 0;
+         //  Iterate through all properties and add a row for
+         //  every Entry
+-        for( PropertyMap::const_iterator propIter = props-&gt;begin();
++        for( PropertySetMap::const_iterator propIter = props-&gt;begin();
+             propIter != props-&gt;end(); propIter++ )
+         {
+             Ogre::String key = propIter-&gt;first;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000517.html">[Dsa-hl-svn] r3446 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+	<LI>Next message: <A HREF="000519.html">[Dsa-hl-svn] r3448 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#518">[ date ]</a>
+              <a href="thread.html#518">[ thread ]</a>
+              <a href="subject.html#518">[ subject ]</a>
+              <a href="author.html#518">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,469 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2979 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2979%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20ui/src&In-Reply-To=%3C200701131955.l0DJtCJJ019272%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000049.html">
+   <LINK REL="Next"  HREF="000051.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2979 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2979%20-%20in%20rl/trunk/engine%3A%20ai/src%20core/include%0A%09core/src%20rules/src%20ui/src&In-Reply-To=%3C200701131955.l0DJtCJJ019272%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2979 - in rl/trunk/engine: ai/src core/include	core/src rules/src ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Jan 13 20:55:12 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000049.html">[Dsa-hl-svn] r2978 - modules
+</A></li>
+        <LI>Next message: <A HREF="000051.html">[Dsa-hl-svn] r2980 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#50">[ date ]</a>
+              <a href="thread.html#50">[ thread ]</a>
+              <a href="subject.html#50">[ subject ]</a>
+              <a href="author.html#50">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-01-13 20:54:58 +0100 (Sat, 13 Jan 2007)
+New Revision: 2979
+
+Modified:
+   rl/trunk/engine/ai/src/AiSubsystem.cpp
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/GameLoop.cpp
+   rl/trunk/engine/rules/src/TimerManager.cpp
+   rl/trunk/engine/ui/src/CloseConfirmationWindow.cpp
+   rl/trunk/engine/ui/src/DebugWindow.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+Renamed GameLoopManager to GameLoop. Introduced task groups for corse grained flow control.
+
+Modified: rl/trunk/engine/ai/src/AiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -62,7 +62,7 @@
+ 	mWorld = new AiWorld();
+ 
+     CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;addSceneChangeListener(this);
+-	GameLoopManager::getSingleton().addTask(AgentManager::getSingletonPtr());
++    GameLoop::getSingleton().addTask(AgentManager::getSingletonPtr(), GameLoop::TG_LOGIC);
+ }
+ 
+ void AiSubsystem::onBeforeClearScene()
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -37,7 +37,7 @@
+ class ContentModule;
+ class ScriptWrapper;
+ class PhysicsManager;
+-class GameLoopManager;
++class GameLoop;
+ class AnimationManager;
+ class ActorManager;
+ class GameEventManager;
+@@ -128,7 +128,7 @@
+     ScriptWrapper* mScriptWrapper;
+     XmlResourceManager* mXmlResourceManager;
+     PhysicsManager* mPhysicsManager;
+-    GameLoopManager* mGameLoopManager;
++    GameLoop* mGameLoopManager;
+     AnimationManager* mAnimationManager;
+     ActorManager* mActorManager;
+     GameEventManager* mGameEventManager;
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -27,18 +27,16 @@
+ namespace rl {
+ 
+ class GameTask;
+-class GameLoop;
+-class SynchronizedGameLoop;
+ 
+-typedef std::list&lt;GameTask*&gt; GameTaskList;
+-
+-class _RlCoreExport GameLoopManager : protected Ogre::Singleton&lt;GameLoopManager&gt;
++class _RlCoreExport GameLoop : protected Ogre::Singleton&lt;GameLoop&gt;
+ {
+ public:
+-	GameLoopManager();
+-	virtual ~GameLoopManager();
++    typedef enum {TG_PHYSICS, TG_INPUT, TG_LOGIC, TG_GRAPHICS, TG_SOUND} TaskGroup;
+ 
+-    void addTask(GameTask* newTask);
++	GameLoop();
++	virtual ~GameLoop();
++
++    void addTask(GameTask* newTask, TaskGroup group);
+ 	void removeTask(GameTask* oldTask);
+ 
+ 	/// Request the game to quit. The current task loop will finish though.
+@@ -47,11 +45,13 @@
+     /// Main loop of RL.
+     void loop();
+       
+-    static GameLoopManager &amp; getSingleton(void);
+-	static GameLoopManager * getSingletonPtr(void);
++    static GameLoop &amp; getSingleton(void);
++	static GameLoop * getSingletonPtr(void);
+ 
+ private:
+-	GameTaskList mTaskList;
++    typedef std::list&lt;GameTask*&gt; GameTaskList;
++
++    std::vector&lt;GameTaskList*&gt; mTaskLists;
+     std::deque&lt;unsigned long&gt; mLastTimes;
+     /// In milliseconds, because Ogre's timer works this way.
+     unsigned long mSmoothPeriod;
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -184,7 +184,7 @@
+         if (!carryOn) 
+             return false;
+ 
+-		mGameLoopManager = new GameLoopManager();
++		mGameLoopManager = new GameLoop();
+         LOG_MESSAGE(Logger::CORE,&quot;GameLoopmanager erzeugt&quot;);
+ 
+ 		mScriptWrapper = new ScriptWrapper();
+@@ -215,16 +215,16 @@
+ 		mActorManager-&gt;setWorld(mWorld);
+ 
+ 		mPhysicsManager = new PhysicsManager();        
+-        GameLoopManager::getSingleton().addTask(mPhysicsManager);
++        GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+ 
+         mAnimationManager = new AnimationManager();
+-        GameLoopManager::getSingleton().addTask(mAnimationManager);
++        GameLoop::getSingleton().addTask(mAnimationManager, GameLoop::TG_GRAPHICS);
+ 
+         mGameEventManager = new GameEventManager();
+-        GameLoopManager::getSingleton().addTask(mGameEventManager);
++        GameLoop::getSingleton().addTask(mGameEventManager, GameLoop::TG_LOGIC);
+         
+         mDebugVisualsManager = new DebugVisualsManager();
+-        GameLoopManager::getSingleton().addTask(mDebugVisualsManager);
++        GameLoop::getSingleton().addTask(mDebugVisualsManager, GameLoop::TG_GRAPHICS);
+ 
+ 		return true;
+     }
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -25,48 +25,68 @@
+ 
+ using namespace Ogre;
+ 
+-template&lt;&gt; rl::GameLoopManager* Singleton&lt;rl::GameLoopManager&gt;::ms_Singleton = 0;
++template&lt;&gt; rl::GameLoop* Singleton&lt;rl::GameLoop&gt;::ms_Singleton = 0;
+ 
+ namespace rl {
+ 
+-    GameLoopManager* GameLoopManager::getSingletonPtr(void)
++    GameLoop* GameLoop::getSingletonPtr(void)
+     {
+-        return Singleton&lt;GameLoopManager&gt;::getSingletonPtr();
++        return Singleton&lt;GameLoop&gt;::getSingletonPtr();
+     }
+-    GameLoopManager&amp; GameLoopManager::getSingleton(void)
++    GameLoop&amp; GameLoop::getSingleton(void)
+     {
+-        return Singleton&lt;GameLoopManager&gt;::getSingleton();
++        return Singleton&lt;GameLoop&gt;::getSingleton();
+     }
+ 
+-    GameLoopManager::GameLoopManager()
+-        : mTaskList(),
++    GameLoop::GameLoop()
++        : mTaskLists(),
+           mLastTimes(),
+           mSmoothPeriod(5000),
+           mMaxFrameTime(0.5f),
+           mQuitRequested(false)
+     {
++        // create five task lists, one for each taskgroup
++        mTaskLists.push_back(new GameTaskList);
++        mTaskLists.push_back(new GameTaskList);
++        mTaskLists.push_back(new GameTaskList);
++        mTaskLists.push_back(new GameTaskList);
++        mTaskLists.push_back(new GameTaskList);
+     }
+ 
+-    GameLoopManager::~GameLoopManager()
++    GameLoop::~GameLoop()
+     {
++        for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
++        {
++            delete mTaskLists[i];
++        }
++        mTaskLists.clear();
+     }
+ 
+-    void GameLoopManager::addTask(GameTask* task)
++    void GameLoop::addTask(GameTask* task, TaskGroup group)
+     {
+-        mTaskList.push_back(task);
++        mTaskLists[group]-&gt;push_back(task);
+     }
+ 
+-    void GameLoopManager::removeTask(GameTask* task)
++    void GameLoop::removeTask(GameTask* task)
+     {
+-        mTaskList.remove(task);
++        for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
++        {
++            GameTaskList* tasks = mTaskLists[i];
++            GameTaskList::iterator it = std::find(tasks-&gt;begin(), tasks-&gt;end(), task);
++            if (it != tasks-&gt;end())
++            {
++                tasks-&gt;erase(it);
++                break;
++            }
++        }
+     }
+ 
+-    void GameLoopManager::quitGame()
++    void GameLoop::quitGame()
+     {
+         mQuitRequested = true;
+     }
+ 
+-    void GameLoopManager::loop()
++    void GameLoop::loop()
+     {
+         Timer* timer = Root::getSingleton().getTimer();
+         // A sensible start value
+@@ -81,11 +101,15 @@
+ 			WindowEventUtilities::messagePump();
+             Root::getSingleton().renderOneFrame();
+ 
+-            for (GameTaskList::iterator i = mTaskList.begin(); i != mTaskList.end(); ++i)
++            for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
+             {
+-                if (!(*i)-&gt;isPaused())
++                GameTaskList* tasks = mTaskLists[i];
++                for (GameTaskList::iterator it = tasks-&gt;begin(); it != tasks-&gt;end(); ++it)
+                 {
+-                    (*i)-&gt;run(frameTime);
++                    if (!(*it)-&gt;isPaused())
++                    {
++                        (*it)-&gt;run(frameTime);
++                    }
+                 }
+             }
+         }
+@@ -93,7 +117,7 @@
+ 
+     // Idea taken from Ogre, but implementation by us.
+     // smooths time step over the period mSmoothPeriod.
+-    unsigned long GameLoopManager::smoothTime(unsigned long time)
++    unsigned long GameLoop::smoothTime(unsigned long time)
+     {
+         mLastTimes.push_back(time);
+ 
+
+Modified: rl/trunk/engine/rules/src/TimerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/TimerManager.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/rules/src/TimerManager.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -44,7 +44,7 @@
+ 	TimerManager::TimerManager() :
+ 		mTimers()
+ 	{
+-		GameLoopManager::getSingleton().addTask(this);
++        GameLoop::getSingleton().addTask(this, GameLoop::TG_GRAPHICS);
+ 	}
+ 
+ 	TimerManager::~TimerManager()
+@@ -56,7 +56,7 @@
+ 			ScriptWrapper::getSingleton().disowned( currTimer );
+ 		}
+ 		mTimers.clear();
+-		GameLoopManager::getSingleton().removeTask(this);
++		GameLoop::getSingleton().removeTask(this);
+ 	}
+ 
+ 	void TimerManager::run(Ogre::Real elapsedTime)
+
+Modified: rl/trunk/engine/ui/src/CloseConfirmationWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CloseConfirmationWindow.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/CloseConfirmationWindow.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -42,7 +42,7 @@
+ 
+ bool CloseConfirmationWindow::handleConfirm()
+ {
+-	GameLoopManager::getSingleton().quitGame();
++	GameLoop::getSingleton().quitGame();
+ 	return true;
+ }
+ 
+
+Modified: rl/trunk/engine/ui/src/DebugWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DebugWindow.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/DebugWindow.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -214,9 +214,9 @@
+ 	{
+ 		CeGuiWindow::setVisible(visible, destroyAfterHide);
+ 		if (visible)
+-			GameLoopManager::getSingleton().addTask(this);
++            GameLoop::getSingleton().addTask(this, GameLoop::TG_GRAPHICS);
+ 		else
+-			GameLoopManager::getSingleton().removeTask(this);
++			GameLoop::getSingleton().removeTask(this);
+ 	}
+ 
+     const Ogre::String&amp; DebugWindow::getName() const
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -64,12 +64,12 @@
+         mInputManager(NULL)
+ 	{
+         initializeOis(win);
+-        GameLoopManager::getSingleton().addTask(this);
++        GameLoop::getSingleton().addTask(this, GameLoop::TG_INPUT);
+     }
+ 
+ 	InputManager::~InputManager()
+ 	{
+-        GameLoopManager::getSingleton().removeTask(this);
++        GameLoop::getSingleton().removeTask(this);
+ 		if( mInputManager )
+ 		{
+ 			mInputManager-&gt;destroyInputObject( mMouse );
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -131,7 +131,7 @@
+ 			boost::bind(&amp;InventoryWindow::handleClose, this));
+ 
+         mInventoryArrangeTask = new InventoryArrangeTask();
+-		GameLoopManager::getSingletonPtr()-&gt;addTask(mInventoryArrangeTask);
++        GameLoop::getSingletonPtr()-&gt;addTask(mInventoryArrangeTask, GameLoop::TG_GRAPHICS);
+ 	}
+ 	
+ 	InventoryWindow::~InventoryWindow()
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -85,7 +85,7 @@
+ 		delete mWindowFactory;
+ 		delete mWindowManager;
+ 
+-        GameLoopManager::getSingleton().removeTask(mCharacterController);
++        GameLoop::getSingleton().removeTask(mCharacterController);
+ 		delete mCharacterController;
+ 
+ 		delete mInputManager;
+@@ -159,7 +159,10 @@
+ 
+         mWindowFactory-&gt;initialize();
+ 
+-		GameLoopManager::getSingleton().addTask(this);
++        ///\XXX Not sensible to call setCharacterController each frame.
++        /// A better control over removed and added tasks will resolve this.
++        /// TG_INPUT is a bit of a stretch, but this doesn't fit anywhere else.
++        GameLoop::getSingleton().addTask(this, GameLoop::TG_INPUT);
+     }
+ 
+ 
+@@ -225,7 +228,7 @@
+ 			if (mCharacterController-&gt;getType() == type)
+ 				return;
+ 
+-			GameLoopManager::getSingleton().removeTask(mCharacterController);
++			GameLoop::getSingleton().removeTask(mCharacterController);
+ 			delete mCharacterController;
+             mCharacterController = NULL;
+ 			LOG_MESSAGE(Logger::UI,
+@@ -281,7 +284,7 @@
+ 		mInputManager-&gt;setCharacterController(mCharacterController);
+ 
+ 	    LOG_MESSAGE(Logger::UI, &quot;CharacterController created.&quot;);
+-		GameLoopManager::getSingleton().addTask(mCharacterController);
++        GameLoop::getSingleton().addTask(mCharacterController, GameLoop::TG_INPUT);
+         LOG_MESSAGE(Logger::UI, &quot;CharacterController task added.&quot;);
+ 	}
+ 
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2007-01-13 15:16:36 UTC (rev 2978)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2007-01-13 19:54:58 UTC (rev 2979)
+@@ -32,13 +32,13 @@
+ 	WindowManager::WindowManager()
+ 	{
+ 		mWindowUpdater = new WindowUpdater();
+-		GameLoopManager::getSingleton().addTask(mWindowUpdater);
++        GameLoop::getSingleton().addTask(mWindowUpdater, GameLoop::TG_GRAPHICS);
+ 		//mWindowUpdater-&gt;setPaused(true);
+ 	}
+ 
+ 	WindowManager::~WindowManager()
+ 	{
+-		GameLoopManager::getSingleton().removeTask(mWindowUpdater);
++		GameLoop::getSingleton().removeTask(mWindowUpdater);
+ 		delete mWindowUpdater;
+ 	}
+ 	
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000049.html">[Dsa-hl-svn] r2978 - modules
+</A></li>
+	<LI>Next message: <A HREF="000051.html">[Dsa-hl-svn] r2980 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#50">[ date ]</a>
+              <a href="thread.html#50">[ thread ]</a>
+              <a href="subject.html#50">[ subject ]</a>
+              <a href="author.html#50">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

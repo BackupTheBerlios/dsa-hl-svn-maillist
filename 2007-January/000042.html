@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2971 - in rl/trunk/plugins/fmod4driver: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2971%20-%20in%20rl/trunk/plugins/fmod4driver%3A%20include%20src&In-Reply-To=%3C200701121438.l0CEcnOt001913%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000041.html">
+   <LINK REL="Next"  HREF="000043.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2971 - in rl/trunk/plugins/fmod4driver: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2971%20-%20in%20rl/trunk/plugins/fmod4driver%3A%20include%20src&In-Reply-To=%3C200701121438.l0CEcnOt001913%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2971 - in rl/trunk/plugins/fmod4driver: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Jan 12 15:38:49 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000041.html">[Dsa-hl-svn] r2970 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000043.html">[Dsa-hl-svn] r2972 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#42">[ date ]</a>
+              <a href="thread.html#42">[ thread ]</a>
+              <a href="subject.html#42">[ subject ]</a>
+              <a href="author.html#42">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-01-12 15:38:47 +0100 (Fri, 12 Jan 2007)
+New Revision: 2971
+
+Modified:
+   rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+   rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+Log:
+Change fmod4 error check into macro to get some usable line numbers from 
+exceptions
+
+
+
+Modified: rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+===================================================================
+--- rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-01-12 13:38:48 UTC (rev 2970)
++++ rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-01-12 14:38:47 UTC (rev 2971)
+@@ -20,8 +20,10 @@
+ 
+ #if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+     #include &lt;fmod.hpp&gt;
++    #include &lt;fmod_errors.h&gt;
+ #else
+     #include &lt;fmodex/fmod.hpp&gt;
++    #include &lt;fmodex/fmod_errors.h&gt;
+ #endif
+ 
+ #include &quot;SoundDriver.h&quot;
+@@ -31,6 +33,19 @@
+ 
+ typedef map&lt;Ogre::String, StringList&gt; DriverMap;
+ 
++#define CHECK_FMOD4_ERRORS(fmod4_errorcode)\
++{\
++    if (fmod4_errorcode != FMOD_OK)\
++    {\
++        Throw(rl::RuntimeException,\
++            &quot;FMOD error #&quot;\
++            + StringConverter::toString(fmod4_errorcode)\
++            + &quot; &quot;\
++            + FMOD_ErrorString(fmod4_errorcode));\
++    }\
++}
++
++
+ /** Diese Klasse ist der Treiber, der OpenAL zur
+  * Ausgabe benutzt.
+  */
+@@ -76,8 +91,6 @@
+ 
+     FMOD::System* _getFmodSystem();
+ 
+-    void checkErrors(const FMOD_RESULT&amp; errorcode) const;
+-
+ private:
+     /// Informationen &#65533;ber den Treiber ausgeben
+     virtual void printData() const;
+
+Modified: rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+===================================================================
+--- rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-01-12 13:38:48 UTC (rev 2970)
++++ rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-01-12 14:38:47 UTC (rev 2971)
+@@ -20,16 +20,8 @@
+ #include &quot;Logger.h&quot;
+ #include &quot;SoundResource.h&quot;
+ 
+-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-    #include &lt;fmod_errors.h&gt;
+-#else
+-    #include &lt;fmodex/fmod_errors.h&gt;
+-#endif
+-
+-
+ using namespace Ogre;
+ 
+-
+ namespace rl
+ {
+ String Fmod4Driver::NAME = &quot;FMOD4&quot;;
+@@ -54,7 +46,7 @@
+     static int MAX_VIRTUAL_CHANNELS = 100;
+ 
+     FMOD_RESULT result = FMOD::System_Create(&amp;mFmod4System);
+-    checkErrors(result);
++    CHECK_FMOD4_ERRORS(result);
+ 
+     mFmod4System-&gt;setFileSystem(
+         Fmod4Driver::open,
+@@ -72,8 +64,8 @@
+ 
+ void Fmod4Driver::shutdown()
+ {
+-    checkErrors(mFmod4System-&gt;close());
+-    checkErrors(mFmod4System-&gt;release());
++    CHECK_FMOD4_ERRORS(mFmod4System-&gt;close());
++    CHECK_FMOD4_ERRORS(mFmod4System-&gt;release());
+ }
+ 
+ bool Fmod4Driver::isDriverAvailable()
+@@ -353,16 +345,5 @@
+     return factor;
+ }
+ 
+-void Fmod4Driver::checkErrors(const FMOD_RESULT &amp;errorcode) const
+-{
+-    if (errorcode != FMOD_OK)
+-    {
+-        Throw(rl::RuntimeException,
+-            &quot;FMOD error #&quot;
+-            + StringConverter::toString(errorcode)
+-            + &quot; &quot;
+-            + FMOD_ErrorString(errorcode));
+-    }
+-}
+ 
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000041.html">[Dsa-hl-svn] r2970 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000043.html">[Dsa-hl-svn] r2972 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#42">[ date ]</a>
+              <a href="thread.html#42">[ thread ]</a>
+              <a href="subject.html#42">[ subject ]</a>
+              <a href="author.html#42">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

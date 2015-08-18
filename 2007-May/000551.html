@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3480 - rl/trunk/engine/common/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3480%20-%20rl/trunk/engine/common/include&In-Reply-To=%3C200705221957.l4MJvLZt002762%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000550.html">
+   <LINK REL="Next"  HREF="000552.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3480 - rl/trunk/engine/common/include</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3480%20-%20rl/trunk/engine/common/include&In-Reply-To=%3C200705221957.l4MJvLZt002762%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3480 - rl/trunk/engine/common/include">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue May 22 21:57:21 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000550.html">[Dsa-hl-svn] r3479 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000552.html">[Dsa-hl-svn] r3481 - modules/common/materials/programs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#551">[ date ]</a>
+              <a href="thread.html#551">[ thread ]</a>
+              <a href="subject.html#551">[ subject ]</a>
+              <a href="author.html#551">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-22 21:57:19 +0200 (Tue, 22 May 2007)
+New Revision: 3480
+
+Modified:
+   rl/trunk/engine/common/include/Property.h
+Log:
+Fix GCC build
+
+
+Modified: rl/trunk/engine/common/include/Property.h
+===================================================================
+--- rl/trunk/engine/common/include/Property.h	2007-05-22 19:41:53 UTC (rev 3479)
++++ rl/trunk/engine/common/include/Property.h	2007-05-22 19:57:19 UTC (rev 3480)
+@@ -71,13 +71,44 @@
+ 
+ 	class Property;
+ 
+-	typedef std::vector&lt;Property&gt; PropertyVector;
+-	typedef std::map&lt;CeGuiString, Property&gt; PropertyMap;
++    typedef std::vector&lt;Property&gt; PropertyVector;
++    typedef std::map&lt;CeGuiString, Property&gt; PropertyMap;
++    
++    class _RlCommonExport Property
++    {
++    public:
++		Property();
+ 
+-    template&lt;typename T&gt; PropertyMap convertToPropertyMap(const std::map&lt;const CeGuiString, typename T&gt;&amp; input)
++        PropertyMethod(Bool, const bool&amp;);
++        PropertyMethod(String, const CeGuiString&amp;);
++        PropertyMethod(Int, const int&amp;);
++        PropertyMethod(Real, const Ogre::Real&amp;);
++        PropertyMethod(Vector3, const Ogre::Vector3&amp;);
++        PropertyMethod(Quaternion, const Ogre::Quaternion&amp;);
++        PropertyMethod(IntTriple, const Tripel&lt;int&gt;);
++        PropertyMethod(IntPair, const IntPair);
++		PropertyMethod(Array, const PropertyVector);
++		PropertyMethod(Map, const PropertyMap);
++
++    private:
++        boost::any mValue;
++    };
++
++    class _RlCommonExport PropertyPtr :
++        public Ogre::SharedPtr&lt;Property&gt;
+     {
++    public:
++        PropertyPtr() : Ogre::SharedPtr&lt;Property&gt;() {}
++        explicit PropertyPtr(Property* rep) : Ogre::SharedPtr&lt;Property&gt;(rep) {}
++        PropertyPtr(const PropertyPtr&amp; res) : Ogre::SharedPtr&lt;Property&gt;(res) {}
++    protected:
++        void destroy() { Ogre::SharedPtr&lt;Property&gt;::destroy(); }
++    };
++
++    template&lt;typename T&gt; PropertyMap convertToPropertyMap(const std::map&lt;const CeGuiString, T&gt;&amp; input)
++    {
+         PropertyMap map;
+-        for (std::map&lt;const CeGuiString, typename T&gt;::const_iterator it =
++        for (typename std::map&lt;const CeGuiString, T&gt;::const_iterator it =
+             input.begin(); it != input.end(); ++it)
+         {
+             map[it-&gt;first] = Property(it-&gt;second);
+@@ -85,10 +116,10 @@
+         return map;
+     }
+ 
+-    template&lt;typename T&gt; PropertyMap convertToPropertyMap(const std::map&lt;const Ogre::String, typename T&gt;&amp; input)
++    template&lt;typename T&gt; PropertyMap convertToPropertyMap(const std::map&lt;const Ogre::String, T&gt;&amp; input)
+     {
+         PropertyMap map;
+-        for (std::map&lt;const Ogre::String, typename T&gt;::const_iterator it =
++        for (typename std::map&lt;const Ogre::String, T&gt;::const_iterator it =
+             input.begin(); it != input.end(); ++it)
+         {
+             map[it-&gt;first] = Property(it-&gt;second);
+@@ -97,7 +128,7 @@
+     }
+ 
+     template&lt;typename T&gt; void convertToMap(
+-        const PropertyMap&amp; propmap, std::map&lt;const Ogre::String, typename T&gt;&amp; output)
++        const PropertyMap&amp; propmap, std::map&lt;const Ogre::String, T&gt;&amp; output)
+     {
+         for (PropertyMap::const_iterator it = propmap.begin(); it != propmap.end(); ++it)
+         {
+@@ -106,7 +137,7 @@
+     }
+     
+     template&lt;typename T&gt; void convertToMap(
+-        const PropertyMap&amp; propmap, std::map&lt;const CeGuiString, typename T&gt;&amp; output)
++        const PropertyMap&amp; propmap, std::map&lt;const CeGuiString, T&gt;&amp; output)
+     {
+         for (PropertyMap::const_iterator it = propmap.begin(); it != propmap.end(); ++it)
+         {
+@@ -115,37 +146,6 @@
+     }
+     
+ 
+-    class _RlCommonExport Property
+-    {
+-    public:
+-		Property();
+-
+-        PropertyMethod(Bool, const bool&amp;);
+-        PropertyMethod(String, const CeGuiString&amp;);
+-        PropertyMethod(Int, const int&amp;);
+-        PropertyMethod(Real, const Ogre::Real&amp;);
+-        PropertyMethod(Vector3, const Ogre::Vector3&amp;);
+-        PropertyMethod(Quaternion, const Ogre::Quaternion&amp;);
+-        PropertyMethod(IntTriple, const Tripel&lt;int&gt;);
+-        PropertyMethod(IntPair, const IntPair);
+-		PropertyMethod(Array, const PropertyVector);
+-		PropertyMethod(Map, const PropertyMap);
+-
+-    private:
+-        boost::any mValue;
+-    };
+-
+-    class _RlCommonExport PropertyPtr :
+-        public Ogre::SharedPtr&lt;Property&gt;
+-    {
+-    public:
+-        PropertyPtr() : Ogre::SharedPtr&lt;Property&gt;() {}
+-        explicit PropertyPtr(Property* rep) : Ogre::SharedPtr&lt;Property&gt;(rep) {}
+-        PropertyPtr(const PropertyPtr&amp; res) : Ogre::SharedPtr&lt;Property&gt;(res) {}
+-    protected:
+-        void destroy() { Ogre::SharedPtr&lt;Property&gt;::destroy(); }
+-    };
+-
+ } // namespace rl
+ 
+ #endif //__Property_H__
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000550.html">[Dsa-hl-svn] r3479 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000552.html">[Dsa-hl-svn] r3481 - modules/common/materials/programs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#551">[ date ]</a>
+              <a href="thread.html#551">[ thread ]</a>
+              <a href="subject.html#551">[ subject ]</a>
+              <a href="author.html#551">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,230 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4100 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4100%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803031057.m23Avf6u016721%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001170.html">
+   <LINK REL="Next"  HREF="001172.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4100 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4100%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803031057.m23Avf6u016721%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4100 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  3 11:57:41 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001170.html">[Dsa-hl-svn] r4099 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="001172.html">[Dsa-hl-svn] r4101 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1171">[ date ]</a>
+              <a href="thread.html#1171">[ thread ]</a>
+              <a href="subject.html#1171">[ subject ]</a>
+              <a href="author.html#1171">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-03 11:57:39 +0100 (Mon, 03 Mar 2008)
+New Revision: 4100
+
+Modified:
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/TimeSource.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/TimeSource.cpp
+Log:
+Added time factor to CoreSubsystem and TimeSources
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2008-03-03 10:54:05 UTC (rev 4099)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2008-03-03 10:57:39 UTC (rev 4100)
+@@ -98,8 +98,8 @@
+ 
+     bool isInitialized() const;
+ 
+-    Ogre::String getEngineVersionString() const;
+-    Ogre::String getEngineVersionName() const;
++    const Ogre::String getEngineVersionString() const;
++    const Ogre::String getEngineVersionName() const;
+     long         getEngineBuildNumber() const;
+ 
+     /**
+@@ -107,12 +107,14 @@
+      *
+      * @return pointer to render window
+      */
+-    Ogre::RenderWindow* getRenderWindow();
++    Ogre::RenderWindow* getRenderWindow() const;
+ 
+ 	/// Sets the pause state of the game
+ 	/// @param paused &lt;code&gt;true&lt;/code&gt; if the game should be paused, &lt;code&gt;false&lt;/code&gt; if it should be continued
+ 	void setPaused(bool paused);
+ 
++    void setTimeFactor(const Ogre::Real&amp; factor = 1.0F);
++
+ private:
+     World* mWorld;
+     RubyInterpreter* mRubyInterpreter;
+
+Modified: rl/trunk/engine/core/include/TimeSource.h
+===================================================================
+--- rl/trunk/engine/core/include/TimeSource.h	2008-03-03 10:54:05 UTC (rev 4099)
++++ rl/trunk/engine/core/include/TimeSource.h	2008-03-03 10:57:39 UTC (rev 4100)
+@@ -32,6 +32,7 @@
+     public:
+         enum TimeSourceType
+         {
++            UNKNOWN,
+             REALTIME_CONTINUOUS,
+             REALTIME_INTERRUPTABLE,
+             GAMETIME
+@@ -92,6 +93,7 @@
+ 
+         void registerTimeSource(TimeSource* ts);
+         TimeSource* getTimeSource(const TimeSource::TimeSourceType&amp; type) const;
++        void setTimeFactor(const Ogre::Real&amp; factor);
+ 
+ 		virtual CeGuiString getXmlNodeIdentifier() const;
+         virtual void writeData(SaveGameFileWriter* writer);
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-03 10:54:05 UTC (rev 4099)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-03 10:57:39 UTC (rev 4100)
+@@ -156,7 +156,7 @@
+         return mInitialized;
+     }
+ 
+-    Ogre::RenderWindow* CoreSubsystem::getRenderWindow()
++    Ogre::RenderWindow* CoreSubsystem::getRenderWindow() const
+     {
+         return mRenderWindow;
+     }
+@@ -164,8 +164,15 @@
+ 	void CoreSubsystem::setPaused(bool paused)
+ 	{
+ 		mGameLoop-&gt;setPaused(paused);
++        ///@todo mTimeSourceManager-&gt;setPaused(paused)?
+ 	}
+ 
++    void CoreSubsystem::setTimeFactor(const Ogre::Real &amp;factor)
++    {
++        mAnimationManager-&gt;setGlobalAnimationSpeed(factor);
++        mTimeSourceManager-&gt;setTimeFactor(factor);
++    }
++
+     bool CoreSubsystem::initializeCoreSubsystem()
+     {
+         // By not specifying the first two parameters, OGRE will not try
+@@ -174,7 +181,6 @@
+ 
+         // Load Ogre plugins
+         Ogre::StringVector pluginList = ConfigurationManager::getSingleton().getPluginList();
+-
+         for (Ogre::StringVector::const_iterator it = pluginList.begin(); it &lt; pluginList.end(); it++)
+         {
+             mOgreRoot-&gt;loadPlugin(*it);
+@@ -239,7 +245,7 @@
+ 
+         mScriptWrapper = new ScriptWrapper();
+         LOG_MESSAGE(Logger::CORE,&quot;Skriptwrapper erzeugt&quot;);
+-        // TODO: muss l&#65533;schbar werden.
++        ///@todo: muss loeschbar werden.
+         mRubyInterpreter = new RubyInterpreter();
+         LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter erzeugt&quot;);
+         mRubyInterpreter-&gt;initializeInterpreter();
+@@ -255,7 +261,7 @@
+         initializeResources();
+ 
+         // Set default mipmap level (NB some APIs ignore this)
+-        //TODO: In Config-Datei verlagern
++        ///@todo: In Config-Datei verlagern
+         TextureManager::getSingleton().setDefaultNumMipmaps(5);
+         MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_TRILINEAR);
+         MaterialManager::getSingleton().setDefaultAnisotropy(
+@@ -500,13 +506,13 @@
+         return mWorld;
+     }
+ 
+-    Ogre::String CoreSubsystem::getEngineVersionString() const
++    const Ogre::String CoreSubsystem::getEngineVersionString() const
+     {
+         static Ogre::String version = &quot;0.3.0&quot;;
+         return version;
+     }
+ 
+-    Ogre::String CoreSubsystem::getEngineVersionName() const
++    const Ogre::String CoreSubsystem::getEngineVersionName() const
+     {
+         static Ogre::String version = &quot;Internal Build&quot;;
+         return version;
+@@ -528,9 +534,9 @@
+             month++;
+ 
+         return /* Jahr */          year * 100000 +
+-               /* Monat */     (month+1) * 1000 +
++               /* Monat */         (month+1) * 1000 +
+                /* Tag */           day * 10 +
+-               /* Sub-Version */     0;
++               /* Sub-Version */   0;
+     }
+ 
+     RubyInterpreter* CoreSubsystem::getRubyInterpreter()
+
+Modified: rl/trunk/engine/core/src/TimeSource.cpp
+===================================================================
+--- rl/trunk/engine/core/src/TimeSource.cpp	2008-03-03 10:54:05 UTC (rev 4099)
++++ rl/trunk/engine/core/src/TimeSource.cpp	2008-03-03 10:57:39 UTC (rev 4100)
+@@ -147,6 +147,14 @@
+         return it-&gt;second;
+     }
+ 
++    void TimeSourceManager::setTimeFactor(const Ogre::Real&amp; factor)
++    {
++        for (std::map&lt;TimeSource::TimeSourceType, TimeSource*&gt;::iterator it
++            = mTimeSources.begin(); it != mTimeSources.end(); ++it)
++        {
++            it-&gt;second-&gt;setTimeFactor(factor);
++        }
++    }
+ 
+ 	CeGuiString TimeSourceManager::getXmlNodeIdentifier() const
+ 	{
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001170.html">[Dsa-hl-svn] r4099 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="001172.html">[Dsa-hl-svn] r4101 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1171">[ date ]</a>
+              <a href="thread.html#1171">[ thread ]</a>
+              <a href="subject.html#1171">[ subject ]</a>
+              <a href="author.html#1171">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

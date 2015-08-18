@@ -1,0 +1,345 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4261 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4261%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200803081406.m28E6Bob026168%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001331.html">
+   <LINK REL="Next"  HREF="001333.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4261 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4261%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200803081406.m28E6Bob026168%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4261 - in rl/trunk/engine: rules/include rules/src	script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 15:06:11 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001331.html">[Dsa-hl-svn] r4260 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001333.html">[Dsa-hl-svn] r4262 - modules/kanalisation/materials/textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1332">[ date ]</a>
+              <a href="thread.html#1332">[ thread ]</a>
+              <a href="subject.html#1332">[ subject ]</a>
+              <a href="author.html#1332">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-08 15:06:09 +0100 (Sat, 08 Mar 2008)
+New Revision: 4261
+
+Modified:
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Some fixes in GameObject/Item state change,
+split onStateChange method in onBefore... and onAfter...
+
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-03-08 14:02:10 UTC (rev 4260)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-03-08 14:06:09 UTC (rev 4261)
+@@ -164,7 +164,8 @@
+         void addQueryFlag(unsigned long queryflag);
+         void setQueryFlags(unsigned long queryflags);
+ 
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+ 
+         /**
+          * Lets an effect affect the game object
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 14:02:10 UTC (rev 4260)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 14:06:09 UTC (rev 4261)
+@@ -16,6 +16,7 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;GameObject.h&quot;
++#include &lt;CEGUIPropertyHelper.h&gt;
+ 
+ #include &quot;Action.h&quot;
+ #include &quot;ActionManager.h&quot;
+@@ -30,6 +31,7 @@
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+ 
++
+ using namespace std;
+ 
+ namespace rl
+@@ -170,7 +172,7 @@
+ 
+         mActions.push_back(make_pair(action, option));
+         LOG_MESSAGE(Logger::RULES,
+-            &quot;Bei GameObject #&quot;+Ogre::StringConverter::toString(mId)+
++            &quot;Bei GameObject #&quot;+CEGUI::PropertyHelper::intToString(mId)+
+             &quot; (&quot;+getName()+&quot;) wurde Aktion &quot;+action-&gt;getName().c_str()+&quot; hinzugefuegt.&quot;);
+     }
+ 
+@@ -623,7 +625,7 @@
+ 
+     Actor* GameObject::createActor()
+     {
+-        if (mActor == NULL)
++        if (!mActor)
+         {
+             Ogre::String actorName = Ogre::StringConverter::toString(mId);
+ 			Actor* actor = NULL;
+@@ -660,12 +662,11 @@
+ 					&quot;Error creating actor '&quot;
+ 					+ actorName	+ &quot;'.&quot;);
+ 			}
+-            return actor;
++
++            setActor(actor);
+         }
+-        else
+-        {
+-            return mActor;
+-        }
++
++        return mActor;
+     }
+ 
+     void GameObject::destroyActor()
+@@ -721,11 +722,14 @@
+         if (mState == GOS_IN_SCENE)
+         {
+             Actor* actor = mActor;
+-            mOrientation = actor-&gt;getWorldOrientation();
+-            mPosition = actor-&gt;getWorldPosition();
++            if (actor)
++            {
++                mOrientation = actor-&gt;getWorldOrientation();
++                mPosition = actor-&gt;getWorldPosition();
+ 
+-            setActor(NULL);
+-            actor-&gt;removeFromScene();
++                setActor(NULL);
++                actor-&gt;removeFromScene();
++            }
+ 
+             // give the setstate function the possibility to reuse the actor
+             //ActorManager::getSingleton().destroyActor(actor);
+@@ -745,6 +749,7 @@
+         }
+ 
+         GameObjectState oldState = mState;
++        onBeforeStateChange(oldState, targetstate);
+ 
+         if (targetstate == GOS_LOADED &amp;&amp; mState == GOS_IN_SCENE)
+         {
+@@ -767,14 +772,18 @@
+         }
+ 
+         mState = targetstate;
+-        onStateChange(oldState, targetstate);
++        onAfterStateChange(oldState, targetstate);
+         GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetstate);
+     }
+ 
+-    void GameObject::onStateChange(GameObjectState oldState, GameObjectState newState)
++    void GameObject::onBeforeStateChange(GameObjectState oldState, GameObjectState newState)
+     {
+     }
+ 
++    void GameObject::onAfterStateChange(GameObjectState oldState, GameObjectState newState)
++    {
++    }
++
+     GameObjectState GameObject::getState() const
+     {
+         return mState;
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2008-03-08 14:02:10 UTC (rev 4260)
++++ rl/trunk/engine/rules/src/Item.cpp	2008-03-08 14:06:09 UTC (rev 4261)
+@@ -134,30 +134,43 @@
+             //removeOldState();
+         }
+ 
++        // everything else is not handled here, so give it to the parent
++        if ((targetState == GOS_IN_SCENE || targetState == GOS_LOADED)
++            &amp;&amp; (mState == GOS_IN_SCENE || mState == GOS_LOADED))
++        {
++            GameObject::setState(targetState);
++            return;
++        }
+ 
+         GameObjectState oldState = mState;
++        onBeforeStateChange(oldState, targetState);        
+ 
+-        if( targetState == GOS_LOADED &amp;&amp; (mState == GOS_HELD || mState == GOS_READY || GOS_IN_POSSESSION) )
++        if (targetState == GOS_LOADED 
++            &amp;&amp; (mState == GOS_HELD || mState == GOS_READY || GOS_IN_POSSESSION) )
+         {
+             mState = targetState; // this is needed here to prevent an endless recursion
+             // &quot;remove old state&quot;
+             doLoose();
+             destroyActor();
+         }
+-        else if( mState == GOS_LOADED &amp;&amp;
+-                 (targetState == GOS_HELD || targetState == GOS_READY || targetState == GOS_IN_POSSESSION))
++        else if (mState == GOS_LOADED &amp;&amp;
++                 (targetState == GOS_HELD || targetState == GOS_READY))
+         {
++            createActor();
+             mState = targetState;
+             // do nothing, the user has to do what he needs himself
+         }
+-        else // everything else is not handled here, so give it to the parent
++        else if ((mState == GOS_LOADED &amp;&amp; targetState == GOS_IN_POSSESSION)
++            || (mState == GOS_IN_POSSESSION &amp;&amp; targetState == GOS_LOADED))
+         {
+-            GameObject::setState(targetState);
+-            return;
++            mState = targetState;
+         }
++        else
++        {
++            Throw(rl::IllegalStateException, &quot;Unhandled state change&quot;);
++        }
+ 
+-
+-        onStateChange(oldState, mState);
++        onAfterStateChange(oldState, targetState);
+         GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetState);
+     }
+ 
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2008-03-08 14:02:10 UTC (rev 4260)
++++ rl/trunk/engine/script/swig/RlRules.swig	2008-03-08 14:06:09 UTC (rev 4261)
+@@ -434,7 +434,8 @@
+         void addQueryFlag(unsigned long queryflag);
+         void setQueryFlags(unsigned long queryflags);
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
+     class WaitJob : public rl::Job
+@@ -492,7 +493,8 @@
+         virtual rl::PropertyKeys getAllPropertyKeys() const;
+         virtual bool isContainer();
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
+     %feature(&quot;director&quot;) Weapon;
+@@ -523,7 +525,8 @@
+         virtual void setProperty(const rl::CeGuiString&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertyKeys getAllPropertyKeys() const;
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
+     %feature(&quot;director&quot;) Armor;
+@@ -541,7 +544,8 @@
+         virtual void setProperty(const rl::CeGuiString&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertyKeys getAllPropertyKeys() const;
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
+     %feature(&quot;director&quot;) Container;
+@@ -565,7 +569,8 @@
+         virtual void setProperty(const rl::CeGuiString&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertyKeys getAllPropertyKeys() const;
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
+ 
+@@ -687,13 +692,12 @@
+             ALIGNMENT_ENEMY    ///&lt; Creature fights against the player.
+         };
+ 
+-            enum SfStatus
+-            {
+-                SFSTATUS_IN_TRAINING = 1,
+-                SFSTATUS_OK,
+-                SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Wird das ueberhaupt gebraucht?
++        enum SfStatus
++        {
++            SFSTATUS_IN_TRAINING = 1,
++            SFSTATUS_OK,
++            SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Wird das ueberhaupt gebraucht?
+         };
+-        
+ 
+         // some targets
+         static const std::string Creature::ALL_EIGENSCHAFTEN = &quot;alle Eigenschaften&quot;;
+@@ -765,7 +769,8 @@
+         void setAlignment(Alignment);
+         Alignment getAlignment() const;
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+    };
+    
+    %feature(&quot;director&quot;) Person;
+@@ -785,7 +790,8 @@
+         virtual void setProperty(const rl::CeGuiString&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertyKeys getAllPropertyKeys() const;
+         
+-        virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onBeforeStateChange(GameObjectState oldState, GameObjectState newState);
++        virtual void onAfterStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+         
+     %feature(&quot;director&quot;) ActionManager;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001331.html">[Dsa-hl-svn] r4260 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001333.html">[Dsa-hl-svn] r4262 - modules/kanalisation/materials/textures
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1332">[ date ]</a>
+              <a href="thread.html#1332">[ thread ]</a>
+              <a href="subject.html#1332">[ subject ]</a>
+              <a href="author.html#1332">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,171 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3267 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3267%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200704120053.l3C0reAT001449%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000337.html">
+   <LINK REL="Next"  HREF="000339.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3267 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3267%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200704120053.l3C0reAT001449%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3267 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 12 02:53:40 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000337.html">[Dsa-hl-svn] r3266 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000339.html">[Dsa-hl-svn] r3268 - in rl/trunk/engine: rules/include rules/src	ui/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#338">[ date ]</a>
+              <a href="thread.html#338">[ thread ]</a>
+              <a href="subject.html#338">[ subject ]</a>
+              <a href="author.html#338">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-12 02:53:37 +0200 (Thu, 12 Apr 2007)
+New Revision: 3267
+
+Modified:
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/src/Item.cpp
+Log:
+Extracted one method for state change
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2007-04-12 00:52:47 UTC (rev 3266)
++++ rl/trunk/engine/rules/include/Item.h	2007-04-12 00:53:37 UTC (rev 3267)
+@@ -102,6 +102,7 @@
+ 		std::pair&lt;int,int&gt; mSize;
+ 
+ 		void doHold();
++		void doLoose();
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2007-04-12 00:52:47 UTC (rev 3266)
++++ rl/trunk/engine/rules/src/Item.cpp	2007-04-12 00:53:37 UTC (rev 3267)
+@@ -109,6 +109,15 @@
+         mState = GOS_HELD;
+     }
+ 
++	void Item::doLoose()
++	{
++		if (mActor != NULL)
++		{
++			mActor-&gt;detachFromParent();
++			//@todo is mState = GOS_IN_SCENE; after detaching?
++		}
++	}
++
+     void Item::setState(GameObjectState targetstate)
+     {
+         if (mState == targetstate)
+@@ -131,7 +140,7 @@
+             }
+             else if (mState == GOS_HELD)
+             {
+-                mActor-&gt;detachFromParent();
++                doLoose();
+                 destroyActor();
+                 stateChanged = true;
+             }
+@@ -140,25 +149,29 @@
+         {
+             if (mState == GOS_IN_POSSESSION)
+             {
++				mState = GOS_LOADED;
+                 stateChanged = true;
+             }
+             if (mState == GOS_HELD)
+             {
+-                mActor-&gt;detachFromParent();
++                doLoose();
+                 destroyActor();
+-                stateChanged = true;
++                mState = GOS_LOADED;
++				stateChanged = true;
+             }
+         }
+         else if (targetstate == GOS_IN_SCENE)
+         {
+             if (mState == GOS_IN_POSSESSION)
+             {
++                ///@todo remove from parent container?
+                 doRemoveFromScene();
+                 stateChanged = true;
+-            }
++			}
+             if (mState == GOS_HELD)
+             {
+-                mActor-&gt;detachFromParent();
++                doLoose();
++				doPlaceIntoScene();
+                 stateChanged = true;
+             }
+         }
+@@ -171,7 +184,7 @@
+             }
+             else if (mState == GOS_IN_SCENE)
+             {
+-                mActor-&gt;removeFromScene();
++                doRemoveFromScene();
+                 doHold();
+                 stateChanged = true;
+             }
+@@ -186,12 +199,8 @@
+             ///@todo
+         }
+ 
+-        if (stateChanged)
++        if (!stateChanged)
+         {
+-            mState = targetstate;   
+-        }
+-        else
+-        {
+             GameObject::setState(targetstate);
+         }
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000337.html">[Dsa-hl-svn] r3266 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000339.html">[Dsa-hl-svn] r3268 - in rl/trunk/engine: rules/include rules/src	ui/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#338">[ date ]</a>
+              <a href="thread.html#338">[ thread ]</a>
+              <a href="subject.html#338">[ subject ]</a>
+              <a href="author.html#338">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

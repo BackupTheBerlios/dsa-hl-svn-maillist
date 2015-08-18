@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4173 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4173%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200803060006.m2606ekA001794%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001243.html">
+   <LINK REL="Next"  HREF="001245.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4173 - rl/trunk/engine/ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4173%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200803060006.m2606ekA001794%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4173 - rl/trunk/engine/ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  6 01:06:40 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001243.html">[Dsa-hl-svn] r4172 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001245.html">[Dsa-hl-svn] r4174 - in rl/trunk/engine: script/swig ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1244">[ date ]</a>
+              <a href="thread.html#1244">[ thread ]</a>
+              <a href="subject.html#1244">[ subject ]</a>
+              <a href="author.html#1244">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-06 01:06:29 +0100 (Thu, 06 Mar 2008)
+New Revision: 4173
+
+Modified:
+   rl/trunk/engine/ui/src/InputManager.cpp
+Log:
+small fixes for KeyRepeatJob
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2008-03-05 23:31:18 UTC (rev 4172)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2008-03-06 00:06:29 UTC (rev 4173)
+@@ -525,22 +525,24 @@
+     class KeyRepeatJob : public Job
+     {
+     public:
+-        KeyRepeatJob(AbstractWindow* window, OIS::KeyCode key) :
+-          Job(false, true),
+-          mWindow(window),
+-          mKey(key),
+-          mLastTime(0)
++        static void createKeyRepeatJob(AbstractWindow* window, OIS::KeyCode key)
+         {
++            // nur neu anlegen, wenns noch nicht existiert!
++            if( mKeyJobMap.find(key) == mKeyJobMap.end() )
++            {
++                KeyRepeatJob *job = new KeyRepeatJob(window, key);
++                JobScheduler::getSingleton().addJob(job, JobScheduler::JP_NORMAL, 0.5);
++            }
+         }
+         bool execute(Ogre::Real t)
+         {
++            bool handled = false;
+             rl::Time time = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_CONTINUOUS)-&gt;getClock();
+             if ( WindowManager::getSingleton().getActiveWindow() == mWindow &amp;&amp; // perhaps window was deleted!!
+                 InputManager::getSingleton().isKeyDown(OIS::KeyCode(mKey)) )
+             {
+-                if ( time - mLastTime &gt; 50 )
++                if ( time - mLastTime &gt; 50*mCount )
+                 {
+-                    bool handled = false;
+                     if( CEGUI::System::getSingleton().injectKeyDown(mKey) )
+                         handled = true;
+                     else
+@@ -556,20 +558,37 @@
+                         handled = true;
+ 
+                     mLastTime = time;
++                }
+ 
+-                    if( !handled )  // we don't need a job for keys, that are not handled!
+-                        return true;
+-                }
+                 return false;
+             }
+-            else
+-                return true; // delete this job
++
++            mKeyJobMap.erase(mKey);
++            if( mCount &gt; 0 )
++                mCount--;
++            return true;
+         }
+     private:
+         rl::Time mLastTime;
+         AbstractWindow* mWindow;
+         OIS::KeyCode mKey;
++        typedef std::map&lt;OIS::KeyCode, KeyRepeatJob*&gt; KeyJobMap;
++        static KeyJobMap mKeyJobMap;
++        static int mCount;
++
++
++        KeyRepeatJob(AbstractWindow* window, OIS::KeyCode key) :
++          Job(false, true),
++          mWindow(window),
++          mKey(key),
++          mLastTime(0)
++        {
++            mKeyJobMap[key] = this;
++            mCount++;
++        }
+     };
++    KeyRepeatJob::KeyJobMap KeyRepeatJob::mKeyJobMap;
++    int KeyRepeatJob::mCount = 0;
+ 
+     bool InputManager::keyPressed(const OIS::KeyEvent&amp; evt)
+     {
+@@ -581,8 +600,7 @@
+             {
+                 if( activeWin-&gt;wantsKeyToRepeat(evt.key) )
+                 {
+-                    KeyRepeatJob *job = new KeyRepeatJob(activeWin, evt.key);
+-                    JobScheduler::getSingleton().addJob(job, JobScheduler::JP_NORMAL, 0.5);
++                    KeyRepeatJob::createKeyRepeatJob(activeWin, evt.key);
+                 }
+             }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001243.html">[Dsa-hl-svn] r4172 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001245.html">[Dsa-hl-svn] r4174 - in rl/trunk/engine: script/swig ui/include	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1244">[ date ]</a>
+              <a href="thread.html#1244">[ thread ]</a>
+              <a href="subject.html#1244">[ subject ]</a>
+              <a href="author.html#1244">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

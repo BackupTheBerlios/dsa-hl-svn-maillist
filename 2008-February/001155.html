@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4084 - in rl/trunk/engine: core/include core/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4084%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200802291146.m1TBkI26011110%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001154.html">
+   <LINK REL="Next"  HREF="001156.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4084 - in rl/trunk/engine: core/include core/src	ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4084%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200802291146.m1TBkI26011110%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4084 - in rl/trunk/engine: core/include core/src	ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Feb 29 12:46:18 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001154.html">[Dsa-hl-svn] r4083 - modules/regressiontest/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001156.html">[Dsa-hl-svn] r4085 - in modules: common/dsa common/scripts	regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1155">[ date ]</a>
+              <a href="thread.html#1155">[ thread ]</a>
+              <a href="subject.html#1155">[ subject ]</a>
+              <a href="author.html#1155">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-02-29 12:46:06 +0100 (Fri, 29 Feb 2008)
+New Revision: 4084
+
+Modified:
+   rl/trunk/engine/core/include/Zone.h
+   rl/trunk/engine/core/src/Zone.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+-multiple persons ins zone are now handled correctly
+ (zone activated when first person enters and deactivated
+ when last person leaves)
+-QUERYFLAG_PLAYER now set by UiSubsystem::setActiveCharacter,
+ so only one person has this flag
+=&gt; correct activation of zones (bug FS#30 ?\226?\128?\148 regressiontest: LightzoneTest - Zone zu fr?\195?\188h aktiv )
+
+Modified: rl/trunk/engine/core/include/Zone.h
+===================================================================
+--- rl/trunk/engine/core/include/Zone.h	2008-02-25 23:22:32 UTC (rev 4083)
++++ rl/trunk/engine/core/include/Zone.h	2008-02-29 11:46:06 UTC (rev 4084)
+@@ -59,7 +59,10 @@
+         void addEventSource(GameAreaEventSource* gam);
+         void removeEventSource(GameAreaEventSource* gam);
+         GameAreaEventSourceList&amp; getEventSources();
+-	private:
++        void personEntered();
++        void personLeft();
++        bool isActive() const; // only for the ZoneManager, in order to ask if a zone is active use ZoneManager::isZoneActive
++    private:
+         bool mNeedsToBeSaved;
+         long mId;
+         Zone();
+@@ -68,6 +71,7 @@
+ 		std::list&lt;Trigger*&gt; mTriggers;
+         GameAreaEventSourceList mEventSources;
+         Ogre::String mEaxPreset;
++        int mPersonsInside;
+ 	};
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/Zone.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Zone.cpp	2008-02-25 23:22:32 UTC (rev 4083)
++++ rl/trunk/engine/core/src/Zone.cpp	2008-02-29 11:46:06 UTC (rev 4084)
+@@ -27,7 +27,7 @@
+ {
+ 
+ 
+-    Zone::Zone(long id, bool needsToBeSaved) : mId(id), mEaxPreset(&quot;&quot;), mNeedsToBeSaved(needsToBeSaved)
++    Zone::Zone(long id, bool needsToBeSaved) : mId(id), mEaxPreset(&quot;&quot;), mNeedsToBeSaved(needsToBeSaved), mPersonsInside(0)
+     {
+     }
+ 
+@@ -143,4 +143,19 @@
+ 	{
+ 		return mEventSources;
+ 	}
++
++    bool Zone::isActive() const
++    {
++        return mPersonsInside &gt; 0;
++    }
++
++    void Zone::personEntered()
++    {
++        mPersonsInside++;
++    }
++
++    void Zone::personLeft()
++    {
++        mPersonsInside--;
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2008-02-25 23:22:32 UTC (rev 4083)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2008-02-29 11:46:06 UTC (rev 4084)
+@@ -321,13 +321,21 @@
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+-                    zoneLeft(zone);
++                {
++                    zone-&gt;personLeft();
++                    if( !zone-&gt;isActive() )
++                        zoneLeft(zone);
++                }
+             }
+             else
+             {
+                 Zone *zone = getZone(-id); // means we have to subtract this area from the zone
+                 if( zone )
+-                    zoneEntered(zone);
++                {
++                    if( !zone-&gt;isActive() )
++                        zoneEntered(zone);
++                    zone-&gt;personEntered();
++                }
+             }
+ 
+ 		    update();
+@@ -343,13 +351,21 @@
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+-                    zoneEntered(zone);
++                {
++                    if( !zone-&gt;isActive() )
++                        zoneEntered(zone);
++                    zone-&gt;personEntered();
++                }
+             }
+             else
+             {
+                 Zone *zone = getZone(-id); // means we have to subtract this area from the zone
+                 if( zone )
+-                    zoneLeft(zone);
++                {
++                    zone-&gt;personLeft();
++                    if( !zone-&gt;isActive() )
++                        zoneLeft(zone);
++                }
+             }
+ 
+ 		    update();
+@@ -358,6 +374,8 @@
+ 
+     void ZoneManager::zoneEntered(Zone *zone)
+     {
++        if( isZoneActive(zone) )
++            return;
+         // perhaps the trigger destroys the zone, so we should put the zone in the list, before the triggers does so
+         mActiveZones.push_front(zone);
+ 
+@@ -376,6 +394,8 @@
+ 
+     void ZoneManager::zoneLeft(Zone *zone)
+     {
++        if( !isZoneActive(zone) )
++            return;
+         // perhaps the trigger destroys the zone, so we should put the zone in the list, before the triggers does so
+         mActiveZones.remove(zone);
+ 
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2008-02-25 23:22:32 UTC (rev 4083)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2008-02-29 11:46:06 UTC (rev 4084)
+@@ -162,6 +162,7 @@
+             {
+                 ScriptWrapper::getSingleton().disowned( mCharacter );
+                 mCharacter-&gt;getActor()-&gt;detach(SoundManager::getSingleton().getListenerActor());
++                mCharacter-&gt;setQueryFlags(mCharacter-&gt;getQueryFlags() &amp; (~QUERYFLAG_PLAYER));
+             }
+ 
+             if (person == NULL)
+@@ -173,6 +174,7 @@
+             {
+                 ScriptWrapper::getSingleton().owned( person );
+                 mCharacter = person;
++                mCharacter-&gt;addQueryFlag(QUERYFLAG_PLAYER);
+ 
+                 mWindowFactory-&gt;setActiveCharacter(person);
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001154.html">[Dsa-hl-svn] r4083 - modules/regressiontest/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001156.html">[Dsa-hl-svn] r4085 - in modules: common/dsa common/scripts	regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1155">[ date ]</a>
+              <a href="thread.html#1155">[ thread ]</a>
+              <a href="subject.html#1155">[ subject ]</a>
+              <a href="author.html#1155">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,345 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4186 - in rl/trunk/engine: core/include core/src	rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4186%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200803061520.m26FKTgB012655%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001256.html">
+   <LINK REL="Next"  HREF="001258.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4186 - in rl/trunk/engine: core/include core/src	rules/include rules/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4186%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200803061520.m26FKTgB012655%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4186 - in rl/trunk/engine: core/include core/src	rules/include rules/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  6 16:20:29 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001256.html">[Dsa-hl-svn] r4185 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001258.html">[Dsa-hl-svn] r4187 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1257">[ date ]</a>
+              <a href="thread.html#1257">[ thread ]</a>
+              <a href="subject.html#1257">[ subject ]</a>
+              <a href="author.html#1257">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-06 16:20:19 +0100 (Thu, 06 Mar 2008)
+New Revision: 4186
+
+Modified:
+   rl/trunk/engine/core/include/Actor.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+fixed save/load of inventory; the items in slots are now shown when a creature is placed into the scene
+
+Modified: rl/trunk/engine/core/include/Actor.h
+===================================================================
+--- rl/trunk/engine/core/include/Actor.h	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/core/include/Actor.h	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -269,6 +269,7 @@
+ 
+         ///@todo mehr Query-Methoden f&#252;r Childs
+         Actor* getChildByName(const Ogre::String&amp; name ) const;
++        bool hasChild(Actor*) const;
+         /// Sets the Visibility
+         void setVisible( bool vis, bool cascade = true );
+         bool isVisible() const;
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/core/src/Actor.cpp	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -828,6 +828,12 @@
+         return NULL;
+     }
+ 
++    bool Actor::hasChild(Actor* act) const
++    {
++        ChildSet::const_iterator iter = mChildren.find(act);
++        return iter != mChildren.end();
++    }
++
+     void Actor::detachAllChildren( )
+     {
+         ChildSet::iterator iter =  mChildren.begin();
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/rules/include/Creature.h	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -742,9 +742,15 @@
+              **/
+             virtual int getCurrentBe();
+ 
++            /// inherited from GameObject
++            virtual void doPlaceIntoScene();
+ 
++            /// inherited from GameObject
++            virtual void doRemoveFromScene();
+ 
+ 
++
++
+         private:
+ ///////////////////////////////////////////////////////////////////////////////
+ // Typedefs
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -208,8 +208,8 @@
+         Actor* createActor();
+         void destroyActor();
+ 
+-        void doPlaceIntoScene();
+-        void doRemoveFromScene();
++        virtual void doPlaceIntoScene();
++        virtual void doRemoveFromScene();
+ 
+         /**
+          * Ueberprueft die wirkenden Effekte auf Lebendigkeit
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/rules/include/Slot.h	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -30,6 +30,7 @@
+     // item-state etc, returns true, if succeeded to set item, false indicates to to nothing
+     // subclasses MUST call this method when overriding
+     virtual bool setItem(Item* item);
++    virtual void update() {} // this must only be called from creature::doPlaceIntoScene
+     Item* getItem() const;
+     bool isAllowed(const Item* item) const;
+     bool isEmpty() const {return mItem == NULL;}
+@@ -57,6 +58,7 @@
+ public:
+     BoneSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; bone);
+     virtual bool setItem(Item* item);
++    virtual void update();
+ 
+ private:
+     Ogre::String mBone;
+@@ -67,6 +69,7 @@
+ public:
+     SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh);
+     virtual bool setItem(Item* item);
++    virtual void update();
+ 
+ private:
+     Ogre::String mSubmesh;
+@@ -77,6 +80,7 @@
+ public:
+     MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh);
+     virtual bool setItem(Item* item);
++    virtual void update();
+ 
+ private:
+     Ogre::String mSubmesh;
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/rules/src/Creature.cpp	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -28,6 +28,7 @@
+ #include &quot;Kampftechnik.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;StateSet.h&quot;
++#include &quot;Slot.h&quot;
+ #include &quot;Talent.h&quot;
+ #include &quot;Weapon.h&quot;
+ 
+@@ -1234,4 +1235,22 @@
+     {
+         return (item-&gt;getPosition() - getPosition()).length() &lt;= 3.0f;
+     }
++
++    void Creature::doPlaceIntoScene()
++    {
++        GameObject::doPlaceIntoScene();
++
++        // check items in inventory
++        Inventory::SlotMap slots = mInventory-&gt;getAllSlots();
++        Inventory::SlotMap::iterator it = slots.begin();
++        for( ; it != slots.end(); it++ )
++        {
++            it-&gt;second-&gt;update();
++        }
++    }
++
++    void Creature::doRemoveFromScene()
++    {
++        GameObject::doRemoveFromScene();
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2008-03-06 14:20:26 UTC (rev 4185)
++++ rl/trunk/engine/rules/src/Slot.cpp	2008-03-06 15:20:19 UTC (rev 4186)
+@@ -126,7 +126,26 @@
+         return true;
+     }
+ 
++    void BoneSlot::update()
++    {
++        if( mItem &amp;&amp; (mOwner-&gt;getState() == GOS_IN_SCENE
++                || mOwner-&gt;getState() == GOS_HELD
++                || mOwner-&gt;getState() == GOS_READY) )
++        {
++            if( !mItem-&gt;getActor() )
++            {
++                mItem-&gt;doCreateActor();
++                mOwner-&gt;getActor()-&gt;attachToSlot(mItem-&gt;getActor(), mBone);
++            }
++            else
++            {
++                if( !mOwner-&gt;getActor()-&gt;hasChild(mItem-&gt;getActor()) )
++                    mOwner-&gt;getActor()-&gt;attachToSlot(mItem-&gt;getActor(), mBone);
++            }
++        }
++    }
+ 
++
+     SubmeshSlot::SubmeshSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh)
+         : Slot(owner, name, itemReadyMask, itemHeldMask), mSubmesh(submesh)
+     {
+@@ -187,6 +206,50 @@
+         return true;
+     }
+ 
++    void SubmeshSlot::update()
++    {
++	    if (mOwner-&gt;getActor())
++	    {
++		    MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
++			    mOwner-&gt;getActor()-&gt;getControlledObject());
++
++		    if (mmo)
++		    {
++			    MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
++			    if (it != mOwner-&gt;getMeshParts().end())
++			    {
++				    mmo-&gt;replaceSubmesh(
++					    mSubmesh,
++					    (*it).second);
++			    }
++			    else
++			    {
++				    mmo-&gt;removeSubmesh(mSubmesh);
++			    }
++
++			    if (mItem)
++			    {
++                    mItem-&gt;doCreateActor();
++                    CeGuiString file = mItem-&gt;getSubmeshName();
++                    if( file == &quot;&quot; )
++                        file = mItem-&gt;getMeshfile();
++                    else
++                        file = mOwner-&gt;getSubmeshPreName()+file;
++
++				    mmo-&gt;replaceSubmesh(
++					    mSubmesh,
++					    file.c_str());
++			    }
++		    }
++
++            if (mOwner-&gt;getActor()
++                &amp;&amp; mOwner-&gt;getActor()-&gt;getPhysicalThing())
++            {
++                mOwner-&gt;getActor()-&gt;getPhysicalThing()-&gt;updatePhysicsProxy();
++            }
++	    }
++    }
++
+     MaterialSlot::MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask, const Ogre::String&amp; submesh)
+       : Slot(owner, name, itemReadyMask, itemHeldMask),
+         mSubmesh(submesh)
+@@ -244,4 +307,44 @@
+         return true;
+     }
+ 
++    void MaterialSlot::update()
++    {
++        if (mItem)
++        {
++            try
++            {
++                CeGuiString mat = mItem-&gt;getProperty(&quot;material&quot;).toString();
++                CeGuiString mesh = mItem-&gt;getSubmeshName();
++
++                ///@todo: what to do if actor is null?, think about changing the inventory of an gameobject not in scene
++		        if (mOwner-&gt;getActor())
++		        {
++			        MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(
++				        mOwner-&gt;getActor()-&gt;getControlledObject());
++
++                    MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
++				        mo);
++
++                    if (mmo &amp;&amp; !mesh.empty())
++                    {
++                        mmo-&gt;replaceSubmesh(mSubmesh, mesh.c_str());
++                    }
++
++			        if (mo)
++			        {                        
++                        mo-&gt;setMaterial(mat.c_str(), mSubmesh);
++                    }
++                }
++            }
++            catch (const IllegalArgumentException&amp;)
++            {
++                LOG_ERROR(Logger::RULES, &quot;Item &quot; + mItem-&gt;getName() + &quot; has no property material.&quot;);
++            }
++            catch (const WrongFormatException&amp;)
++            {
++                LOG_ERROR(Logger::RULES, &quot;Item &quot; + mItem-&gt;getName() + &quot; has a property material, but it is no string property.&quot;);
++            }
++        }
++    }
++
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001256.html">[Dsa-hl-svn] r4185 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001258.html">[Dsa-hl-svn] r4187 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1257">[ date ]</a>
+              <a href="thread.html#1257">[ thread ]</a>
+              <a href="subject.html#1257">[ subject ]</a>
+              <a href="author.html#1257">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

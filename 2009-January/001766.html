@@ -1,0 +1,441 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4709 - in modules: common/materials/programs	common/materials/programs/Normalmapping kanalisation/materials
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4709%20-%20in%20modules%3A%20common/materials/programs%0A%09common/materials/programs/Normalmapping%20kanalisation/materials&In-Reply-To=%3C200901171009.n0HA9rsB021776%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001765.html">
+   <LINK REL="Next"  HREF="001767.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4709 - in modules: common/materials/programs	common/materials/programs/Normalmapping kanalisation/materials</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4709%20-%20in%20modules%3A%20common/materials/programs%0A%09common/materials/programs/Normalmapping%20kanalisation/materials&In-Reply-To=%3C200901171009.n0HA9rsB021776%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4709 - in modules: common/materials/programs	common/materials/programs/Normalmapping kanalisation/materials">timm at mail.berlios.de
+       </A><BR>
+    <I>Sat Jan 17 11:09:53 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001765.html">[Dsa-hl-svn] r4708 - in rl/trunk/engine: core/include ui/include
+</A></li>
+        <LI>Next message: <A HREF="001767.html">[Dsa-hl-svn] r4710 - in modules/branch_persistenz/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1766">[ date ]</a>
+              <a href="thread.html#1766">[ thread ]</a>
+              <a href="subject.html#1766">[ subject ]</a>
+              <a href="author.html#1766">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2009-01-17 11:09:45 +0100 (Sat, 17 Jan 2009)
+New Revision: 4709
+
+Added:
+   modules/common/materials/programs/Normalmapping/Basic_Normalmapping.frag
+   modules/common/materials/programs/Normalmapping/Basic_Normalmapping_UV0.vert
+Modified:
+   modules/common/materials/programs/Basic_Vertex_Shader.program
+   modules/common/materials/programs/Normalmapping/Basic_Normalmapping.material
+   modules/common/materials/programs/Normalmapping/Normalmapping.program
+   modules/kanalisation/materials/Normalmapping.program
+Log:
+Basic Normalmapshader for OpenGL
+And unified program for basic vertex/pixel shader
+
+Modified: modules/common/materials/programs/Basic_Vertex_Shader.program
+===================================================================
+--- modules/common/materials/programs/Basic_Vertex_Shader.program	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/common/materials/programs/Basic_Vertex_Shader.program	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -38,6 +38,10 @@
+ fragment_program Basic_Pixel_Shader_glsl glsl
+ {
+ 	source Basic_Pixel_Shader_glsl.source
++	default_params
++	{
++		param_named baseMap int 0
++	}
+ }
+ 
+ vertex_program Basic_Vertex_Shader_SR hlsl
+@@ -57,7 +61,6 @@
+ fragment_program Basic_Pixel_ShaderUV1_glsl glsl
+ {
+ 	source Basic_Pixel_ShaderUV1_glsl.source
+-
+ }
+ 
+ vertex_program Skin_Vertex_Shader hlsl
+@@ -71,7 +74,19 @@
+ 	source Skin_Vertex_Shader_glsl.source
+ }
+ 
++vertex_program Basic_Vertex_Unified unified
++{
++	delegate Basic_Vertex_Shader
++	delegate Basic_Vertex_Shader_glsl
++}
+ 
++fragment_program Basic_Pixel_Unified unified
++{
++	delegate Basic_Pixel_Shader
++	delegate Basic_Pixel_Shader_glsl
++}
++
++
+ material Basic_Vertex_Shader
+ {
+ 	technique glsl
+
+Added: modules/common/materials/programs/Normalmapping/Basic_Normalmapping.frag
+===================================================================
+--- modules/common/materials/programs/Normalmapping/Basic_Normalmapping.frag	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/common/materials/programs/Normalmapping/Basic_Normalmapping.frag	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -0,0 +1,66 @@
++uniform vec4 LightColor_0;
++uniform vec4 LightColor_1;
++uniform vec4 LightColor_2;
++uniform vec4 groundcolor;
++uniform vec4 skycolor;
++uniform vec4 SpecColor;
++uniform float SpecExp;
++
++varying vec4 LightDir_0;
++varying vec3 HalfVect_0;
++varying vec4 LightDir_1;
++varying vec3 HalfVect_1;
++varying vec4 LightDir_2;
++varying vec3 HalfVect_2;
++varying vec3 SkyDir;
++
++uniform sampler2D DiffuseMap;
++uniform sampler2D NormalMap;
++
++void main(void)
++{
++   vec3 normal = texture2D(NormalMap,gl_TexCoord[0].xy).rgb * 2.0 -1.0; 
++   vec4 ambient= mix(skycolor , groundcolor, ((dot(normal, SkyDir) + 1.0)/2.0));
++   
++   
++   float specAttn = 0.0;
++   float specAttn1 = 0.0;
++   float specAttn2 = 0.0;
++   vec4 AngleAttn;
++   vec4 AngleAttn1;
++   vec4 AngleAttn2;
++     
++   AngleAttn= vec4(clamp(dot(normal,LightDir_0.xyz),0.0,1.0));
++   AngleAttn1= vec4(clamp(dot(normal,LightDir_1.xyz),0.0,1.0));
++   AngleAttn2= vec4(clamp(dot(normal,LightDir_2.xyz),0.0,1.0)); 
++   
++   
++   
++   if (AngleAttn.r &gt; 0.0)
++   {
++      specAttn = float(LightColor_0 * pow(clamp(dot(normal,normalize(HalfVect_0)),0.0,1.0),SpecExp)* LightDir_0.w);
++      AngleAttn *= LightColor_0 * LightDir_0.w;
++   }
++   
++   if (AngleAttn1.r &gt; 0.0)
++   {
++      specAttn1  = float(LightColor_1 *  pow(clamp(dot(normal,normalize(HalfVect_1)),0.0,1.0),SpecExp)* LightDir_1.w);
++      AngleAttn1 *= LightColor_1 * LightDir_1.w;
++   }
++  
++   if (AngleAttn2.r &gt; 0.0)
++   {
++      specAttn2  = float(LightColor_2 *  pow(clamp(dot(normal,normalize(HalfVect_2)),0.0,1.0),SpecExp)* LightDir_2.w);
++      AngleAttn2 *= LightColor_2 * LightDir_2.w;
++   }
++  
++  
++   vec4 Diffuse = AngleAttn + AngleAttn1 + AngleAttn2;
++   vec4 specular = SpecColor * (specAttn + specAttn1 + specAttn2) * Diffuse;
++   
++   vec4 color = texture2D(DiffuseMap,gl_TexCoord[0].xy);
++
++   
++   gl_FragColor =  vec4((color.rgb * (ambient.rbg + Diffuse.rgb)) +specular.rgb ,color.a);
++   
++}
+\ No newline at end of file
+
+Modified: modules/common/materials/programs/Normalmapping/Basic_Normalmapping.material
+===================================================================
+--- modules/common/materials/programs/Normalmapping/Basic_Normalmapping.material	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/common/materials/programs/Normalmapping/Basic_Normalmapping.material	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -2,13 +2,13 @@
+ {
+ 	lod_distances 15 100
+ 	receive_shadows off
+-    technique hlsl
++    technique
+     {
+ 	    lod_index 0
+         pass
+         {
+         	alpha_rejection greater 128
+-            vertex_program_ref Basic_Normalmapping_UV0_VS_HLSL
++            vertex_program_ref Basic_Normalmapping_UV0_VERTEX
+             {
+                 param_named_auto matViewProjection worldviewproj_matrix
+                 param_named_auto LightPosition_0 light_position_object_space 0
+@@ -22,7 +22,7 @@
+                 param_named_auto vViewPosition	 camera_position_object_space
+             }
+ 
+-            fragment_program_ref Basic_Normalmapping_PS_HLSL
++            fragment_program_ref Basic_Normalmapping_PIXEL
+             {
+                 param_named_auto LightColor_0  light_diffuse_colour  0
+                 param_named_auto LightColor_1  light_diffuse_colour  1
+
+Added: modules/common/materials/programs/Normalmapping/Basic_Normalmapping_UV0.vert
+===================================================================
+--- modules/common/materials/programs/Normalmapping/Basic_Normalmapping_UV0.vert	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/common/materials/programs/Normalmapping/Basic_Normalmapping_UV0.vert	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -0,0 +1,97 @@
++//input
++attribute vec3 tangent;
++uniform vec4 vViewPosition;
++uniform mat4 matViewProjection;
++
++uniform vec4 LightPosition_0;
++uniform vec4 LightPosition_1;
++uniform vec4 LightPosition_2;
++uniform vec4 LightAttn_0;
++uniform vec4 LightAttn_1;
++uniform vec4 LightAttn_2;
++
++
++//output
++varying vec4 LightDir_0;
++varying vec3 HalfVect_0;
++varying vec4 LightDir_1;
++varying vec3 HalfVect_1;
++varying vec4 LightDir_2;
++varying vec3 HalfVect_2;
++varying vec3 SkyDir;
++
++
++void main(void)
++{
++   gl_TexCoord[0] = gl_MultiTexCoord0;
++   gl_Position = matViewProjection * gl_Vertex;
++   
++   mat3 TangentSpace;
++   
++   TangentSpace[0] = tangent;
++   TangentSpace[1] = cross(tangent,gl_Normal.xyz);
++   TangentSpace[2] = gl_Normal.xyz;
++   
++   vec3 eyeVector = normalize(vViewPosition - gl_Vertex).xyz;
++   
++   
++   //Light 1   
++   vec4 LightDir;
++   LightDir.w = 0.0;
++   LightDir.xyz = (LightPosition_0 - gl_Vertex).xyz * LightPosition_0.w;
++   float Dist = length(LightDir.xyz);
++   LightDir.xyz = LightDir.xyz /Dist;
++   
++   if (LightPosition_0.w != 0.0)
++   {
++      LightDir.w = clamp(1.0/(LightAttn_0.y +
++                            LightAttn_0.z * Dist +
++                            LightAttn_0.w * Dist * Dist)*clamp(LightAttn_0.x-Dist,0.0,1.0),0.0,1.0);
++   }
++   
++   
++   HalfVect_0 = TangentSpace * normalize(LightDir.xyz + eyeVector);
++   LightDir_0.xyz = TangentSpace*(LightDir.xyz);
++   LightDir_0.w = LightDir.w;
++   
++   
++   //Light 2
++   LightDir.xyz = (LightPosition_1 - gl_Vertex).xyz * LightPosition_1.w;
++   Dist = length(LightDir.xyz);
++   LightDir.xyz = LightDir.xyz /Dist;
++   
++   if (LightPosition_1.w != 0.0)
++   {
++      LightDir.w = clamp(1.0/(LightAttn_1.y +
++                            LightAttn_1.z * Dist +
++                            LightAttn_1.w * Dist * Dist)*clamp(LightAttn_1.x-Dist,0.0,1.0),0.0,1.0);
++   }
++   
++   
++   HalfVect_1 = TangentSpace * normalize(LightDir.xyz + eyeVector);
++   LightDir_1.xyz = TangentSpace*(LightDir.xyz);
++   LightDir_1.w = LightDir.w;
++   
++   
++  //Light 3
++   LightDir.xyz = (LightPosition_2 - gl_Vertex).xyz * LightPosition_2.w;
++   Dist = length(LightDir.xyz);
++   LightDir.xyz = LightDir.xyz /Dist;
++   
++   if (LightPosition_2.w != 0.0)
++   {
++      LightDir.w = clamp(1.0/(LightAttn_2.y +
++                            LightAttn_2.z * Dist +
++                            LightAttn_2.w * Dist * Dist)*clamp(LightAttn_2.x-Dist,0.0,1.0),0.0,1.0);
++   }
++   
++   
++   HalfVect_2 = TangentSpace * normalize(LightDir.xyz + eyeVector);
++   LightDir_2.xyz = TangentSpace*(LightDir.xyz);
++   LightDir_2.w = LightDir.w; 
++   
++   
++   
++   // SkyLight
++   SkyDir    = TangentSpace * vec3(0,-1,0);
++}
+\ No newline at end of file
+
+Modified: modules/common/materials/programs/Normalmapping/Normalmapping.program
+===================================================================
+--- modules/common/materials/programs/Normalmapping/Normalmapping.program	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/common/materials/programs/Normalmapping/Normalmapping.program	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -5,6 +5,17 @@
+     target vs_1_1
+ }
+ 
++vertex_program Basic_Normalmapping_UV0_VP_GLSL glsl
++{
++    source Basic_Normalmapping_UV0.vert
++}
++
++vertex_program Basic_Normalmapping_UV0_VERTEX unified
++{
++    delegate Basic_Normalmapping_UV0_VS_HLSL
++	delegate Basic_Normalmapping_UV0_VP_GLSL
++}
++
+ vertex_program Basic_Normalmapping_architecture_VS_HLSL hlsl
+ {
+     source Basic_Normalmapping_architecture_VS.hlsl
+@@ -39,6 +50,25 @@
+     entry_point ps_main
+     target ps_2_0
+ }
++
++fragment_program Basic_Normalmapping_FP_GLSL glsl
++{
++    source Basic_Normalmapping.frag
++	
++	default_params
++	{				
++		param_named DiffuseMap int 0
++		param_named NormalMap int 1
++	}
++}
++
++fragment_program Basic_Normalmapping_PIXEL unified
++{
++	delegate Basic_Normalmapping_PS_HLSL
++    delegate Basic_Normalmapping_FP_GLSL
++}
++
++
+ fragment_program Basic_Normalmapping_architecture_PS_HLSL hlsl
+ {
+     source Basic_Normalmapping_architecture_PS.hlsl
+
+Modified: modules/kanalisation/materials/Normalmapping.program
+===================================================================
+--- modules/kanalisation/materials/Normalmapping.program	2009-01-12 22:35:42 UTC (rev 4708)
++++ modules/kanalisation/materials/Normalmapping.program	2009-01-17 10:09:45 UTC (rev 4709)
+@@ -1,12 +1,11 @@
+ material Basic_Normalmapping_kana 
+ {
+-	
+-    technique hlsl
++    technique high
+     {
+ 	    lod_index 0
+         pass
+         {
+-            vertex_program_ref Basic_Normalmapping_UV0_VS_HLSL
++            vertex_program_ref Basic_Normalmapping_UV0_VERTEX
+             {
+                 param_named_auto matViewProjection worldviewproj_matrix
+                 param_named_auto LightPosition_0 light_position_object_space 0
+@@ -20,7 +19,7 @@
+                 param_named_auto vViewPosition	 camera_position_object_space
+             }
+ 
+-            fragment_program_ref Basic_Normalmapping_PS_HLSL
++            fragment_program_ref Basic_Normalmapping_PIXEL
+             {
+                 param_named_auto LightColor_0  light_diffuse_colour  0
+                 param_named_auto LightColor_1  light_diffuse_colour  1
+@@ -45,20 +44,19 @@
+             }
+         }
+     }
+-    
+-    technique hlsl1
++
++	
++	technique low
+ 	{
+ 		lod_index 1
+ 		//Rendering Pass: Pass 0 (pass index: #0 )
+ 		pass
+ 		{
+ 			alpha_rejection greater 128
+-			//DirectX 9.0 HLSL Pixel Shader ps_2_0
+-			fragment_program_ref Basic_Pixel_Shader
++			fragment_program_ref Basic_Pixel_Unified
+ 			{
+ 			}
+-			//DirectX 9.0 HLSL Vertex Shader vs_2_0
+-			vertex_program_ref Basic_Vertex_Shader
++			vertex_program_ref Basic_Vertex_Unified
+ 			{
+ 				// param_named_auto
+ 
+@@ -95,6 +93,8 @@
+ 	}
+     
+ 
++	
++	
+     technique fixed_function
+     {
+ 	    lod_index 2
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001765.html">[Dsa-hl-svn] r4708 - in rl/trunk/engine: core/include ui/include
+</A></li>
+	<LI>Next message: <A HREF="001767.html">[Dsa-hl-svn] r4710 - in modules/branch_persistenz/scripts: . maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1766">[ date ]</a>
+              <a href="thread.html#1766">[ thread ]</a>
+              <a href="subject.html#1766">[ subject ]</a>
+              <a href="author.html#1766">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

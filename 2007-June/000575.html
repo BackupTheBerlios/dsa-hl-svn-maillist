@@ -1,0 +1,180 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3504 - in modules: common/materials common/scripts	regressiontest/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3504%20-%20in%20modules%3A%20common/materials%20common/scripts%0A%09regressiontest/scripts&In-Reply-To=%3C200706052030.l55KUncJ026865%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000574.html">
+   <LINK REL="Next"  HREF="000576.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3504 - in modules: common/materials common/scripts	regressiontest/scripts</H1>
+    <B>josch at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3504%20-%20in%20modules%3A%20common/materials%20common/scripts%0A%09regressiontest/scripts&In-Reply-To=%3C200706052030.l55KUncJ026865%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3504 - in modules: common/materials common/scripts	regressiontest/scripts">josch at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun  5 22:30:49 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000574.html">[Dsa-hl-svn] r3503 - dependencies/dsa4wz/src
+</A></li>
+        <LI>Next message: <A HREF="000576.html">[Dsa-hl-svn] r3505 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#575">[ date ]</a>
+              <a href="thread.html#575">[ thread ]</a>
+              <a href="subject.html#575">[ subject ]</a>
+              <a href="author.html#575">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: josch
+Date: 2007-06-05 22:30:41 +0200 (Tue, 05 Jun 2007)
+New Revision: 3504
+
+Modified:
+   modules/common/materials/Fackel.particle
+   modules/common/materials/Rastullahs_particle_zumpi.material
+   modules/common/scripts/torch.rb
+   modules/regressiontest/scripts/SoundTest.rb
+Log:
+Torch now shows flare
+
+Modified: modules/common/materials/Fackel.particle
+===================================================================
+--- modules/common/materials/Fackel.particle	2007-06-05 19:20:24 UTC (rev 3503)
++++ modules/common/materials/Fackel.particle	2007-06-05 20:30:41 UTC (rev 3504)
+@@ -2,7 +2,7 @@
+ flammen
+ {
+ 	quota	10
+-	material	feuer
++	material	fackel
+ 	particle_width	20.66
+ 	particle_height	23.12
+ 	cull_each	false
+
+Modified: modules/common/materials/Rastullahs_particle_zumpi.material
+===================================================================
+--- modules/common/materials/Rastullahs_particle_zumpi.material	2007-06-05 19:20:24 UTC (rev 3503)
++++ modules/common/materials/Rastullahs_particle_zumpi.material	2007-06-05 20:30:41 UTC (rev 3504)
+@@ -10,7 +10,7 @@
+ 
+ 			texture_unit
+ 			{
+-				texture flamme.dds
++				texture flaretrail.dds
+ 			
+ 			}
+ 		}
+
+Modified: modules/common/scripts/torch.rb
+===================================================================
+--- modules/common/scripts/torch.rb	2007-06-05 19:20:24 UTC (rev 3503)
++++ modules/common/scripts/torch.rb	2007-06-05 20:30:41 UTC (rev 3504)
+@@ -22,6 +22,8 @@
+     end
+     
+     def doAction(torch, user, target)
++        p torch.lit?
++        return if torch.lit?
+         # Fackel hat ein Licht am Slot SLOT_FAR_END
+         # Man k&#246;nnte es auch so machen, dass dieses Licht jetzt
+         # erzeugt und angeheftet wird. Spr&#228;che einiges daf&#252;r.
+@@ -44,6 +46,7 @@
+         # ausgeht.
+         torch.sound.getSound().setPosition(torchActor.getPosition())
+         torch.sound.play()
++        torch.flammen.getControlledObject().setActive(true)
+         torch.setLit(true);
+     end
+ end
+@@ -61,6 +64,7 @@
+     end
+     
+     def doAction(torch, user, target)
++        return unless torch.lit?
+         # Fackel hat ein Licht am Slot SLOT_FAR_END
+         # Man k&#246;nnte es auch so machen, dass dieses Licht jetzt
+         # erzeugt und angeheftet wird. Spr&#228;che einiges daf&#252;r.
+@@ -82,6 +86,7 @@
+         #TODO timer setzen, damit die Fackel nach Ablauf ihrer Lebensdauer
+         # ausgeht.
+         torch.sound.stop();
++        torch.flammen.getControlledObject().setActive(false)
+         torch.setLit(false);
+     end
+ end
+@@ -90,9 +95,13 @@
+ # TODO Persistenz *schreck*
+ class Torch &lt; GameObject
+     include GameObjectProperties
++    attr_reader :flammen
+     
+     def initialize(id)
+         super(id)
++        @flammen = $AM.createParticleSystemActor(&quot;torch&quot; + id.to_s, &quot;flammen&quot;)
++        @flammen.getControlledObject().setActive(false)
++        setLit(false)
+     end
+     
+     def setLit(lit)
+@@ -125,6 +134,7 @@
+         sound.setLooping(true)
+         sound.set3d(true)
+         @_prop_Sound = SoundObject.new(sound, getId().to_s())
++        getActor().attachToSlot(@flammen, &quot;SLOT_FAR_END&quot;)
+         addActions()
+     end
+     
+@@ -138,7 +148,7 @@
+             addAction(@mLightAction, Action::ACT_DISABLED)
+             addAction(@mPutoutAction, Action::ACT_DISABLED)
+         end
+-        doAction(&quot;lighttorch&quot;) unless @_prop_Lit
++        doAction(&quot;putouttorch&quot;) if @_prop_Lit
+     end
+     
+     def getDefaultAction(actor)
+
+Modified: modules/regressiontest/scripts/SoundTest.rb
+===================================================================
+--- modules/regressiontest/scripts/SoundTest.rb	2007-06-05 19:20:24 UTC (rev 3503)
++++ modules/regressiontest/scripts/SoundTest.rb	2007-06-05 20:30:41 UTC (rev 3504)
+@@ -1,3 +1,4 @@
++require 'util/vector_util.rb'
+ require 'testcase.rb'
+ require 'torch.rb'
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000574.html">[Dsa-hl-svn] r3503 - dependencies/dsa4wz/src
+</A></li>
+	<LI>Next message: <A HREF="000576.html">[Dsa-hl-svn] r3505 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#575">[ date ]</a>
+              <a href="thread.html#575">[ thread ]</a>
+              <a href="subject.html#575">[ subject ]</a>
+              <a href="author.html#575">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

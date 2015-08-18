@@ -1,0 +1,392 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4315 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4315%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200803272330.m2RNUXCS009581%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001385.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4315 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4315%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200803272330.m2RNUXCS009581%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4315 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar 28 00:30:33 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001385.html">[Dsa-hl-svn] r4314 - modules/regressiontest/scripts
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1386">[ date ]</a>
+              <a href="thread.html#1386">[ thread ]</a>
+              <a href="subject.html#1386">[ subject ]</a>
+              <a href="author.html#1386">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-28 00:30:30 +0100 (Fri, 28 Mar 2008)
+New Revision: 4315
+
+Modified:
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/ui/include/CombatControlState.h
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+Log:
+End combat when all allies or opponents are not able to fight
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-03-27 23:29:32 UTC (rev 4314)
++++ rl/trunk/engine/rules/include/Combat.h	2008-03-27 23:30:30 UTC (rev 4315)
+@@ -19,19 +19,20 @@
+ 
+ #include &quot;RulesPrerequisites.h&quot;
+ 
++#include &lt;set&gt;
++#include &lt;vector&gt;
++#include &lt;boost/tuple/tuple.hpp&gt;
++
+ #include &quot;JobListener.h&quot;
+ #include &quot;Kampfaktion.h&quot;
+ #include &quot;MessagePump.h&quot;
+ #include &quot;RulesConstants.h&quot;
++#include &quot;Effect.h&quot;
+ 
+-#include &lt;set&gt;
+-#include &lt;vector&gt;
+-#include &lt;boost/tuple/tuple.hpp&gt;
+-
+ namespace rl
+ {
+     class Combatant;
+-	class Creature;
++	class GameObject;
+ 	class JobSet;
+ 
+ 	class _RlRulesExport Combat : public JobListener
+@@ -70,10 +71,7 @@
+ 
+         virtual void jobFinished(unsigned long ticket);
+ 
+-		// Message handlers
+ 
+-		bool creatureLifeStateChanged(Creature*, LifeState);
+-
+     private:
+ 		typedef enum {ATTACKE, BEWEGEN, FOLGEN} Aktion;
+ 		typedef enum {PARADE, AUSWEICHEN} Reaktion;
+@@ -110,6 +108,10 @@
+ 		void doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target);
+ 
+ 		Ogre::Real getMaximumAttackeDistance(Combatant* actor) const;
++
++        // Message handlers
++
++        bool onGameObjectLifeStateChanged(GameObject*, Effect::LifeState, Effect::LifeState);
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-27 23:29:32 UTC (rev 4314)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-27 23:30:30 UTC (rev 4315)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;Combatant.h&quot;
+ #include &quot;CreatureController.h&quot;
++#include &quot;Effect.h&quot;
+ #include &quot;GameEventLog.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Job.h&quot;
+@@ -65,8 +66,8 @@
+ 		  mAnimationSequenceTicket(0)
+     {
+ 		mLifeStateChangeConnection =
+-            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CreatureLifeStateChanged&gt;(
+-			    boost::bind(&amp;Combat::creatureLifeStateChanged, this, _1, _2));
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectLifeStateChanged&gt;(
++			    boost::bind(&amp;Combat::onGameObjectLifeStateChanged, this, _1, _2, _3));
+     }
+ 
+     Combat::~Combat()
+@@ -256,37 +257,40 @@
+ 				it != mCombatantQueue.end(); ++it)
+ 			{
+ 				Combatant* combatant = it-&gt;second;
+-				// Is there an action registed for combatant?
+-				CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
+-				if (actionsIt != mCombatantActions.end())
+-				{
+-					// Do we have an action for this pass ?
+-					if (actionIndex &lt; actionsIt-&gt;second.size())
+-					{
+-						// Yes we do.
+ 
+-						ActionEntry entry = actionsIt-&gt;second[actionIndex];
+-						if (entry.aktion == ATTACKE)
+-						{
+-							// Check whether possible
+-							if (canAttack(combatant, entry.target))
+-							{
+-								doAttacke(jobSet, combatant, entry.target);
+-							}
+-						}
+-						else if (entry.aktion == BEWEGEN)
+-						{
+-							GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
+-								+ CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
+-							combatant-&gt;doBewegen(jobSet, entry.targetPos);
+-						}
+-						else if (entry.aktion == FOLGEN)
+-						{
+-							GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
+-								+ entry.target-&gt;getName(), GET_COMBAT);
+-							combatant-&gt;doFolgen(jobSet, entry.target);
+-						}
+-					}
++                if (!(combatant-&gt;getCreature()-&gt;getLifeState() &amp; Effect::LS_NO_COMBAT))
++                {
++				    // Is there an action registed for combatant?
++				    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
++				    if (actionsIt != mCombatantActions.end())
++				    {
++					    // Do we have an action for this pass ?
++					    if (actionIndex &lt; actionsIt-&gt;second.size())
++					    {
++						    // Yes we do.
++						    ActionEntry entry = actionsIt-&gt;second[actionIndex];
++						    if (entry.aktion == ATTACKE)
++						    {
++							    // Check whether possible
++							    if (canAttack(combatant, entry.target))
++							    {
++								    doAttacke(jobSet, combatant, entry.target);
++							    }
++						    }
++						    else if (entry.aktion == BEWEGEN)
++						    {
++							    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
++								    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
++							    combatant-&gt;doBewegen(jobSet, entry.targetPos);
++						    }
++						    else if (entry.aktion == FOLGEN)
++						    {
++							    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
++								    + entry.target-&gt;getName(), GET_COMBAT);
++							    combatant-&gt;doFolgen(jobSet, entry.target);
++						    }
++					    }
++                    }
+ 				}
+ 			}
+ 			jobQueue-&gt;add(jobSet);
+@@ -298,17 +302,27 @@
+     void Combat::endRound()
+     {
+         // All actions executed. Analyze outcome of this round.
+-        // 
+-
+-        // Refill combatant queue with combatants that are still alive.
+-		beginRound();
++        if (mAllies.empty())
++        {
++            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(false);
++        }
++        else if (mOpponents.empty())
++        {
++            MessagePump::getSingleton().sendMessage&lt;MessageType_CombatEnded&gt;(true);
++        }
++        else 
++        {
++            // Refill combatant queue with combatants that are still alive.
++		    beginRound();
++        }
+     }
+ 
+ 	void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
+ 	{
+-		GameEventLog::getSingleton().logEvent(
++        GameEventLog::getSingleton().logEvent(
+ 			actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
+-		bool rollDamage = false;
++        
++        bool rollDamage = false;
+ 		// Make an attack roll.
+ 		int aresult = actor-&gt;rollAttacke();
+ 		if (aresult &gt;= RESULT_ERFOLG)
+@@ -374,22 +388,23 @@
+ 		}
+ 	}
+ 
+-	bool Combat::creatureLifeStateChanged(Creature* creature, LifeState state)
++    bool Combat::onGameObjectLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate, Effect::LifeState newstate)
+ 	{
+-		if (state != LIFESTATE_ALIVE)
++        if (newstate &amp; Effect::LS_NO_COMBAT)
+ 		{
+ 			// Is a creature in combat affected?
+ 			for (size_t i = 0; i &lt; mCombatantQueue.size(); ++i)
+ 			{
+-				if (creature == mCombatantQueue[i].second-&gt;getCreature())
++                Creature* curCreature = mCombatantQueue[i].second-&gt;getCreature();
++				if (gameobject == curCreature)
+ 				{
+ 					// Yes. Log about it and remove it from combat.
+-					CeGuiString msg = creature-&gt;getName() + &quot; ist jetzt &quot;;
+-					if (state == LIFESTATE_INCAPACITATED)
++					CeGuiString msg = curCreature-&gt;getName() + &quot; ist jetzt &quot;;
++					if (newstate == Effect::LS_INCAPACITATED)
+ 					{
+ 						msg += &quot;kampfunf&#228;hig.&quot;;
+ 					}
+-					else if (state == LIFESTATE_UNCONCIOUS)
++                    else if (newstate == Effect::LS_UNCONSCIOUS)
+ 					{
+ 						msg += &quot;bewusstlos.&quot;;
+ 					}
+@@ -400,7 +415,7 @@
+ 					GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
+ 
+ 					CombatantSet::iterator it = std::find_if(mOpponents.begin(), mOpponents.end(),
+-						std::bind2nd(FindCombatantByCreature(), creature));
++						std::bind2nd(FindCombatantByCreature(), curCreature));
+ 					if (it != mOpponents.end())
+ 					{
+ 						removeOpponent(mCombatantQueue[i].second);
+@@ -408,7 +423,7 @@
+ 					else
+ 					{
+ 						CombatantSet::iterator it = std::find_if(mAllies.begin(), mAllies.end(),
+-							std::bind2nd(FindCombatantByCreature(), creature));
++							std::bind2nd(FindCombatantByCreature(), curCreature));
+ 						if (it != mOpponents.end())
+ 						{
+ 							removeAlly(mCombatantQueue[i].second);
+
+Modified: rl/trunk/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatControlState.h	2008-03-27 23:29:32 UTC (rev 4314)
++++ rl/trunk/engine/ui/include/CombatControlState.h	2008-03-27 23:30:30 UTC (rev 4315)
+@@ -53,14 +53,6 @@
+         virtual Ogre::String getCombatantTypeName() const;
+         virtual void requestCombatantAction();
+ 
+-		// Event handlers
+-
+-		bool userRequestAttackOpponent(Combatant*);
+-		bool userRequestParryOpponent(Combatant*);
+-		bool userRequestEndTurn();
+-
+-		bool enemyLeftCombat(Combatant*);
+-
+     private:
+ 		enum State {REQUEST_USER_INPUT, ROUND_EXECUTION};
+ 
+@@ -69,6 +61,7 @@
+ 		MessagePump::ScopedConnection mCombatIoEndTurnRequestedConnection;
+ 
+ 	    MessagePump::ScopedConnection mEnemyLeftCombatConnection;
++	    MessagePump::ScopedConnection mCombatEndConnection;
+ 
+ 		Combatant* mAttackedOpponent;
+ 		Combatant* mParriedOpponent;
+@@ -80,6 +73,14 @@
+         CameraObject* mCamera;
+ 
+ 		State mState;
++        
++        // Event handlers
++		bool userRequestAttackOpponent(Combatant*);
++		bool userRequestParryOpponent(Combatant*);
++		bool userRequestEndTurn();
++
++		bool enemyLeftCombat(Combatant*);
++        bool combatEnded(bool);
+ 	};
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-27 23:29:32 UTC (rev 4314)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-27 23:30:30 UTC (rev 4315)
+@@ -55,9 +55,6 @@
+         filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
+         mEnemySelector.setFilter(filter);
+ 
+-        mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
+-		mCombatGui = new CombatGui(mCombat, mCamera);
+-
+         // Message handlers
+ 		mCombatIoAttackOpponentConnection =
+             MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoAttackOpponent&gt;(
+@@ -71,6 +68,12 @@
+ 		mEnemyLeftCombatConnection =
+             MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatOpponentLeft&gt;(
+ 			    boost::bind(&amp;CombatControlState::enemyLeftCombat, this, _1));
++		mCombatEndConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatEnded&gt;(
++			    boost::bind(&amp;CombatControlState::combatEnded, this, _1));
++
++        mCamera = static_cast&lt;CameraObject*&gt;(mCameraActor-&gt;getControlledObject());
++		mCombatGui = new CombatGui(mCombat, mCamera);
+     }
+ 
+ 	CombatControlState::~CombatControlState()
+@@ -129,6 +132,7 @@
+ 
+         // reset current combat, in order to avoid a potential dangling pointer
+         mCombat-&gt;stop();
++        //delete mCombat; ///@todo: is this correct? someone has to delete the combat
+         mCombat = NULL;
+     }
+ 
+@@ -210,4 +214,11 @@
+ 		}
+ 		return true;
+ 	}
++
++    bool CombatControlState::combatEnded(bool alliesWon)
++    {
++        ///@todo some feedback, Abenteuerpunkte, anything? 
++        InputManager::getSingleton().popControlState();
++        return true;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001385.html">[Dsa-hl-svn] r4314 - modules/regressiontest/scripts
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1386">[ date ]</a>
+              <a href="thread.html#1386">[ thread ]</a>
+              <a href="subject.html#1386">[ subject ]</a>
+              <a href="author.html#1386">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,1343 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4917 - in rl/trunk/editors/Lockenwickler/src: .	media/icons media/terrain media/terrain/brushes
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4917%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%0A%09media/icons%20media/terrain%20media/terrain/brushes&In-Reply-To=%3C200905041922.n44JM7cb019824%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001973.html">
+   <LINK REL="Next"  HREF="001975.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4917 - in rl/trunk/editors/Lockenwickler/src: .	media/icons media/terrain media/terrain/brushes</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4917%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%0A%09media/icons%20media/terrain%20media/terrain/brushes&In-Reply-To=%3C200905041922.n44JM7cb019824%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4917 - in rl/trunk/editors/Lockenwickler/src: .	media/icons media/terrain media/terrain/brushes">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Mon May  4 21:22:07 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001973.html">[Dsa-hl-svn] r4916 - in rl/trunk/editors/Lockenwickler: src	src/media ui files
+</A></li>
+        <LI>Next message: <A HREF="001975.html">[Dsa-hl-svn] r4919 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1974">[ date ]</a>
+              <a href="thread.html#1974">[ thread ]</a>
+              <a href="subject.html#1974">[ subject ]</a>
+              <a href="author.html#1974">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-05-04 21:22:03 +0200 (Mon, 04 May 2009)
+New Revision: 4917
+
+Added:
+   rl/trunk/editors/Lockenwickler/src/media/icons/icons.qrc
+   rl/trunk/editors/Lockenwickler/src/media/terrain/brushes/
+   rl/trunk/editors/Lockenwickler/src/media/terrain/brushes/brush.png
+Removed:
+   rl/trunk/editors/Lockenwickler/src/media/terrain/brush.png
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py
+   rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+   rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py
+Log:
+- Improvements to the terrain tools
+
+
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -332,7 +332,6 @@
+     def finishEditorSetup(self):
+         if not self.editorSetupFinished:
+             og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
+-            og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media/terrain&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
+             og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+ 
+             self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -979,7 +979,7 @@
+                     self.updatePivots()
+                 elif controlDown and not shiftDown:
+                     so.setSelected(True)
+-
++                    
+                     for soFromList in self.userSelectionList:
+                         if soFromList == so:
+                             return # object already selected
+
+Modified: rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/MyTerrainManager.py	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -1,157 +1,244 @@
+-#################################################
+-# This source file is part of Rastullahs Lockenwickler.
+-# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-#
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2 of the License, or
+-# (at your option) any later version.
+-#
+-# This program is distributed in the hope that it will be useful,
+-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-#
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
+-#################################################
+-
+-from PyQt4.QtCore import *
+-from PyQt4.QtGui import *
+-
+-import ogre.renderer.OGRE as og
+-import ogre.addons.et as ET
+-
+-import Ui_MyTerrainManagerDock
+-
+-class MyTerrainManagerDock(Ui_MyTerrainManagerDock.Ui_TerrainManagerUi, QWidget):
+-    def __init__(self, parent):
+-        super(MyTerrainManagerDock, self).__init__(parent)
+-        self.setupUi(self)
+-        QWidget.connect(self.createTerrainButton, SIGNAL(&quot;clicked()&quot;), self.onCreateTerrainButtonClicked)
+-        
+-    def onCreateTerrainButtonClicked(self):
+-        terrainData = {}
+-        terrainData[&quot;name&quot;]  = str(self.nameLineEdit.text())
+-        terrainData[&quot;size&quot;]  = int(self.sizeComboBox.currentText())
+-        terrainData[&quot;positionX&quot;]  = self.positionSpinBoxX.value()
+-        terrainData[&quot;positionY&quot;]  = self.positionSpinBoxY.value()
+-        terrainData[&quot;positionZ&quot;]  = self.positionSpinBoxZ.value()
+-        terrainData[&quot;extendsX&quot;]  = self.extendsSpinBoxX.value()
+-        terrainData[&quot;extendsY&quot;]  = self.extendsSpinBoxY.value()
+-        terrainData[&quot;extendsZ&quot;]  = self.extendsSpinBoxZ.value()
+-        terrainData[&quot;terrainSize&quot;] = int(self.sizeComboBox.currentText())
+-        terrainData[&quot;terrainHeight&quot;]  = self.terrainHeightSpinBox.value()
+-        terrainData[&quot;splattingBaseName&quot;]  = str(self.baseNameLineEdit.text())
+-        terrainData[&quot;splattingResGroup&quot;]  = str(self.resGroupLineEdit.text())
+-        terrainData[&quot;splattingTexturSize&quot;]  = int(self.texSizeComboBox.currentText())
+-        terrainData[&quot;splattingNumTextures&quot;]  = int(self.numTexturesComboBox.currentText())
+-        
+-        self.emit(SIGNAL(&quot;createTerrain&quot;), terrainData)
+-        
+-class Terrain():
+-    def __init__(self, sceneManager):
+-        self.sceneManager = sceneManager
+-        self.camera = self.sceneManager.getCamera(&quot;MainCam&quot;)
+-        self.position = og.Vector3()
+-        self.extends = og.Vector3(128, 50, 128)
+-        self.terrainHeight = 0.5
+-        self.name = &quot;&quot;
+-        self.terrainSize = 129
+-        self.splattingBaseName = &quot;ETSplatting&quot;
+-        self.splattingResGroup = &quot;ET&quot;
+-        self.splattingTexturSize = 128
+-        self.splattingNumTextures = 6
+-        
+-        ## create terrain manager
+-        self.terrainManager =  ET.TerrainManager(self.sceneManager)
+-        self.terrainManager.setLODErrorMargin(2, self.camera.getViewport().getActualHeight())
+-        self.terrainManager.setUseLODMorphing(True, 0.2, &quot;morphFactor&quot;)
+-    
+-    def create(self, arg):
+-        self.name = arg[&quot;name&quot;]
+-        self.position = og.Vector3(arg[&quot;positionX&quot;], arg[&quot;positionY&quot;], arg[&quot;positionZ&quot;])
+-        self.extends = og.Vector3(arg[&quot;extendsX&quot;], arg[&quot;extendsY&quot;], arg[&quot;extendsZ&quot;])
+-        self.terrainHeight = arg[&quot;terrainHeight&quot;]
+-        self.terrainSize = arg[&quot;terrainSize&quot;] + 1
+-        self.splattingBaseName = arg[&quot;splattingBaseName&quot;]
+-        self.splattingResGroup = arg[&quot;splattingResGroup&quot;]
+-        self.splattingTexturSize = arg[&quot;splattingTexturSize&quot;]
+-        self.splattingNumTextures = arg[&quot;splattingNumTextures&quot;]
+-        
+-        
+-        ## create a fresh, mid-high terrain for editing
+-        # Note 
+-        heightMapValues = og.LodDistanceList() ## ET.stdVectorFloat()
+-        for i in xrange(self.terrainSize):
+-            for j in xrange(self.terrainSize):
+-                heightMapValues.append(self.terrainHeight)
+-        # width, height, heightmapvalues as a float array
+-        self.terrainInfo = ET.TerrainInfo (self.terrainSize, self.terrainSize, heightMapValues )
+-        
+-        ## save typing self
+-        terrainInfo  = self.terrainInfo 
+-        sceneManager = self.sceneManager
+-        terrainMgr   = self.terrainManager
+-        
+-        ## set position and size of the terrain
+-        half = self.extends / 2
+-        minPos = self.position - half
+-        maxPos = self.position + half
+-        terrainInfo.setExtents(og.AxisAlignedBox(int(minPos.x), int(minPos.y), int(minPos.z), int(minPos.x), int(minPos.y), int(minPos.z)))
+-
+-        print minPos.x, minPos.y, minPos.z, minPos.x, minPos.y, minPos.z
+-
+-        ## now render it
+-        terrainMgr.createTerrain(terrainInfo)
+-
+-        ## create the splatting manager
+-#        * @param baseName   base name for the map textures (will be appended by their number)
+-#        * @param group      the resource group the textures will be placed in
+-#        * @param width      width of the textures in pixels
+-#        * @param height     height of the textures in pixels
+-#        * @param channels   Number of channels per texture (must be in {1, 2, 3, 4})
+-        self.splatMgr = ET.SplattingManager(self.splattingBaseName, self.splattingResGroup, self.splattingTexturSize, self.splattingTexturSize, 3)
+-        ## specify number of splatting textures we need to handle
+-        self.splatMgr.setNumTextures(self.splattingNumTextures)
+-
+-        ## create a manual lightmap texture
+-        lightmapTex = og.TextureManager.getSingleton().createManual(
+-        self.splattingBaseName, self.splattingResGroup, og.TEX_TYPE_2D, self.splattingTexturSize, self.splattingTexturSize, 1, og.PF_BYTE_RGB)
+-
+-        lightmap = og.Image()
+-        ET.createTerrainLightmap(terrainInfo, lightmap, 128, 128,\
+-                                 og.Vector3(1, -1, 1),\
+-                                 og.ColourValue().White,\
+-                                 og.ColourValue(0.3, 0.3, 0.3,1.0))
+-        lightmapTex.getBuffer(0, 0).blitFromMemory(lightmap.getPixelBox(0, 0))
+-
+-        ##  load the terrain material and assign it
+-        material = og.MaterialManager.getSingleton().getByName(&quot;ETTerrainMaterial&quot;)
+-#        material = og.MaterialManager.getSingleton().getByName(&quot;Lockenwickler_Area&quot;)
+-        self.terrainManager.setMaterial(material)
+-        
+-class MyTerrainManager():
+-    def __init__(self, sceneManager):
+-        self.sceneManager = sceneManager
+-        self.dockWidgetContents = None
+-
+-    def getDockWidget(self, parent):
+-        if self.dockWidgetContents is None:
+-            self.dockWidgetContents = MyTerrainManagerDock(parent)
+-            self.myTerrainManagerDock = QDockWidget(&quot;Terrain Tools&quot;, parent)
+-            self.myTerrainManagerDock.setObjectName(&quot;TerrainToolsDockWindow&quot;)
+-            self.myTerrainManagerDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+-            self.myTerrainManagerDock.setWidget(self.dockWidgetContents)
+-            self.myTerrainManagerDock.setWindowIcon(QIcon(&quot;media/icons/terrain_small.png&quot;))
+-            parent.addDockWidget(Qt.LeftDockWidgetArea, self.myTerrainManagerDock)
+-            
+-            QWidget.connect(self.dockWidgetContents, SIGNAL(&quot;createTerrain&quot;), self.onCreateTerrain)
+-            
+-            
+-        return self.myTerrainManagerDock
+-
+-    def onCreateTerrain(self, arg):
+-        self.terrain = Terrain(self.sceneManager)
+-        self.terrain.create(arg)
++#################################################
++# This source file is part of Rastullahs Lockenwickler.
++# Copyright (C) 2003-2009 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++#  but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  US
++#################################################
++
++from PyQt4.QtCore import *
++from PyQt4.QtGui import *
++
++import ogre.renderer.OGRE as og
++import ogre.addons.et as ET
++
++import Ui_MyTerrainManagerDock
++from GlobDirectoryWalker import GlobDirectoryWalker
++
++class BrushDialog(QDialog):
++    def __init__(self, parent = None):
++        super(BrushDialog, self).__init__(parent)
++        self.setupUi(self)
++        self.brushName = &quot;&quot;
++        
++        for file in GlobDirectoryWalker(&quot;./media/terrain/brushes&quot;, &quot;*.png&quot;):
++            btn = QListWidgetItem()
++            btn.setText(file.replace(&quot;./media/terrain/brushes/&quot;, &quot;&quot;))
++            btn.setIcon(QIcon(file))
++            self.listWidget.addItem(btn)
++        
++    def setupUi(self, Dialog):
++        Dialog.setObjectName(&quot;Dialog&quot;)
++        Dialog.resize(343, 388)
++        self.gridLayout = QGridLayout(Dialog)
++        self.gridLayout.setObjectName(&quot;gridLayout&quot;)
++        self.pushButton = QPushButton(Dialog)
++        self.pushButton.setObjectName(&quot;pushButton&quot;)
++        self.gridLayout.addWidget(self.pushButton, 1, 0, 1, 1)
++        self.pushButton_2 = QPushButton(Dialog)
++        self.pushButton_2.setObjectName(&quot;pushButton_2&quot;)
++        self.gridLayout.addWidget(self.pushButton_2, 1, 1, 1, 1)
++        self.listWidget = QListWidget(Dialog)
++        self.listWidget.setObjectName(&quot;listWidget&quot;)
++        self.gridLayout.addWidget(self.listWidget, 0, 0, 1, 2)
++
++        self.retranslateUi(Dialog)
++        QObject.connect(self.pushButton_2, SIGNAL(&quot;pressed()&quot;), Dialog.reject)
++        QObject.connect(self.pushButton, SIGNAL(&quot;pressed()&quot;), Dialog.accept)
++        QObject.connect(self.listWidget, SIGNAL(&quot;doubleClicked(QModelIndex)&quot;), Dialog.saveBrushName)
++        QObject.connect(self.listWidget, SIGNAL(&quot;doubleClicked(QModelIndex)&quot;), Dialog.accept)
++        QMetaObject.connectSlotsByName(Dialog)
++
++    def retranslateUi(self, Dialog):
++        Dialog.setWindowTitle(QApplication.translate(&quot;Dialog&quot;, &quot;Dialog&quot;, None, QApplication.UnicodeUTF8))
++        self.pushButton.setText(QApplication.translate(&quot;Dialog&quot;, &quot;Ok&quot;, None, QApplication.UnicodeUTF8))
++        self.pushButton_2.setText(QApplication.translate(&quot;Dialog&quot;, &quot;Cancel&quot;, None, QApplication.UnicodeUTF8))
++    
++    def saveBrushName(self):
++        item = self.listWidget.currentItem()
++        self.brushName = str(item.text())
++        
++class MyTerrainManagerDock(Ui_MyTerrainManagerDock.Ui_TerrainManagerUi, QWidget):
++    def __init__(self, onBrushChangedCallback, parent = None):
++        super(MyTerrainManagerDock, self).__init__(parent)
++        self.setupUi(self)
++        QWidget.connect(self.createTerrainButton, SIGNAL(&quot;clicked()&quot;), self.onCreateTerrainButtonClicked)
++        QWidget.connect(self.brushButton, SIGNAL(&quot;clicked()&quot;), self.onBrushButtonClicked)
++        self.onBrushChangedCallback = onBrushChangedCallback
++        
++    def onBrushButtonClicked(self):
++        dlg = BrushDialog(self)
++        dlg.exec_()
++        self.onBrushChangedCallback(dlg.brushName)
++        self.brushButton.setIcon(QIcon(&quot;./media/terrain/brushes/&quot; + dlg.brushName))
++        self.brushButton.setIconSize(QSize(150, 150))
++        self.brushButton.setText(dlg.brushName)
++        
++    def onCreateTerrainButtonClicked(self):
++        terrainData = {}
++        terrainData[&quot;name&quot;]  = str(self.nameLineEdit.text())
++        terrainData[&quot;size&quot;]  = int(self.sizeComboBox.currentText())
++        terrainData[&quot;positionX&quot;]  = self.positionSpinBoxX.value()
++        terrainData[&quot;positionY&quot;]  = self.positionSpinBoxY.value()
++        terrainData[&quot;positionZ&quot;]  = self.positionSpinBoxZ.value()
++        terrainData[&quot;extendsX&quot;]  = self.extendsSpinBoxX.value()
++        terrainData[&quot;extendsY&quot;]  = self.extendsSpinBoxY.value()
++        terrainData[&quot;extendsZ&quot;]  = self.extendsSpinBoxZ.value()
++        terrainData[&quot;terrainSize&quot;] = int(self.sizeComboBox.currentText())
++        terrainData[&quot;terrainHeight&quot;]  = self.terrainHeightSpinBox.value()
++        terrainData[&quot;splattingBaseName&quot;]  = str(self.baseNameLineEdit.text())
++        terrainData[&quot;splattingResGroup&quot;]  = str(self.resGroupLineEdit.text())
++        terrainData[&quot;splattingTextureSize&quot;]  = int(self.texSizeComboBox.currentText())
++        terrainData[&quot;splattingNumTextures&quot;]  = int(self.numTexturesComboBox.currentText())
++        
++        self.emit(SIGNAL(&quot;createTerrain&quot;), terrainData)
++        
++class Terrain():
++    def __init__(self, sceneManager):
++        self.sceneManager = sceneManager
++        self.camera = self.sceneManager.getCamera(&quot;MainCam&quot;)
++        self.position = og.Vector3()
++        self.extends = og.Vector3(128, 50, 128)
++        self.terrainHeight = 0.5
++        self.name = &quot;&quot;
++        self.terrainSize = 129
++        self.splattingBaseName = &quot;ETSplatting&quot;
++        self.splattingResGroup = &quot;ET&quot;
++        self.splattingTextureSize = 128
++        self.splattingNumTextures = 6
++        
++        self.created = False
++        self.terrainInfo = None
++        
++    def create(self, arg):
++#        if self.created:
++#            del self.terrainInfo
++#            del self.terrainManager
++        if arg is not None:
++            self.name = arg[&quot;name&quot;]
++            self.position = og.Vector3(arg[&quot;positionX&quot;], arg[&quot;positionY&quot;], arg[&quot;positionZ&quot;])
++            self.extends = og.Vector3(arg[&quot;extendsX&quot;], arg[&quot;extendsY&quot;], arg[&quot;extendsZ&quot;])
++            self.terrainHeight = arg[&quot;terrainHeight&quot;]
++            self.terrainSize = arg[&quot;terrainSize&quot;] + 1
++            self.splattingBaseName = arg[&quot;splattingBaseName&quot;]
++            self.splattingResGroup = arg[&quot;splattingResGroup&quot;]
++            self.splattingTextureSize = arg[&quot;splattingTextureSize&quot;]
++            self.splattingNumTextures = arg[&quot;splattingNumTextures&quot;]
++        
++        self.terrainManager =  ET.TerrainManager(self.sceneManager, self.name)
++        self.terrainManager.setLODErrorMargin(2, self.camera.getViewport().getActualHeight())
++        self.terrainManager.setUseLODMorphing(True, 0.2, &quot;morphFactor&quot;)
++        
++        ## create a fresh, mid-high terrain for editing
++        # Note 
++        heightMapValues = og.LodDistanceList() ## ET.stdVectorFloat()
++        for i in xrange(self.terrainSize):
++            for j in xrange(self.terrainSize):
++                heightMapValues.append(self.terrainHeight)
++        # width, height, heightmapvalues as a float array
++        self.terrainInfo = ET.TerrainInfo (self.terrainSize, self.terrainSize, heightMapValues )
++        
++        ## save typing self
++        terrainInfo  = self.terrainInfo 
++        sceneManager = self.sceneManager
++        terrainMgr   = self.terrainManager
++        
++        ## set position and size of the terrain
++        half = self.extends / 2
++        terrainInfo.setExtents(og.AxisAlignedBox(-half.x, -half.y, -half.z, half.x, half.y, half.z))
++
++
++        ## now render it
++        terrainMgr.createTerrain(terrainInfo)
++
++        ## create the splatting manager
++#        * @param baseName   base name for the map textures (will be appended by their number)
++#        * @param group      the resource group the textures will be placed in
++#        * @param width      width of the textures in pixels
++#        * @param height     height of the textures in pixels
++#        * @param channels   Number of channels per texture (must be in {1, 2, 3, 4})
++        self.splatMgr = ET.SplattingManager(self.splattingBaseName, self.splattingResGroup, self.splattingTextureSize, self.splattingTextureSize, 3)
++        ## specify number of splatting textures we need to handle
++        self.splatMgr.setNumTextures(self.splattingNumTextures)
++        
++        ## create a manual lightmap texture
++        lightmapTex = og.TextureManager.getSingleton().createManual(
++        &quot;ETLightmap&quot;, self.splattingResGroup, og.TEX_TYPE_2D, self.splattingTextureSize, self.splattingTextureSize, 1, og.PF_BYTE_RGB)
++
++        lightmap = og.Image()
++        ET.createTerrainLightmap(terrainInfo, lightmap, 128, 128,\
++                                 og.Vector3(1, -1, 1),\
++                                 og.ColourValue().White,\
++                                 og.ColourValue(0.3, 0.3, 0.3,1.0))
++        lightmapTex.getBuffer(0, 0).blitFromMemory(lightmap.getPixelBox(0, 0))
++
++        ##  load the terrain material and assign it
++        material = og.MaterialManager.getSingleton().getByName(&quot;ETTerrainMaterial&quot;)
++#        material = og.MaterialManager.getSingleton().getByName(&quot;Lockenwickler_Area&quot;)
++        self.terrainManager.setMaterial(material)
++        
++        self.sceneNode = self.sceneManager.getSceneNode(self.name + &quot;/Terrain&quot;)
++        self.sceneNode.setPosition(self.position)
++        self.created = True
++        
++class MyTerrainManager():
++    def __init__(self, sceneManager):
++        self.sceneManager = sceneManager
++        self.dockWidgetContents = None
++        og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media/terrain&quot;, &quot;FileSystem&quot;, &quot;ET&quot;, True)
++        self.terrainList = []
++    
++    def getDockWidget(self, parent):
++        if self.dockWidgetContents is None:
++            self.dockWidgetContents = MyTerrainManagerDock(self.onBrushChanged, parent)
++            self.myTerrainManagerDock = QDockWidget(&quot;Terrain Tools&quot;, parent)
++            self.myTerrainManagerDock.setObjectName(&quot;TerrainToolsDockWindow&quot;)
++            self.myTerrainManagerDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
++            self.myTerrainManagerDock.setWidget(self.dockWidgetContents)
++            self.myTerrainManagerDock.setWindowIcon(QIcon(&quot;media/icons/terrain_small.png&quot;))
++            parent.addDockWidget(Qt.LeftDockWidgetArea, self.myTerrainManagerDock)
++            
++            QWidget.connect(self.dockWidgetContents, SIGNAL(&quot;createTerrain&quot;), self.onCreateTerrain)
++            
++            
++        return self.myTerrainManagerDock
++
++    def onBrushChanged(self, brushName):
++        print brushName
++
++    def onCreateTerrain(self, arg):
++        terrain = Terrain(self.sceneManager)
++        terrain.create(arg)
++        self.terrainList.append(terrain)
++        
++        og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
++        
++        self.updateTerrainListBox()
++        
++#        i = 0
++#        numChildren = self.sceneManager.getRootSceneNode().numChildren()
++#        while i &lt; numChildren:
++#            n = self.sceneManager.getRootSceneNode().getChild(i)
++#            name = n.getName()
++#            print name
++#            i += 1
++
++    def updateTerrainListBox(self):
++        self.dockWidgetContents.terrainListComboBox.clear()
++        if len(self.terrainList) == 0:
++            self.dockWidgetContents.terrainListComboBox.addItem(&quot;No Terrain&quot;)
++            return
++            
++        for terrain in self.terrainList:
++            self.dockWidgetContents.terrainListComboBox.addItem(terrain.name)
+
+Modified: rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -52,8 +52,8 @@
+         self.entity = entity #the selected entity
+         self.isPivot = False
+ 
++        print self.entity.getParentNode().getName()
+ 
+-
+     #if True this instance will show its bounding box else it will hide it
+     def setSelected(self,  selected):
+         if selected == True:
+@@ -102,7 +102,6 @@
+                 self.lastEntity = subEntity.getParent().getName()
+                 self.colorDict[self.lastEntity] = self.currentColorAsVector3
+                 return self.lastTechnique
+-        
+ 
+     def randomizeColor(self):
+         r = random.randrange(1, 255)
+@@ -187,7 +186,8 @@
+ 
+         self.pBox = og.PixelBox(pixelBuffer.getWidth(), pixelBuffer.getHeight(),pixelBuffer.getDepth(), pixelBuffer.getFormat(), VoidPointer)
+         self.renderTexture.copyContentsToMemory(self.pBox, og.RenderTarget.FrameBuffer.FB_FRONT)
+-
++        
++#        self.renderTexture.writeContentsToFile(&quot;selectionbuffer.png&quot;)
+ #        i = 0
+ #        
+ #        while i &lt; len(self.buffer):
+
+Modified: rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/Ui_MyTerrainManagerDock.py	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -1,323 +1,394 @@
+-# -*- coding: utf-8 -*-
+-
+-# Form implementation generated from reading ui file 'D:\Lockenwickler\ui files\MyTerrainManagerDock.ui'
+-#
+-# Created: Sun May 03 18:30:28 2009
+-#      by: PyQt4 UI code generator 4.4.3
+-#
+-# WARNING! All changes made in this file will be lost!
+-
+-from PyQt4 import QtCore, QtGui
+-
+-class Ui_TerrainManagerUi(object):
+-    def setupUi(self, TerrainManagerUi):
+-        TerrainManagerUi.setObjectName(&quot;TerrainManagerUi&quot;)
+-        TerrainManagerUi.resize(263, 748)
+-        self.gridLayout_2 = QtGui.QGridLayout(TerrainManagerUi)
+-        self.gridLayout_2.setMargin(1)
+-        self.gridLayout_2.setSpacing(1)
+-        self.gridLayout_2.setObjectName(&quot;gridLayout_2&quot;)
+-        self.comboBox = QtGui.QComboBox(TerrainManagerUi)
+-        self.comboBox.setObjectName(&quot;comboBox&quot;)
+-        self.comboBox.addItem(QtCore.QString())
+-        self.gridLayout_2.addWidget(self.comboBox, 0, 0, 1, 1)
+-        self.toolBox = QtGui.QToolBox(TerrainManagerUi)
+-        self.toolBox.setFrameShape(QtGui.QFrame.NoFrame)
+-        self.toolBox.setFrameShadow(QtGui.QFrame.Plain)
+-#        self.toolBox.setTabSpacing(1)
+-        self.toolBox.setObjectName(&quot;toolBox&quot;)
+-        self.page = QtGui.QWidget()
+-        self.page.setGeometry(QtCore.QRect(0, 0, 261, 656))
+-        self.page.setObjectName(&quot;page&quot;)
+-        self.gridLayout = QtGui.QGridLayout(self.page)
+-        self.gridLayout.setMargin(1)
+-        self.gridLayout.setSpacing(1)
+-        self.gridLayout.setObjectName(&quot;gridLayout&quot;)
+-        self.label_6 = QtGui.QLabel(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.label_6.sizePolicy().hasHeightForWidth())
+-        self.label_6.setSizePolicy(sizePolicy)
+-        self.label_6.setAlignment(QtCore.Qt.AlignCenter)
+-        self.label_6.setObjectName(&quot;label_6&quot;)
+-        self.gridLayout.addWidget(self.label_6, 0, 0, 1, 2)
+-        self.label = QtGui.QLabel(self.page)
+-        self.label.setObjectName(&quot;label&quot;)
+-        self.gridLayout.addWidget(self.label, 1, 0, 1, 1)
+-        self.nameLineEdit = QtGui.QLineEdit(self.page)
+-        self.nameLineEdit.setObjectName(&quot;nameLineEdit&quot;)
+-        self.gridLayout.addWidget(self.nameLineEdit, 1, 1, 1, 1)
+-        self.label_2 = QtGui.QLabel(self.page)
+-        self.label_2.setObjectName(&quot;label_2&quot;)
+-        self.gridLayout.addWidget(self.label_2, 2, 0, 1, 1)
+-        self.sizeComboBox = QtGui.QComboBox(self.page)
+-        self.sizeComboBox.setObjectName(&quot;sizeComboBox&quot;)
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.sizeComboBox.addItem(QtCore.QString())
+-        self.gridLayout.addWidget(self.sizeComboBox, 2, 1, 1, 1)
+-        self.positionSpinBoxX = QtGui.QDoubleSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.positionSpinBoxX.sizePolicy().hasHeightForWidth())
+-        self.positionSpinBoxX.setSizePolicy(sizePolicy)
+-        self.positionSpinBoxX.setMinimum(-999999999.0)
+-        self.positionSpinBoxX.setMaximum(999999999.0)
+-        self.positionSpinBoxX.setProperty(&quot;value&quot;, QtCore.QVariant(0.0))
+-        self.positionSpinBoxX.setObjectName(&quot;positionSpinBoxX&quot;)
+-        self.gridLayout.addWidget(self.positionSpinBoxX, 3, 1, 1, 1)
+-        self.label_11 = QtGui.QLabel(self.page)
+-        self.label_11.setObjectName(&quot;label_11&quot;)
+-        self.gridLayout.addWidget(self.label_11, 4, 0, 1, 1)
+-        self.positionSpinBoxY = QtGui.QDoubleSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.positionSpinBoxY.sizePolicy().hasHeightForWidth())
+-        self.positionSpinBoxY.setSizePolicy(sizePolicy)
+-        self.positionSpinBoxY.setMinimum(-999999999.0)
+-        self.positionSpinBoxY.setMaximum(999999999.0)
+-        self.positionSpinBoxY.setObjectName(&quot;positionSpinBoxY&quot;)
+-        self.gridLayout.addWidget(self.positionSpinBoxY, 4, 1, 1, 1)
+-        self.positionSpinBoxZ = QtGui.QDoubleSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.positionSpinBoxZ.sizePolicy().hasHeightForWidth())
+-        self.positionSpinBoxZ.setSizePolicy(sizePolicy)
+-        self.positionSpinBoxZ.setMinimum(-999999999.0)
+-        self.positionSpinBoxZ.setMaximum(999999999.0)
+-        self.positionSpinBoxZ.setObjectName(&quot;positionSpinBoxZ&quot;)
+-        self.gridLayout.addWidget(self.positionSpinBoxZ, 5, 1, 1, 1)
+-        self.extendsSpinBoxX = QtGui.QSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.extendsSpinBoxX.sizePolicy().hasHeightForWidth())
+-        self.extendsSpinBoxX.setSizePolicy(sizePolicy)
+-        self.extendsSpinBoxX.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
+-        self.extendsSpinBoxX.setMinimum(0)
+-        self.extendsSpinBoxX.setMaximum(10000)
+-        self.extendsSpinBoxX.setObjectName(&quot;extendsSpinBoxX&quot;)
+-        self.gridLayout.addWidget(self.extendsSpinBoxX, 6, 1, 1, 1)
+-        self.label_3 = QtGui.QLabel(self.page)
+-        self.label_3.setObjectName(&quot;label_3&quot;)
+-        self.gridLayout.addWidget(self.label_3, 7, 0, 1, 1)
+-        self.extendsSpinBoxY = QtGui.QSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.extendsSpinBoxY.sizePolicy().hasHeightForWidth())
+-        self.extendsSpinBoxY.setSizePolicy(sizePolicy)
+-        self.extendsSpinBoxY.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
+-        self.extendsSpinBoxY.setMinimum(0)
+-        self.extendsSpinBoxY.setMaximum(10000)
+-        self.extendsSpinBoxY.setObjectName(&quot;extendsSpinBoxY&quot;)
+-        self.gridLayout.addWidget(self.extendsSpinBoxY, 7, 1, 1, 1)
+-        self.extendsSpinBoxZ = QtGui.QSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.extendsSpinBoxZ.sizePolicy().hasHeightForWidth())
+-        self.extendsSpinBoxZ.setSizePolicy(sizePolicy)
+-        self.extendsSpinBoxZ.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
+-        self.extendsSpinBoxZ.setMinimum(0)
+-        self.extendsSpinBoxZ.setMaximum(10000)
+-        self.extendsSpinBoxZ.setObjectName(&quot;extendsSpinBoxZ&quot;)
+-        self.gridLayout.addWidget(self.extendsSpinBoxZ, 8, 1, 1, 1)
+-        self.label_10 = QtGui.QLabel(self.page)
+-        self.label_10.setObjectName(&quot;label_10&quot;)
+-        self.gridLayout.addWidget(self.label_10, 9, 0, 1, 1)
+-        self.terrainHeightSpinBox = QtGui.QDoubleSpinBox(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.terrainHeightSpinBox.sizePolicy().hasHeightForWidth())
+-        self.terrainHeightSpinBox.setSizePolicy(sizePolicy)
+-        self.terrainHeightSpinBox.setMaximum(1.0)
+-        self.terrainHeightSpinBox.setSingleStep(0.1)
+-        self.terrainHeightSpinBox.setProperty(&quot;value&quot;, QtCore.QVariant(0.5))
+-        self.terrainHeightSpinBox.setObjectName(&quot;terrainHeightSpinBox&quot;)
+-        self.gridLayout.addWidget(self.terrainHeightSpinBox, 9, 1, 1, 1)
+-        self.label_7 = QtGui.QLabel(self.page)
+-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.label_7.sizePolicy().hasHeightForWidth())
+-        self.label_7.setSizePolicy(sizePolicy)
+-        self.label_7.setAlignment(QtCore.Qt.AlignCenter)
+-        self.label_7.setObjectName(&quot;label_7&quot;)
+-        self.gridLayout.addWidget(self.label_7, 10, 0, 1, 2)
+-        self.label_4 = QtGui.QLabel(self.page)
+-        self.label_4.setObjectName(&quot;label_4&quot;)
+-        self.gridLayout.addWidget(self.label_4, 11, 0, 1, 1)
+-        self.baseNameLineEdit = QtGui.QLineEdit(self.page)
+-        self.baseNameLineEdit.setObjectName(&quot;baseNameLineEdit&quot;)
+-        self.gridLayout.addWidget(self.baseNameLineEdit, 11, 1, 1, 1)
+-        self.label_5 = QtGui.QLabel(self.page)
+-        self.label_5.setObjectName(&quot;label_5&quot;)
+-        self.gridLayout.addWidget(self.label_5, 12, 0, 1, 1)
+-        self.resGroupLineEdit = QtGui.QLineEdit(self.page)
+-        self.resGroupLineEdit.setObjectName(&quot;resGroupLineEdit&quot;)
+-        self.gridLayout.addWidget(self.resGroupLineEdit, 12, 1, 1, 1)
+-        self.label_8 = QtGui.QLabel(self.page)
+-        self.label_8.setObjectName(&quot;label_8&quot;)
+-        self.gridLayout.addWidget(self.label_8, 13, 0, 1, 1)
+-        self.texSizeComboBox = QtGui.QComboBox(self.page)
+-        self.texSizeComboBox.setObjectName(&quot;texSizeComboBox&quot;)
+-        self.texSizeComboBox.addItem(QtCore.QString())
+-        self.texSizeComboBox.addItem(QtCore.QString())
+-        self.texSizeComboBox.addItem(QtCore.QString())
+-        self.texSizeComboBox.addItem(QtCore.QString())
+-        self.texSizeComboBox.addItem(QtCore.QString())
+-        self.gridLayout.addWidget(self.texSizeComboBox, 13, 1, 1, 1)
+-        self.label_9 = QtGui.QLabel(self.page)
+-        self.label_9.setObjectName(&quot;label_9&quot;)
+-        self.gridLayout.addWidget(self.label_9, 14, 0, 1, 1)
+-        self.numTexturesComboBox = QtGui.QComboBox(self.page)
+-        self.numTexturesComboBox.setObjectName(&quot;numTexturesComboBox&quot;)
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.numTexturesComboBox.addItem(QtCore.QString())
+-        self.gridLayout.addWidget(self.numTexturesComboBox, 14, 1, 1, 1)
+-        self.createTerrainButton = QtGui.QPushButton(self.page)
+-        self.createTerrainButton.setObjectName(&quot;createTerrainButton&quot;)
+-        self.gridLayout.addWidget(self.createTerrainButton, 15, 0, 1, 2)
+-        self.toolBox.addItem(self.page, &quot;&quot;)
+-        self.page_2 = QtGui.QWidget()
+-        self.page_2.setGeometry(QtCore.QRect(0, 0, 261, 656))
+-        self.page_2.setObjectName(&quot;page_2&quot;)
+-        self.toolBox.addItem(self.page_2, &quot;&quot;)
+-        self.Seite = QtGui.QWidget()
+-        self.Seite.setGeometry(QtCore.QRect(0, 0, 261, 656))
+-        self.Seite.setObjectName(&quot;Seite&quot;)
+-        self.toolBox.addItem(self.Seite, &quot;&quot;)
+-        self.gridLayout_2.addWidget(self.toolBox, 1, 0, 1, 1)
+-        self.label_6.setBuddy(self.nameLineEdit)
+-        self.label.setBuddy(self.nameLineEdit)
+-        self.label_2.setBuddy(self.sizeComboBox)
+-        self.label_11.setBuddy(self.extendsSpinBoxX)
+-        self.label_3.setBuddy(self.extendsSpinBoxX)
+-        self.label_10.setBuddy(self.extendsSpinBoxX)
+-        self.label_7.setBuddy(self.baseNameLineEdit)
+-        self.label_4.setBuddy(self.baseNameLineEdit)
+-        self.label_5.setBuddy(self.resGroupLineEdit)
+-        self.label_8.setBuddy(self.texSizeComboBox)
+-        self.label_9.setBuddy(self.numTexturesComboBox)
+-
+-        self.retranslateUi(TerrainManagerUi)
+-        self.toolBox.setCurrentIndex(0)
+-        QtCore.QMetaObject.connectSlotsByName(TerrainManagerUi)
+-        TerrainManagerUi.setTabOrder(self.nameLineEdit, self.sizeComboBox)
+-        TerrainManagerUi.setTabOrder(self.sizeComboBox, self.extendsSpinBoxX)
+-        TerrainManagerUi.setTabOrder(self.extendsSpinBoxX, self.extendsSpinBoxY)
+-        TerrainManagerUi.setTabOrder(self.extendsSpinBoxY, self.extendsSpinBoxZ)
+-        TerrainManagerUi.setTabOrder(self.extendsSpinBoxZ, self.baseNameLineEdit)
+-        TerrainManagerUi.setTabOrder(self.baseNameLineEdit, self.resGroupLineEdit)
+-        TerrainManagerUi.setTabOrder(self.resGroupLineEdit, self.texSizeComboBox)
+-        TerrainManagerUi.setTabOrder(self.texSizeComboBox, self.numTexturesComboBox)
+-        TerrainManagerUi.setTabOrder(self.numTexturesComboBox, self.createTerrainButton)
+-
+-    def retranslateUi(self, TerrainManagerUi):
+-        TerrainManagerUi.setWindowTitle(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Form&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.comboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;No Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_6.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Geometry&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Name of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Name&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.nameLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Name of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_2.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Vertex density&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_2.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Size&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Vertex density&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;8&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;16&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;32&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;64&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;128&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(5, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;256&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(6, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;512&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.sizeComboBox.setItemText(7, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1024&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxX.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxX.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;X:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_11.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_11.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Position&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxY.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxY.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Y:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxZ.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.positionSpinBoxZ.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Z:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxX.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxX.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;X:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_3.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_3.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Extends&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxY.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxY.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Y:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxZ.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.extendsSpinBoxZ.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Z:&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_10.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&lt;!DOCTYPE HTML PUBLIC \&quot;-//W3C//DTD HTML 4.0//EN\&quot; \&quot;<A HREF="http://www.w3.org/TR/REC-html40/strict.dtd\">http://www.w3.org/TR/REC-html40/strict.dtd\</A>&quot;&gt;\n&quot;
+-&quot;&lt;html&gt;&lt;head&gt;&lt;meta name=\&quot;qrichtext\&quot; content=\&quot;1\&quot; /&gt;&lt;style type=\&quot;text/css\&quot;&gt;\n&quot;
+-&quot;p, li { white-space: pre-wrap; }\n&quot;
+-&quot;&lt;/style&gt;&lt;/head&gt;&lt;body style=\&quot; font-family:\'Sans Serif\'; font-size:9pt; font-weight:400; font-style:normal;\&quot;&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This value means how high the vertices are placed in relation to the terrain extend in Y.&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This means when you have a terrain extend in Y by 100 and the terrain height is 0.5&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;the vertices are placed in at height 50.&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;&lt;img src=\&quot;:/helpPref/TerrainExtends1.png\&quot; /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_10.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Height&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.terrainHeightSpinBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&lt;!DOCTYPE HTML PUBLIC \&quot;-//W3C//DTD HTML 4.0//EN\&quot; \&quot;<A HREF="http://www.w3.org/TR/REC-html40/strict.dtd\">http://www.w3.org/TR/REC-html40/strict.dtd\</A>&quot;&gt;\n&quot;
+-&quot;&lt;html&gt;&lt;head&gt;&lt;meta name=\&quot;qrichtext\&quot; content=\&quot;1\&quot; /&gt;&lt;style type=\&quot;text/css\&quot;&gt;\n&quot;
+-&quot;p, li { white-space: pre-wrap; }\n&quot;
+-&quot;&lt;/style&gt;&lt;/head&gt;&lt;body style=\&quot; font-family:\'Sans Serif\'; font-size:9pt; font-weight:400; font-style:normal;\&quot;&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This value means how high the vertices are placed in relation to the terrain extend in Y.&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This means when you have a terrain extend in Y by 100 and the terrain height is 0.5&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;the vertices are placed in at height 50.&lt;/p&gt;\n&quot;
+-&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;&lt;img src=\&quot;:/helpPref/TerrainExtends1.png\&quot; /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_7.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Splatting Settings&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_4.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Base name for the map textures (will be appended by their number)&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_4.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Base Name&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.baseNameLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Base name for the map textures (will be appended by their number)&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.baseNameLineEdit.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ETSplatting&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_5.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The resource group the textures will be placed in&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_5.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Res Group&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.resGroupLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The resource group the textures will be placed in&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.resGroupLineEdit.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ET&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_8.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Texture size in pixels&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_8.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Tex Size&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Texture size in pixels&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;64&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;128&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;256&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;512&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.texSizeComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1024&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_9.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Number of splatting textures (Layers)&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.label_9.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;NumTextures&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Number of splatting textures (Layers)&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;2&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;3&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;4&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;5&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.numTexturesComboBox.setItemText(5, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;6&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.createTerrainButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.toolBox.setItemText(self.toolBox.indexOf(self.page), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.toolBox.setItemText(self.toolBox.indexOf(self.page_2), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ModifyTerrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.toolBox.setItemText(self.toolBox.indexOf(self.Seite), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;PaintTerrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-
+-import help_rc
+-
+-if __name__ == &quot;__main__&quot;:
+-    import sys
+-    app = QtGui.QApplication(sys.argv)
+-    TerrainManagerUi = QtGui.QWidget()
+-    ui = Ui_TerrainManagerUi()
+-    ui.setupUi(TerrainManagerUi)
+-    TerrainManagerUi.show()
+-    sys.exit(app.exec_())
+-
++# -*- coding: utf-8 -*-
++
++# Form implementation generated from reading ui file '/home/fusion/dev/ui files/MyTerrainManagerDock.ui'
++#
++# Created: Mon May  4 20:23:29 2009
++#      by: PyQt4 UI code generator 4.4.4
++#
++# WARNING! All changes made in this file will be lost!
++
++from PyQt4 import QtCore, QtGui
++
++class Ui_TerrainManagerUi(object):
++    def setupUi(self, TerrainManagerUi):
++        TerrainManagerUi.setObjectName(&quot;TerrainManagerUi&quot;)
++        TerrainManagerUi.resize(266, 748)
++        self.gridLayout_2 = QtGui.QGridLayout(TerrainManagerUi)
++        self.gridLayout_2.setMargin(1)
++        self.gridLayout_2.setSpacing(1)
++        self.gridLayout_2.setObjectName(&quot;gridLayout_2&quot;)
++        self.terrainListComboBox = QtGui.QComboBox(TerrainManagerUi)
++        self.terrainListComboBox.setObjectName(&quot;terrainListComboBox&quot;)
++        self.terrainListComboBox.addItem(QtCore.QString())
++        self.gridLayout_2.addWidget(self.terrainListComboBox, 0, 0, 1, 1)
++        self.deleteTerrainButton = QtGui.QToolButton(TerrainManagerUi)
++        icon = QtGui.QIcon()
++        icon.addPixmap(QtGui.QPixmap(&quot;:/iconsPref/editdelete.png&quot;), QtGui.QIcon.Normal, QtGui.QIcon.Off)
++        self.deleteTerrainButton.setIcon(icon)
++        self.deleteTerrainButton.setObjectName(&quot;deleteTerrainButton&quot;)
++        self.gridLayout_2.addWidget(self.deleteTerrainButton, 0, 1, 1, 1)
++        self.toolBox = QtGui.QToolBox(TerrainManagerUi)
++        self.toolBox.setFrameShape(QtGui.QFrame.NoFrame)
++        self.toolBox.setFrameShadow(QtGui.QFrame.Sunken)
++#        self.toolBox.setTabSpacing(1)
++        self.toolBox.setObjectName(&quot;toolBox&quot;)
++        self.page = QtGui.QWidget()
++        self.page.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.page.setObjectName(&quot;page&quot;)
++        self.gridLayout = QtGui.QGridLayout(self.page)
++        self.gridLayout.setMargin(1)
++        self.gridLayout.setSpacing(1)
++        self.gridLayout.setObjectName(&quot;gridLayout&quot;)
++        self.label_6 = QtGui.QLabel(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.label_6.sizePolicy().hasHeightForWidth())
++        self.label_6.setSizePolicy(sizePolicy)
++        self.label_6.setAlignment(QtCore.Qt.AlignCenter)
++        self.label_6.setObjectName(&quot;label_6&quot;)
++        self.gridLayout.addWidget(self.label_6, 0, 0, 1, 2)
++        self.label = QtGui.QLabel(self.page)
++        self.label.setObjectName(&quot;label&quot;)
++        self.gridLayout.addWidget(self.label, 1, 0, 1, 1)
++        self.nameLineEdit = QtGui.QLineEdit(self.page)
++        self.nameLineEdit.setObjectName(&quot;nameLineEdit&quot;)
++        self.gridLayout.addWidget(self.nameLineEdit, 1, 1, 1, 1)
++        self.label_2 = QtGui.QLabel(self.page)
++        self.label_2.setObjectName(&quot;label_2&quot;)
++        self.gridLayout.addWidget(self.label_2, 2, 0, 1, 1)
++        self.sizeComboBox = QtGui.QComboBox(self.page)
++        self.sizeComboBox.setObjectName(&quot;sizeComboBox&quot;)
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.sizeComboBox.addItem(QtCore.QString())
++        self.gridLayout.addWidget(self.sizeComboBox, 2, 1, 1, 1)
++        self.positionSpinBoxX = QtGui.QDoubleSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.positionSpinBoxX.sizePolicy().hasHeightForWidth())
++        self.positionSpinBoxX.setSizePolicy(sizePolicy)
++        self.positionSpinBoxX.setMinimum(-999999999.0)
++        self.positionSpinBoxX.setMaximum(999999999.0)
++        self.positionSpinBoxX.setProperty(&quot;value&quot;, QtCore.QVariant(0.0))
++        self.positionSpinBoxX.setObjectName(&quot;positionSpinBoxX&quot;)
++        self.gridLayout.addWidget(self.positionSpinBoxX, 3, 1, 1, 1)
++        self.label_11 = QtGui.QLabel(self.page)
++        self.label_11.setObjectName(&quot;label_11&quot;)
++        self.gridLayout.addWidget(self.label_11, 4, 0, 1, 1)
++        self.positionSpinBoxY = QtGui.QDoubleSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.positionSpinBoxY.sizePolicy().hasHeightForWidth())
++        self.positionSpinBoxY.setSizePolicy(sizePolicy)
++        self.positionSpinBoxY.setMinimum(-999999999.0)
++        self.positionSpinBoxY.setMaximum(999999999.0)
++        self.positionSpinBoxY.setObjectName(&quot;positionSpinBoxY&quot;)
++        self.gridLayout.addWidget(self.positionSpinBoxY, 4, 1, 1, 1)
++        self.positionSpinBoxZ = QtGui.QDoubleSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.positionSpinBoxZ.sizePolicy().hasHeightForWidth())
++        self.positionSpinBoxZ.setSizePolicy(sizePolicy)
++        self.positionSpinBoxZ.setMinimum(-999999999.0)
++        self.positionSpinBoxZ.setMaximum(999999999.0)
++        self.positionSpinBoxZ.setObjectName(&quot;positionSpinBoxZ&quot;)
++        self.gridLayout.addWidget(self.positionSpinBoxZ, 5, 1, 1, 1)
++        self.extendsSpinBoxX = QtGui.QSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.extendsSpinBoxX.sizePolicy().hasHeightForWidth())
++        self.extendsSpinBoxX.setSizePolicy(sizePolicy)
++        self.extendsSpinBoxX.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
++        self.extendsSpinBoxX.setMinimum(0)
++        self.extendsSpinBoxX.setMaximum(10000)
++        self.extendsSpinBoxX.setProperty(&quot;value&quot;, QtCore.QVariant(128))
++        self.extendsSpinBoxX.setObjectName(&quot;extendsSpinBoxX&quot;)
++        self.gridLayout.addWidget(self.extendsSpinBoxX, 6, 1, 1, 1)
++        self.label_3 = QtGui.QLabel(self.page)
++        self.label_3.setObjectName(&quot;label_3&quot;)
++        self.gridLayout.addWidget(self.label_3, 7, 0, 1, 1)
++        self.extendsSpinBoxY = QtGui.QSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.extendsSpinBoxY.sizePolicy().hasHeightForWidth())
++        self.extendsSpinBoxY.setSizePolicy(sizePolicy)
++        self.extendsSpinBoxY.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
++        self.extendsSpinBoxY.setMinimum(0)
++        self.extendsSpinBoxY.setMaximum(10000)
++        self.extendsSpinBoxY.setProperty(&quot;value&quot;, QtCore.QVariant(128))
++        self.extendsSpinBoxY.setObjectName(&quot;extendsSpinBoxY&quot;)
++        self.gridLayout.addWidget(self.extendsSpinBoxY, 7, 1, 1, 1)
++        self.extendsSpinBoxZ = QtGui.QSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.extendsSpinBoxZ.sizePolicy().hasHeightForWidth())
++        self.extendsSpinBoxZ.setSizePolicy(sizePolicy)
++        self.extendsSpinBoxZ.setCorrectionMode(QtGui.QAbstractSpinBox.CorrectToNearestValue)
++        self.extendsSpinBoxZ.setMinimum(0)
++        self.extendsSpinBoxZ.setMaximum(10000)
++        self.extendsSpinBoxZ.setProperty(&quot;value&quot;, QtCore.QVariant(128))
++        self.extendsSpinBoxZ.setObjectName(&quot;extendsSpinBoxZ&quot;)
++        self.gridLayout.addWidget(self.extendsSpinBoxZ, 8, 1, 1, 1)
++        self.label_10 = QtGui.QLabel(self.page)
++        self.label_10.setObjectName(&quot;label_10&quot;)
++        self.gridLayout.addWidget(self.label_10, 9, 0, 1, 1)
++        self.terrainHeightSpinBox = QtGui.QDoubleSpinBox(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.terrainHeightSpinBox.sizePolicy().hasHeightForWidth())
++        self.terrainHeightSpinBox.setSizePolicy(sizePolicy)
++        self.terrainHeightSpinBox.setMaximum(1.0)
++        self.terrainHeightSpinBox.setSingleStep(0.1)
++        self.terrainHeightSpinBox.setProperty(&quot;value&quot;, QtCore.QVariant(0.5))
++        self.terrainHeightSpinBox.setObjectName(&quot;terrainHeightSpinBox&quot;)
++        self.gridLayout.addWidget(self.terrainHeightSpinBox, 9, 1, 1, 1)
++        self.label_7 = QtGui.QLabel(self.page)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.label_7.sizePolicy().hasHeightForWidth())
++        self.label_7.setSizePolicy(sizePolicy)
++        self.label_7.setAlignment(QtCore.Qt.AlignCenter)
++        self.label_7.setObjectName(&quot;label_7&quot;)
++        self.gridLayout.addWidget(self.label_7, 10, 0, 1, 2)
++        self.label_4 = QtGui.QLabel(self.page)
++        self.label_4.setObjectName(&quot;label_4&quot;)
++        self.gridLayout.addWidget(self.label_4, 11, 0, 1, 1)
++        self.baseNameLineEdit = QtGui.QLineEdit(self.page)
++        self.baseNameLineEdit.setObjectName(&quot;baseNameLineEdit&quot;)
++        self.gridLayout.addWidget(self.baseNameLineEdit, 11, 1, 1, 1)
++        self.label_5 = QtGui.QLabel(self.page)
++        self.label_5.setObjectName(&quot;label_5&quot;)
++        self.gridLayout.addWidget(self.label_5, 12, 0, 1, 1)
++        self.resGroupLineEdit = QtGui.QLineEdit(self.page)
++        self.resGroupLineEdit.setObjectName(&quot;resGroupLineEdit&quot;)
++        self.gridLayout.addWidget(self.resGroupLineEdit, 12, 1, 1, 1)
++        self.label_8 = QtGui.QLabel(self.page)
++        self.label_8.setObjectName(&quot;label_8&quot;)
++        self.gridLayout.addWidget(self.label_8, 13, 0, 1, 1)
++        self.texSizeComboBox = QtGui.QComboBox(self.page)
++        self.texSizeComboBox.setObjectName(&quot;texSizeComboBox&quot;)
++        self.texSizeComboBox.addItem(QtCore.QString())
++        self.texSizeComboBox.addItem(QtCore.QString())
++        self.texSizeComboBox.addItem(QtCore.QString())
++        self.texSizeComboBox.addItem(QtCore.QString())
++        self.texSizeComboBox.addItem(QtCore.QString())
++        self.gridLayout.addWidget(self.texSizeComboBox, 13, 1, 1, 1)
++        self.label_9 = QtGui.QLabel(self.page)
++        self.label_9.setObjectName(&quot;label_9&quot;)
++        self.gridLayout.addWidget(self.label_9, 14, 0, 1, 1)
++        self.numTexturesComboBox = QtGui.QComboBox(self.page)
++        self.numTexturesComboBox.setObjectName(&quot;numTexturesComboBox&quot;)
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.numTexturesComboBox.addItem(QtCore.QString())
++        self.gridLayout.addWidget(self.numTexturesComboBox, 14, 1, 1, 1)
++        self.createTerrainButton = QtGui.QPushButton(self.page)
++        self.createTerrainButton.setObjectName(&quot;createTerrainButton&quot;)
++        self.gridLayout.addWidget(self.createTerrainButton, 15, 0, 1, 2)
++        self.toolBox.addItem(self.page, &quot;&quot;)
++        self.page_2 = QtGui.QWidget()
++        self.page_2.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.page_2.setObjectName(&quot;page_2&quot;)
++        self.gridLayout_3 = QtGui.QGridLayout(self.page_2)
++        self.gridLayout_3.setMargin(1)
++        self.gridLayout_3.setSpacing(1)
++        self.gridLayout_3.setObjectName(&quot;gridLayout_3&quot;)
++        self.terrainModToolComboBox = QtGui.QComboBox(self.page_2)
++        self.terrainModToolComboBox.setObjectName(&quot;terrainModToolComboBox&quot;)
++        self.terrainModToolComboBox.addItem(QtCore.QString())
++        self.terrainModToolComboBox.addItem(QtCore.QString())
++        self.terrainModToolComboBox.addItem(QtCore.QString())
++        self.gridLayout_3.addWidget(self.terrainModToolComboBox, 0, 0, 1, 4)
++        self.label_12 = QtGui.QLabel(self.page_2)
++        self.label_12.setObjectName(&quot;label_12&quot;)
++        self.gridLayout_3.addWidget(self.label_12, 1, 0, 1, 2)
++        self.intensitySlider = QtGui.QSlider(self.page_2)
++        self.intensitySlider.setProperty(&quot;value&quot;, QtCore.QVariant(2))
++        self.intensitySlider.setOrientation(QtCore.Qt.Horizontal)
++        self.intensitySlider.setObjectName(&quot;intensitySlider&quot;)
++        self.gridLayout_3.addWidget(self.intensitySlider, 1, 2, 1, 1)
++        self.label_13 = QtGui.QLabel(self.page_2)
++        self.label_13.setObjectName(&quot;label_13&quot;)
++        self.gridLayout_3.addWidget(self.label_13, 1, 3, 1, 1)
++        self.brushButton = QtGui.QPushButton(self.page_2)
++        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.brushButton.sizePolicy().hasHeightForWidth())
++        self.brushButton.setSizePolicy(sizePolicy)
++        self.brushButton.setMinimumSize(QtCore.QSize(130, 130))
++        self.brushButton.setObjectName(&quot;brushButton&quot;)
++        self.gridLayout_3.addWidget(self.brushButton, 2, 1, 1, 2)
++        spacerItem = QtGui.QSpacerItem(20, 451, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
++        self.gridLayout_3.addItem(spacerItem, 3, 2, 1, 1)
++        self.label_14 = QtGui.QLabel(self.page_2)
++        self.label_14.setObjectName(&quot;label_14&quot;)
++        self.gridLayout_3.addWidget(self.label_14, 2, 0, 1, 1)
++        self.toolBox.addItem(self.page_2, &quot;&quot;)
++        self.Seite = QtGui.QWidget()
++        self.Seite.setGeometry(QtCore.QRect(0, 0, 264, 634))
++        self.Seite.setObjectName(&quot;Seite&quot;)
++        self.toolBox.addItem(self.Seite, &quot;&quot;)
++        self.gridLayout_2.addWidget(self.toolBox, 1, 0, 1, 2)
++        self.label_6.setBuddy(self.nameLineEdit)
++        self.label.setBuddy(self.nameLineEdit)
++        self.label_2.setBuddy(self.sizeComboBox)
++        self.label_11.setBuddy(self.extendsSpinBoxX)
++        self.label_3.setBuddy(self.extendsSpinBoxX)
++        self.label_10.setBuddy(self.extendsSpinBoxX)
++        self.label_7.setBuddy(self.baseNameLineEdit)
++        self.label_4.setBuddy(self.baseNameLineEdit)
++        self.label_5.setBuddy(self.resGroupLineEdit)
++        self.label_8.setBuddy(self.texSizeComboBox)
++        self.label_9.setBuddy(self.numTexturesComboBox)
++        self.label_12.setBuddy(self.intensitySlider)
++        self.label_14.setBuddy(self.brushButton)
++
++        self.retranslateUi(TerrainManagerUi)
++        self.toolBox.setCurrentIndex(1)
++        self.sizeComboBox.setCurrentIndex(3)
++        QtCore.QObject.connect(self.intensitySlider, QtCore.SIGNAL(&quot;sliderMoved(int)&quot;), self.label_13.setNum)
++        QtCore.QMetaObject.connectSlotsByName(TerrainManagerUi)
++        TerrainManagerUi.setTabOrder(self.terrainModToolComboBox, self.intensitySlider)
++        TerrainManagerUi.setTabOrder(self.intensitySlider, self.brushButton)
++        TerrainManagerUi.setTabOrder(self.brushButton, self.extendsSpinBoxZ)
++        TerrainManagerUi.setTabOrder(self.extendsSpinBoxZ, self.baseNameLineEdit)
++        TerrainManagerUi.setTabOrder(self.baseNameLineEdit, self.resGroupLineEdit)
++        TerrainManagerUi.setTabOrder(self.resGroupLineEdit, self.texSizeComboBox)
++        TerrainManagerUi.setTabOrder(self.texSizeComboBox, self.numTexturesComboBox)
++        TerrainManagerUi.setTabOrder(self.numTexturesComboBox, self.createTerrainButton)
++        TerrainManagerUi.setTabOrder(self.createTerrainButton, self.terrainListComboBox)
++        TerrainManagerUi.setTabOrder(self.terrainListComboBox, self.positionSpinBoxX)
++        TerrainManagerUi.setTabOrder(self.positionSpinBoxX, self.positionSpinBoxY)
++        TerrainManagerUi.setTabOrder(self.positionSpinBoxY, self.positionSpinBoxZ)
++        TerrainManagerUi.setTabOrder(self.positionSpinBoxZ, self.terrainHeightSpinBox)
++        TerrainManagerUi.setTabOrder(self.terrainHeightSpinBox, self.nameLineEdit)
++        TerrainManagerUi.setTabOrder(self.nameLineEdit, self.sizeComboBox)
++        TerrainManagerUi.setTabOrder(self.sizeComboBox, self.extendsSpinBoxX)
++        TerrainManagerUi.setTabOrder(self.extendsSpinBoxX, self.extendsSpinBoxY)
++
++    def retranslateUi(self, TerrainManagerUi):
++        TerrainManagerUi.setWindowTitle(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Form&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainListComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;No Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.deleteTerrainButton.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Delete the current terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.deleteTerrainButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;...&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_6.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Geometry&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Name of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Name&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.nameLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Name of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_2.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Vertex density&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_2.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Size&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Vertex density&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;8&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;16&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;32&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;64&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;128&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(5, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;256&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(6, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;512&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.sizeComboBox.setItemText(7, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1024&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxX.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxX.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;X:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_11.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_11.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Position&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxY.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxY.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Y:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxZ.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Position of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.positionSpinBoxZ.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Z:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxX.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxX.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;X:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_3.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_3.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Extends&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxY.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxY.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Y:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxZ.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The extends of the terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.extendsSpinBoxZ.setPrefix(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Z:&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_10.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&lt;!DOCTYPE HTML PUBLIC \&quot;-//W3C//DTD HTML 4.0//EN\&quot; \&quot;<A HREF="http://www.w3.org/TR/REC-html40/strict.dtd\">http://www.w3.org/TR/REC-html40/strict.dtd\</A>&quot;&gt;\n&quot;
++&quot;&lt;html&gt;&lt;head&gt;&lt;meta name=\&quot;qrichtext\&quot; content=\&quot;1\&quot; /&gt;&lt;style type=\&quot;text/css\&quot;&gt;\n&quot;
++&quot;p, li { white-space: pre-wrap; }\n&quot;
++&quot;&lt;/style&gt;&lt;/head&gt;&lt;body style=\&quot; font-family:\'Sans Serif\'; font-size:9pt; font-weight:400; font-style:normal;\&quot;&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This value means how high the vertices are placed in relation to the terrain extend in Y.&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This means when you have a terrain extend in Y by 100 and the terrain height is 0.5&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;the vertices are placed in at height 50.&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;&lt;img src=\&quot;:/helpPref/TerrainExtends1.png\&quot; /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_10.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Height&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainHeightSpinBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&lt;!DOCTYPE HTML PUBLIC \&quot;-//W3C//DTD HTML 4.0//EN\&quot; \&quot;<A HREF="http://www.w3.org/TR/REC-html40/strict.dtd\">http://www.w3.org/TR/REC-html40/strict.dtd\</A>&quot;&gt;\n&quot;
++&quot;&lt;html&gt;&lt;head&gt;&lt;meta name=\&quot;qrichtext\&quot; content=\&quot;1\&quot; /&gt;&lt;style type=\&quot;text/css\&quot;&gt;\n&quot;
++&quot;p, li { white-space: pre-wrap; }\n&quot;
++&quot;&lt;/style&gt;&lt;/head&gt;&lt;body style=\&quot; font-family:\'Sans Serif\'; font-size:9pt; font-weight:400; font-style:normal;\&quot;&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This value means how high the vertices are placed in relation to the terrain extend in Y.&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;This means when you have a terrain extend in Y by 100 and the terrain height is 0.5&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;the vertices are placed in at height 50.&lt;/p&gt;\n&quot;
++&quot;&lt;p style=\&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\&quot;&gt;&lt;img src=\&quot;:/helpPref/TerrainExtends1.png\&quot; /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_7.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Splatting Settings&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_4.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Base name for the map textures (will be appended by their number)&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_4.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Base Name&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.baseNameLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Base name for the map textures (will be appended by their number)&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.baseNameLineEdit.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ETSplatting&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_5.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The resource group the textures will be placed in&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_5.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Res Group&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.resGroupLineEdit.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The resource group the textures will be placed in&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.resGroupLineEdit.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ET&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_8.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Texture size in pixels&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_8.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;Tex Size&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Texture size in pixels&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;64&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;128&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;256&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;512&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.texSizeComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1024&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_9.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Number of splatting textures (Layers)&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_9.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;&amp;NumTextures&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Number of splatting textures (Layers)&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;1&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;2&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;3&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(3, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;4&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(4, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;5&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.numTexturesComboBox.setItemText(5, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;6&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.createTerrainButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.toolBox.setItemText(self.toolBox.indexOf(self.page), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Create Terrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainModToolComboBox.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Terrain tools&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainModToolComboBox.setItemText(0, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Flatten&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainModToolComboBox.setItemText(1, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Lower&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.terrainModToolComboBox.setItemText(2, QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Raise&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_12.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_12.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Intensity&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.intensitySlider.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_13.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The intensity wich is applied to the tool&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_13.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;2&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.brushButton.setToolTip(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;The brush that is applied&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.brushButton.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;PushButton&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.label_14.setText(QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;Brush Type  &quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.toolBox.setItemText(self.toolBox.indexOf(self.page_2), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;ModifyTerrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.toolBox.setItemText(self.toolBox.indexOf(self.Seite), QtGui.QApplication.translate(&quot;TerrainManagerUi&quot;, &quot;PaintTerrain&quot;, None, QtGui.QApplication.UnicodeUTF8))
++
++import help_rc
++import icons_rc
++
++if __name__ == &quot;__main__&quot;:
++    import sys
++    app = QtGui.QApplication(sys.argv)
++    TerrainManagerUi = QtGui.QWidget()
++    ui = Ui_TerrainManagerUi()
++    ui.setupUi(TerrainManagerUi)
++    TerrainManagerUi.show()
++    sys.exit(app.exec_())
++
+
+Added: rl/trunk/editors/Lockenwickler/src/media/icons/icons.qrc
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/icons/icons.qrc	2009-05-03 16:38:09 UTC (rev 4916)
++++ rl/trunk/editors/Lockenwickler/src/media/icons/icons.qrc	2009-05-04 19:22:03 UTC (rev 4917)
+@@ -0,0 +1,51 @@
++&lt;RCC&gt;
++  &lt;qresource prefix=&quot;iconsPref&quot; &gt;
++    &lt;file&gt;2rightarrow.png&lt;/file&gt;
++    &lt;file&gt;14_layer_invisible.png&lt;/file&gt;
++    &lt;file&gt;14_layer_visible.png&lt;/file&gt;
++    &lt;file&gt;agt_games.png&lt;/file&gt;
++    &lt;file&gt;agt_multimedia.png&lt;/file&gt;
++    &lt;file&gt;back.png&lt;/file&gt;
++    &lt;file&gt;colors.png&lt;/file&gt;
++    &lt;file&gt;configure.png&lt;/file&gt;
++    &lt;file&gt;console.png&lt;/file&gt;
++    &lt;file&gt;cursor.png&lt;/file&gt;
++    &lt;file&gt;decrypted.png&lt;/file&gt;
++    &lt;file&gt;dissociatecell.png&lt;/file&gt;
++    &lt;file&gt;edit_add.png&lt;/file&gt;
++    &lt;file&gt;editclear.png&lt;/file&gt;
++    &lt;file&gt;editcopy.png&lt;/file&gt;
++    &lt;file&gt;editcut.png&lt;/file&gt;
++    &lt;file&gt;editdelete.png&lt;/file&gt;
++    &lt;file&gt;editpaste.png&lt;/file&gt;
++    &lt;file&gt;edit.png&lt;/file&gt;
++    &lt;file&gt;edit_remove.png&lt;/file&gt;
++    &lt;file&gt;encrypted.png&lt;/file&gt;
++    &lt;file&gt;endturn.png&lt;/file&gt;
++    &lt;file&gt;exit.png&lt;/file&gt;
++    &lt;file&gt;fileexport.png&lt;/file&gt;
++    &lt;file&gt;filenew.png&lt;/file&gt;
++    &lt;file&gt;fileopen.png&lt;/file&gt;
++    &lt;file&gt;filesave.png&lt;/file&gt;
++    &lt;file&gt;find.png&lt;/file&gt;
++    &lt;file&gt;forward.png&lt;/file&gt;
++    &lt;file&gt;goto.png&lt;/file&gt;
++    &lt;file&gt;idea.png&lt;/file&gt;
++    &lt;file&gt;lockenwickler_provisorium.png&lt;/file&gt;
++    &lt;file&gt;lockenwickler_provisorium_small.png&lt;/file&gt;
++    &lt;file&gt;move.png&lt;/file&gt;
++    &lt;file&gt;move_task_down.png&lt;/file&gt;
++    &lt;file&gt;move_task_up.png&lt;/file&gt;
++    &lt;file&gt;multirow.png&lt;/file&gt;
++    &lt;file&gt;ok.png&lt;/file&gt;
++    &lt;file&gt;playlist.png&lt;/file&gt;
++    &lt;file&gt;redo.png&lt;/file&gt;
++    &lt;file&gt;resizecol.png&lt;/file&gt;
++    &lt;file&gt;rotate.png&lt;/file&gt;
++    &lt;file&gt;terrain.png&lt;/file&gt;
++    &lt;file&gt;terrain_small.png&lt;/file&gt;
++    &lt;file&gt;tux.png&lt;/file&gt;
++    &lt;file&gt;unsortedlist1.png&lt;/file&gt;
++    &lt;file&gt;view_tree.png&lt;/file&gt;
++  &lt;/qresource&gt;
++&lt;/RCC&gt;
+
+Deleted: rl/trunk/editors/Lockenwickler/src/media/terrain/brush.png
+===================================================================
+(Binary files differ)
+
+Added: rl/trunk/editors/Lockenwickler/src/media/terrain/brushes/brush.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/terrain/brushes/brush.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001973.html">[Dsa-hl-svn] r4916 - in rl/trunk/editors/Lockenwickler: src	src/media ui files
+</A></li>
+	<LI>Next message: <A HREF="001975.html">[Dsa-hl-svn] r4919 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1974">[ date ]</a>
+              <a href="thread.html#1974">[ thread ]</a>
+              <a href="subject.html#1974">[ subject ]</a>
+              <a href="author.html#1974">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

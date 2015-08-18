@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4045%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200801061440.m06Eem1n031505%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001115.html">
+   <LINK REL="Next"  HREF="001117.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4045%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200801061440.m06Eem1n031505%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Jan  6 15:40:48 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001115.html">[Dsa-hl-svn] r4044 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001117.html">[Dsa-hl-svn] r4046 - in rl/trunk/engine: core/include core/src	rules/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1116">[ date ]</a>
+              <a href="thread.html#1116">[ thread ]</a>
+              <a href="subject.html#1116">[ subject ]</a>
+              <a href="author.html#1116">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-01-06 15:40:32 +0100 (Sun, 06 Jan 2008)
+New Revision: 4045
+
+Modified:
+   rl/trunk/engine/ui/include/GameSaveLoadWindow.h
+   rl/trunk/engine/ui/src/Console.cpp
+   rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+Log:
+-fixed bug in InputManager: key-event not translated into char (so editboxes didn't work)
+- enabled &quot;key-repeat&quot; for GameSaveLoadWindow
+
+Modified: rl/trunk/engine/ui/include/GameSaveLoadWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/GameSaveLoadWindow.h	2008-01-06 13:23:36 UTC (rev 4044)
++++ rl/trunk/engine/ui/include/GameSaveLoadWindow.h	2008-01-06 14:40:32 UTC (rev 4045)
+@@ -54,6 +54,9 @@
+          * @param object The GameObject to be displayed
+          */
+         virtual void initialize();
++
++        // derived from AbstractWindow
++        bool wantsKeyToRepeat(const int &amp;key);
+         
+     private:
+         bool handleLoadEvent();
+
+Modified: rl/trunk/engine/ui/src/Console.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/Console.cpp	2008-01-06 13:23:36 UTC (rev 4044)
++++ rl/trunk/engine/ui/src/Console.cpp	2008-01-06 14:40:32 UTC (rev 4045)
+@@ -165,16 +165,6 @@
+ 			mCommandLine-&gt;setText((utf8*)&quot;&quot;);
+ 			return true;
+ 		}
+-        else
+-        {
+-            if( im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()) != NO_CHAR )
+-            {
+-                InputManager* im = InputManager::getSingletonPtr();
+-                CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-                cegui.injectChar(im-&gt;getKeyChar(ke.scancode, im-&gt;getModifierCode()));
+-                return true;
+-            }
+-        }
+ 
+ 		return false;
+ 	}
+@@ -207,8 +197,8 @@
+             ke.scancode == CEGUI::Key::ArrowUp ||
+             ke.scancode == CEGUI::Key::Return )
+             return true;
+-        else
+-            return false;
++
++        return false;
+     }
+ 
+ 	void Console::write(const CeGuiString&amp; output)
+
+Modified: rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-01-06 13:23:36 UTC (rev 4044)
++++ rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-01-06 14:40:32 UTC (rev 4045)
+@@ -25,6 +25,7 @@
+ #include &lt;CEGUIWindowManager.h&gt;
+ #include &lt;elements/CEGUIListboxTextItem.h&gt;
+ #include &lt;Exception.h&gt;
++#include &lt;InputManager.h&gt;
+ #include &lt;GameObjectManager.h&gt;
+ #include &lt;GameObject.h&gt;
+ #include &lt;Actor.h&gt;
+@@ -88,7 +89,6 @@
+ 
+         bindDestroyWindowToXButton();
+         bindDestroyWindowToClick(getWindow(&quot;GameSaveLoadWindow/ButtonSheet/CancelButton&quot;));
+-
+     }
+ 
+     //------------------------------------------------------- Destructor
+@@ -196,4 +196,18 @@
+         return true;
+     }
+ 
++    //------------------------------------------------------- repeat some keys
++    bool GameSaveLoadWindow::wantsKeyToRepeat(const int &amp;key)
++    {
++        InputManager* im = InputManager::getSingletonPtr();
++        static const CEGUI::utf8 NO_CHAR = 0;
++        if( im-&gt;getKeyChar(key, im-&gt;getModifierCode()) != NO_CHAR || // keys that should be repeated
++            key == CEGUI::Key::ArrowLeft ||
++            key == CEGUI::Key::ArrowRight ||
++            key == CEGUI::Key::Backspace ||
++            key == CEGUI::Key::Delete )
++            return true;
++
++        return false;
++    }
+ } // namespace rl
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2008-01-06 13:23:36 UTC (rev 4044)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2008-01-06 14:40:32 UTC (rev 4045)
+@@ -533,8 +533,19 @@
+                 if ( time - mLastTime &gt; 50 )
+                 {
+                     bool handled = false;
+-                    handled = handled || CEGUI::System::getSingleton().injectKeyDown(mKey);
+-                    handled = handled || CEGUI::System::getSingleton().injectKeyUp(mKey);
++                    if( CEGUI::System::getSingleton().injectKeyDown(mKey) )
++                        handled = true;
++                    else
++                    {
++                        static const CEGUI::utf8 NO_CHAR = 0;
++                        if( InputManager::getSingleton().getKeyChar(mKey, InputManager::getSingleton().getModifierCode()) != NO_CHAR )
++                        {
++                            if( CEGUI::System::getSingleton().injectChar(InputManager::getSingleton().getKeyChar(mKey, InputManager::getSingleton().getModifierCode())) )
++                                handled = true;
++                        }
++                    }
++                    if( CEGUI::System::getSingleton().injectKeyUp(mKey) )
++                        handled = true;
+                     
+                     mLastTime = time;
+ 
+@@ -569,6 +580,15 @@
+ 
+             if( CEGUI::System::getSingleton().injectKeyDown( evt.key ) )
+                 retval = true;
++            else
++            {
++                static const CEGUI::utf8 NO_CHAR = 0;
++                if( getKeyChar(evt.key, getModifierCode()) != NO_CHAR )
++                {
++                    if( CEGUI::System::getSingleton().injectChar(getKeyChar(evt.key, getModifierCode())) )
++                        retval = true;
++                }
++            }
+         }
+ 
+         if( !mControlStates.empty() )
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001115.html">[Dsa-hl-svn] r4044 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001117.html">[Dsa-hl-svn] r4046 - in rl/trunk/engine: core/include core/src	rules/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1116">[ date ]</a>
+              <a href="thread.html#1116">[ thread ]</a>
+              <a href="subject.html#1116">[ subject ]</a>
+              <a href="author.html#1116">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

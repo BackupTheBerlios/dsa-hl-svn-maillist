@@ -1,0 +1,238 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3893 - in rl/trunk/engine: common/src core/src	rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3893%20-%20in%20rl/trunk/engine%3A%20common/src%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200710091758.l99HwY5I009432%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000963.html">
+   <LINK REL="Next"  HREF="000965.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3893 - in rl/trunk/engine: common/src core/src	rules/include rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3893%20-%20in%20rl/trunk/engine%3A%20common/src%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200710091758.l99HwY5I009432%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3893 - in rl/trunk/engine: common/src core/src	rules/include rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Oct  9 19:58:34 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000963.html">[Dsa-hl-svn] r3892 - rl/trunk
+</A></li>
+        <LI>Next message: <A HREF="000965.html">[Dsa-hl-svn] r3894 - in modules: . kanalisation	kanalisation/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#964">[ date ]</a>
+              <a href="thread.html#964">[ thread ]</a>
+              <a href="subject.html#964">[ subject ]</a>
+              <a href="author.html#964">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-09 19:58:27 +0200 (Tue, 09 Oct 2007)
+New Revision: 3893
+
+Modified:
+   rl/trunk/engine/common/src/XmlPropertyWriter.cpp
+   rl/trunk/engine/core/src/SaveGameFile.cpp
+   rl/trunk/engine/rules/include/JournalEntry.h
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/rules/src/JournalEntry.cpp
+   rl/trunk/engine/rules/src/QuestBook.cpp
+Log:
+- loading journals added
+- removed log messages
+
+Modified: rl/trunk/engine/common/src/XmlPropertyWriter.cpp
+===================================================================
+--- rl/trunk/engine/common/src/XmlPropertyWriter.cpp	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/common/src/XmlPropertyWriter.cpp	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -69,7 +69,7 @@
+             else
+             {
+                 element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-                if(entry.first != &quot;\0&quot;)
++                if(!entry.first.empty())
+                     setAttribute(element, &quot;name&quot;, entry.first.c_str());
+ 
+                 //Ogre::String typeName = entry.second.getTypeName();
+@@ -108,13 +108,14 @@
+     DOMElement* XmlPropertyWriter::processPropertyArray(DOMElement *parent, const char *const name, PropertyVector vector)
+     {
+         DOMElement* element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-        setAttribute(element, &quot;name&quot;, name);
++        if(name[0] != '\0')
++            setAttribute(element, &quot;name&quot;, name);
+         setAttribute(element, &quot;type&quot;, &quot;ARRAY&quot;);
+ 
+         PropertyVector::iterator iter;
+         for(iter = vector.begin(); iter != vector.end(); iter++)
+         {
+-            processProperty(element, PropertyEntry(&quot;\0&quot;,*iter));
++            processProperty(element, PropertyEntry(Ogre::String(),*iter));
+         }
+         return element;
+     }
+@@ -122,7 +123,8 @@
+     DOMElement* XmlPropertyWriter::processPropertyMap(DOMElement *parent, const char *const name, PropertyMap map)
+     {
+         DOMElement* element = appendChildElement(mDocument, parent, &quot;property&quot;);
+-        setAttribute(element, &quot;name&quot;, name);
++        if(name[0] != '\0')
++            setAttribute(element, &quot;name&quot;, name);
+         setAttribute(element, &quot;type&quot;, &quot;MAP&quot;);
+ 
+         PropertyMap::iterator iter;
+
+Modified: rl/trunk/engine/core/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFile.cpp	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/core/src/SaveGameFile.cpp	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -131,7 +131,6 @@
+     void SaveGameFile::parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
+     {
+         mStream = stream;
+-        LOG_ERROR(Logger::CORE, &quot;Stream Loaded&quot;);
+     }
+ 
+     Ogre::Real SaveGameFile::getLoadingOrder() const
+
+Modified: rl/trunk/engine/rules/include/JournalEntry.h
+===================================================================
+--- rl/trunk/engine/rules/include/JournalEntry.h	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/rules/include/JournalEntry.h	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -32,6 +32,9 @@
+     class _RlRulesExport JournalEntry
+     {
+     public:
++        static const Ogre::String PROPERTY_TEXT;
++        static const Ogre::String PROPERTY_CAPTION;
++
+         JournalEntry(const CeGuiString caption, const CeGuiString text);
+         virtual ~JournalEntry();
+ 
+@@ -48,6 +51,7 @@
+     {
+     public:
+         static const unsigned int JOURNAL_ENTRY_ADDED = 1;
++        static const unsigned int JOURNAL_ENTRY_DELETED = 2;
+ 
+         JournalEvent(QuestBook* src, int reason, JournalEntry* entry);
+         virtual ~JournalEvent();
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -297,7 +297,6 @@
+                         int ID = reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ID&quot;);
+                         Ogre::String classID = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ClassID&quot;);
+                         PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlGameObject));
+-                        LOG_ERROR(Logger::SCRIPT, &quot;Found game object &quot; + classID + &quot; in save game&quot;);
+                     }
+                 }
+             }
+
+Modified: rl/trunk/engine/rules/src/JournalEntry.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/JournalEntry.cpp	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/rules/src/JournalEntry.cpp	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -20,6 +20,9 @@
+ 
+ namespace rl
+ {
++    const Ogre::String JournalEntry::PROPERTY_TEXT = &quot;text&quot;;
++    const Ogre::String JournalEntry::PROPERTY_CAPTION = &quot;caption&quot;;
++
+     JournalEntry::JournalEntry(const CeGuiString caption, const CeGuiString text)
+         : mCaption(caption), mText(text)
+     {
+
+Modified: rl/trunk/engine/rules/src/QuestBook.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-09 15:34:07 UTC (rev 3892)
++++ rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-09 17:58:27 UTC (rev 3893)
+@@ -181,8 +181,8 @@
+             for(std::vector&lt;JournalEntry*&gt;::const_iterator iter = mJournalEntries.begin(); iter != mJournalEntries.end(); iter++)
+             {
+                 PropertySet journal;
+-                journal.setProperty(&quot;caption&quot;, Property((*iter)-&gt;getCaption()));
+-                journal.setProperty(&quot;text&quot;, Property((*iter)-&gt;getText()));
++                journal.setProperty(JournalEntry::PROPERTY_CAPTION, Property((*iter)-&gt;getCaption()));
++                journal.setProperty(JournalEntry::PROPERTY_TEXT, Property((*iter)-&gt;getText()));
+                 journals.push_back(journal.toPropertyMap());
+             }
+             return Property(journals);
+@@ -215,6 +215,15 @@
+         }
+         else if (key == PROPERTY_JOURNAL)
+         {
++            PropertyVector journals = value.toArray();
++            for(PropertyVector::const_iterator it = journals.begin(); it != journals.end(); it++)
++            {
++                PropertyMap curVal = it-&gt;toMap();
++                Property caption = curVal[JournalEntry::PROPERTY_CAPTION];
++                Property text = curVal[JournalEntry::PROPERTY_TEXT];
++
++                addJournalEntry(caption.toString(), text.toString());
++            }
+             ///@todo implement journal properties
+         }
+         else
+@@ -258,7 +267,7 @@
+ 
+     void QuestBook::writeData(SaveGameFileWriter *writer)
+     {
+-        DOMElement* quests = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), &quot;quests&quot;);
++        DOMElement* quests = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+ 
+         PropertySet* set = getAllProperties();
+         writer-&gt;writeEachProperty(quests, set-&gt;toPropertyMap());
+@@ -275,6 +284,7 @@
+         {
+             DOMNode* xmlQuestBook = rootNodeList-&gt;item(0);
+             PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlQuestBook));
++
+             setProperties(&amp;properties);
+         }
+ 
+@@ -287,6 +297,7 @@
+         for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
+             it != mJournalEntries.end(); it++ )
+         {
++            fireJournalChanged(*it, JournalEvent::JOURNAL_ENTRY_DELETED);
+             delete *it;
+         }
+         mJournalEntries.clear();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000963.html">[Dsa-hl-svn] r3892 - rl/trunk
+</A></li>
+	<LI>Next message: <A HREF="000965.html">[Dsa-hl-svn] r3894 - in modules: . kanalisation	kanalisation/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#964">[ date ]</a>
+              <a href="thread.html#964">[ thread ]</a>
+              <a href="subject.html#964">[ subject ]</a>
+              <a href="author.html#964">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

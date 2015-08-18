@@ -1,0 +1,224 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3963 - in rl/trunk/engine: ai/include ai/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3963%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200711052101.lA5L1VJ4032437%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001033.html">
+   <LINK REL="Next"  HREF="001035.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3963 - in rl/trunk/engine: ai/include ai/src	ui/include ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3963%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200711052101.lA5L1VJ4032437%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3963 - in rl/trunk/engine: ai/include ai/src	ui/include ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Nov  5 22:01:31 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001033.html">[Dsa-hl-svn] r3962 - in rl/trunk/engine: ai/include ai/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001035.html">[Dsa-hl-svn] r3964 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1034">[ date ]</a>
+              <a href="thread.html#1034">[ thread ]</a>
+              <a href="subject.html#1034">[ subject ]</a>
+              <a href="author.html#1034">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-11-05 22:01:25 +0100 (Mon, 05 Nov 2007)
+New Revision: 3963
+
+Modified:
+   rl/trunk/engine/ai/include/Dialog.h
+   rl/trunk/engine/ai/src/Dialog.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/ui/include/DialogControlState.h
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+Log:
+Replace {$foo} by value of variable foo
+
+
+Modified: rl/trunk/engine/ai/include/Dialog.h
+===================================================================
+--- rl/trunk/engine/ai/include/Dialog.h	2007-11-04 19:26:55 UTC (rev 3962)
++++ rl/trunk/engine/ai/include/Dialog.h	2007-11-05 21:01:25 UTC (rev 3963)
+@@ -24,6 +24,7 @@
+ {
+     class DialogOption;
+     class DialogResponse;
++    class DialogVariable;
+     class GameObject;
+ 
+     class _RlAiExport Dialog : public PropertyHolder
+@@ -36,10 +37,12 @@
+ 
+         DialogResponse* getDialogStart() const;
+         void setStartResponse(DialogResponse* start);
++        void addVariable(DialogVariable* variable);
+         void initialize();
+         GameObject* getNpc(int id) const;
+         GameObject* getPc(int id) const;
+ 		bool isExitRequested() const;
++        CeGuiString getVariableValue(const Ogre::String&amp; variableName) const;
+ 
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+@@ -49,6 +52,7 @@
+         DialogResponse* mDialogStart;
+         std::vector&lt;GameObject*&gt; mNonPlayerCharacters;
+         std::vector&lt;GameObject*&gt; mPlayerCharacters;
++        std::map&lt;Ogre::String, DialogVariable*&gt; mVariables;
+         PropertyRecord mPropertyVariables;
+ 		bool mExitRequested;
+     };
+
+Modified: rl/trunk/engine/ai/src/Dialog.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Dialog.cpp	2007-11-04 19:26:55 UTC (rev 3962)
++++ rl/trunk/engine/ai/src/Dialog.cpp	2007-11-05 21:01:25 UTC (rev 3963)
+@@ -47,6 +47,11 @@
+ 		mExitRequested = false;
+     }
+ 
++    void Dialog::addVariable(DialogVariable* variable)
++    {
++        //mVariables[vkey] = variable;
++    }
++
+     GameObject* Dialog::getNpc(int id) const
+     {
+         return mNonPlayerCharacters[id];
+@@ -89,4 +94,9 @@
+ 	{
+ 		return mExitRequested;
+ 	}
++
++    CeGuiString Dialog::getVariableValue(const Ogre::String&amp; key) const
++    {
++        return getProperty(key).getAsString();
++    }
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2007-11-04 19:26:55 UTC (rev 3962)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2007-11-05 21:01:25 UTC (rev 3963)
+@@ -124,6 +124,7 @@
+                 }
+             }
+         }
++        LOG_MESSAGE(Logger::AI, &quot;Processed Dialog &quot;+ name);
+     }
+ 
+     void DialogManager::processElementNodes(XERCES_CPP_NAMESPACE::DOMElement* dialogXml, const Ogre::String&amp; nodeName, DialogPrototype* dialogPrototype)
+
+Modified: rl/trunk/engine/ui/include/DialogControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/DialogControlState.h	2007-11-04 19:26:55 UTC (rev 3962)
++++ rl/trunk/engine/ui/include/DialogControlState.h	2007-11-05 21:01:25 UTC (rev 3963)
+@@ -109,7 +109,8 @@
+ 		SoundObject* mSoundObject;
+ 	
+ 		float getShowTextLength(const CeGuiString&amp; text) const;
+-        void recalculateCamera(GameObject* speaker, GameObject* listener );
++        void recalculateCamera(GameObject* speaker, GameObject* listener);
++        void processTextVariables(CeGuiString&amp; text);
+ 
+ 		enum DialogState
+ 		{
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-04 19:26:55 UTC (rev 3962)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-05 21:01:25 UTC (rev 3963)
+@@ -151,7 +151,9 @@
+ 
+ 		if (!mDialog || !mDialogWindow)
+ 		{
+-			Throw(IllegalStateException, &quot;DialogControlState not properly initialized.&quot;);
++            LOG_ERROR(Logger::UI, &quot;DialogControlState not properly initialized.&quot;);
++            handleDialogClose();
++            return;
+ 		}
+ 
+         mCurrentSpeaker = mDialog-&gt;getNpc(0);
+@@ -246,11 +248,34 @@
+                0.25f;                   // Fade in
+     }
+ 
++    void DialogControlState::processTextVariables(CeGuiString&amp; text)
++    {
++        CeGuiString newText = text;
++        CeGuiString::size_type pos = CeGuiString::npos;
++        do
++        {
++            pos = newText.find(&quot;{$&quot;);
++            if (pos != CeGuiString::npos)
++            {
++                CeGuiString::size_type endpos = newText.find(&quot;}&quot;, pos);
++                if (endpos != CeGuiString::npos)
++                {
++                    CeGuiString varName = newText.substr(pos+2, endpos - pos - 2);
++                    CeGuiString varValue = mDialog-&gt;getVariableValue(varName.c_str());
++                    newText = newText.replace(pos, endpos - pos + 1, varValue);
++                }
++            }
++        }
++        while (pos != CeGuiString::npos);
++        text.assign(newText);
++    }
++
+     void DialogControlState::doTalk(DialogParagraph* paragraph)
+     {
+         mDialogWindow-&gt;setVisible(false);
+         Ogre::String soundFile = paragraph-&gt;getVoiceFile();
+         CeGuiString text = paragraph-&gt;getText();
++        processTextVariables(text);
+ 
+         recalculateCamera(mCurrentSpeaker, mCurrentListener);
+ 
+@@ -449,6 +474,8 @@
+ 		InputManager::getSingleton().popControlState();
+ 		mDialogWindow-&gt;setVisible(false, true);
+ 		mSubtitleWindow-&gt;setVisible(false, true);
++        mDialogWindow = NULL;
++        mSubtitleWindow = NULL;
+ 		return true;
+ 	}
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001033.html">[Dsa-hl-svn] r3962 - in rl/trunk/engine: ai/include ai/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001035.html">[Dsa-hl-svn] r3964 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1034">[ date ]</a>
+              <a href="thread.html#1034">[ thread ]</a>
+              <a href="subject.html#1034">[ subject ]</a>
+              <a href="author.html#1034">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

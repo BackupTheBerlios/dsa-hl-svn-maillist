@@ -1,0 +1,513 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3178 - in rl/trunk/engine: core/src rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3178%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200703132148.l2DLm9SB020976%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000248.html">
+   <LINK REL="Next"  HREF="000250.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3178 - in rl/trunk/engine: core/src rules/src	ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3178%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200703132148.l2DLm9SB020976%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3178 - in rl/trunk/engine: core/src rules/src	ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar 13 22:48:09 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000248.html">[Dsa-hl-svn] r3177 - rl/trunk/engine/ai/src
+</A></li>
+        <LI>Next message: <A HREF="000250.html">[Dsa-hl-svn] r3179 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#249">[ date ]</a>
+              <a href="thread.html#249">[ thread ]</a>
+              <a href="subject.html#249">[ subject ]</a>
+              <a href="author.html#249">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-03-13 22:47:48 +0100 (Tue, 13 Mar 2007)
+New Revision: 3178
+
+Modified:
+   rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+   rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+removed shivering of the FreeFlightCharacterController
+fixed some bugs of the MovementCharacterController like the velocity of jogging and running and character now doesn't stop any more before a jump
+for testing: jumps are relative to the time the jump-key is pressed
+
+Modified: rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+===================================================================
+--- rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2007-03-13 21:42:53 UTC (rev 3177)
++++ rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2007-03-13 21:47:48 UTC (rev 3178)
+@@ -55,7 +55,7 @@
+ 
+             mCamera-&gt;setPosition( getStartPoint() );
+             mCamera-&gt;setFOVy(Degree(60));
+-            mCamera-&gt;setFixedYawAxis(false);
++            mCamera-&gt;setFixedYawAxis(true);
+             mCamera-&gt;setAutoAspectRatio(true);
+ 
+             actor-&gt;placeIntoScene();
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-03-13 21:42:53 UTC (rev 3177)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-03-13 21:47:48 UTC (rev 3178)
+@@ -1296,11 +1296,11 @@
+         }
+         else if( movementType &amp; BEWEGUNG_LAUFEN )
+         {
+-            velocity = act_gs / 2.5;
++            velocity = act_gs / 2.0;
+         }
+         else if( movementType &amp; BEWEGUNG_JOGGEN )
+         {
+-            velocity = act_gs / 2.0;
++            velocity = act_gs / 3.0;
+         }
+         else if( movementType &amp; BEWEGUNG_GEHEN )
+         {
+@@ -1391,7 +1391,7 @@
+                 patzer = 0;
+             }
+             // Ausdauerverbrauch: eigentlich 1, aber ich denke das ist zu hoch
+-            damageAu(1./3);
++            damageAu(2./3);
+             return velocity;
+         }
+         else if( movementType &amp; BEWEGUNG_HOCHSPRUNG )
+
+Modified: rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-03-13 21:42:53 UTC (rev 3177)
++++ rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-03-13 21:47:48 UTC (rev 3178)
+@@ -65,8 +65,7 @@
+ 		Ogre::Real mSpeedIncrement;
+ 		Ogre::Real mRotationSpeed;
+         Ogre::Vector3 mDesiredVelocity;
+-        Ogre::Degree mPitch;
+-        Ogre::Degree mYaw;
++        Ogre::Vector3 mCameraUpConstraint;
+         bool mCollisionsEnabled;
+         Ogre::Real mMouseSensitivity;
+         bool mInvertedMouse;
+
+Modified: rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-03-13 21:42:53 UTC (rev 3177)
++++ rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-03-13 21:47:48 UTC (rev 3178)
+@@ -41,11 +41,11 @@
+ 		mCurrentMovementState(0),
+         mDesiredVelocity(Vector3::ZERO),
+         mCollisionsEnabled(false),
+-        mPitch(Degree(0)),
+-        mYaw(Degree(0)),
+-        mPitchRange(Degree(-89), Degree(89))
++        mPitchRange(Degree(-89), Degree(89)),
++        mCameraUpConstraint(Vector3::ZERO)
+ 	{
+-		//mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
++		mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
++        mCameraUpConstraint = mCameraActor-&gt;getPhysicalThing()-&gt;getUpConstraint();
+ 		mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+         mMouseSensitivity = ConfigurationManager::getSingleton().getIntSetting(ConfigurationManager::CS_INPUT, &quot;Mouse Sensitivity&quot;);
+         mInvertedMouse = ConfigurationManager::getSingleton().getBoolSetting(ConfigurationManager::CS_INPUT, &quot;Mouse Invert&quot;);
+@@ -72,7 +72,9 @@
+ 
+ 	FreeFlightCharacterController::~FreeFlightCharacterController()
+ 	{
+-		//mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
++		mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        if(mCameraUpConstraint != Vector3::ZERO)
++            mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(mCameraUpConstraint);
+ 		mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
+ 	}
+ 
+@@ -139,32 +141,34 @@
+ 		}
+ 
+ 
++        Radian yaw;
+         if (movement &amp; TURN_LEFT)
+-            mYaw += elapsedTime * Degree(120.0f);
++            yaw = elapsedTime * Degree(120.0f);
+         if (movement &amp; TURN_RIGHT)
+-            mYaw -= elapsedTime * Degree(120.0f);
++            yaw = -elapsedTime * Degree(120.0f);
+ 
+         // mouse
+         if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
+         {
+-            Degree rotation = mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
+-
+-            mYaw -= rotation;
+-
+-            while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+-            while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
++            yaw = -mMouseSensitivity * Degree(im-&gt;getMouseRelativeX() / 10);
+         }
++        while (yaw.valueDegrees() &gt; 360.0f) yaw -= Degree(360.0f);
++        while (yaw.valueDegrees() &lt; -360.0f) yaw += Degree(360.0f);
+ 
+-
++        Radian pitch;
+         if (mInvertedMouse)
+-            mPitch += mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++            pitch = mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+         else
+-            mPitch -= mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
++            pitch = -mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 4);
+ 
+-        while (mPitch.valueDegrees() &gt; 360.0f) mPitch -= Degree(360.0f);
+-        while (mPitch.valueDegrees() &lt; -360.0f) mPitch += Degree(360.0f);
+-        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+-        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
++        while (pitch.valueDegrees() &gt; 360.0f) pitch -= Degree(360.0f);
++        while (pitch.valueDegrees() &lt; -360.0f) pitch += Degree(360.0f);
++        if (pitch &lt; mPitchRange.first) pitch = mPitchRange.first;
++        if (pitch &gt; mPitchRange.second) pitch = mPitchRange.second;
++
++        mCameraActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
++        mCameraActor-&gt;yaw(yaw.valueDegrees());
++        mCameraActor-&gt;pitch(pitch.valueDegrees());
+     }
+ 
+ 	void FreeFlightCharacterController::toggleViewMode()
+@@ -176,8 +180,6 @@
+ 
+ 	void FreeFlightCharacterController::resetCamera()
+ 	{
+-        mYaw = Degree(0);
+-        mPitch = Degree(0);
+ 		// Position camera at char position
+         if( mCharacterActor != NULL )
+         {
+@@ -280,11 +282,6 @@
+             Vector3 force = mass*(orientation * mDesiredVelocity - currentVel) / delay;
+ 
+             body-&gt;setForce(force);
+-
+-
+-            mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+-            mCameraActor-&gt;yaw(mYaw.valueDegrees());
+-            mCameraActor-&gt;pitch(mPitch.valueDegrees());
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-13 21:42:53 UTC (rev 3177)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-13 21:47:48 UTC (rev 3178)
+@@ -440,8 +440,6 @@
+ 
+             if( !blockMovement )
+             {
+-                mCharacterState.mDesiredVel = Vector3::ZERO;
+-
+                 // not handled movements:
+                 if( movement &amp; MOVE_FORWARD &amp;&amp; movement &amp; MOVE_BACKWARD ||
+                     movement &amp; MOVE_LEFT &amp;&amp; movement &amp; MOVE_RIGHT )
+@@ -494,41 +492,26 @@
+ 
+                 // ---------- jumping-behaviour (and falling?) ---------
+                 {
+-                    if( !(creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) &amp;&amp; 
+-                        !blockMovement &amp;&amp; !mCharacterState.beginJump &amp;&amp;
+-                        !(creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG) &amp;&amp;
+-                        !(creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG) &amp;&amp;
++                    if( !((creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) || 
++                        blockMovement || mCharacterState.beginJump ||
++                        (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG) ||
++                        (creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG)) &amp;&amp;
+                         movement &amp; MOVE_JUMP)
+                     {
+                         if( mCharacterState.mDesiredVel.squaredLength() &gt; 0 )
+                         {
+-                            mCharacterState.jumpType = CharacterState::WEITSPRUNG;
+-                            if( mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement | Creature::BEWEGUNG_WEITSPRUNG) )
++                            if( movement &amp; MOVE_FORWARD )
+                             {
+                                 mCharacterState.beginJump = true;
+-                                Real jumpWidth = 
+-                                    mCharacter-&gt;doTaktischeBewegung(
+-                                            newCreatureMovement | Creature::BEWEGUNG_WEITSPRUNG,
+-                                            elapsedTime,
+-                                            patzer);
+-
+-                                mCharacterState.mJumpWidthHeight = jumpWidth;
++                                mCharacterState.jumpType = CharacterState::WEITSPRUNG;
++                                creatureMovement = newCreatureMovement;
+                             }
+                         }
+                         else
+                         {
++                            mCharacterState.beginJump = true;
+                             mCharacterState.jumpType = CharacterState::HOCHSPRUNG;
+-                            if( mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement | Creature::BEWEGUNG_HOCHSPRUNG) )
+-                            {
+-                                mCharacterState.beginJump = true;
+-                                Real jumpHeight = 
+-                                    mCharacter-&gt;doTaktischeBewegung(
+-                                            newCreatureMovement | Creature::BEWEGUNG_HOCHSPRUNG,
+-                                            elapsedTime,
+-                                            patzer);
+-
+-                                mCharacterState.mJumpWidthHeight = jumpHeight;
+-                            }
++                            creatureMovement = newCreatureMovement;
+                         }
+                     }
+ 
+@@ -542,18 +525,15 @@
+                     }
+ 
+ 
+-
+-                    
+-                    Real timeJumpKeyPressed (0.0);
+-                    if( !mCharacterState.beginJump )
++                    static Real timeJumpKeyPressed (0.0);
++                    if( mCharacterState.beginJump &amp;&amp; (movement &amp; MOVE_JUMP) )
++                        timeJumpKeyPressed += elapsedTime;
++                    else
+                         timeJumpKeyPressed = 0;
+-                    else if( movement &amp; MOVE_JUMP &amp;&amp; 
+-                        (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG ||
+-                        creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG ) )
+-                        timeJumpKeyPressed += elapsedTime;
+ 
+ 
+ 
++
+                     if( mCharacterState.beginJump )
+                     {
+                         blockMovement = true;
+@@ -565,6 +545,7 @@
+                         else // HOCHSPRUNG
+                         {
+                             newAnimation = &quot;idle_absprung&quot;;
++
+                         }
+                         animTimesToPlay = 1;
+                         
+@@ -572,13 +553,63 @@
+                         MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+                         if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+                         {
+-                            mCharacterState.mStartJump = true;
+-                            if( timeJumpKeyPressed &gt; 0.5 )
+-                            mCharacterState.mJumpWidthHeight *= timeJumpKeyPressed / meshAnim-&gt;getLength();
+                             mCharacterState.beginJump = false;
++                            
++                            if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
++                            {
++                                if( mCharacter-&gt;canUseTaktischeBewegung(creatureMovement | Creature::BEWEGUNG_WEITSPRUNG) )
++                                {
++                                    Real jumpWidth = 
++                                        mCharacter-&gt;doTaktischeBewegung(
++                                                creatureMovement | Creature::BEWEGUNG_WEITSPRUNG,
++                                                elapsedTime,
++                                                patzer);
++
++                                    mCharacterState.mJumpWidthHeight = jumpWidth;
++                                    mCharacterState.mStartJump = true;
++                                }
++                            }
++                            else
++                            {
++                                if( mCharacter-&gt;canUseTaktischeBewegung(creatureMovement | Creature::BEWEGUNG_HOCHSPRUNG) )
++                                {
++                                    Real jumpHeight = 
++                                        mCharacter-&gt;doTaktischeBewegung(
++                                                creatureMovement | Creature::BEWEGUNG_HOCHSPRUNG,
++                                                elapsedTime,
++                                                patzer);
++
++                                    mCharacterState.mJumpWidthHeight = jumpHeight;
++                                    mCharacterState.mStartJump = true;
++                                }
++                            }
++
++                            if( timeJumpKeyPressed &lt; 0.1f )
++                                timeJumpKeyPressed = 0.1f;
++                            Real factor = timeJumpKeyPressed / meshAnim-&gt;getLength();
++                            if (factor &gt; 1.0f)
++                                factor = 1.0f;
++
++
++                            mCharacterState.mJumpWidthHeight *= factor;
+                         }
++                        else
++                        {
++                            mCharacterState.mDesiredVel = Vector3::ZERO;
++                            if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
++                            {
++                                mCharacterState.mDesiredVel.z = -1;
++                                Real vel = mCharacter-&gt;doTaktischeBewegung(
++                                    creatureMovement, elapsedTime, patzer);
++                                mCharacterState.mDesiredVel *= vel;
++                            }
++                            else
++                            {
++                                mCharacter-&gt;setTaktischeBewegung(creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG);
++                            }
++                        }
+                     }
+-                    else // !beginJump
++                    else
+                     {
+                         if( creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG )
+                         {
+@@ -594,13 +625,33 @@
+                         }
+                     }
+ 
++
+                     if( mCharacterState.endJump )
+                     {
++                        mCharacterState.mDesiredVel = Vector3::ZERO;
++
+                         blockMovement = true;
+-                        if( creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG )
++                        if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+                         {
+                             newAnimation = &quot;rennen_sprung_landung&quot;;
+                             animSpeed = factor_rennen_sprung * vel;
++
++                            // schneller oder gleich schnell weiterlaufen
++                            if( movement &amp; MOVE_FORWARD )
++                            {
++                                int dummy = Creature::BEWEGUNG_GEHEN |
++                                            Creature::BEWEGUNG_LAUFEN |
++                                            Creature::BEWEGUNG_JOGGEN |
++                                            Creature::BEWEGUNG_RENNEN;
++                                if( (newCreatureMovement &amp; dummy) &gt;=
++                                    (creatureMovement &amp; dummy) )
++                                {
++                                    blockMovement = false;
++                                    mCharacterState.mDesiredVel.z = -1;
++                                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_WEITSPRUNG;
++                                }
++                                    
++                            }
+                         }
+                         else // HOCHSPRUNG
+                         {
+@@ -718,9 +769,11 @@
+             }
+ 
+ 
++            static bool lastTurning(false);
+             if( mCharacter-&gt;getTaktischeBewegung() == Creature::BEWEGUNG_DREHEN &amp;&amp;
+-                charOmega.y != 0 )
++                (rotation &lt;= Degree(-2) || rotation &gt;= Degree(2) || lastTurning) )
+             {
++                lastTurning = true;
+                 if( charOmega.y &gt; 0 )
+                     newAnimation = &quot;drehen_links&quot;;
+                 else
+@@ -728,6 +781,8 @@
+                 
+                 animSpeed = factor_drehen_idle * charOmega.y;
+             }
++            else
++                lastTurning = false;
+ 
+ 
+             mYaw -= rotation;
+@@ -1043,9 +1098,6 @@
+                         Real g = mGravitation.length();
+                         Real t = timestep;
+                         Real h = height;
+-                        std::ostringstream os;
+-                        os &lt;&lt; &quot;Sprungh&#246;he: &quot; &lt;&lt; height;
+-                        LOG_MESSAGE(Logger::UI, os.str());
+                         Real jumpForce = 0.5f*g*m * (Math::Sqrt(1 + 8*h/(g * t * t)) - 1);
+                         force += Vector3(0,
+                             jumpForce,
+@@ -1059,9 +1111,6 @@
+                         Real v0 = currentVel.x;
+                         Real t = timestep;
+                         Real s = width;
+-                        std::ostringstream os;
+-                        os &lt;&lt; &quot;Sprungweite: &quot; &lt;&lt; width;
+-                        LOG_MESSAGE(Logger::UI, os.str());
+                         Real jumpForcezy = 
+                             m*g/4 - v0*m /2 /t + 
+                             Math::Sqrt( 
+@@ -1070,16 +1119,7 @@
+                                 m*m * g*g * t*t /4 +
+                                 2 * s * m*m *g
+                                        )/2/t;
+-                        force += Vector3(0,jumpForcezy,0);
+-                        // in the direction of mDesiredVel
+-                        if( mCharacterState.mDesiredVel.squaredLength() == 0 )
+-                        {
+-                            // this shouldn't happen...
+-                            mCharacterState.mDesiredVel.z = -1;                            
+-                        }
+-                        mCharacterState.mDesiredVel.y = 0;
+-                        mCharacterState.mDesiredVel.normalise();
+-                        force += orientation * mCharacterState.mDesiredVel * jumpForcezy;
++                        force += orientation * Vector3(0,jumpForcezy,-jumpForcezy);
+                     }
+ 
+                     mCharacterState.mStartJump = false;
+@@ -1089,6 +1129,8 @@
+                 else
+                 {
+                     Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep(); // so ist die Beschleunigung unabh&#228;ngig von der framerate!
++                    if( mCharacterState.mDesiredVel.squaredLength() &lt; currentVel.squaredLength() )
++                        delay *= 4;
+                     force += mass*(orientation*mCharacterState.mDesiredVel - currentVel) / delay;
+                 }
+             }
+@@ -1731,6 +1773,7 @@
+         mCharacterState.endJump = false;
+         mCharacterState.beginSneak = false;
+         mCharacterState.endSneak = false;
++        mCharacter-&gt;modifyAu(100);
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000248.html">[Dsa-hl-svn] r3177 - rl/trunk/engine/ai/src
+</A></li>
+	<LI>Next message: <A HREF="000250.html">[Dsa-hl-svn] r3179 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/script/swig	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#249">[ date ]</a>
+              <a href="thread.html#249">[ thread ]</a>
+              <a href="subject.html#249">[ subject ]</a>
+              <a href="author.html#249">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

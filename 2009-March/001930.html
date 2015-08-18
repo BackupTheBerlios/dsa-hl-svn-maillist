@@ -1,0 +1,227 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4873 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4873%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903301917.n2UJHEks006367%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001929.html">
+   <LINK REL="Next"  HREF="001931.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4873 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4873%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903301917.n2UJHEks006367%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4873 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar 30 21:17:14 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001929.html">[Dsa-hl-svn] r4872 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001931.html">[Dsa-hl-svn] r4874 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1930">[ date ]</a>
+              <a href="thread.html#1930">[ thread ]</a>
+              <a href="subject.html#1930">[ subject ]</a>
+              <a href="author.html#1930">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-30 21:17:11 +0200 (Mon, 30 Mar 2009)
+New Revision: 4873
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/OgreWidget.py
+   rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+Log:
+- module explorer now syncs correctly with the 3d window
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-30 15:00:49 UTC (rev 4872)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-30 19:17:11 UTC (rev 4873)
+@@ -173,15 +173,38 @@
+     def onSelectionChanged(self):
+         if self.selectionChangedCallback is None:
+             return
++
++        nodeNames = {}
++        
++        # get all maps and add them as a key to the dictionary
++        # append a empty list to that key
++        items = self.sceneTreeView.findItems(&quot;Map: &quot;, Qt.MatchStartsWith | Qt.MatchCaseSensitive | Qt.MatchRecursive)
++        for item in items:
++            nodeNames[str(item.text(0))] = []
+             
+-        nodeNames = []
++        # get all zones and add them as a key to the dictionary
++        # append a empty list to that key            
++        items = self.sceneTreeView.findItems(&quot;Zone: &quot;, Qt.MatchStartsWith | Qt.MatchCaseSensitive | Qt.MatchRecursive)
++        for item in items:
++            nodeNames[str(item.text(0))] = []
++        
++        #get all selected items
+         items = self.sceneTreeView.selectedItems()
++        
++        #end remove all the things from the list we actually don't want to be selected
+         for item in items:
++            if str(item.text(0)).startswith(&quot;Scene: &quot;) or str(item.text(0)).startswith(&quot;Map: &quot;) or str(item.text(0)).startswith(&quot;Zone: &quot;):
++                items.remove(item)
++        
++        for item in items:
++            parentName =  str(item.text(0))
++                        
+             name = str(item.data(0, Qt.UserRole).toString())
+             if len &gt; 0:
+-                nodeNames.append(name)
++                nodeNames[str(item.parent().text(0))].append(name)
+                 
+         self.selectionChangedCallback(nodeNames)
++
+     def deselectAll(self):
+         self.disconnect(self.sceneTreeView, SIGNAL(&quot;itemSelectionChanged ()&quot;), self.onSelectionChanged)
+         
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-30 15:00:49 UTC (rev 4872)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-30 19:17:11 UTC (rev 4873)
+@@ -865,7 +865,7 @@
+                 self.moduleExplorer.setCurrentModule(m)
+ 
+         if self.selectionBuffer is None:
+-            self.selectionBuffer = SelectionBuffer(self.sceneManager, self.ogreRoot.getRenderTarget(&quot;OgreMainWin&quot;))
++            self.selectionBuffer = SelectionBuffer(self.sceneManager, self.ogreRoot.getRenderTarget(&quot;OgreMainWin&quot;), self, self.zoneManager)
+ 
+ #        if self.depthBuffer is None:
+ #            self.depthBuffer = DepthBuffer(self.sceneManager, self.ogreRoot.getRenderTarget(&quot;OgreMainWin&quot;))
+
+Modified: rl/trunk/editors/Lockenwickler/src/OgreWidget.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/OgreWidget.py	2009-03-30 15:00:49 UTC (rev 4872)
++++ rl/trunk/editors/Lockenwickler/src/OgreWidget.py	2009-03-30 19:17:11 UTC (rev 4873)
+@@ -105,13 +105,11 @@
+         if self.renderWindow:
+             self.renderWindow.resize(event.size().width(), event.size().height())
+             self.renderWindow.windowMovedOrResized()
++            self.viewport.update()
+ 
+-            if platform.system() == &quot;Linux&quot;:
+-                self.viewport._updateDimensions() # shouldn't actually be needed but it doesn't work without it on linux
+-
+             self.renderWindow.update(True)
+             self.ogreRoot.renderOneFrame()
+-
++            
+             if self.camera:
+                 self.camera.setAspectRatio(float(event.size().width()) / float(event.size().height()));
+                 
+
+Modified: rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-30 15:00:49 UTC (rev 4872)
++++ rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-30 19:17:11 UTC (rev 4873)
+@@ -33,6 +33,17 @@
+             if tp == &quot;&lt;class 'ogre.renderer.OGRE._ogre_.Light'&gt;&quot;:
+                 return c
+             i += 1
++            
++# get the light out of a light node
++def extractEntity(node):
++        i = 0
++        num = node.numAttachedObjects()
++        while i &lt; node.numAttachedObjects():
++            c = node.getAttachedObject(i)
++            tp = str(type(c))
++            if tp == &quot;&lt;class 'ogre.renderer.OGRE._ogre_.Entity'&gt;&quot;:
++                return c
++            i += 1
+ 
+ # a class to store information about a object that got selected
+ class SelectionObject():
+@@ -124,10 +135,12 @@
+ 
+         
+ class SelectionBuffer():
+-    def __init__(self, sceneManager,  renderTarget):
++    def __init__(self, sceneManager,  renderTarget, moduleManager, zoneManager):
+         self.sceneMgr = sceneManager
+         self.camera = sceneManager.getCamera(&quot;MainCam&quot;)
+-
++        self.moduleManager = moduleManager
++        self.zoneManager = zoneManager
++        
+         self.renderTarget = renderTarget
+         
+         # This is the material listener - Note: it is controlled by a seperate
+@@ -254,15 +267,26 @@
+         return None
+         
+     def manualSelectObjects(self, itemNodes):
+-        return
+-        
+         items = []
+-        for item in itemNodes:
+-            if item.startswith(&quot;light_&quot;):
+-                pass
+-            obj = self.sceneMgr.getRootSceneNode().getChild(item).getAttachedObject(0)
+-            so = SelectionObject(obj)
+-            items.append(so)
++        for key in itemNodes:
++            parentNode = None
++            if key.startswith(&quot;Map: &quot;):
++                parentNode = self.moduleManager.mainModule.getMap(key.replace(&quot;Map: &quot;, &quot;&quot;)).mapNode
++                for nodeName in itemNodes[key]:                    
++                    n = parentNode.getChild(nodeName).getAttachedObject(0)
++                    if parentNode.getChild(nodeName).getName().startswith(&quot;light_&quot;):
++                        n = extractEntity(parentNode.getChild(nodeName))
++                        
++                    so = SelectionObject(n)
++                    so.setSelected(True)
++                    items.append(so)
++            elif key.startswith(&quot;Zone: &quot;):
++                parentNode = self.zoneManager.getZone(key.replace(&quot;Zone: &quot;, &quot;&quot;)).zoneNode
++                for nodeName in itemNodes[key]:
++                    obj = parentNode.getChild(nodeName).getAttachedObject(0)
++                    so = SelectionObject(obj)
++                    so.setSelected(True)
++                    items.append(so)
+         
+         return items
+         
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001929.html">[Dsa-hl-svn] r4872 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001931.html">[Dsa-hl-svn] r4874 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1930">[ date ]</a>
+              <a href="thread.html#1930">[ thread ]</a>
+              <a href="subject.html#1930">[ subject ]</a>
+              <a href="author.html#1930">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,4013 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3460 - in rl/trunk/engine: rules rules/include	rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3460%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui/include%20ui/src&In-Reply-To=%3C200705201052.l4KAq6LO029405%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000530.html">
+   <LINK REL="Next"  HREF="000532.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3460 - in rl/trunk/engine: rules rules/include	rules/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3460%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui/include%20ui/src&In-Reply-To=%3C200705201052.l4KAq6LO029405%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3460 - in rl/trunk/engine: rules rules/include	rules/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun May 20 12:52:06 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000530.html">[Dsa-hl-svn] r3459 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000532.html">[Dsa-hl-svn] r3461 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#531">[ date ]</a>
+              <a href="thread.html#531">[ thread ]</a>
+              <a href="subject.html#531">[ subject ]</a>
+              <a href="author.html#531">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-05-20 12:51:25 +0200 (Sun, 20 May 2007)
+New Revision: 3460
+
+Added:
+   rl/trunk/engine/rules/include/MovingCreature.h
+   rl/trunk/engine/rules/include/MovingCreatureManager.h
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+   rl/trunk/engine/rules/src/MovingCreatureManager.cpp
+Modified:
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/RulesSubsystem.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/RulesSubsystem.cpp
+   rl/trunk/engine/ui/include/MovementCharacterController.h
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+new movement-system:
+MovingCreature and MovingCreatureManager provide an interface for simply setting the &quot;movement&quot; of a creature. Each &quot;movement&quot; has its own class. All the stuff related to moving a creature (like force, contactCallback and animations) is now done in these classes, so the movement-functions in creature are not needed any more.
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -345,6 +345,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\MovingCreature.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\MovingCreatureManager.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\ObjectStateChangeEvent.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -535,6 +543,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\MovingCreature.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\MovingCreatureManager.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\ObjectStateChangeEvent.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/include/Creature.h	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -674,91 +674,7 @@
+             virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+             virtual PropertySet* getAllProperties() const;
+ 
+-
+-            /**
+-             * Berechnet die taktische Geschwindigkeit bei der angegebenen Bewegungsart (siehe Basisbox S.112 ff).
+-             * Eventuelle Athletikproben werden hier nicht miteinbezogen!
+-             * Die Wirkung der Modifikatoren h&#239;&#191;&#189;gt von den Eigenschaften der Kreatur ab!
+-             * Eine gezogene Waffe (bedeutet Aufmerksamkeit) msste hier auch miteinbezogen werden.
+-             * Eigentlich sind die Modifikatoren laut Regelwerk nur fr strategische Bewegung gedacht,
+-             * aber man k&#239;&#191;&#189;nte sie auch gut hier einbauen zum Ausspielen von Vorteilen wie Gel&#239;&#191;&#189;dekundig
+-             * @param movementType Flag fr die Art der Bewegung
+-             * @param modified Gibt an, ob die Behinderung und &#239;&#191;&#189;nliches miteinbezogen werden soll, 
+-             *  bei zu geringerer Au gibt dies auch eine geringere Geschwindigkeit zurck
+-             * @param modifikatoren Flags fr verschiedene Modifikatoren wie Gel&#239;&#191;&#189;de und Wetter
+-             * @retval Berechnete Geschwindigkeit, kann diese Bewegung nicht ausgefhrt werden, ist der Wert 0
+-             *  Bei Sprngen ist die Angabe die H&#239;&#191;&#189;e oder die Weite des Sprungs, bei Drehungen die Umdrehungen pro Sekunde
+-            **/
+-            float getTaktischeGeschwindigkeitsBasis(int movementType, bool modified, int modifikatoren = 0);
+-            // die Reihenfolger der Definitionen hier ist wichtig!
+-            static const int BEWEGUNG_NONE = 0;
+-            //static const int BEWEGUNG_FALLEN = -1 ?
+-            // schlie&#239;&#191;&#189;n sich gegenseitig aus
+-            static const int BEWEGUNG_GEHEN = 1; // bitte das hier nicht &#239;&#191;&#189;dern, ohne sich der Folgen in MovementCharacterController bewusst zu sein!
+-            static const int BEWEGUNG_JOGGEN = 2;
+-            static const int BEWEGUNG_LAUFEN = 4;
+-            static const int BEWEGUNG_RENNEN = 8;
+-            //static const int BEWEGUNG_SCHWIMMEN = 6;
+-            //static const int BEWEGUNG_TAUCHEN = 7;
+-            // schlie&#239;&#191;&#189;n sich gegenseitig aus
+-            static const int BEWEGUNG_WEITSPRUNG = 16;
+-            static const int BEWEGUNG_HOCHSPRUNG = 32;
+-            //static const int BEWEGUNG_PRAEZISER_SPRUNG = 24;
+-            static const int BEWEGUNG_SCHLEICHEN = 64; //allgemein fr den Versuch leise zu sein?
+-            // k&#239;&#191;&#189;nen miteinander kombiniert werden
+-            static const int BEWEGUNG_RUECKWAERTS = 128;
+-            static const int BEWEGUNG_SEITWAERTS = 256;
+-            // k&#239;&#191;&#189;nen nicht miteinander kombiniert werden
+-            static const int BEWEGUNG_DREHEN = 512;
+-            static const int BEWEGUNG_UMDREHEN = 1024;
+-            //static const int BEWEGUNG_BALANCIEREN = 1024;
+-            //static const int BEWEGUNG_FLUCHT = 2048; //weiterrennen auch bei zu niedriger AU?
+-            //...
+-            // folgendes sinnvoll? siehe taktische und strategische Bewegung
+-            //static const int BEWEGUNG_MOD_NONE = 0;
+-            //static const int BEWEGUNG_MOD_REICHSSTRASSE = 1;
+-            //static const int BEWEGUNG_MOD_STADT = 2;
+-            //static const int BEWEGUNG_MOD_OFFENES_GELAENDE = 4;
+-            //static const int BEWEGUNG_MOD_STEILER_ABHANG = 8; // ? ...
+-
+-
+-            /**
+-             * Gibt an, ob die angegebene taktische Bewegungsart im Moment berhaupt m&#239;&#191;&#189;lich ist.
+-             * (Ausdauer und Talentwerte hoch genug?)
+-            **/
+-            bool canUseTaktischeBewegung(int movementType);
+-
+-
+-            /**
+-             * Fhrt eine taktische Bewegung aus, das bedeutet, es werden falls n&#239;&#191;&#189;ig Proben abgelegt
+-             * und die Ver&#239;&#191;&#189;derungen der AU und LE berechnet; fr Richtungs&#239;&#191;&#189;derungen (Drehung) beim Laufen/etc
+-             * muss die Funktion zweimal aufgerufen werden, einmal um die Laufgeschwindigkeit und einmal um die 
+-             * Rotationsgeschwindigkeit zu ermitteln 
+-             * (das bedeutet auch, dass sobald eine Drehung angegeben wird, nur die Auswirkungen der Drehung, 
+-             * nicht der restlichen Bewegung ermittelt werden)
+-             * @param movementType Flag fr die Art der Bewegung
+-             * @param modifikator Flags fr die Umgebung
+-             * @param time Die Dauer der Bewegung; hier sind kurze Zeiten vorgesehen (Dauer einer Frame)
+-             * @param patzer Falls eine Probe ben&#239;&#191;&#189;igt wird, gibt dies die briggebliebenen TaW an.
+-             *  Ein negativer Wert steht fr einen Patzer; je kleiner der Wert, desto schlimmer sollten die
+-             *  Auswirkungen ausfallen!
+-             * @param probenErschwernis Um diesen Wert sind alle ben&#239;&#191;&#189;igten Proben erschwert, dient vor allem
+-             *  dazu, erschwerte Schleichen-Proben oder &#239;&#191;&#189;nliches zu erm&#239;&#191;&#189;lichen!
+-             * @retval Berechnete Geschwindigkeit (alle Ergebnisse von Talentproben einbezogen)
+-            **/
+-            float doTaktischeBewegung(int movementType, float time, int&amp; patzer, int probenErschwernis = 0, int modifikatoren = 0);
+-
+-            /**
+-             * Fragt den aktuellen Bewegungstyp ab.
+-            **/
+-            int getTaktischeBewegung(void) const;
+-
+-            /**
+-             * Setzt den aktuellen Bewegungstyp. Wird ebenfalls in doTaktischeBewegung getan!
+-            **/
+-            void setTaktischeBewegung(int type);
+-
+-            void setAlignment(Alignment);
++             void setAlignment(Alignment);
+             Alignment getAlignment() const;
+ 
+         protected:
+
+Added: rl/trunk/engine/rules/include/MovingCreature.h
+===================================================================
+--- rl/trunk/engine/rules/include/MovingCreature.h	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/include/MovingCreature.h	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -0,0 +1,244 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Perl Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Perl Artistic License for more details.
++*
++*  You should have received a copy of the Perl Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++*/
++
++
++#ifndef __MovingCreature_H__
++#define __MovingCreature_H__
++
++#include &quot;RulesPrerequisites.h&quot;
++#include &quot;PhysicsController.h&quot;
++#include &quot;PhysicsGenericContactCallback.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;Actor.h&quot;
++#include &lt;map&gt;
++
++
++
++namespace rl
++{
++    class AbstractMovement;
++    class MovingCreatureManager;
++
++    /** 
++     * This class provides an interface to control the movement of a creature.
++     * It handles all nessessary things like animations and calculates the movement speed.
++     */
++    class _RlRulesExport MovingCreature :
++        public PhysicsController,
++        public PhysicsGenericContactCallback
++    {
++    public:
++        /** Constructor.
++		 * @param creature the creature of the bot/char
++		 * @param actor the actor of the bot/char
++		 */
++        MovingCreature(Creature *character);
++        ~MovingCreature();
++
++        /**
++         * This function is not intented to be called directly
++         * @retval true, if this MovingCreature still needs to be called every frame
++         */
++        bool run(Ogre::Real elapsedTime);
++
++        /// Newton force and torque callback
++        void OnApplyForceAndTorque(PhysicalThing* thing);
++
++        /// Newton contact callback called by the movingCreatureManager
++        int userProcess();
++
++        Creature *getCreature() {return mCreature;}
++
++        /** 
++         * the different movements a creature can perform, 
++         * there must be an adequate movement-class
++         * (derived from AbstractMovement)
++         */
++        typedef enum
++        {
++            // these movements can be used
++            MT_NONE,
++            MT_STEHEN,
++            MT_GEHEN,
++            MT_JOGGEN,
++            MT_LAUFEN,
++            MT_RENNEN,
++            MT_RUECKWAERTS_GEHEN,
++            MT_RUECKWAERTS_JOGGEN,
++            MT_SEITWAERTS_GEHEN,
++            MT_SCHLEICHEN,
++            MT_HOCHSPRUNG,
++            MT_WEITSPRUNG,
++            // these movements are only for internal purposes and should not be used directly
++            // instead use one of the movements above
++            MT_DREHEN
++        } MovementType;
++
++        /// The generalization of the place (in the air, on the floor, in the water...)
++        typedef enum { 
++            AL_AIRBORNE, // the creature is floating/falling in the air
++            AL_FLOOR // the creature is standing/lying/moving/... on the floor
++        } AbstractLocation;
++
++        /**
++         * sets wether the creature is airborne or not
++         * this is done by this class itself every frame, so using this method does probably not
++         * have the desired effect
++         */
++        void setAbstractLocation(AbstractLocation type) {mAbstractLocation = type;}
++
++        AbstractLocation getAbstractLocation() const {return mAbstractLocation;}
++
++
++        /**
++         * the most important function: sets a new movement or changes the direction or rotation of a movement
++         * if this movement isn't possible, the fallback-movement is called.
++         * The movement doesn't change until another movement is set, so it is not necessary to call this function 
++         * every frame. Only the rotation is resettet to zero every new frame!
++         * @param type the id of the movement
++         * @param direction if the direction isn't possible (see AbstractMovement::isDirectionPossible), only a &quot;part&quot; of the direction is applied
++         * @param rotation like above
++         * @retval false signifies that the change to this movement was not possible (possibly because the present movement forbade it)
++         */
++        bool setMovement(MovementType type, Ogre::Vector3 direction, Ogre::Vector3 rotation);
++
++
++        MovementType getMovementId() const;
++        Ogre::Vector3 getDirection() const {return mDirection;}
++
++        /// This function does probably not return the expected value, because the rotation is resetted every frame!
++        Ogre::Vector3 getRotation() const {return mRotation;}
++
++        /// This function can return NULL
++        AbstractMovement *getMovement() {return mMovement;}
++
++        /// This function can return NULL
++        AbstractMovement *getMovementFromId(MovementType id);
++
++        // some methods used by movements
++        int getCurrentGS() const;
++        Ogre::Vector3 getVelocity() const; // in local axes
++        Ogre::Vector3 getOmega() const;
++        void setAnimation(const Ogre::String &amp;name, 
++                          Ogre::Real speed = 1, 
++                          unsigned int timesToPlay = 0, 
++                          const Ogre::String &amp;collisionName = &quot;&quot; // the name of the animation the collision is based on
++                          );
++
++
++    protected:
++        Creature *mCreature;
++        AbstractLocation mAbstractLocation;
++        
++        
++        AbstractMovement *mMovement;
++        Ogre::Vector3 mDirection;
++        Ogre::Vector3 mRotation;
++
++        typedef std::map&lt;MovementType, AbstractMovement*&gt; MovementMap;
++        MovementMap mMovementMap;
++
++        // in order to copy the contactcallback members correctly;
++        friend class MovingCreatureManager;
++    };
++
++    /// this is the base class of all movements
++    class AbstractMovement : 
++        public OgreNewt::ContactCallback
++    {
++    public:
++        AbstractMovement(MovingCreature *movingCreature) : mMovingCreature(movingCreature) {}
++
++        /// returns the id of this movement
++        virtual MovingCreature::MovementType getId() const = 0;
++
++        /// returns the id of the movement that is used, if this movement isn't possible (any more)
++        virtual MovingCreature::MovementType getFallBackMovement() const = 0;
++
++        /**
++         * this method calculates the basis velocity (without any changes due to Talentproben etc)
++         * @param velocity this parameter returns the calculated &quot;velocity&quot; ( m/s, rpm, or width/height of a jump)
++         * @retval false indicates, that this movement isn't possible, so the calculated values can be incorrect
++         */
++        virtual bool calculateBaseVelocity(Ogre::Real &amp;velocity) = 0;
++
++        /**
++         * this method specifies, if the movement is possible
++         */
++        virtual bool isPossible() const = 0;
++
++        /**
++         * this method is called, when this movement is currently used to enable 
++         * an individual procession of collisions contacts for each movement
++         */
++        virtual int userProcess(OgreNewt::Body *body0, OgreNewt::Body *body1) {return 1;}
++
++        /**
++         * this method is called by OnApplyTorqueAndForceCallback of the MovingCreature
++         * the PhysicalThing can be acquired via the Creature
++         */
++        virtual void calculateForceAndTorque(Ogre::Vector3 &amp;force, Ogre::Vector3 &amp;torque, Ogre::Real timestep) = 0;
++
++        /**
++         * this method indicates if it is possible to change to the specified movement at this moment
++         */
++        virtual bool canChangeToMovement(MovingCreature::MovementType id) {return true;}
++
++        /**
++         * this signifies that someone tried to change to another movement, but this was not possible (due to canChangeToMovement returning false)
++         */
++        virtual void requestChangeToMovement(MovingCreature::MovementType id) {}
++
++        /**
++         * here all the stuff not (directly) relating the physics should be done
++         * this function is called every frame if this movement is activated and the
++         * Creature is in an active moving state. It is important to handle all 
++         * &quot;Talentproben&quot; etc here and not in the physics function!
++         * The parameter direction an rotation don't need to obey the rules from isDirectionPossible and isRotationPossible
++         * @retval true indicates that the creature should remain active (in order to activate it use MovingCreatureManager::setActive)
++         */
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation) = 0;
++
++        /**
++         * this function is called if this movement is activated.
++         * it can be used to determine if a new &quot;Talentprobe&quot; is needed
++         */
++        virtual void activate() {}
++
++        /**
++         * this function is called every time this movement is deactivated.
++         */
++        virtual void deactivate() {}
++
++        /**
++         * this method is used to get to know if a movement can be used with a certain direction
++         * @retval true if this movement can be used with the direction, false otherwise
++         * @param direction (in local axes); if this function returns false, this variable contains another valid direction (constructed from the given direction)
++         */
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const = 0;
++
++        /**
++         * this method is used to get to know if the given rotation can be used with this movement
++         * @retval true if the creature can perform this rotation with this movement
++         * @param rotation (in local axes and rpm); if the function returns false, this variable contains another valid rotation (constructed from the given rotation)
++         */
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const = 0;
++
++    protected:
++        MovingCreature *mMovingCreature;
++    };
++}
++#endif
+
+Added: rl/trunk/engine/rules/include/MovingCreatureManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/MovingCreatureManager.h	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/include/MovingCreatureManager.h	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -0,0 +1,83 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Perl Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Perl Artistic License for more details.
++*
++*  You should have received a copy of the Perl Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++*/
++
++
++#ifndef __MovingCreatureManager_H__
++#define __MovingCreatureManager_H__
++
++#include &quot;RulesPrerequisites.h&quot;
++#include &quot;GameTask.h&quot;
++#include &quot;PhysicsGenericContactCallback.h&quot;
++#include &lt;vector&gt;
++#include &lt;map&gt;
++
++
++
++namespace rl
++{
++    class MovingCreature;
++
++    class _RlRulesExport MovingCreatureManager : 
++        public GameTask,
++        public Ogre::Singleton&lt;MovingCreatureManager&gt;,
++        public PhysicsGenericContactCallback
++    {
++    public:
++        MovingCreatureManager();
++        ~MovingCreatureManager();
++
++        /**
++         * adds a new movingCreature, this function is not intended to be used directly; 
++         * each MovingCreature is automatically added. a creature is always added in a
++         * idle state
++         */
++        void add(MovingCreature *movingCreature);
++
++        /**
++         * removes a movingCreature, this function is not intended to be used directly, 
++         * destroy the movingCreature instead.
++         */
++        void remove(MovingCreature *movingCreature);
++
++        void run(Ogre::Real elapsedTime);
++
++        /**
++         * Sets a movingCreature in an active state, this means that it is updated every
++         * frame. This must be the case, if the creature is moving. If a creature is in an
++         * idle state, it is only updated less often
++         */
++        void setActive(MovingCreature* movingCreature);
++
++        const Ogre::String &amp; getName() const {return mName;}
++
++        // Newton Contact Callback
++        int userProcess();
++    protected:
++        typedef std::vector&lt;MovingCreature*&gt; MovingCreatureVector;
++        MovingCreatureVector mActiveCreatures;
++        MovingCreatureVector mIdleCreatures;
++        MovingCreatureVector mAddToActiveCreatures;
++        Ogre::Real mUpdateIdleTime;
++        Ogre::Real mTimeSinceLastIdleUpdate;
++        Ogre::String mName;
++
++        typedef std::map&lt;OgreNewt::Body*,MovingCreature*&gt; MovingCreatureBodyMap;
++        MovingCreatureBodyMap mMovingCreatureFromBody;
++    };
++}
++
++
++#endif
+
+Modified: rl/trunk/engine/rules/include/RulesSubsystem.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesSubsystem.h	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/include/RulesSubsystem.h	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -27,6 +27,7 @@
+     class ActionManager;
+     class CombatManager;
+     class DsaManager;
++    class MovingCreatureManager;
+     class TimerManager;
+     class XdimlLoader;
+ 
+@@ -44,6 +45,7 @@
+         ActionManager* mActionManager;
+         CombatManager* mCombatManager;
+         DsaManager* mDsaManager;
++        MovingCreatureManager *mMovingCreatureManager;
+         TimerManager* mTimerManager;
+         XdimlLoader* mXdimlLoader;
+     };
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -1008,519 +1008,4 @@
+ 
+         return ps;
+     }
+-
+-    int Creature::getTaktischeBewegung(void) const
+-    {
+-        return mMovementType;
+-    }
+-
+-    void Creature::setTaktischeBewegung(int type)
+-    {
+-        mMovementType = type;
+-    }
+-
+-
+-    bool Creature::canUseTaktischeBewegung(int movementType)
+-    {
+-        if( movementType == BEWEGUNG_NONE )
+-        {
+-            return true;
+-        }
+-        // kann sich die Kreatur ueberhaupt bewegen?
+-        ///@todo What other Stati prohibit creature  movement? Paralyzed? Incapacitated? Sleep? etc.
+-        ///@todo Crouching still possible, even if immobilized.
+-        if (getStatus() &amp; Effect::STATUS_IMMOBILE)
+-        {
+-          //CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(&quot;p \&quot;Immobile!\&quot;&quot;);
+-          return false;
+-        }
+-
+-        if( getAu() &lt;= 1 )
+-            return false;
+-
+-
+-
+-        if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-        {
+-            // if( getragenes Gewicht &gt; 2*KK ) return false
+-            if( movementType &amp; 
+-                (BEWEGUNG_RENNEN | BEWEGUNG_LAUFEN | BEWEGUNG_JOGGEN |
+-                BEWEGUNG_HOCHSPRUNG | BEWEGUNG_WEITSPRUNG | BEWEGUNG_UMDREHEN) 
+-                )
+-            {
+-                return false;
+-            }
+-
+-        }
+-        else if( movementType &amp; BEWEGUNG_SEITWAERTS )
+-        {
+-            if( movementType &amp; 
+-                (BEWEGUNG_RENNEN | BEWEGUNG_JOGGEN |
+-                BEWEGUNG_HOCHSPRUNG | BEWEGUNG_WEITSPRUNG | BEWEGUNG_UMDREHEN)
+-                )
+-            {
+-                return false;
+-            }
+-        }
+-        else if( (movementType &amp; BEWEGUNG_HOCHSPRUNG) || (movementType &amp; BEWEGUNG_WEITSPRUNG) )
+-        {
+-            // if( getragenes Gewicht &gt; KK ) return false
+-            if( getAu() &lt; 6.0 || getAu() &lt; getAuBasis()/3.0 )
+-                return false;
+-        }
+-
+-
+-
+-        if( (movementType &amp; BEWEGUNG_DREHEN) ||
+-            (movementType &amp; BEWEGUNG_UMDREHEN))
+-        {
+-        }
+-        else if( movementType &amp; BEWEGUNG_RENNEN )
+-        {
+-            // if( getragenes Gewicht &gt; KK ) return false
+-            // getCurrentBE() &gt; ?
+-            if( getAu() &lt; 6.0 || getAu() &lt; getAuBasis()/3.0 )
+-                return false;
+-        }
+-        else if( movementType &amp; BEWEGUNG_LAUFEN )
+-        {
+-            // if( getragenes Gewicht &gt; 1.5*KK ) return false
+-            if( getAu() &lt; 6.0 )
+-                return false;
+-        }
+-        else if( movementType &amp; BEWEGUNG_JOGGEN )
+-        {
+-            // if( getragenes Gewicht &gt; 2*KK ) return false
+-            if( getAu() &lt; 6.0 )
+-                return false;
+-        }
+-        else if( movementType &amp; BEWEGUNG_GEHEN )
+-        {
+-        }    
+-
+-        return true;
+-    }
+-
+-
+-
+-
+-    float Creature::getTaktischeGeschwindigkeitsBasis(int movementType, bool modified, int modifikatoren)
+-    {
+-        static float factorJoggen = 2.0;
+-        // Bewegung nicht m&#195;&#182;glich!
+-        if( !canUseTaktischeBewegung(movementType) )
+-            return 0;
+-
+-
+-		int act_gs = getWert(WERT_GS);
+-        if( modified )
+-            act_gs -= getCurrentBe();
+-        if( act_gs &lt; 1 )
+-            act_gs = 1;
+-
+-        float velocity = 0;
+-
+-
+-        // drehen ist ein sonderfall! angabe der Rotationsgeschwindigkeit in Umdrehungen pro Sekunde
+-        if( (movementType &amp; BEWEGUNG_DREHEN) ||
+-            (movementType &amp; BEWEGUNG_UMDREHEN) )
+-        {
+-            if( movementType &amp; BEWEGUNG_UMDREHEN )
+-                velocity = 0.5;
+-            else
+-                velocity = 0.3;
+-            //if( modified )
+-            //    velocity -= getCurrentBe()/getEigenschaft(&quot;GE&quot;);
+-            if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-                velocity *= 0.5;
+-            return velocity;
+-        }
+-
+-
+-
+-
+-        if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-        {
+-            if( !(movementType &amp; BEWEGUNG_GEHEN) &amp;&amp; !(movementType &amp; BEWEGUNG_JOGGEN) &amp;&amp;
+-                !(movementType &amp; BEWEGUNG_RENNEN) &amp;&amp; !(movementType &amp; BEWEGUNG_LAUFEN) )
+-            {
+-                return 0;
+-            }
+-            if( (movementType &amp; BEWEGUNG_RUECKWAERTS) || (movementType &amp; BEWEGUNG_SEITWAERTS) )
+-                return 1;
+-            if( modified &amp;&amp; getCurrentBe() &gt; 1 )
+-                return 1;
+-            
+-            return 2;
+-        }
+-        else if( movementType &amp; BEWEGUNG_WEITSPRUNG )
+-        {
+-            float mod;
+-            if( movementType &amp; BEWEGUNG_RENNEN )
+-                mod = 1;
+-            else if( movementType &amp; BEWEGUNG_LAUFEN )
+-                mod = 0.6;
+-            else if( movementType &amp; BEWEGUNG_JOGGEN )
+-                mod = 0.5;
+-            else
+-                mod = 0.3;
+-            velocity = mod*(getEigenschaft(&quot;GE&quot;) + getEigenschaft(&quot;KK&quot;)) / 5.0;
+-
+-            if( modified )
+-            {
+-                // steht nicht in den Regeln aber finde ich sinnvoll
+-                // velocityBase *= (1 - getrageneLast/KK);
+-                // steht in den Regeln: pro Ersch&#195;&#182;pfung ein KK abziehen
+-                if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
+-                    velocity -= mod*(mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 5.0;
+-                // steht nicht in den Regeln, aber finde ich sinnvoll
+-                if( getAu() &lt; getAuBasis() / 3.0 )
+-                    velocity -= mod*(getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 5.0;
+-            }
+-            if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-            {
+-                velocity *= 0.3;
+-            }
+-            if( movementType &amp; BEWEGUNG_RUECKWAERTS )
+-            {
+-                velocity *= 0.3;
+-            }
+-            return velocity;
+-        }
+-        else if( movementType &amp; BEWEGUNG_HOCHSPRUNG )
+-        {
+-            velocity = (getEigenschaft(&quot;GE&quot;) + getEigenschaft(&quot;KK&quot;)) / 4.0 / 5.0;
+-            
+-            if( modified )
+-            {
+-                // steht nicht in den Regeln aber finde ich sinnvoll
+-                // velocityBase *= (1 - getrageneLast/KK);
+-                // steht in den Regeln: pro Ersch&#195;&#182;pfung ein KK abziehen
+-                if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
+-                    velocity -= (mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 4.0 / 5.0;
+-                // steht nicht in den Regeln, aber finde ich sinnvoll
+-                if( getAu() &lt; getAuBasis() / 3.0 )
+-                    velocity -= (getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 4.0 / 5.0;
+-            }
+-            if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-            {
+-                velocity *= 0.3;
+-            }
+-            return velocity;
+-        }
+-
+-
+-        if( movementType &amp; BEWEGUNG_RUECKWAERTS )
+-        {
+-            if( (movementType &amp; BEWEGUNG_RENNEN) ||
+-                (movementType &amp; BEWEGUNG_LAUFEN) ||
+-                (movementType &amp; BEWEGUNG_JOGGEN) )
+-            {
+-                velocity = 0.6 * act_gs / factorJoggen;
+-            }
+-            else if( (movementType &amp; BEWEGUNG_GEHEN) )
+-            {
+-                velocity = 0.6 * act_gs / 3.6;
+-            }
+-
+-            if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-            {
+-                velocity = 0.3 * act_gs / 3.6;
+-            }
+-            return velocity;
+-        }
+-        else if( movementType &amp; BEWEGUNG_SEITWAERTS )
+-        {
+-            if( (movementType &amp; BEWEGUNG_RENNEN) || 
+-                (movementType &amp; BEWEGUNG_LAUFEN) ||
+-                (movementType &amp; BEWEGUNG_JOGGEN) )
+-            {
+-                velocity = 0.8 * act_gs / factorJoggen;
+-            }
+-            else if( movementType &amp; BEWEGUNG_GEHEN )
+-            {
+-                velocity = 0.8 * act_gs / 3.6;
+-            }
+-            
+-            if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-            {
+-                velocity = 0.4 * act_gs / 3.6;
+-            }            
+-            return velocity;
+-        }
+-
+-
+-
+-        if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-        {
+-            if( !(movementType &amp; BEWEGUNG_GEHEN) &amp;&amp; !(movementType &amp; BEWEGUNG_JOGGEN) &amp;&amp;
+-                !(movementType &amp; BEWEGUNG_RENNEN) &amp;&amp; !(movementType &amp; BEWEGUNG_LAUFEN) )
+-            {
+-                return 0;
+-            }
+-            if( modified &amp;&amp; getCurrentBe() &gt; 1 )
+-                return 1;
+-            
+-            return 2;
+-        }
+-
+-
+-        if( movementType &amp; BEWEGUNG_RENNEN )
+-        {
+-            velocity = act_gs;
+-        }
+-        else if( movementType &amp; BEWEGUNG_LAUFEN )
+-        {
+-            velocity = act_gs / 2.0;
+-        }
+-        else if( movementType &amp; BEWEGUNG_JOGGEN )
+-        {
+-            velocity = act_gs / 3.0;
+-        }
+-        else if( movementType &amp; BEWEGUNG_GEHEN )
+-        {
+-            velocity = act_gs / 3.6;
+-        }
+-        else
+-        {
+-            velocity = 0;
+-        }
+-        return velocity;
+-    }
+-
+-
+-
+-    float Creature::doTaktischeBewegung(int movementType, Ogre::Real time, int&amp; patzer, int probenErschwernis, int modifikatoren)
+-    {
+-        // damit bei einem Sprint immer nur eine Probe gemacht wird!
+-        static int lastProbeTaW = 0;
+-        static Ogre::Real lastProbeTime = 0;
+-        static int lastMovementType = 0;
+-        lastProbeTime -= time;
+-        bool movementTypeChanged = false;
+-        if( movementType != lastMovementType ) // das System l&#195;&#164;sst sich durch Zwischendurch nicht rennen austricksen!!!!
+-            movementTypeChanged = true;
+-        lastMovementType = movementType;
+-        
+-        const int regenerateAuModifier_Gehen = 2;
+-        const float regenerateAuFactor_Gehen = 0.5;
+-        const int regenerateAuModifier_Stehen = 1;
+-        const float regenerateAuFactor_Stehen = 0.75;
+-
+-
+-
+-
+-        float velocity = getTaktischeGeschwindigkeitsBasis(movementType, true, modifikatoren);
+-
+-
+-        setTaktischeBewegung(movementType);
+-
+-        
+-
+-
+-        if( movementType &amp; BEWEGUNG_DREHEN )
+-        {
+-            return velocity;
+-        }
+-
+-
+-
+-        if( movementType &amp; BEWEGUNG_SCHLEICHEN )
+-        {
+-//
+-/*
+-            try // schleichen wirklich hier machen?
+-            {
+-                patzer = doTalentprobe(&quot;Schleichen&quot;, probenErschwernis);
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-                patzer = RESULT_MISSERFOLG;
+-            }
+-*/
+-            return velocity;
+-        }
+-        else if( movementType &amp; BEWEGUNG_WEITSPRUNG )
+-        {
+-            try
+-            {
+-                patzer = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+-                if( patzer &gt; 0 )
+-                {
+-                    if( patzer == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) / 25.0;
+-                    }
+-                    else if( patzer == RESULT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) / 50.0;
+-                    }
+-                    else
+-                    {
+-                        velocity += patzer / 50.0;
+-                    }
+-                }
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-                patzer = 0;
+-            }
+-            // Ausdauerverbrauch: eigentlich 1, aber ich denke das ist zu hoch
+-            damageAu(2./3);
+-            return velocity;
+-        }
+-        else if( movementType &amp; BEWEGUNG_HOCHSPRUNG )
+-        {
+-            try
+-            {
+-                patzer = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+-                if( patzer &gt; 0 )
+-                {
+-                    if( patzer == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) / 12.5;
+-                    }
+-                    else if( patzer == RESULT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) / 25.0;
+-                    }
+-                    else
+-                    {
+-                        velocity += patzer / 25.0;
+-                    }
+-                }
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-                patzer = 0;
+-            }
+-            // Ausdauerverbrauch:
+-            damageAu(2./3);
+-            return velocity;
+-        }
+-
+-
+-        if( movementType &amp; BEWEGUNG_RUECKWAERTS )
+-        {
+-            if( (movementType &amp; BEWEGUNG_RENNEN) || 
+-                (movementType &amp; BEWEGUNG_LAUFEN) ||
+-                (movementType &amp; BEWEGUNG_JOGGEN) )
+-            {
+-            }
+-            else if( movementType &amp; BEWEGUNG_GEHEN )
+-            {
+-            }
+-            return velocity;
+-        }
+-        else if( movementType &amp; BEWEGUNG_SEITWAERTS )
+-        {
+-            if( (movementType &amp; BEWEGUNG_RENNEN) || 
+-                (movementType &amp; BEWEGUNG_LAUFEN) ||
+-                (movementType &amp; BEWEGUNG_JOGGEN) )
+-            {
+-            }
+-            else if( movementType &amp; BEWEGUNG_GEHEN )
+-            {
+-            }
+-            
+-            return velocity;
+-        }
+-
+-
+-
+-        if( movementType &amp; BEWEGUNG_RENNEN )
+-        {
+-            // f&#195;&#188;r Rennen Athletik-probe -&gt; h&#195;&#182;here Geschwindigkeit
+-            try
+-            {
+-                if( lastProbeTime &lt;= 0 || movementTypeChanged)
+-                {
+-                	int lastProbeTaW = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+-                    patzer = (int)lastProbeTaW;
+-                    lastProbeTime = getAuMax();
+-                }
+-                else
+-                {
+-                    // wird nur einmal angerechnet ?
+-                    patzer = 0;
+-                }
+-                if( lastProbeTaW &gt; 0 )
+-                {
+-                    if( lastProbeTaW == RESULT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) * 0.2;
+-                    }
+-                    else if( lastProbeTaW == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        velocity += getTalent(&quot;Athletik&quot;) * 0.3;
+-                    }
+-                    else
+-                    {
+-                        velocity += lastProbeTaW;
+-                    }
+-                }
+-                damageAu(time/1.5);
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-                patzer = 0;
+-            }
+-        }
+-        else if( movementType &amp; BEWEGUNG_LAUFEN )
+-        {
+-            // f&#195;&#188;r Laufen, Athletik-Probe weniger Ausdauer-Verbrauch
+-            float timePerAu = 180;
+-            try
+-            {
+-                if( lastProbeTime &lt;= 0 || movementTypeChanged )
+-                {
+-                    lastProbeTaW = doTalentprobe(&quot;Athletik&quot;, probenErschwernis);
+-                    patzer = lastProbeTaW;
+-                    lastProbeTime = Date::ONE_SPIELRUNDE;
+-                }
+-                else
+-                {
+-                    // wird nur einmal angerechnet ?
+-                    patzer = 0;
+-                }
+-                if( lastProbeTaW &gt; 0 )
+-                {
+-                    if( lastProbeTaW == RESULT_AUTOERFOLG )
+-                    {
+-                        timePerAu += getTalent(&quot;Athletik&quot;) * 5;
+-                    }
+-                    else if( lastProbeTime == RESULT_SPEKT_AUTOERFOLG )
+-                    {
+-                        timePerAu += getTalent(&quot;Athletik&quot;) * 10;
+-                    }
+-                    else
+-                    {
+-                        timePerAu += lastProbeTaW * 5;
+-                    }
+-                }
+-                damageAu(time/timePerAu);
+-            }
+-            catch(OutOfRangeException err)
+-            {
+-                patzer = 0;
+-            }
+-        }
+-        else if( movementType &amp; BEWEGUNG_JOGGEN )
+-        {
+-        }
+-        else if( movementType &amp; BEWEGUNG_GEHEN )
+-        {
+-            regenerateAu(regenerateAuModifier_Gehen, regenerateAuFactor_Gehen, time);
+-        }
+-        else
+-        {
+-            // rumstehen
+-            regenerateAu(regenerateAuModifier_Stehen, regenerateAuFactor_Stehen, time);
+-        }
+-
+-        return velocity;
+-    }
+-
+-
+-
+ }
+
+Added: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -0,0 +1,1194 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Perl Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Perl Artistic License for more details.
++*
++*  You should have received a copy of the Perl Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++*/
++
++
++#include &quot;Actor.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;DsaManager.h&quot;
++#include &quot;MeshAnimation.h&quot;
++#include &quot;MeshObject.h&quot;
++#include &quot;MovingCreature.h&quot;
++#include &quot;MovingCreatureManager.h&quot;
++#include &quot;PhysicsManager.h&quot;
++#include &quot;PhysicalThing.h&quot;
++
++
++
++using namespace Ogre;
++using namespace std;
++
++namespace rl
++{
++
++    class Stehen : public AbstractMovement
++    {
++    public:
++        Stehen(MovingCreature *creature) : AbstractMovement(creature), mVelocity(Vector3::ZERO) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_STEHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
++        virtual void activate()
++        {
++            getRotationMovement()-&gt;activate();
++        }
++        virtual void deactivate()
++        {
++            getRotationMovement()-&gt;deactivate();
++        }
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = 0.0f; 
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return 
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_DEAD | Effect::STATUS_UNCONSCIOUS | Effect::STATUS_SLEEPING));
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
++        {
++            getRotationMovement()-&gt;calculateForceAndTorque(force, torque, timestep);
++
++            Real mass;
++            Vector3 inertia;
++            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++            body-&gt;getMassMatrix(mass, inertia);
++
++            Vector3 vel = mMovingCreature-&gt;getVelocity();
++            Real delay (2 * PhysicsManager::getSingleton().getMaxTimestep());
++            if(vel.squaredLength() &gt; mVelocity.squaredLength())
++                delay *= 1.5;
++            force = mass * (mVelocity - vel) / delay;
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            direction.normalise();
++            Real velocity;
++            calculateBaseVelocity(velocity);
++            mVelocity = direction * velocity;
++            applyAuChanges(elapsedTime);
++            setAnimation(elapsedTime);
++            if( rotation != Vector3::ZERO )
++                if( getRotationMovement()-&gt;isPossible() )
++                    return getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
++            return false;
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            Real omegaY = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega().y;
++            if( omegaY &gt; Degree(20).valueRadians() )
++                mMovingCreature-&gt;setAnimation(&quot;drehen_links&quot;);
++            else
++            {
++                if( omegaY &lt; Degree(-20).valueRadians() )
++                    mMovingCreature-&gt;setAnimation(&quot;drehen_rechts&quot;);
++                else
++                    mMovingCreature-&gt;setAnimation(&quot;idle&quot;);                            
++            }
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;getCreature()-&gt;regenerateAu(2, 0.5, elapsedTime);
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction = Vector3::ZERO;
++            return oldDirection == Vector3::ZERO;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            return getRotationMovement()-&gt;isRotationPossible(rotation);
++        }
++    protected:
++        Ogre::Vector3 mVelocity;
++        virtual AbstractMovement* getRotationMovement() const
++        {
++            static AbstractMovement *stehen_drehen(NULL);
++
++            if( stehen_drehen == NULL)
++            {                
++                stehen_drehen = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
++            }
++            if( stehen_drehen == NULL )
++            {
++                Throw(NullPointerException, &quot;Konnte Movement mit der Id MT_STEHEN_DREHEN nicht finden.&quot;);
++            }
++            return stehen_drehen;
++        }
++    };
++
++    class Drehen : public AbstractMovement
++    {
++    public:
++        Drehen(MovingCreature *creature) : AbstractMovement(creature), mYaw(0)
++        {
++            mRotLinearSpringK = 600.0f;
++            Real relationCoefficient = 1.0f;
++            mRotLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mRotLinearSpringK);
++        }
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_DREHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = 0.3f;
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return 
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++        }
++        virtual void activate()
++        {
++            mYaw = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getWorldOrientation().getYaw();
++        }
++        virtual void deactivate()
++        {
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
++        {
++            Real mass;
++            Vector3 inertia;
++            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++            body-&gt;getMassMatrix(mass, inertia);
++
++            Quaternion orientation = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getWorldOrientation();
++            // Calculate angular velocity
++            // We first need the yaw rotation from actual yaw to desired yaw
++            Vector3 src = orientation*Vector3::UNIT_Z;
++            src.y = 0;
++            Vector3 dst = Quaternion(mYaw, Vector3::UNIT_Y)*Vector3::UNIT_Z;
++            dst.y = 0;
++            Radian yaw = src.getRotationTo(dst, Vector3::UNIT_Y).getYaw();
++
++            // using a spring system to apply the rotation
++            Vector3 diff = Vector3(0, yaw.valueRadians(), 0);
++            Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
++            omega.x = omega.z = 0;
++            Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
++            torque = mass * springAcc;
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            mYaw += Radian(rotation.y);
++            while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
++            while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
++            return rotation.y != 0.0f;
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction = Vector3::ZERO;
++            return oldDirection == Vector3::ZERO;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            Vector3 oldRotation(rotation);
++            rotation.x = rotation.y = 0;
++            return oldRotation.x == 0 &amp;&amp; oldRotation.y == 0;
++        }
++    protected:
++        Ogre::Radian mYaw;
++        Ogre::Real mRotLinearDampingK, mRotLinearSpringK;
++    };
++
++
++    class Gehen : public Stehen
++    {
++    public:
++        Gehen(MovingCreature *creature) : Stehen(creature) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_GEHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 3.6f; 
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return 
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp; 
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; Effect::STATUS_IMMOBILE);
++        }
++        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            Stehen::run(elapsedTime, direction, rotation);
++            return true;
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction.x = direction.y = 0;
++            if( direction.z &gt; 0 )
++                direction.z = 0;
++            return oldDirection.x == 0 &amp;&amp; oldDirection.y == 0 &amp;&amp; oldDirection.z &gt; 0;
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;getCreature()-&gt;regenerateAu(2, 0.5, elapsedTime);
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;gehen&quot;);
++        }
++    };
++
++    class Joggen : public Gehen
++    {
++    public:
++        Joggen(MovingCreature *creature) : Gehen(creature) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_JOGGEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_GEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 2.8f; 
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return Gehen::isPossible() &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime) {} // empty
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;rennen&quot;);
++        }
++    };
++
++    class Laufen : public Gehen
++    {
++    public:
++        Laufen(MovingCreature *creature) : Gehen(creature), mTimePerAu(1), mLastProbe(0) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_LAUFEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_JOGGEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 2.0f; 
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            if( mMovingCreature-&gt;getMovement() == this )
++                return Gehen::isPossible() &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
++            else
++                return Gehen::isPossible() &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 10;
++        }
++        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            doTalentProbeIfNecessary();
++            return Gehen::run(elapsedTime, direction, rotation);
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;getCreature()-&gt;damageAu(elapsedTime/mTimePerAu);
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;rennen&quot;);
++        }
++        virtual void activate()
++        {
++            doTalentProbeIfNecessary();
++        }
++        virtual void doTalentProbeIfNecessary()
++        {
++            Date now = DsaManager::getSingleton().getCurrentDate();
++            if( mLastProbe + Date::ONE_SPIELRUNDE &gt;= now || mLastProbe == 0 )
++            {
++                mTimePerAu = 180;
++                try
++                {
++                    mLastProbe = now;
++                    int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;,0);
++                    if( taw == RESULT_AUTOERFOLG )
++                    {
++                        mTimePerAu += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 5;
++                    }
++                    else if( taw == RESULT_SPEKT_AUTOERFOLG )
++                    {
++                        mTimePerAu += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 10;
++                    }
++                    else
++                    {
++                        mTimePerAu += taw * 5;
++                    }
++                }
++                catch(OutOfRangeException)
++                {
++                    mTimePerAu = 180;
++                }
++            }
++        }
++    protected:
++        Real mTimePerAu;
++        Date mLastProbe;
++    };
++
++
++    class Rennen : public Gehen
++    {
++    public:
++        Rennen(MovingCreature *creature) : Gehen(creature), mVelocityImprovement(0), mLastProbe(0) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RENNEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_LAUFEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS(); 
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            if( mMovingCreature-&gt;getMovement() == this )
++                return Gehen::isPossible() &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax() * 0.3 &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6;
++            else
++                return Gehen::isPossible() &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax() * 0.5 &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 10;
++        }
++        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            doTalentProbeIfNecessary();
++            bool ret = Gehen::run(elapsedTime, direction, rotation);
++            mVelocity += mVelocityImprovement;
++            return ret;
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;getCreature()-&gt;damageAu(elapsedTime/1.5);
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;rennen&quot;);
++        }
++        virtual void activate()
++        {
++            doTalentProbeIfNecessary();
++        }
++        virtual void doTalentProbeIfNecessary()
++        {
++            Date now = DsaManager::getSingleton().getCurrentDate();
++            if( mLastProbe + mMovingCreature-&gt;getCreature()-&gt;getAuMax() * Date::ONE_SECOND &gt;= now || mLastProbe == 0)
++            {
++                mVelocityImprovement = 0;
++                try
++                {
++                    mLastProbe = now;
++                    int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;,0);
++                    if( taw == RESULT_AUTOERFOLG )
++                    {
++                        mVelocityImprovement += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 0.2;
++                    }
++                    else if( taw == RESULT_SPEKT_AUTOERFOLG )
++                    {
++                        mVelocityImprovement += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) * 0.3;
++                    }
++                    else
++                    {
++                        mVelocityImprovement += taw * 0.1;
++                    }
++                }
++                catch(OutOfRangeException)
++                {
++                    mVelocityImprovement = 0;
++                }
++            }
++        }
++    protected:
++        Real mVelocityImprovement;
++        Date mLastProbe;
++    };
++
++    class RueckwaertsGehen : public Gehen
++    {
++    public:
++        RueckwaertsGehen(MovingCreature *creature) : Gehen(creature) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RUECKWAERTS_GEHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 4.0; 
++            return isPossible();
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;gehen_rueckwaerts&quot;);
++        }
++    };
++
++    class RueckwaertsJoggen : public Joggen
++    {
++    public:
++        RueckwaertsJoggen(MovingCreature *creature) : Joggen(creature) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_RUECKWAERTS_JOGGEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_RUECKWAERTS_GEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 3.2; 
++            return isPossible();
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            mMovingCreature-&gt;setAnimation(&quot;rennen&quot;);
++        }
++    };
++
++
++    class SeitwaertsGehen : public Gehen
++    {
++    public:
++        SeitwaertsGehen(MovingCreature *creature) : Gehen(creature), mLeft(true) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_SEITWAERTS_GEHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 4.0; 
++            return isPossible();
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction.z = direction.y = 0;
++            return oldDirection.z == 0 &amp;&amp; oldDirection.y == 0;
++        }
++        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            mLeft = direction.x &lt; 0;
++            return Gehen::run(elapsedTime, direction, rotation);
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++            if( mLeft )
++                mMovingCreature-&gt;setAnimation(&quot;seitwaerts_links&quot;);
++            else
++                mMovingCreature-&gt;setAnimation(&quot;seitwaerts_rechts&quot;);
++        }
++    protected:
++        bool mLeft;
++    };
++
++    class Schleichen : public Gehen
++    {
++    public:
++        Schleichen(MovingCreature *creature) : Gehen(creature), mState(UP), mTimer(0) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_SCHLEICHEN;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = mMovingCreature-&gt;getCurrentGS() / 6.0; 
++            return isPossible();
++        }
++        virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            if( mState == UPTODOWN )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt; 0.5f )
++                    mState = DOWN;
++            }
++            if( mState == UP )
++            {
++                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
++            }
++            if( mState == DOWNTOUP )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt; 0.5f )
++                    mState = UP;
++            }
++            if( mState == DOWN )
++            {
++                setAnimation(elapsedTime);
++                direction.normalise();
++                Real velocity;
++                calculateBaseVelocity(velocity);
++                mVelocity = direction * velocity;
++                if( direction == Vector3::ZERO )
++                    mMovingCreature-&gt;setAnimation(&quot;hocke_idle&quot;);
++                else
++                    mMovingCreature-&gt;setAnimation(&quot;hocke_gehen&quot;);
++                applyAuChanges(elapsedTime);
++                if( rotation != Vector3::ZERO )
++                    if( getRotationMovement()-&gt;isPossible() )
++                        getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
++            }
++            else
++                mVelocity = Vector3::ZERO;
++            return true;
++        }
++        void applyAuChanges(Ogre::Real elapsedTime) {}
++        virtual void setAnimation(Ogre::Real elapsedTime) {} // is not used
++        virtual void activate()
++        {
++            mState = UPTODOWN;
++            mMovingCreature-&gt;setAnimation(&quot;idle_zu_hocke&quot;,1,1,&quot;idle&quot;);
++            mTimer = 0;
++        }
++        virtual bool canChangeToMovement(MovingCreature::MovementType id)
++        {
++            return mState == UP;
++        }
++        virtual void requestChangeToMovement(MovingCreature::MovementType id)
++        {
++            if( mState == DOWN )
++            {
++                mState = DOWNTOUP;
++                mMovingCreature-&gt;setAnimation(&quot;hocke_zu_stehen&quot;,1,1,&quot;idle&quot;);
++                mTimer = 0;
++            }
++        }
++    protected:
++        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
++        Real mTimer;
++    };
++
++
++    class Hochsprung : public AbstractMovement
++    {
++    public:
++        Hochsprung(MovingCreature *creature) : AbstractMovement(creature), mState(DOWN), mHeight(0), mJumpNow(false), mTimer(0) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_HOCHSPRUNG;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual void activate()
++        {
++            mState = DOWNTOUP;
++            mMovingCreature-&gt;setAnimation(&quot;idle_absprung&quot;,1,1,&quot;idle&quot;);
++            mTimer = 0;
++            calculateBaseVelocity(mHeight);
++
++            try
++            {
++                int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
++                if( taw &gt; 0 )
++                {
++                    if( taw == RESULT_SPEKT_AUTOERFOLG )
++                    {
++                        mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 12.5;
++                    }
++                    else if( taw == RESULT_AUTOERFOLG )
++                    {
++                        mHeight += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 25.0;
++                    }
++                    else
++                    {
++                        mHeight += taw / 25.0;
++                    }
++                }
++            }
++            catch(OutOfRangeException err)
++            {
++            }
++            mMovingCreature-&gt;getCreature()-&gt;damageAu(2./3);
++        }
++        virtual void deactivate()
++        {
++        }
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = (mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;GE&quot;) + 
++                        mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;KK&quot;)) / 4.0 / 5.0;
++
++            // steht nicht in den Regeln aber finde ich sinnvoll
++            // velocityBase *= (1 - getrageneLast/KK);
++            // steht in den Regeln: pro Ersch&#246;pfung ein KK abziehen
++            //if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
++            //    velocity -= (mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 4.0 / 5.0;
++            // steht nicht in den Regeln, aber finde ich sinnvoll
++            //if( getAu() &lt; getAuBasis() / 3.0 )
++            //    velocity -= (getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 4.0 / 5.0;
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            if( mMovingCreature-&gt;getMovement() == this )
++                return
++                    (mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR ||
++                    mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_AIRBORNE) &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
++                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++            else
++                return 
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 10 &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
++        {
++            if( mJumpNow )
++            {
++                mJumpNow = false;
++
++                Real mass;
++                Vector3 inertia;
++                OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++                body-&gt;getMassMatrix(mass, inertia);
++
++                Real m = mass;
++                Real g = PhysicsManager::getSingleton().getGravity().length();
++                Real t = timestep;
++                Real h = mHeight;
++                Real jumpForce = 0.5f*g*m * (Math::Sqrt(1 + 8*h/(g * t * t)) - 1);
++                force = Vector3(0,
++                    jumpForce,
++                    0);
++                mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
++            }
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            if( mState == DOWN )
++            {
++                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
++            }
++            if( mState == UPTODOWN )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt;= 0.5f )
++                {
++                    mState = DOWN;
++                }
++            }
++            if( mState == UP )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &lt; 0.5f )
++                {
++                    mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
++                }
++                else if( mMovingCreature-&gt;getAbstractLocation() != MovingCreature::AL_AIRBORNE )
++                {
++                    mState = UPTODOWN;
++                    mMovingCreature-&gt;setAnimation(&quot;idle_sprung_landung&quot;, 1, 1, &quot;idle&quot;);
++                    mTimer = 0;
++                }
++            }
++            if( mState == DOWNTOUP )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt;= 0.5f )
++                {
++                    mState = UP;
++                    mMovingCreature-&gt;setAbstractLocation(MovingCreature::AL_AIRBORNE);
++                    //mMovingCreature-&gt;setAnimation(&quot;idle_sprung&quot;);
++                    mJumpNow = true;
++                    mTimer = 0;
++                }
++            }
++            return false;
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction.z = direction.x = 0;
++            if(direction.y &lt; 0)
++                direction.y = 0;
++            return oldDirection.x == 0 &amp;&amp; oldDirection.z == 0 &amp;&amp; oldDirection.y &gt; 0;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            return false;
++        }
++        virtual bool canChangeToMovement(MovingCreature::MovementType id)
++        {
++            return mState == DOWN;
++        }
++    protected:
++        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
++        Ogre::Real mHeight;
++        bool mJumpNow;
++        Ogre::Real mTimer;
++    };
++
++
++    class Weitsprung : public AbstractMovement
++    {
++    public:
++        Weitsprung(MovingCreature *creature) : AbstractMovement(creature), mState(DOWN), mWidth(0), mJumpNow(false), mTimer(0) {}
++        virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_WEITSPRUNG;}
++        virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
++        virtual void activate()
++        {
++            mState = DOWNTOUP;
++            mMovingCreature-&gt;setAnimation(&quot;rennen_absprung&quot;,1,1,&quot;rennen&quot;);
++            mTimer = 0;
++            calculateBaseVelocity(mWidth);
++
++            try
++            {
++                int taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;Athletik&quot;, 0);
++                if( taw &gt; 0 )
++                {
++                    if( taw == RESULT_SPEKT_AUTOERFOLG )
++                    {
++                        mWidth += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 25.0;
++                    }
++                    else if( taw == RESULT_AUTOERFOLG )
++                    {
++                        mWidth += mMovingCreature-&gt;getCreature()-&gt;getTalent(&quot;Athletik&quot;) / 50.0;
++                    }
++                    else
++                    {
++                        mWidth += taw / 50.0;
++                    }
++                }
++            }
++            catch(OutOfRangeException err)
++            {
++            }
++            mMovingCreature-&gt;getCreature()-&gt;damageAu(2./3);
++        }
++        virtual void deactivate()
++        {
++        }
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = (mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;GE&quot;) + 
++                        mMovingCreature-&gt;getCreature()-&gt;getEigenschaft(&quot;KK&quot;)) / 5.0;
++
++            // steht nicht in den Regeln aber finde ich sinnvoll
++            // velocityBase *= (1 - getrageneLast/KK);
++            // steht in den Regeln: pro Ersch&#246;pfung ein KK abziehen
++            //if( mErschoepfung &gt; getEigenschaft(&quot;KO&quot;) )
++            //    velocity -= (mErschoepfung - getEigenschaft(&quot;KO&quot;)) / 5.0;
++            // steht nicht in den Regeln, aber finde ich sinnvoll
++            //if( getAu() &lt; getAuBasis() / 3.0 )
++            //    velocity -= (getAu() / getAuBasis() * 3.0) * getEigenschaft(&quot;GE&quot;) / 5.0;
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            if( mMovingCreature-&gt;getMovement() == this )
++                return
++                    (mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR ||
++                    mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_AIRBORNE) &amp;&amp;
++                    mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
++                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++            else
++                return 
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 10 &amp;&amp;
++                mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
++                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
++        {
++            if( mJumpNow )
++            {
++                mJumpNow = false;
++
++                Real mass;
++                Vector3 inertia;
++                OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++                body-&gt;getMassMatrix(mass, inertia);
++
++
++                Real m = mass;
++                Real g = PhysicsManager::getSingleton().getGravity().length();
++                Real v0 = mMovingCreature-&gt;getVelocity().length();
++                Real t = timestep;
++                Real s = mWidth;
++                Real jumpForcezy = 
++                    m*g/4 - v0*m /2 /t + 
++                    Math::Sqrt( 
++                        v0*v0 * m*m  -
++                        v0 * m*m *g *t +
++                        m*m * g*g * t*t /4 +
++                        2 * s * m*m *g
++                               )/2/t;
++                force += Vector3(0,jumpForcezy,-jumpForcezy);
++                mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
++            }
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            if( mState == DOWN )
++            {
++                mMovingCreature-&gt;setMovement(MovingCreature::MT_STEHEN, direction, rotation);
++            }
++            if( mState == UPTODOWN )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt;= 0.5f )
++                {
++                    mState = DOWN;
++                }
++            }
++            if( mState == UP )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &lt; 0.5f )
++                {
++                    mMovingCreature-&gt;setAbstractLocation( MovingCreature::AL_AIRBORNE );
++                }
++                else if( mMovingCreature-&gt;getAbstractLocation() != MovingCreature::AL_AIRBORNE )
++                {
++                    mState = UPTODOWN;
++                    mMovingCreature-&gt;setAnimation(&quot;rennen_sprung_landung&quot;, 1, 1, &quot;rennen&quot;);
++                    mTimer = 0;
++                }
++            }
++            if( mState == DOWNTOUP )
++            {
++                mTimer += elapsedTime;
++                if( mTimer &gt;= 0.5f )
++                {
++                    mState = UP;
++                    mMovingCreature-&gt;setAbstractLocation(MovingCreature::AL_AIRBORNE);
++                    //mMovingCreature-&gt;setAnimation(&quot;rennen_sprung&quot;);
++                    mJumpNow = true;
++                    mTimer = 0;
++                }
++            }
++            return false;
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            Vector3 oldDirection(direction);
++            direction.x = 0;
++            if(direction.y &lt;= 0 || direction.z &gt;= 0)
++                direction.y = direction.z = 0;
++            return oldDirection.x == 0 &amp;&amp; oldDirection.z &lt; 0 &amp;&amp; oldDirection.y &gt; 0;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            return false;
++        }
++        virtual bool canChangeToMovement(MovingCreature::MovementType id)
++        {
++            return mState == DOWN;
++        }
++    protected:
++        enum {UP, DOWN, UPTODOWN, DOWNTOUP} mState;
++        Ogre::Real mWidth;
++        bool mJumpNow;
++        Ogre::Real mTimer;
++    };
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++    MovingCreature::MovingCreature(Creature *creature) :
++        mCreature(creature),
++        mAbstractLocation(AL_AIRBORNE),
++        mMovement(NULL),
++        mDirection(Vector3::ZERO),
++        mRotation(Vector3::ZERO)
++    {
++        MovingCreatureManager::getSingleton().add(this);
++        
++        const OgreNewt::MaterialID *material = PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;);
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(material);
++
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
++
++
++        std::pair&lt;MovementType, AbstractMovement*&gt; movementPair;
++        movementPair.first = MT_NONE;
++        movementPair.second = NULL;
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_DREHEN;
++        movementPair.second = new Drehen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_STEHEN;
++        movementPair.second = new Stehen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_GEHEN;
++        movementPair.second = new Gehen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_JOGGEN;
++        movementPair.second = new Joggen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_LAUFEN;
++        movementPair.second = new Laufen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_RENNEN;
++        movementPair.second = new Rennen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_RUECKWAERTS_GEHEN;
++        movementPair.second = new RueckwaertsGehen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_RUECKWAERTS_JOGGEN;
++        movementPair.second = new RueckwaertsJoggen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_SEITWAERTS_GEHEN;
++        movementPair.second = new SeitwaertsGehen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_SCHLEICHEN;
++        movementPair.second = new Schleichen (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_HOCHSPRUNG;
++        movementPair.second = new Hochsprung (this);
++        mMovementMap.insert(movementPair);
++        movementPair.first = MT_WEITSPRUNG;
++        movementPair.second = new Weitsprung (this);
++        mMovementMap.insert(movementPair);
++    }
++
++    MovingCreature::~MovingCreature()
++    {
++        MovementMap::iterator iter;
++        for(iter = mMovementMap.begin(); iter != mMovementMap.end(); iter++)
++            delete iter-&gt;second;
++        mMovementMap.erase(mMovementMap.begin(), mMovementMap.end());
++
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
++
++        MovingCreatureManager::getSingleton().remove(this);
++    }
++
++    MovingCreature::MovementType MovingCreature::getMovementId() const
++    {
++        if (mMovement == NULL) 
++            return MT_NONE; 
++        else 
++            return mMovement-&gt;getId();
++    }
++
++    int MovingCreature::getCurrentGS() const
++    {
++        int act_gs = mCreature-&gt;getWert(Creature::WERT_GS);
++        ///@todo wy does this not work
++        //act_gs -= mCreature-&gt;getWert(Creature::WERT_BE);
++        return max(act_gs,1);
++    }
++
++    void MovingCreature::setAnimation(const Ogre::String &amp;name, Ogre::Real speed, unsigned int timesToPlay, const Ogre::String &amp;collisionName)
++    {
++        static Ogre::String lastName(&quot;&quot;);
++        static Ogre::String lastCollisionName(&quot;&quot;);
++        static Real lastSpeed(1);
++        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
++        PhysicalThing* pt = mCreature-&gt;getActor()-&gt;getPhysicalThing();
++        
++        if( lastName != name)
++        {
++            const Ogre::String *pCollisionName = &collisionName;
++            if( collisionName == &quot;&quot; )
++                pCollisionName = &name;
++
++            if( *pCollisionName != lastCollisionName )
++            {
++                pt-&gt;fitToPose(*pCollisionName);
++                lastCollisionName = *pCollisionName;
++            }
++            mesh-&gt;stopAllAnimations();
++
++
++            mesh-&gt;startAnimation(name, speed, timesToPlay);
++            lastName = name;
++            lastSpeed = speed;
++        }
++        else
++        {
++            if( lastSpeed != speed )
++            {
++                MeshAnimation *meshAnim = mesh-&gt;getAnimation(name);
++                meshAnim-&gt;setSpeed(speed);
++                lastSpeed = speed;
++            }
++        }
++    }
++
++    Ogre::Vector3 MovingCreature::getVelocity() const
++    {
++        return 
++            mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;getOrientation().Inverse() *
++            mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getVelocity();
++    }
++
++    Ogre::Vector3 MovingCreature::getOmega() const
++    {
++        return mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
++    }
++
++    bool MovingCreature::run(Real elapsedTime)
++    {
++        if(mMovement != NULL)
++        {
++            if( !mMovement-&gt;isPossible() )
++            {
++                setMovement(mMovement-&gt;getFallBackMovement(), mDirection, mRotation);
++                if( mMovement == NULL )
++                    return false;
++            }
++
++            Vector3 rotation(mRotation);
++            mRotation = Vector3::ZERO;
++            return mMovement-&gt;run(elapsedTime, mDirection, rotation);
++        }
++        return false;
++    }
++
++    void MovingCreature::OnApplyForceAndTorque(PhysicalThing* thing)
++    {
++        Vector3 force, torque;
++        OgreNewt::Body *body = thing-&gt;_getBody();
++        force = Vector3::ZERO;
++        torque = Vector3::ZERO;
++        OgreNewt::World *world = PhysicsManager::getSingleton()._getNewtonWorld();
++        Real timestep = world-&gt;getTimeStep();
++        Real mass;
++        Vector3 inertia;
++        body-&gt;getMassMatrix(mass, inertia);
++
++        if(mMovement != NULL)
++        {
++            mMovement-&gt;calculateForceAndTorque(force, torque, timestep);
++            force = thing-&gt;getOrientation() * force;
++        }
++        else
++        {
++            // don't move
++            force = - mass * body-&gt;getVelocity() / 1 * timestep;
++            force.y = 0;
++        }
++        force += mass * PhysicsManager::getSingleton().getGravity();
++        body-&gt;setForce(force);
++        body-&gt;setTorque(torque);
++    }
++
++    int MovingCreature::userProcess()
++    {
++        // own collision handling (floor, in order to get information for mAbstractLocation)
++        Vector3 point;
++        Vector3 normal;
++        getContactPositionAndNormal(point, normal);
++
++        // determine if this contact is with the floor.
++        // Meaning the contact normal has an angle to UNIT_Y of 20 or less.
++        Degree angle = Math::ACos(normal.dotProduct(Vector3::UNIT_Y));
++
++        Vector3 charPos;
++        Quaternion charOri;
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getPositionOrientation(charPos, charOri);
++        bool isFloorCollision(false);
++
++        //AxisAlignedBox CharAab = mCharBody-&gt;getCollision()-&gt;getAABB();
++        //Real charHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
++        Real stepHeight = point.y - charPos.y;
++
++        if( stepHeight &lt; 0.5f )
++            isFloorCollision = true;
++
++        static Real lastFloorContact(0.0f);
++        if ( isFloorCollision )
++        {
++            setAbstractLocation(AL_FLOOR);
++            if(stepHeight &gt; 0.1f)
++                setContactNormalAcceleration(10);
++            setContactElasticity(0.0f);
++            lastFloorContact = 0.0f;
++        }
++        else
++        {
++            lastFloorContact += PhysicsManager::getSingleton()._getNewtonWorld()-&gt;getTimeStep();
++            if(lastFloorContact &gt;= 2.2f || getAbstractLocation() == AL_AIRBORNE)
++                setAbstractLocation(AL_AIRBORNE);
++        }
++
++
++        if(mMovement != NULL)
++        {
++            // i hope this will copy the protected members of the contact callback
++            OgreNewt::ContactCallback *movement = mMovement;
++            *movement = (OgreNewt::ContactCallback)(*this);
++            return movement-&gt;userProcess();
++        }
++
++        // return one to tell Newton we want to accept this contact
++        return 1;
++    }
++
++    AbstractMovement *MovingCreature::getMovementFromId(MovingCreature::MovementType id)
++    {
++        MovementMap::iterator iter = mMovementMap.find(id);
++        if(iter == mMovementMap.end())
++        {
++            Throw(IllegalArgumentException, &quot;Der angegebene Bewegungstyp wurde nicht gefunden.&quot;);
++        }
++        return iter-&gt;second;
++    }
++
++
++    bool MovingCreature::setMovement(MovementType type, Vector3 direction, Vector3 rotation)
++    {
++        if( mMovement != NULL )
++        {
++            if( mMovement-&gt;getId() == type )
++            {
++                MovingCreatureManager::getSingleton().setActive(this);
++                mDirection = direction;
++                mRotation = rotation;
++                return true;
++            }
++        }
++
++        if( mMovement != NULL )
++        {
++            if( !mMovement-&gt;canChangeToMovement(type) )
++            {
++                mMovement-&gt;requestChangeToMovement(type);
++                return false;
++            }
++        }
++
++        AbstractMovement *movement = getMovementFromId(type);
++
++
++        while(movement != NULL)
++        {
++            if(movement-&gt;isPossible())
++            {
++                MovingCreatureManager::getSingleton().setActive(this); // runs the old movement if idle!
++                if(mMovement != NULL)
++                    mMovement-&gt;deactivate();
++                mMovement = movement;
++                mMovement-&gt;activate();
++                mDirection = direction;
++                mRotation = rotation;
++                return true;
++            }
++
++            movement = getMovementFromId(movement-&gt;getFallBackMovement());
++        }
++
++        return false;
++    }
++}
+
+Added: rl/trunk/engine/rules/src/MovingCreatureManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreatureManager.cpp	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/src/MovingCreatureManager.cpp	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -0,0 +1,228 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Perl Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Perl Artistic License for more details.
++*
++*  You should have received a copy of the Perl Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++*/
++
++
++#include &quot;Actor.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;GameTask.h&quot;
++#include &quot;GameLoop.h&quot;
++#include &quot;Exception.h&quot;
++#include &quot;MovingCreatureManager.h&quot;
++#include &quot;MovingCreature.h&quot;
++
++
++using namespace Ogre;
++using namespace std;
++
++
++template&lt;&gt; rl::MovingCreatureManager* Singleton&lt;rl::MovingCreatureManager&gt;::ms_Singleton = 0;
++
++
++namespace rl
++{
++    MovingCreatureManager::MovingCreatureManager() :
++            mUpdateIdleTime(1.0f),
++            mTimeSinceLastIdleUpdate(0.0f),
++            mName(&quot;MovingCreatureManager&quot;)
++    {
++        GameLoop::getSingleton().addTask(this, GameLoop::TG_LOGIC);
++
++        PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
++        // the material of moving creatures
++        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;createMaterialID(&quot;character&quot;);
++
++        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;createMaterialID(&quot;default&quot;);
++        const OgreNewt::MaterialID *level_mat = physicsManager-&gt;createMaterialID(&quot;level&quot;);
++
++        physicsManager-&gt;createMaterialPair(char_mat, def_mat)-&gt;setContactCallback(this);
++        physicsManager-&gt;createMaterialPair(char_mat, level_mat)-&gt;setContactCallback(this);
++    }
++
++    MovingCreatureManager::~MovingCreatureManager()
++    {
++        PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
++        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;getMaterialID(&quot;character&quot;);
++
++        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;getMaterialID(&quot;default&quot;);
++        const OgreNewt::MaterialID *level_mat = physicsManager-&gt;getMaterialID(&quot;level&quot;);
++
++        physicsManager-&gt;resetMaterialPair(char_mat, def_mat);
++        physicsManager-&gt;resetMaterialPair(char_mat, level_mat);
++
++
++        GameLoop::getSingleton().removeTask(this);
++    }
++
++    void MovingCreatureManager::add(MovingCreature *movingCreature)
++    {
++        if(movingCreature == NULL)
++        {
++            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
++        }
++
++        MovingCreatureVector::const_iterator iter;
++        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
++        {
++            if( (*iter) == movingCreature )
++            {
++                Throw(IllegalArgumentException, &quot;MovingCreature wird schon vom MovingCreatureManager verwaltet.&quot;);
++            }
++        }
++        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
++        {
++            if( (*iter) == movingCreature )
++            {
++                Throw(IllegalArgumentException, &quot;MovingCreature wird schon vom MovingCreatureManager verwaltet.&quot;);
++            }
++        }
++
++        mMovingCreatureFromBody.insert(make_pair(
++            movingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody(),
++            movingCreature));
++        mIdleCreatures.push_back(movingCreature);
++    }
++
++
++    void MovingCreatureManager::remove(MovingCreature *movingCreature)
++    {
++        if(movingCreature == NULL)
++        {
++            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
++        }
++
++        MovingCreatureBodyMap::iterator body_iter = mMovingCreatureFromBody.find(
++            movingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody());
++
++        if( body_iter == mMovingCreatureFromBody.end() )
++        {
++            Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
++        }
++
++        mMovingCreatureFromBody.erase(body_iter);
++
++
++        MovingCreatureVector::iterator iter;
++        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
++        {
++            if( (*iter) == movingCreature )
++            {
++                mIdleCreatures.erase(iter);
++                return;
++            }
++        }
++        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
++        {
++            if( (*iter) == movingCreature )
++            {
++                mActiveCreatures.erase(iter);
++                return;
++            }
++        }
++        for(iter = mAddToActiveCreatures.begin(); iter != mAddToActiveCreatures.end(); iter++)
++        {
++            if( (*iter) == movingCreature )
++            {
++                mAddToActiveCreatures.erase(iter);
++                return;
++            }
++        }
++
++
++        Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
++    }
++
++    void MovingCreatureManager::run(Real elapsedTime)
++    {
++        mTimeSinceLastIdleUpdate += elapsedTime;
++
++
++        MovingCreatureVector::iterator iter;
++        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter ++)
++        {
++            (*iter)-&gt;run(elapsedTime);
++        }
++
++        if( mTimeSinceLastIdleUpdate &gt;= mUpdateIdleTime )
++        {
++            for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
++            {
++                (*iter)-&gt;run(mTimeSinceLastIdleUpdate);
++            }
++            mTimeSinceLastIdleUpdate = 0.0f;
++        }
++    }
++
++
++    void MovingCreatureManager::setActive(MovingCreature* movingCreature)
++    {
++        if(movingCreature == NULL)
++        {
++            Throw(NullPointerException, &quot;Argument movingCreature darf nicht NULL sein.&quot;);
++        }
++
++        // we cannot simply add the item to the other list, since it needs to be updated first!!
++        // i hope there are no errors, if this update is not at the proposed time in the game loop
++        // since it is not executed with the other runs!!!
++
++        MovingCreatureVector::iterator iter;
++        for(iter = mIdleCreatures.begin(); iter != mIdleCreatures.end(); iter++)
++        {
++            if( *iter == movingCreature )
++            {
++                movingCreature-&gt;run(mTimeSinceLastIdleUpdate);
++
++                mActiveCreatures.push_back(movingCreature);
++                mIdleCreatures.erase(iter);
++                return;
++            }
++        }
++
++        for(iter = mActiveCreatures.begin(); iter != mActiveCreatures.end(); iter++)
++        {
++            if( *iter == movingCreature )
++            {
++                LOG_DEBUG(Logger::RULES, &quot;Die angegebene MovingCreature ist schon aktiv.&quot;);
++                return;
++            }
++        }
++
++
++        Throw(IllegalArgumentException, &quot;MovingCreature wird nicht vom MovingCreatureManager verwaltet.&quot;);
++    }
++
++
++    int MovingCreatureManager::userProcess()
++    {
++        MovingCreatureBodyMap::iterator iter;
++        iter = mMovingCreatureFromBody.find(m_body0);
++
++        if( iter == mMovingCreatureFromBody.end() )
++        {
++            iter = mMovingCreatureFromBody.find(m_body1);
++
++            if( iter == mMovingCreatureFromBody.end() )
++            {
++                LOG_ERROR(Logger::RULES, &quot;Der Kollisionsk&#246;rper konnte keiner Creature zugeordner werden.&quot;);
++                return 1;
++            }
++        }
++
++        // i hope this will copy the protected members of the contact callback
++        OgreNewt::ContactCallback *movingCreature = iter-&gt;second;
++        *movingCreature = (OgreNewt::ContactCallback)(*this);
++        return movingCreature-&gt;userProcess();
++    }
++}
+
+Modified: rl/trunk/engine/rules/src/RulesSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -21,6 +21,7 @@
+ //#include &quot;XdimlLoader.h&quot;
+ #include &quot;DsaDataLoader.h&quot;
+ #include &quot;Logger.h&quot;
++#include &quot;MovingCreatureManager.h&quot;
+ #include &quot;TimerManager.h&quot;
+ #include &quot;GameObjectManager.h&quot;
+ #include &quot;QuestBook.h&quot;
+@@ -34,6 +35,7 @@
+         mActionManager(NULL),
+         mCombatManager(NULL),
+         mDsaManager(NULL),
++        mMovingCreatureManager(NULL),
+         mTimerManager(NULL),
+         mXdimlLoader(NULL)
+     {
+@@ -48,7 +50,9 @@
+ 		LOG_MESSAGE(Logger::RULES, &quot;CombatManager erzeugt&quot;);
+         mDsaManager = new DsaManager();
+ 		LOG_MESSAGE(Logger::RULES, &quot;DsaManager erzeugt&quot;);
+-		mTimerManager = new TimerManager(); 
++        mMovingCreatureManager = new MovingCreatureManager();
++		LOG_MESSAGE(Logger::RULES, &quot;MovingCreatureManager erzeugt&quot;);
++        mTimerManager = new TimerManager(); 
+ 		LOG_MESSAGE(Logger::RULES, &quot;TimerManager erzeugt&quot;);
+ 		resetQuestBook();
+ 		LOG_MESSAGE(Logger::RULES, &quot;Questverwaltung erzeugt&quot;);
+@@ -66,6 +70,7 @@
+         delete mQuestBook;
+         delete mTimerManager;
+         delete mDsaManager;
++        delete mMovingCreatureManager;
+         delete mCombatManager;
+         delete mActionManager;
+         delete mXdimlLoader;
+
+Modified: rl/trunk/engine/ui/include/MovementCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementCharacterController.h	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/ui/include/MovementCharacterController.h	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;UiPrerequisites.h&quot;
+ #include &quot;GameTask.h&quot;
++#include &quot;MovingCreature.h&quot;
+ #include &quot;PhysicsController.h&quot;
+ #include &quot;PhysicsGenericContactCallback.h&quot;
+ #include &quot;CharacterController.h&quot;
+@@ -85,34 +86,16 @@
+ 
+     protected:
+         virtual void doCreatePrimitive();
++        MovingCreature *mMovingCreature;
+ 
+     private:
+ 
+ 		/// private struct for holding state info of the controller
+ 		struct CharacterState
+ 		{
+-            //typedef enum {Stand, Crouch, StandToCrouch, CrouchToStand, Falling, Jumping, StartJump, EndJump} Pose;
+-			CharacterState();
+-            //Pose mPose;
+-			bool mIsAirBorne;
+-            bool mHasFloorContact;
+-			//bool mStartJumpLong;
+-            //bool mStartJumpHigh;
+-            bool mStartJump;
+-            Ogre::Real mJumpWidthHeight;
+-
+-			Ogre::Real mJumpTimer;
+-
+-			Ogre::Vector3 mDesiredVel;
+-
++            CharacterState();
+ 			int mCurrentMovementState;
+ 			int mLastMovementState;
+-            bool beginSneak;
+-            bool endSneak;
+-            bool beginJump;
+-            bool endJump;
+-            enum {HOCHSPRUNG, WEITSPRUNG /*, PRAEZISER_SPRUNG*/}
+-                        jumpType;
+ 		};
+ 
+         static Ogre::String msDebugWindowPageName;
+@@ -123,7 +106,6 @@
+         /// optimal distance to the character
+         Ogre::Real mDesiredDistance;
+         std::pair&lt;Ogre::Real, Ogre::Real&gt; mDistanceRange;
+-        Ogre::Degree mYaw;
+         Ogre::Degree mCamYaw; // f&#252;r VM_FREE_CAMERA
+         Ogre::Degree mCamVirtualYaw; // helps to simulate strafe+forward/backward movement
+         Ogre::Degree mPitch;
+@@ -134,10 +116,7 @@
+         Ogre::Radian mRotationSpeed;
+         Ogre::Real mMouseSensitivity;
+         bool mInvertedMouse; // like in old games
+-        Ogre::Real mSpeedModifier;
+ 
+-		Ogre::Vector3 mGravitation;
+-
+         ViewMode mViewMode;
+ 
+         int mObstractedFrameCount;
+@@ -149,14 +128,12 @@
+         HalfSphereSelector mSelector;
+         HalfSphereSelector mCombatSelector;
+ 
++
+         /// Camera Spring-Damping System (smooth movement) spring-factor
+         Ogre::Real mLinearSpringK;
+         /// Camera Spring-Damping System (smooth movement) damping-factor
+         Ogre::Real mLinearDampingK;
+-        /// Character rotation Spring-Damping System (smooth movement) spring-factor
+-        Ogre::Real mRotLinearSpringK;
+-        /// Character rotation Spring-Damping System (smooth movement) spring-factor
+-        Ogre::Real mRotLinearDampingK;
++
+         /// with this velocity the optimal Position of the cam moves away from the char
+         Ogre::Real mCamMoveAwayVelocity;
+         /// if there was no collision of the cam for this time, the cam can securely move backward
+@@ -166,14 +143,15 @@
+ 
+         void updateSelection();
+         bool isEnemyNear();
+-        //void updateCharacterState(int movement, Ogre::Real elapsedTime);
+-        void updateCharacterState(Ogre::Real elapsedTime);
++
++
+         void updateCameraLookAt(Ogre::Real elapsedTime);
+-        //void updateAnimationState(int &amp;movement); // this can also modify movement, if needed
+ 
+-        void interpolateAnimationLookAtOffset(std::string actAnim, std::string newAnim, Ogre::Real factor);
++        void updateCharacter(Ogre::Real elapsedTime);
+ 
++        //void interpolateAnimationLookAtOffset(std::string actAnim, std::string newAnim, Ogre::Real factor);
+ 
++
+         /** Does all camera-stuff, moves the camera to the right position 
+         * and does pathfinding (in a very simple way)
+         * @warning this does only work well, if the character's material is not used for other objects!
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-05-19 23:19:35 UTC (rev 3459)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-05-20 10:51:25 UTC (rev 3460)
+@@ -24,6 +24,7 @@
+ #include &lt;OgreCamera.h&gt;
+ #include &lt;OgreSceneNode.h&gt;
+ #include &lt;OgreSceneQuery.h&gt;
++#include &lt;utility&gt;
+ 
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
+@@ -58,29 +59,19 @@
+     String MovementCharacterController::msDebugWindowPageName = &quot;MovementCharacterController&quot;;
+ 
+     MovementCharacterController::CharacterState::CharacterState()
+-        : mIsAirBorne(false),
+-        mHasFloorContact(false),
+-        mStartJump(false),
+-        mJumpWidthHeight(0),
+-        mJumpTimer(0.0),
+-        mDesiredVel(Vector3::ZERO),
++        :
+         mCurrentMovementState(MOVE_NONE),
+-        mLastMovementState(MOVE_NONE),
+-        beginSneak(false),
+-        endSneak(false),
+-        beginJump(false),
+-        endJump(false)
++        mLastMovementState(MOVE_NONE)
+     {
+-
+     }
+ 
+     MovementCharacterController::MovementCharacterController(CommandMapper* cmdMapper,
+         Actor* camera, Person* character)
+         : CharacterController(cmdMapper, camera, character),
++        mMovingCreature(NULL),
+         mCharacterState(),
+         mDesiredDistance(2.00),
+         mDistanceRange(0.60, 7.00),
+-        mYaw(180),
+         mCamYaw(0),
+         mCamVirtualYaw(0),
+         mPitch(20),
+@@ -91,20 +82,15 @@
+         mCamMoveAwayVelocity(4.0f),
+         mCamMoveAwayStartTime(0.25f),
+         mCamMoveAwayRange(8.0f),
+-        mRotLinearSpringK(600.0f),
+-        mRotLinearDampingK(Math::NEG_INFINITY),
+         mLookAtOffset(),
+         mRotationSpeed(Degree(120.0f)),
+         mMouseSensitivity(4.0f),
+-        mSpeedModifier(1.0f),
+         mViewMode(VM_THIRD_PERSON),
+-//        mMaxDelay(1.0/20.0),
+         mObstractedFrameCount(0),
+         mObstractedTime(0.0f),
+         mCameraJammedFrameCount(0),
+         mCameraJammedTime(0.0f),
+         mRaycast(new PhysicsMaterialRaycast()),
+-        mGravitation(),
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+             QUERYFLAG_CREATURE)
+@@ -112,7 +98,6 @@
+         DebugWindow::getSingleton().registerPage(msDebugWindowPageName);
+ 
+ 
+-        mGravitation = PhysicsManager::getSingleton().getGravity();
+         mMouseSensitivity = ConfigurationManager::getSingleton().getIntSetting(&quot;Input&quot;, &quot;Mouse Sensitivity&quot;);
+         mInvertedMouse = ConfigurationManager::getSingleton().getBoolSetting(&quot;Input&quot;, &quot;Mouse Invert&quot;);
+ 
+@@ -123,7 +108,6 @@
+         // Values greater than 1.0 mean damping is stronger and thus camera takes a detour.
+         Real relationCoefficient = 1.0f;
+         mLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mLinearSpringK);
+-        mRotLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mRotLinearSpringK);
+ 
+         // Offset for the look at point,
+         // so the cam does look at the characters head instead of the feet.
+@@ -162,18 +146,28 @@
+     //------------------------------------------------------------------------
+     void MovementCharacterController::pause()
+     {
++        if( mMovingCreature != NULL )
++        {
++            delete mMovingCreature;
++            mMovingCreature = NULL;
++        }
++
+         // actors aren't controlled anymore
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
++        //mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+-        // Char&lt;-&gt;Level collision back to default
++        // cam&lt;-&gt;Level collision back to default
+         PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+-        // Char&lt;-&gt;Default collision back to default
++        // cam&lt;-&gt;Default collision back to default
+         PhysicsManager::getSingleton().resetMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
++        PhysicsManager::getSingleton().resetMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+ 
++
+         // Unhighlight selected object, if any.
+         GameObject* go = mSelector.getFirstSelectedObject();
+         if (go != NULL &amp;&amp; go-&gt;isHighlighted())
+@@ -185,6 +179,9 @@
+     //------------------------------------------------------------------------
+     void MovementCharacterController::resume()
+     {
++        if( mMovingCreature == NULL )
++            mMovingCreature = new MovingCreature(mCharacter);
++
+         // We want to check for visibility from char's POV.
+         mSelector.setCheckVisibility(true, mCharacter);
+         mSelector.track(mCharacter);
+@@ -197,27 +194,30 @@
+ 
+         // The actor should be controlled manually,
+         // so let the PM prepare it accordingly
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;setMaterialID(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
++        //mCharacterActor-&gt;getPhysicalThing()-&gt;setMaterialID(
++        //    PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++        //mCharacterActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+         mCameraActor-&gt;getPhysicalThing()-&gt;setMaterialID(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++            PhysicsManager::getSingleton().createMaterialID(&quot;camera&quot;));
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+ 
+-        // We also handle char&lt;-&gt;level, char&lt;-&gt;default collision from now on
+-        PhysicsManager::getSingleton().getMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++        // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setContactCallback(this);
+-        PhysicsManager::getSingleton().getMaterialPair(
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;),
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setContactCallback(this);
+-        
++        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setContactCallback(this);
++
+         // Fit Collision proxy to idle anim
+         mCharacterActor-&gt;getPhysicalThing()-&gt;fitToPose(&quot;idle&quot;);
+ 
+-        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
+-        mesh-&gt;stopAllAnimations();
+-        mesh-&gt;startAnimation(&quot;idle&quot;);
++        //MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
++        //mesh-&gt;stopAllAnimations();
++        //mesh-&gt;startAnimation(&quot;idle&quot;);
+ 
+         setViewMode(VM_THIRD_PERSON);
+     }
+@@ -225,11 +225,25 @@
+     //------------------------------------------------------------------------
+     void MovementCharacterController::run(Real elapsedTime)
+     {
+-        updateCharacterState(elapsedTime);
++        InputManager* im = InputManager::getSingletonPtr();
++
++        updateCharacter(elapsedTime);
+         updateCameraLookAt(elapsedTime);
+         updateSelection();
+ 
+ 
++
++        // camera pitch
++        if (mInvertedMouse)
++            mPitch -= 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
++        else
++            mPitch += 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
++        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
++        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
++
++
++
++
+         // Do we need to reset the Camera?
+         Vector3 charPos = mCharacterActor-&gt;getWorldPosition();
+         Quaternion charOri = mCharacterActor-&gt;getWorldOrientation();
+@@ -273,613 +287,134 @@
+     }
+ 
+     //------------------------------------------------------------------------
+-    void MovementCharacterController::updateCharacterState(Ogre::Real elapsedTime)
++    void MovementCharacterController::updateCharacter(Ogre::Real elapsedTime)
+     {
+         InputManager* im = InputManager::getSingletonPtr();
+-        mCharacterState.mDesiredVel = Vector3::ZERO;
+-        int patzer = 0;
+-        int movement = mCharacterState.mCurrentMovementState;
+-        int creatureMovement = mCharacter-&gt;getTaktischeBewegung();
+-        bool blockMovement (false);
+-
+-
+-
+-
+-        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCharacterActor-&gt;getControlledObject());
+-        PhysicalThing* pt = mCharacterActor-&gt;getPhysicalThing();
+-        static std::string lastAnimation(&quot;&quot;);
+-        std::string newAnimation(&quot;idle&quot;);
+-        Real animSpeed = 1;
+-        static Real lastSpeed = 1;
+-        unsigned int animTimesToPlay = 0;
+-		//Real gs = mCharacter-&gt;getWert(Creature::WERT_GS);
+-        static String lastCollisionPose = &quot;&quot;;
+-        String collisionPose = &quot;idle&quot;;
+-
+-        // the different factors used to calculate the animation-speed from the character-speed
+-        const Real factor_hocke_gehen = 0.7;
+-        const Real factor_drehen_idle = 0.6;
+-        const Real factor_gehen = 0.5;
+-        const Real factor_gehen_rueckwaerts = 0.7;
+-        const Real factor_rennen = 0.25;
+-        const Real factor_rennen_absprung = 0.25;
+-        const Real factor_rennen_sprung_landung = 0.6;
+-        const Real factor_rennen_sprung = 0.25;
+-        const Real factor_gehen_seitwaerts = 0.9;
+-
+-
+-
+-
+-        Vector3 charVelocity, charOmega;
+-        charOmega = mCharBody-&gt;getOmega();
+-        charVelocity = mCharBody-&gt;getVelocity();
+-        Real vel = charVelocity.length();
+-
+-
+-
+-
+-        //  --------------------------- sneaking-behaviour ----------------------------
++        if( mMovingCreature != NULL )
+         {
+-            if( (!(creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) &amp;&amp; 
+-                movement &amp; MOVE_SNEAK) || 
+-                mCharacterState.beginSneak )
+-            {
+-                mCharacterState.beginSneak = true;
+-            }
+-            if( (!(movement &amp; MOVE_SNEAK) &amp;&amp; 
+-                creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) || 
+-                mCharacterState.endSneak)
+-            {
+-                mCharacterState.endSneak = true;
+-            }
++            int movement = mCharacterState.mCurrentMovementState;
++            Degree rotation(0);
+ 
+-            if( mCharacterState.beginSneak )
++            AbstractMovement *drehen = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
++            Real baseVelocity = 0;
++            if( drehen-&gt;calculateBaseVelocity(baseVelocity) )
+             {
+-                newAnimation = &quot;idle_zu_hocke&quot;;
++                Degree baseVel(baseVelocity*360);
++                if (movement &amp; TURN_LEFT)
++                    rotation = elapsedTime * baseVel;
++                if (movement &amp; TURN_RIGHT)
++                    rotation = -elapsedTime * baseVel;
+ 
+-                MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+-                if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
++                // mouse
++                if( !im-&gt;isCeguiActive() &amp;&amp; mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
+                 {
+-                    creatureMovement |= Creature::BEWEGUNG_SCHLEICHEN;
+-                    mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+-                    mCharacterState.beginSneak = false;
++                    if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
++                    {
++                        rotation = -mMouseSensitivity/3.0f * Degree(im-&gt;getMouseRelativeX())/200.0 * baseVel;
++                    }
+                 }
+-                else
+-                {
+-                    collisionPose = &quot;idle&quot;;
+-                    animTimesToPlay = 1;
+-                    blockMovement = true;
+ 
+-                    mCharacter-&gt;doTaktischeBewegung(Creature::BEWEGUNG_NONE, elapsedTime, patzer);
+-                }
+ 
+-                // interpolate camera offset
+-                Real factor = meshAnim-&gt;getTimePlayed() / meshAnim-&gt;getLength();
+-                interpolateAnimationLookAtOffset(&quot;idle&quot;, &quot;hocke_idle&quot;, factor);
+-            }
+-
+-            if( creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN )
+-            {
+-                newAnimation = &quot;hocke_idle&quot;;
+-                collisionPose = newAnimation;
+-            }
+-
+-            if( mCharacterState.endSneak )
+-            {
+-                creatureMovement &amp;= ~Creature::BEWEGUNG_SCHLEICHEN;
+-                mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+-                newAnimation = &quot;hocke_zu_stehen&quot;;
+-
+-
+-                MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+-                if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
++                // virtual yaw
++                Degree newVirtualYaw(0);
++                if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) ||
++                    ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) )
+                 {
+-                    newAnimation = &quot;idle&quot;;
+-                    mCharacterState.endSneak = false;
++                    newVirtualYaw = Degree(45);
+                 }
+-                else
++                if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) ||
++                    ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) )
+                 {
+-                    collisionPose = &quot;idle&quot;;
+-                    animTimesToPlay = 1;
+-                    blockMovement = true;
+-
+-                    mCharacter-&gt;doTaktischeBewegung(Creature::BEWEGUNG_NONE, elapsedTime, patzer);
++                    newVirtualYaw = Degree(-45);
+                 }
+-
+-                // interpolate camera-offset
+-                Real factor = meshAnim-&gt;getTimePlayed() / meshAnim-&gt;getLength();
+-                interpolateAnimationLookAtOffset(&quot;hocke_idle&quot;, &quot;idle&quot;, factor);
++                if( mCamVirtualYaw != newVirtualYaw )
++                {
++                    rotation += mCamVirtualYaw - newVirtualYaw;
++                    mCamVirtualYaw = newVirtualYaw;
++                }
+             }
+-        }
+-        //  --------------------------- sneaking-behaviour -------------------------
+ 
+ 
+ 
+-
+-
+-        // ------------------ walking, jogging, running etc ------------------------
+-        if( !blockMovement )
+-        {
+-
+-            int newCreatureMovement = 
+-                creatureMovement &amp; ~
+-                    (Creature::BEWEGUNG_RENNEN |
+-                    Creature::BEWEGUNG_LAUFEN | 
+-                    Creature::BEWEGUNG_JOGGEN |
+-                    Creature::BEWEGUNG_GEHEN | 
+-                    Creature::BEWEGUNG_RUECKWAERTS |
+-                    Creature::BEWEGUNG_SEITWAERTS |
+-                    Creature::BEWEGUNG_DREHEN |
+-                    Creature::BEWEGUNG_UMDREHEN
+-                    );
+-
+-            if( movement &amp; MOVE_RUN &amp;&amp; movement &amp; MOVE_RUN_LOCK )
+-                newCreatureMovement |= Creature::BEWEGUNG_RENNEN;
+-            else if( movement &amp; MOVE_RUN_LOCK )
+-                newCreatureMovement |= Creature::BEWEGUNG_LAUFEN;
+-            else if( !(movement &amp; MOVE_RUN) )
+-                newCreatureMovement |= Creature::BEWEGUNG_JOGGEN;
+-            else
+-                newCreatureMovement |= Creature::BEWEGUNG_GEHEN;
+-
+-            if( movement &amp; MOVE_FORWARD )
+-                ;
+-            else if( movement &amp; MOVE_BACKWARD )
+-                newCreatureMovement |= Creature::BEWEGUNG_RUECKWAERTS;
+-            else if( movement &amp; MOVE_RIGHT || movement &amp; MOVE_LEFT )
+-                newCreatureMovement |= Creature::BEWEGUNG_SEITWAERTS;
+-
+-
+-            // check if new Movement is possible
+-            if( newCreatureMovement &amp; Creature::BEWEGUNG_RENNEN )
++            if( movement &amp; MOVE_SNEAK )
+             {
+-                if( !mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement) )
+-                {
+-                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_RENNEN;
+-                    newCreatureMovement |= Creature::BEWEGUNG_LAUFEN;
+-                }
++                Vector3 direction(Vector3::ZERO);
++                if (movement &amp; MOVE_FORWARD)
++                    direction.z = -1;
++                else if( movement &amp; MOVE_BACKWARD)
++                    direction.z = 1;
++                mMovingCreature-&gt;setMovement(
++                    MovingCreature::MT_SCHLEICHEN,
++                    direction,
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-
+-            if( newCreatureMovement &amp; Creature::BEWEGUNG_LAUFEN )
++            else if( movement &amp; MOVE_JUMP )
+             {
+-                if( !mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement) )
++                MovingCreature::MovementType type = MovingCreature::MT_HOCHSPRUNG;
++                Vector3 direction = Vector3::UNIT_Y;
++                if( movement &amp; MOVE_FORWARD )
+                 {
+-                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_LAUFEN;
+-                    newCreatureMovement |= Creature::BEWEGUNG_JOGGEN;
++                    type = MovingCreature::MT_WEITSPRUNG;
++                    direction += Vector3::NEGATIVE_UNIT_Z;
+                 }
++                mMovingCreature-&gt;setMovement(
++                    type,
++                    direction,
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-            
+-            if( newCreatureMovement &amp; Creature::BEWEGUNG_JOGGEN )
++            else if( movement &amp; MOVE_FORWARD )
+             {
+-                if( !mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement) )
++                MovingCreature::MovementType type = MovingCreature::MT_GEHEN;
++                if( movement &amp; MOVE_RUN_LOCK )
+                 {
+-                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_JOGGEN;
+-                    newCreatureMovement |= Creature::BEWEGUNG_GEHEN;
+-                }
+-            }
+-            
+-            if( newCreatureMovement &amp; Creature::BEWEGUNG_GEHEN )
+-            {
+-                if( !mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement) )
+-                {
+-                    // character exhausted?
+-                    blockMovement = true;
+-                    newAnimation = &quot;idle&quot;;
+-                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_GEHEN;
+-                    newCreatureMovement |= Creature::BEWEGUNG_NONE;
+-                    mCharacter-&gt;doTaktischeBewegung(newCreatureMovement, elapsedTime, patzer);
+-                }
+-            }
+-
+-            if( !blockMovement )
+-            {
+-                // not handled movements:
+-                if( movement &amp; MOVE_FORWARD &amp;&amp; movement &amp; MOVE_BACKWARD ||
+-                    movement &amp; MOVE_LEFT &amp;&amp; movement &amp; MOVE_RIGHT )
+-                {
+-                }
+-                else if( (movement &amp; MOVE_FORWARD || movement &amp; MOVE_BACKWARD) &amp;&amp; // this also handles strafe+forward/backward
+-                         (newCreatureMovement &amp; Creature::BEWEGUNG_LAUFEN ||
+-                          newCreatureMovement &amp; Creature::BEWEGUNG_JOGGEN ||
+-                          newCreatureMovement &amp; Creature::BEWEGUNG_RENNEN ) )
+-                {
+-                    newAnimation = &quot;rennen&quot;;
+-                    if( movement &amp; MOVE_FORWARD )
+-                    {
+-                        mCharacterState.mDesiredVel.z = -1;
+-                        animSpeed = factor_rennen;
+-                    }
++                    if( movement &amp; MOVE_RUN )
++                        type = MovingCreature::MT_RENNEN;
+                     else
+-                    {
+-                        mCharacterState.mDesiredVel.z = 1;
+-                        animSpeed = -factor_rennen;
+-                    }
++                        type = MovingCreature::MT_LAUFEN;
+                 }
+-                else if( movement &amp; MOVE_FORWARD )
++                else
+                 {
+-                    newAnimation = &quot;gehen&quot;;
+-                    animSpeed = factor_gehen;
+-                    mCharacterState.mDesiredVel.z = -1;
+-                }
+-                else if( movement &amp; MOVE_BACKWARD )
+-                {
+-                    newAnimation = &quot;gehen_rueckwaerts&quot;;
+-                    animSpeed = factor_gehen_rueckwaerts;
+-                    mCharacterState.mDesiredVel.z = 1;
+-                }
+-                else if( movement &amp; MOVE_LEFT )
+-                {
+-                    newAnimation = &quot;seitwaerts_links&quot;;
+-                    animSpeed = factor_gehen_seitwaerts;
+-                    mCharacterState.mDesiredVel.x = -1;
+-                }
+-                else if( movement &amp; MOVE_RIGHT )
+-                {
+-                    newAnimation = &quot;seitwaerts_rechts&quot;;
+-                    animSpeed = factor_gehen_seitwaerts;
+-                    mCharacterState.mDesiredVel.x = 1;
+-                }
+-
+-
+-
+-
+-                // ---------- jumping-behaviour (and falling?) ---------
+-                {
+-                    if( !((creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) || 
+-                        blockMovement || mCharacterState.beginJump ||
+-                        (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG) ||
+-                        (creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG)) &amp;&amp;
+-                        movement &amp; MOVE_JUMP)
+-                    {
+-                        if( mCharacterState.mDesiredVel.squaredLength() &gt; 0 )
+-                        {
+-                            if( movement &amp; MOVE_FORWARD )
+-                            {
+-                                mCharacterState.beginJump = true;
+-                                mCharacterState.jumpType = CharacterState::WEITSPRUNG;
+-                                creatureMovement = newCreatureMovement;
+-                            }
+-                        }
+-                        else
+-                        {
+-                            mCharacterState.beginJump = true;
+-                            mCharacterState.jumpType = CharacterState::HOCHSPRUNG;
+-                            creatureMovement = newCreatureMovement;
+-                        }
+-                    }
+-
+-
+-                    if( (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG ||
+-                        creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG  ) &amp;&amp;
+-                        !mCharacterState.beginJump )
+-                    {
+-                        if( !mCharacterState.mIsAirBorne )
+-                            mCharacterState.endJump = true;
+-                    }
+-
+-
+-                    static Real timeJumpKeyPressed (0.0);
+-                    if( mCharacterState.beginJump &amp;&amp; (movement &amp; MOVE_JUMP) )
+-                        timeJumpKeyPressed += elapsedTime;
++                    if( movement &amp; MOVE_RUN )
++                        type = MovingCreature::MT_GEHEN;
+                     else
+-                        timeJumpKeyPressed = 0;
+-
+-
+-
+-
+-                    if( mCharacterState.beginJump )
+-                    {
+-                        blockMovement = true;
+-                        if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+-                        {
+-                            newAnimation = &quot;rennen_absprung&quot;;
+-                            animSpeed = factor_rennen_sprung * vel;
+-                        }
+-                        else // HOCHSPRUNG
+-                        {
+-                            newAnimation = &quot;idle_absprung&quot;;
+-
+-                        }
+-                        animTimesToPlay = 1;
+-                        
+-
+-                        MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+-                        if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+-                        {
+-                            mCharacterState.beginJump = false;
+-                            
+-                            if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+-                            {
+-                                if( mCharacter-&gt;canUseTaktischeBewegung(creatureMovement | Creature::BEWEGUNG_WEITSPRUNG) )
+-                                {
+-                                    Real jumpWidth = 
+-                                        mCharacter-&gt;doTaktischeBewegung(
+-                                                creatureMovement | Creature::BEWEGUNG_WEITSPRUNG,
+-                                                elapsedTime,
+-                                                patzer);
+-
+-                                    mCharacterState.mJumpWidthHeight = jumpWidth;
+-                                    mCharacterState.mStartJump = true;
+-                                }
+-                            }
+-                            else
+-                            {
+-                                if( mCharacter-&gt;canUseTaktischeBewegung(creatureMovement | Creature::BEWEGUNG_HOCHSPRUNG) )
+-                                {
+-                                    Real jumpHeight = 
+-                                        mCharacter-&gt;doTaktischeBewegung(
+-                                                creatureMovement | Creature::BEWEGUNG_HOCHSPRUNG,
+-                                                elapsedTime,
+-                                                patzer);
+-
+-                                    mCharacterState.mJumpWidthHeight = jumpHeight;
+-                                    mCharacterState.mStartJump = true;
+-                                }
+-                            }
+-
+-                            if( timeJumpKeyPressed &lt; 0.1f )
+-                                timeJumpKeyPressed = 0.1f;
+-                            Real factor = timeJumpKeyPressed / meshAnim-&gt;getLength();
+-                            if (factor &gt; 1.0f)
+-                                factor = 1.0f;
+-
+-
+-                            mCharacterState.mJumpWidthHeight *= factor;
+-                        }
+-                        else
+-                        {
+-                            mCharacterState.mDesiredVel = Vector3::ZERO;
+-                            if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+-                            {
+-                                mCharacterState.mDesiredVel.z = -1;
+-                                Real vel = mCharacter-&gt;doTaktischeBewegung(
+-                                    creatureMovement, elapsedTime, patzer);
+-                                mCharacterState.mDesiredVel *= vel;
+-                            }
+-                            else
+-                            {
+-                                mCharacter-&gt;setTaktischeBewegung(creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG);
+-                            }
+-                        }
+-                    }
+-                    else
+-                    {
+-                        if( creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG )
+-                        {
+-                            blockMovement = true;
+-                            newAnimation = &quot;idle_sprung&quot;;
+-                        }
+-                        else
+-                        if( creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG )
+-                        {
+-                            blockMovement = true;
+-                            newAnimation = &quot;rennen_sprung&quot;;
+-                            animSpeed = vel * factor_rennen_sprung;
+-                        }
+-                    }
+-
+-
+-                    if( mCharacterState.endJump )
+-                    {
+-                        mCharacterState.mDesiredVel = Vector3::ZERO;
+-
+-                        blockMovement = true;
+-                        if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+-                        {
+-                            newAnimation = &quot;rennen_sprung_landung&quot;;
+-                            animSpeed = factor_rennen_sprung * vel;
+-
+-                            // schneller oder gleich schnell weiterlaufen
+-                            if( movement &amp; MOVE_FORWARD )
+-                            {
+-                                int dummy = Creature::BEWEGUNG_GEHEN |
+-                                            Creature::BEWEGUNG_LAUFEN |
+-                                            Creature::BEWEGUNG_JOGGEN |
+-                                            Creature::BEWEGUNG_RENNEN;
+-                                if( (newCreatureMovement &amp; dummy) &gt;=
+-                                    (creatureMovement &amp; dummy) )
+-                                {
+-                                    blockMovement = false;
+-                                    mCharacterState.mDesiredVel.z = -1;
+-                                    newCreatureMovement &amp;= ~Creature::BEWEGUNG_WEITSPRUNG;
+-                                }
+-                                    
+-                            }
+-                        }
+-                        else // HOCHSPRUNG
+-                        {
+-                            newAnimation = &quot;idle_sprung_landung&quot;;
+-                        }
+-                        animTimesToPlay = 1;
+-                        
+-
+-                        MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+-                        if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+-                        {
+-                            mCharacterState.endJump = false;
+-                            creatureMovement &amp;= ~Creature::BEWEGUNG_HOCHSPRUNG &amp; ~Creature::BEWEGUNG_WEITSPRUNG;
+-                            mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+-                        }
+-                    }
+-
+-
++                        type = MovingCreature::MT_JOGGEN;
+                 }
+-                // ------ jumping-behaviour ----------
+-
+-
+-
+-                // only do something, if the char does not jump
+-                if( !blockMovement )
+-                {
+-                    Real vel;
+-                    if( mCharacterState.mDesiredVel.squaredLength() == 0 )
+-                    {
+-                        newCreatureMovement &amp;= ~(
+-                                Creature::BEWEGUNG_RENNEN |
+-                                Creature::BEWEGUNG_LAUFEN | 
+-                                Creature::BEWEGUNG_JOGGEN |
+-                                Creature::BEWEGUNG_GEHEN | 
+-                                Creature::BEWEGUNG_RUECKWAERTS |
+-                                Creature::BEWEGUNG_SEITWAERTS |
+-                                Creature::BEWEGUNG_DREHEN |
+-                                Creature::BEWEGUNG_UMDREHEN
+-                                );
+-                    }
+-                    vel = mCharacter-&gt;doTaktischeBewegung(newCreatureMovement, elapsedTime, patzer);
+-                    creatureMovement = newCreatureMovement;
+-                    
+-                    mCharacterState.mDesiredVel *= vel;
+-                    animSpeed *= vel;
+-
+-                    // some special cases:
+-                    if( newCreatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN &amp;&amp;
+-                        vel &gt; 0 )
+-                    {
+-                        newAnimation = &quot;hocke_gehen&quot;;
+-                        animSpeed = vel*factor_hocke_gehen;
+-                    }
+-                }
+-
+-
+-
+-
+-                // this simulates going right-forward or left-forward or right/left - backward
+-                Degree newCharVirtualYaw (0); 
+-                if( (movement &amp; MOVE_FORWARD &amp;&amp; movement &amp; MOVE_LEFT) ||
+-                    (movement &amp; MOVE_BACKWARD &amp;&amp; movement &amp; MOVE_RIGHT) )
+-                {
+-                    newCharVirtualYaw = Degree(45);
+-                }
+-                else if( (movement &amp; MOVE_FORWARD &amp;&amp; movement &amp; MOVE_RIGHT) ||
+-                         (movement &amp; MOVE_BACKWARD &amp;&amp; movement &amp; MOVE_LEFT) )
+-                {
+-                    newCharVirtualYaw = Degree(-45);
+-                }
+-                else // no strafing
+-                {
+-                    newCharVirtualYaw = Degree(0);
+-                }
+-
+-                if( newCharVirtualYaw != -mCamVirtualYaw )
+-                {
+-                    mYaw += mCamVirtualYaw;
+-                    mYaw += newCharVirtualYaw;
+-                    mCamVirtualYaw = -newCharVirtualYaw;
+-                }
++                mMovingCreature-&gt;setMovement(
++                    type,
++                    Vector3(0,0,-1), 
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-        }
+-        // ------------------ walking, jogging, running etc ------------------------
+-
+-
+-
+-
+-        // ---------------------------- turning + direction changing ---------------
+-
+-        if( !blockMovement )
+-        {
+-
+-            Degree rotation;
+-            // keyboard
+-            if (movement &amp; TURN_LEFT)
+-                rotation = -elapsedTime * Degree(360.0f) * mCharacter-&gt;doTaktischeBewegung(
+-                    creatureMovement | Creature::BEWEGUNG_DREHEN, elapsedTime, patzer);
+-            if (movement &amp; TURN_RIGHT)
+-                rotation = elapsedTime * Degree(360.0f) * mCharacter-&gt;doTaktischeBewegung(
+-                    mCharacter-&gt;getTaktischeBewegung() | Creature::BEWEGUNG_DREHEN, elapsedTime, patzer);
+-
+-            // mouse
+-            if( !im-&gt;isCeguiActive() &amp;&amp; mViewMode == VM_FIRST_PERSON || mViewMode == VM_THIRD_PERSON )
++            else if (movement &amp; MOVE_BACKWARD )
+             {
+-                if( !(movement &amp; TURN_LEFT || movement &amp; TURN_RIGHT) )
+-                {
+-                    rotation = mMouseSensitivity/3.0 * Degree(im-&gt;getMouseRelativeX());
+-
+-
+-                    if( rotation != Degree(0) || mCharBody-&gt;getOmega().squaredLength() &gt; 0.1 )
+-                        rotation = rotation * mCharacter-&gt;doTaktischeBewegung( 
+-                                        mCharacter-&gt;getTaktischeBewegung() | Creature::BEWEGUNG_DREHEN, elapsedTime, patzer);
+-                }
++                MovingCreature::MovementType type = MovingCreature::MT_RUECKWAERTS_GEHEN;
++                if( movement &amp; MOVE_RUN )
++                    type = MovingCreature::MT_RUECKWAERTS_JOGGEN;
++                mMovingCreature-&gt;setMovement(
++                    type,
++                    Vector3(0,0,1), 
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-
+-
+-            static bool lastTurning(false);
+-            if( mCharacter-&gt;getTaktischeBewegung() == Creature::BEWEGUNG_DREHEN &amp;&amp;
+-                (rotation &lt;= Degree(-2) || rotation &gt;= Degree(2) || lastTurning) )
++            else if (movement &amp; MOVE_LEFT || movement &amp; MOVE_RIGHT)
+             {
+-                lastTurning = true;
+-                if( charOmega.y &gt; 0 )
+-                    newAnimation = &quot;drehen_links&quot;;
+-                else
+-                    newAnimation = &quot;drehen_rechts&quot;;
+-                
+-                animSpeed = factor_drehen_idle * charOmega.y;
++                Vector3 direction = Vector3::UNIT_X;
++                if( movement &amp; MOVE_LEFT )
++                    direction = Vector3::NEGATIVE_UNIT_X;
++                mMovingCreature-&gt;setMovement(
++                    MovingCreature::MT_SEITWAERTS_GEHEN,
++                    direction, 
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+             else
+-                lastTurning = false;
+-
+-
+-            mYaw -= rotation;
+-            while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+-            while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+-        }
+-
+-        if (mInvertedMouse)
+-            mPitch -= 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
+-        else
+-            mPitch += 0.5 * mMouseSensitivity * Degree(im-&gt;getMouseRelativeY() / 10);
+-        if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+-        if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
+-
+-        // ---------------------------- turning + direction changing ---------------
+-
+-
+-
+-
+-
+-        // ---------------------------- show animation -----------------------------
+-        if (newAnimation != &quot;&quot; &amp;&amp; newAnimation != &quot;drehen_links&quot; &amp;&amp; newAnimation != &quot;drehen_rechts&quot; )
+-        {
+-            // nur schneller nicht langsamer ausfhren!
+-            if (animSpeed &lt; 1) animSpeed = 1;
+-
+-            if (lastAnimation != newAnimation)
+             {
+-                if (collisionPose != lastCollisionPose)
+-                {
+-                    pt-&gt;fitToPose(collisionPose);
+-                    lastCollisionPose = collisionPose;
+-                }
+-                mesh-&gt;stopAllAnimations();
+-
+-
+-                // animations with zero-length can't be played
+-                if( newAnimation == &quot;idle_sprung&quot; ||
+-                    newAnimation == &quot;rennen_sprung&quot; )
+-                {
+-                    newAnimation = &quot;idle&quot;;
+-                    animSpeed = 1;
+-                }
+-
+-
+-
+-                mesh-&gt;startAnimation(newAnimation, animSpeed, animTimesToPlay);
+-                lastAnimation = newAnimation;
+-                lastSpeed = animSpeed;
++                mMovingCreature-&gt;setMovement(
++                    MovingCreature::MT_STEHEN, 
++                    Vector3(0,0,0),
++                    Vector3(0, rotation.valueRadians(), 0) );
+             }
+-            else
+-            {
+-                if ( lastSpeed != animSpeed ) // Geschwindigkeits&#239;&#191;&#189;derung
+-                {
+-                    MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+-                    meshAnim-&gt;setSpeed(animSpeed);
+-                    lastSpeed = animSpeed;
+-                }
+-            }
+         }
+-
+     }
+ 
+-
++    // ------------------------------------------------------------------------
+     void MovementCharacterController::updateCameraLookAt(Ogre::Real elapsedTime)
+     {
+         InputManager* im = InputManager::getSingletonPtr();
+@@ -906,9 +441,9 @@
+         SceneNode* cameraNode = mCameraActor-&gt;_getSceneNode();
+ 
+         Vector3 charPos;
+-        Quaternion charOri(mYaw, Vector3::UNIT_Y);
++        charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
++        Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+-        charPos = mCharacterActor-&gt;getWorldPosition();
+         virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
+ 
+ 
+@@ -974,238 +509,35 @@
+         }
+     }
+ 
+-    //------------------------------------------------------------------------
+-    // adopted from the chararcter demo in the newton sdk
+-    // copyright 2000-2004
+-    // By Julio Jerez
++
++    // -------------------------------------------------------------
++    // character collision moved to MovingCreature(Manager)
+     int MovementCharacterController::userProcess()
+     {
+-        if ((m_body0 == mCamBody &amp;&amp; m_body1 == mCharBody)
+-            || (m_body0 == mCharBody &amp;&amp; m_body1 == mCamBody))
+-        {
+-            // No collision between char and camera
++        // only camera collision
++    
++        if( mViewMode == VM_FIRST_PERSON )
+             return 0;
+-        }
+-        else if (m_body0 == mCamBody || m_body1 == mCamBody)
+-        {
+-            // this is camera collision
+ 
+-            if( mViewMode == VM_FIRST_PERSON )
+-                return 0;
++        setContactSoftness(1.0f);
++        setContactElasticity(0.0f);
+ 
+-            setContactSoftness(1.0f);
+-            setContactElasticity(0.0f);
+-
+-            return 1;
+-        }
+-        else if (m_body0 == mCharBody || m_body1 == mCharBody)
+-        {
+-            // this is character collision
+-            Vector3 point;
+-            Vector3 normal;
+-            getContactPositionAndNormal(point, normal);
+-
+-            // determine if this contact is with the floor.
+-            // Meaning the contact normal has an angle to UNIT_Y of 20 or less.
+-            Degree angle = Math::ACos(normal.dotProduct(Vector3::UNIT_Y));
+-
+-            Vector3 charPos;
+-            Quaternion charOri;
+-            mCharBody-&gt;getPositionOrientation(charPos, charOri);
+-            bool isFloorCollision(false);
+-
+-            //if( charPos.y &gt; point.y &amp;&amp; angle &lt; Degree(50.0f)  )
+-            AxisAlignedBox CharAab = mCharBody-&gt;getCollision()-&gt;getAABB();
+-            Real CharHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
+-            Real stepHeight = point.y - charPos.y;
+-/*
+-            if( stepHeight &lt; 0.5f &amp;&amp; mCharacterState.mHasFloorContact ||
+-                stepHeight &lt; 0.2f )
+-*/
+-            if( stepHeight &lt; 0.5f )
+-                isFloorCollision = true;
+-
+-            if ( isFloorCollision )
+-            {
+-                mCharacterState.mHasFloorContact = true;
+-                if(stepHeight &gt; 0.1f)
+-                    setContactNormalAcceleration(10);
+-                setContactElasticity(0.0f);
+-            }
+-            else
+-            {
+-                // what is the aim of this, this does nothing without an setContactTangentAcceleration, doesn't it?
+-                //Vector3 velocity = mCharBody-&gt;getVelocity();
+-
+-                // calculate char velocity perpendicular to the contact normal
+-                //Vector3 tangentVel = velocity - normal * (normal.dotProduct(velocity));
+-
+-                // align the tangent at the contact point with the
+-                // tangent velocity vector of the char
+-                //rotateTangentDirections(tangentVel);
+-                
+-            }
+-
+-
+-            // perhaps ContactElasticity and ContactSoftness should not be overwritten
+-            //setContactElasticity(?);
+-            //setContactSoftness(?);
+-
+-            setContactFrictionState(1, 0);
+-            setContactFrictionState(1, 1);
+-        }
+-
+-        // return one to tell Newton we want to accept this contact
+         return 1;
+     }
+ 
+     //------------------------------------------------------------------------
+-    // adopted from the chararcter demo in the newton sdk
+-    // copyright 2000-2004
+-    // By Julio Jerez
++    // character callback moved to MovingCreature
+     void MovementCharacterController::OnApplyForceAndTorque(PhysicalThing* thing)
+     {
+         OgreNewt::World* world = PhysicsManager::getSingleton()._getNewtonWorld();
+-        OgreNewt::Body* body = thing-&gt;_getBody();
+-        //static Vector3 lastDirVector = Vector3::ZERO;
+-        static Vector3 lastForce = Vector3::ZERO;
+-        //static bool doCollisionStep = false;
+-        //static Vector3 collisionStepPos;
+-        //static int curCollisionStep;
+-
+-        // Get the current world timestep
+         Real timestep = world-&gt;getTimeStep();
+ 
+-        if (body == mCamBody)
+-        {
+-            calculateCamera(timestep);
+-        }
+-        else
+-        {
+-            mCharacterState.mJumpTimer += timestep;
+-            static Real timeSinceLastFloorContact(0.0f); // damit kleine Bodenunebenheiten nicht gleich zum &quot;Sprung fhren&quot;
+-            if( !mCharacterState.mHasFloorContact )
+-                timeSinceLastFloorContact += timestep;
+-            else
+-                timeSinceLastFloorContact = 0.0f;
++        calculateCamera(timestep);
+ 
+ 
+ 
+ 
+-            // apply character force
+-            Vector3 position;
+-            Quaternion orientation;
+-            body-&gt;getPositionOrientation(position, orientation);
+-
+-            // get the charater mass
+-            Real mass;
+-            Vector3 inertia;
+-            body-&gt;getMassMatrix(mass, inertia);
+-
+-            // apply gravity
+-            Vector3 force = Vector3::ZERO;
+-            force = mass * mGravitation;
+-
+-            // Get the velocity vector
+-            Vector3 currentVel = body-&gt;getVelocity();
+-
+-            // Gravity is applied above, so not needed here
+-            // prevent adding a counter force against gravity
+-            //if (currentVel.y &lt; 0.0f || mCharacterState.mJumpTimer &lt; 2.0f)
+-            currentVel.y = 0.0f;
+-
+-            if( (mCharacterState.mHasFloorContact &amp;&amp; mCharacterState.mJumpTimer &gt; 0.1f) ||
+-                ( timeSinceLastFloorContact &lt; 2.2f &amp;&amp; !mCharacterState.mIsAirBorne ) )
+-                mCharacterState.mIsAirBorne = false;
+-            else
+-                mCharacterState.mIsAirBorne = true;
+-
+-
+-            if( !mCharacterState.mIsAirBorne )
+-            {
+-
+-                if( mCharacterState.mStartJump )
+-                {
+-                    int creatureMovement = mCharacter-&gt;getTaktischeBewegung();
+-
+-                    if( creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG )
+-                    {
+-                        Real height = mCharacterState.mJumpWidthHeight;
+-                        Real m = mass;
+-                        Real g = mGravitation.length();
+-                        Real t = timestep;
+-                        Real h = height;
+-                        Real jumpForce = 0.5f*g*m * (Math::Sqrt(1 + 8*h/(g * t * t)) - 1);
+-                        force += Vector3(0,
+-                            jumpForce,
+-                            0);
+-                    }
+-                    else // weitsprung
+-                    {
+-                        Real width = mCharacterState.mJumpWidthHeight;
+-                        Real m = mass;
+-                        Real g = mGravitation.length();
+-                        Real v0 = currentVel.x;
+-                        Real t = timestep;
+-                        Real s = width;
+-                        Real jumpForcezy = 
+-                            m*g/4 - v0*m /2 /t + 
+-                            Math::Sqrt( 
+-                                v0*v0 * m*m  -
+-                                v0 * m*m *g *t +
+-                                m*m * g*g * t*t /4 +
+-                                2 * s * m*m *g
+-                                       )/2/t;
+-                        force += orientation * Vector3(0,jumpForcezy,-jumpForcezy);
+-                    }
+-
+-                    mCharacterState.mStartJump = false;
+-                    mCharacterState.mIsAirBorne = true;
+-                    mCharacterState.mJumpTimer = 0;
+-                }
+-                else
+-                {
+-                    Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep(); // so ist die Beschleunigung unabh&#239;&#191;&#189;gig von der framerate!
+-                    if( mCharacterState.mDesiredVel.squaredLength() &lt; currentVel.squaredLength() )
+-                        delay *= 4;
+-                    force += mass*(orientation*mCharacterState.mDesiredVel - currentVel) / delay;
+-                }
+-            }
+-
+-
+-            body-&gt;setForce(force);
+-            lastForce = force;
+-            // Assume we are air borne.
+-            // Might be set to true in the collision callback
+-            mCharacterState.mHasFloorContact = false;
+-
+-
+-
+-
+-
+-
+-
+-            // Calculate angular velocity
+-            // We first need the yaw rotation from actual yaw to desired yaw
+-            Vector3 src = orientation*Vector3::UNIT_Z;
+-            src.y = 0;
+-            Vector3 dst = Quaternion(mYaw, Vector3::UNIT_Y)*Vector3::UNIT_Z;
+-            dst.y = 0;
+-            Radian yaw = src.getRotationTo(dst, Vector3::UNIT_Y).getYaw();
+-
+-
+-            // using a spring system to apply the rotation
+-            Vector3 diff = Vector3(0, yaw.valueRadians(), 0);
+-            Vector3 omega = mCharBody-&gt;getOmega();
+-            omega.x = omega.z = 0;
+-            // should not set directly orientation!
+-            Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+-            //body-&gt;setOmega(Vector3(0, newOmega, 0)); // omega sollte nicht direkt gesetzt werden
+-            body-&gt;setTorque( mass * springAcc );
+-        }
+-
+-
+-
++        ///@todo move to MovingCreature?
+         SceneNode* node = mCharacterActor-&gt;_getSceneNode();
+         std::ostringstream ss;
+         Vector3 bodpos, playpos = node-&gt;getPosition();
+@@ -1224,10 +556,8 @@
+             &lt;&lt; &quot;camera actor orientation : &quot; &lt;&lt; mCameraActor-&gt;getWorldOrientation() &lt;&lt; std::endl
+             &lt;&lt; &quot;camera actor : &quot; &lt;&lt; mCameraActor-&gt;getWorldPosition() &lt;&lt; std::endl
+             &lt;&lt; &quot;camera body pos : &quot; &lt;&lt; bodpos &lt;&lt; std::endl
+-            &lt;&lt; &quot;is airborne: &quot; &lt;&lt; (mCharacterState.mIsAirBorne ? &quot;true&quot; : &quot;false&quot;) &lt;&lt; std::endl
+-            &lt;&lt; &quot;start jump : &quot; &lt;&lt; (mCharacterState.mStartJump ? &quot;true&quot; : &quot;false&quot;)  &lt;&lt; std::endl
+-            &lt;&lt; &quot;jump timer : &quot; &lt;&lt; mCharacterState.mJumpTimer &lt;&lt; std::endl
+-            &lt;&lt; &quot;force : &quot; &lt;&lt; lastForce &lt;&lt; std::endl;
++            &lt;&lt; &quot;camera distance : &quot; &lt;&lt; mDesiredDistance &lt;&lt; std::endl
++            &lt;&lt; &quot;is airborne: &quot; &lt;&lt; (mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_AIRBORNE ? &quot;true&quot; : &quot;false&quot;) &lt;&lt; std::endl;
+ 
+         LOG_DEBUG(Logger::UI, ss.str());
+         DebugWindow::getSingleton().setPageText(msDebugWindowPageName, ss.str());
+@@ -1236,10 +566,9 @@
+     //------------------------------------------------------------------------
+     void MovementCharacterController::calculateCamera(const Ogre::Real&amp; timestep)
+     {
+-        Vector3 charPos;
+-        Quaternion charOri(mYaw, Vector3::UNIT_Y);
++        Vector3 charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
++        Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+-        charPos = mCharacterActor-&gt;getWorldPosition();
+         virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
+ 
+ 
+@@ -1293,8 +622,11 @@
+ 
+             // wir machen ein paar Raycasts um herauszufinden, ob wir von der jetzigen Position
+             // so zur optimalen kommen
+-            const OgreNewt::MaterialID* materialId =
+-                mCharBody-&gt;getMaterialGroupID();
++            const OgreNewt::MaterialID *charMaterialId = mCharBody-&gt;getMaterialGroupID();
++            const OgreNewt::MaterialID *camMaterialId = mCamBody-&gt;getMaterialGroupID();
++            PhysicsMaterialRaycast::MaterialVector materialVector;
++            materialVector.push_back(charMaterialId);
++            materialVector.push_back(camMaterialId);
+ //                PhysicsManager::getSingleton()._getLevelMaterialID();
+             OgreNewt::World *world = PhysicsManager::getSingleton()._getNewtonWorld();
+ 
+@@ -1305,14 +637,14 @@
+ 
+             RaycastInfo infoCastOptPos = mRaycast-&gt;execute(
+                 world,
+-                materialId,
++                &amp;materialVector,
+                 camPos + camRadius * normToOptCamPos, // Gr&#239;&#191;&#189;e der Kamera einbeziehen
+                 optimalCamPos + camRadius * normToOptCamPos,
+                 true); // Gr&#239;&#191;&#189;e der Kamera einbeziehen
+ 
+             RaycastInfo infoCastChar = mRaycast-&gt;execute(
+                 world,
+-                materialId,
++                &amp;materialVector,
+                 camPos,
+                 charPos,
+                 true);
+@@ -1350,7 +682,7 @@
+                     {
+                         infoCastNewPos = mRaycast-&gt;execute(
+                             world,
+-                            materialId,
++                            &amp;materialVector,
+                             camPos + camRadius * normToOptCamPos, // Gr&#239;&#191;&#189;e der Kamera!
+                             temp,
+                             true);
+@@ -1402,9 +734,9 @@
+                     {
+                         RaycastInfo info = mRaycast-&gt;execute(
+                             world,
+-                            materialId,
++                            &amp;materialVector,
+                             camPos,
+-                            charPositionsBuffer[ (charPositionsBufferIdx - delta) % buffSize ] ,
++                            charPositionsBuffer[ (charPositionsBufferIdx - delta) % buffSize ],
+                             true);
+ 
+                         if( !info.mBody )
+@@ -1435,7 +767,7 @@
+                     {
+                         RaycastInfo info = mRaycast-&gt;execute(
+                             world,
+-                            materialId,
++                            &amp;materialVector,
+                             camPos,
+                             charPositionsBuffer[ (charPositionsBufferIdx - delta) % buffSize ],
+                             true);
+@@ -1456,7 +788,6 @@
+                 isPathfinding = false;
+             }
+ 
+-
+             Vector3 diff = camPos - optimalCamPos;
+ 
+             Vector3 cameraVelocity;
+@@ -1483,10 +814,9 @@
+     {
+         Vector3 targetCamPos;
+ 
+-        Vector3 charPos;
+-        Quaternion charOri(mYaw, Vector3::UNIT_Y);
++        Vector3 charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
++        Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+-        charPos = mCharacterActor-&gt;getWorldPosition();
+         virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
+ 
+ 
+@@ -1567,7 +897,7 @@
+                     endRay[i],
+                     true);
+ 
+-                if( info.mBody )
++                if( info.mBody &amp;&amp; info.mBody != mCamBody )
+                 {
+                     CollisionFound = true;
+                     Vector3 newdiff = (info.mDistance) * (endRay[i] - startRay[i]);
+@@ -1737,13 +1067,15 @@
+             mPitchRange.first = Degree(-75);
+             mPitchRange.second = Degree(85);
+             mPitch = Degree(30);
+-            mCamYaw = mYaw;
++            mCamYaw = mCharacter-&gt;getActor()-&gt;getWorldOrientation().getYaw();
+             LOG_MESSAGE(Logger::UI, &quot;Switch to free camera view&quot;);
+             resetCamera();
+         }
+     }
+ 
+     //------------------------------------------------------------------------
++/*
++    // not used at the moment!
+     void MovementCharacterController::interpolateAnimationLookAtOffset(std::string actAnim, std::string newAnim, Ogre::Real factor)
+     {
+         AxisAlignedBox aab;
+@@ -1776,6 +1108,7 @@
+             mLookAtOffset = Vector3(0, interpolatedSize.y * 0.80f, 0);
+         }
+     }
++*/
+ 
+     //------------------------------------------------------------------------
+     MovementCharacterController::ViewMode MovementCharacterController::getViewMode()
+@@ -1805,19 +1138,9 @@
+             mCharacterActor-&gt;setVisible(false);
+         else
+             mCharacterActor-&gt;setVisible(true);
+-
+-        // also reset the char
+-        mCharacterState.mCurrentMovementState = 0;
+-        mCharacterState.mDesiredVel = Vector3::ZERO;
+-        mCharacterState.mHasFloorContact = true;
+-        mCharacterState.mIsAirBorne = true;
+-        mCharacterState.mStartJump = false;
+-        mCharacterState.mJumpTimer = 0;
+-        mCharacter-&gt;setTaktischeBewegung(Creature::BEWEGUNG_NONE);
+-        mCharacterState.beginJump = false;
+-        mCharacterState.endJump = false;
+-        mCharacterState.beginSneak = false;
+-        mCharacterState.endSneak = false;
++        
++        LOG_MESSAGE(Logger::UI, &quot;Camera resetted.&quot;);
++        ///@todo remove this
+         mCharacter-&gt;modifyAu(100);
+     }
+ 
+@@ -1917,7 +1240,6 @@
+         LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+         lineSet-&gt;clear();
+         lineSet-&gt;addLine(mLookAtOffset, mLookAtOffset + Vector3(0, 1.2, 0), ColourValue::Red);
+-        lineSet-&gt;addLine(Vector3::ZERO, mGravitation * 0.1, ColourValue::Green);
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000530.html">[Dsa-hl-svn] r3459 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000532.html">[Dsa-hl-svn] r3461 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#531">[ date ]</a>
+              <a href="thread.html#531">[ thread ]</a>
+              <a href="subject.html#531">[ subject ]</a>
+              <a href="author.html#531">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

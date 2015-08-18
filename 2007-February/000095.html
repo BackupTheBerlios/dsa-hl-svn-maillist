@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3024 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3024%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200702061856.l16Iu8c5013039%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000094.html">
+   <LINK REL="Next"  HREF="000096.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3024 - in rl/trunk/engine/core: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3024%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200702061856.l16Iu8c5013039%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3024 - in rl/trunk/engine/core: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Tue Feb  6 19:56:08 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000094.html">[Dsa-hl-svn] r3023 - content/models/men/Basemeshes
+</A></li>
+        <LI>Next message: <A HREF="000096.html">[Dsa-hl-svn] r3025 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#95">[ date ]</a>
+              <a href="thread.html#95">[ thread ]</a>
+              <a href="subject.html#95">[ subject ]</a>
+              <a href="author.html#95">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-02-06 19:55:31 +0100 (Tue, 06 Feb 2007)
+New Revision: 3024
+
+Modified:
+   rl/trunk/engine/core/include/SoundManager.h
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/ContentModule.cpp
+   rl/trunk/engine/core/src/SoundManager.cpp
+Log:
+SoundManager now manages its resources like Ogre's own ResourceManagers do.
+
+Modified: rl/trunk/engine/core/include/SoundManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SoundManager.h	2007-02-05 17:30:36 UTC (rev 3023)
++++ rl/trunk/engine/core/include/SoundManager.h	2007-02-06 18:55:31 UTC (rev 3024)
+@@ -60,18 +60,7 @@
+         /// Konstruktor
+         SoundManager();
+ 		virtual ~SoundManager();
+-        /// Alle Sounds in die Resourcenliste eintragen.
+-		virtual void addSounds(const Ogre::String&amp; groupName = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+-        /// erzeugt einen Sound und f&#252;gt ihn hinzufuegen (Mit Mutex mittelbar)
+-        virtual void add(const Ogre::String&amp; filename, const Ogre::String&amp; groupName = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+-        /// Eine Namesliste erzeugen
+-        StringList getSounds();
+ 
+-        virtual Ogre::ResourcePtr create(const Ogre::String&amp; name, 
+-            const Ogre::String&amp; group = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, 
+-            bool isManual = false, Ogre::ManualResourceLoader* loader = 0, 
+-            const Ogre::NameValuePairList* createParams = 0);
+-
+ 	    /// Den aktiven Listener zur&#252;ckgeben.
+ 		ListenerObject* getListener() const;
+         /// Creates the listener actor.
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2007-02-05 17:30:36 UTC (rev 3023)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2007-02-06 18:55:31 UTC (rev 3024)
+@@ -193,7 +193,8 @@
+         try
+         {
+             Sound* sm = SoundManager::getSingleton().
+-				getActiveDriver()-&gt;createSample(SoundManager::getSingleton().getByName(soundfile));
++				getActiveDriver()-&gt;createSample(SoundManager::getSingleton().load(soundfile,
++                    ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME));
+             SoundObject* so = new SoundObject(sm, soundfile);
+             actor = new Actor(uniquename, so);
+             mActors.insert(ActorPtrPair(uniquename,actor));  
+@@ -222,7 +223,8 @@
+         try
+         {
+             Sound* sm = SoundManager::getSingleton().
+-                getActiveDriver()-&gt;createStream(SoundManager::getSingleton().getByName(soundfile));
++                getActiveDriver()-&gt;createStream(SoundManager::getSingleton().load(soundfile,
++                    ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME));
+             SoundObject* so = new SoundObject(sm, soundfile);
+ 
+             actor = new Actor(uniquename, so);
+
+Modified: rl/trunk/engine/core/src/ContentModule.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentModule.cpp	2007-02-05 17:30:36 UTC (rev 3023)
++++ rl/trunk/engine/core/src/ContentModule.cpp	2007-02-06 18:55:31 UTC (rev 3024)
+@@ -133,8 +133,6 @@
+         addSearchPath(moduleDir + &quot;/gui/windows/buttons&quot;, resourceGroup);
+         addSearchPath(moduleDir + &quot;/dialogs&quot;, resourceGroup);     
+ 
+-		SoundManager::getSingleton().addSounds( resourceGroup );
+-
+ 		RubyInterpreter* interpreter = CoreSubsystem::getSingleton().getRubyInterpreter();
+         if (interpreter != NULL)
+         {
+
+Modified: rl/trunk/engine/core/src/SoundManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SoundManager.cpp	2007-02-05 17:30:36 UTC (rev 3023)
++++ rl/trunk/engine/core/src/SoundManager.cpp	2007-02-06 18:55:31 UTC (rev 3024)
+@@ -25,6 +25,7 @@
+ #include &quot;SoundDriver.h&quot;
+ #include &quot;SoundResource.h&quot;
+ #include &lt;OgreException.h&gt;
++#include &lt;OgreResourceGroupManager.h&gt;
+ 
+ #include &quot;NullDriver.h&quot;
+ 
+@@ -77,10 +78,15 @@
+ 	NullDriver* nullDriver = new NullDriver(this);
+     registerDriver(nullDriver);
+     setActiveDriver(nullDriver);
++
++    mResourceType = &quot;Sound&quot;;
++    ResourceGroupManager::getSingleton()._registerResourceManager(mResourceType, this);
++
+ }
+ 
+ SoundManager::~SoundManager()
+ {
++    ResourceGroupManager::getSingleton()._unregisterResourceManager(mResourceType);
+     unloadAllDrivers();    
+ }
+ 
+@@ -118,63 +124,7 @@
+ 	return newSound;
+ }
+ 
+-ResourcePtr SoundManager::create(const String&amp; name, const String&amp; group, 
+-            bool isManual, ManualResourceLoader* loader , 
+-            const NameValuePairList* createParams)
+-{
+-    ResourcePtr p = ResourceManager::create(name, group, isManual, loader, createParams);
+-    return p;
+-}
+-
+ /**
+- * @author JoSch
+- * @date 04-27-2004
+- */
+-void SoundManager::addSounds(const Ogre::String&amp; group)
+-{
+-    StringList extlist = getExtension();
+-    StringList::const_iterator cit;
+-    for(cit = extlist.begin(); cit != extlist.end(); cit++)
+-    {
+-		StringVectorPtr sl = ResourceGroupManager::getSingleton().findResourceNames(
+-			group, *cit );
+-        StringVector::const_iterator it;
+-        for(it = sl-&gt;begin(); it != sl-&gt;end(); it++)
+-        {
+-            try {
+-                create(*it, group);
+-            } catch(...)
+-            {}
+-        }
+-    }
+-}
+-
+-void SoundManager::add(const String&amp; filename, const String&amp; group)
+-{
+-	boost::mutex::scoped_lock lock(mResListMutex);
+-    create(filename, group);
+-}
+-
+-/**
+- * Erzeugt eine Liste von Soundnamen.
+- * @return Erzeugte Namensliste.
+- * @author JoSch
+- * @date 06-17-2004
+- */
+-StringList SoundManager::getSounds()
+-{
+-    StringList result;
+-    ResourceMapIterator it = getResourceIterator();
+-    while (it.hasMoreElements())
+-    {
+-        result.push_back(it.peekNextValue()-&gt;getName());
+-        it.moveNext();
+-    }
+-    
+-    return result;
+-}
+-
+-/**
+  * @return Die Liste der funktionierenden Treiber.
+  * @author JoSch
+  * @date 12-23-2005
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000094.html">[Dsa-hl-svn] r3023 - content/models/men/Basemeshes
+</A></li>
+	<LI>Next message: <A HREF="000096.html">[Dsa-hl-svn] r3025 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#95">[ date ]</a>
+              <a href="thread.html#95">[ thread ]</a>
+              <a href="subject.html#95">[ subject ]</a>
+              <a href="author.html#95">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

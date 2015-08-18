@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4887 - in dependencies/OgreNewt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4887%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200904061304.n36D47rK014432%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001943.html">
+   <LINK REL="Next"  HREF="001945.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4887 - in dependencies/OgreNewt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4887%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200904061304.n36D47rK014432%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4887 - in dependencies/OgreNewt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Apr  6 15:04:07 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001943.html">[Dsa-hl-svn] r4886 - in modules/common: materials materials/model	models
+</A></li>
+        <LI>Next message: <A HREF="001945.html">[Dsa-hl-svn] r4888 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1944">[ date ]</a>
+              <a href="thread.html#1944">[ thread ]</a>
+              <a href="subject.html#1944">[ subject ]</a>
+              <a href="author.html#1944">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-04-06 15:04:06 +0200 (Mon, 06 Apr 2009)
+New Revision: 4887
+
+Modified:
+   dependencies/OgreNewt/inc/OgreNewt_CollisionPrimitives.h
+   dependencies/OgreNewt/src/OgreNewt_CollisionPrimitives.cpp
+Log:
+-added the scale as a parameter for CollisionPrimitives::ConvexHull
+
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_CollisionPrimitives.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_CollisionPrimitives.h	2009-04-05 09:39:03 UTC (rev 4886)
++++ dependencies/OgreNewt/inc/OgreNewt_CollisionPrimitives.h	2009-04-06 13:04:06 UTC (rev 4887)
+@@ -214,15 +214,17 @@
+ 
+             //! constructor
+             /*!
+-                Overloaded constructor.  pass a SceneNode*, and it will use the vertex data from the first attached object.
++                Overloaded constructor.  pass an Entity*, and it will use its vertex data. if it is attached to Node*, the collision
++                will be scaled apperently (entity-&gt;getParentNode()-&gt;getScale())
+                 \param world pointer to the OgreNewt::World
+                 \param node pointer to an Ogre::SceneNode with a single entity attached
+                 \param orient orientation offset of the primitive
+                 \param pos position offset of the primitive
+                 \parem tolerance a tolerance passed to newton
++                \param forceScale if set to something else then (0,0,0), the value of this argument will be used as scale instead of the parent-node's scale
+             */
+             ConvexHull( const World* world, Ogre::Entity* ent, 
+-                const Ogre::Quaternion&amp; orient = Ogre::Quaternion::IDENTITY, const Ogre::Vector3&amp; pos = Ogre::Vector3::ZERO, Ogre::Real tolerance = 0.001f );
++                const Ogre::Quaternion&amp; orient = Ogre::Quaternion::IDENTITY, const Ogre::Vector3&amp; pos = Ogre::Vector3::ZERO, Ogre::Real tolerance = 0.001f , const Ogre::Vector3&amp; forceScale = Ogre::Vector3::ZERO);
+ 
+             /*!
+                 Overloaded constructor.  pass a pointer to an array of vertices and the hull will be made from that.
+
+Modified: dependencies/OgreNewt/src/OgreNewt_CollisionPrimitives.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_CollisionPrimitives.cpp	2009-04-05 09:39:03 UTC (rev 4886)
++++ dependencies/OgreNewt/src/OgreNewt_CollisionPrimitives.cpp	2009-04-06 13:04:06 UTC (rev 4887)
+@@ -118,7 +118,7 @@
+         ConvexHull::ConvexHull(const World* world) : ConvexCollision( world )
+         {}
+ 
+-        ConvexHull::ConvexHull( const World* world, Ogre::Entity* obj, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, Ogre::Real tolerance ) : ConvexCollision( world )
++        ConvexHull::ConvexHull( const World* world, Ogre::Entity* obj, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, Ogre::Real tolerance, const Ogre::Vector3&amp; forceScale ) : ConvexCollision( world )
+         {
+             Ogre::Vector3 scale(1.0,1.0,1.0);
+             
+@@ -127,9 +127,11 @@
+             //Ogre::Entity* obj = (Ogre::Entity*)node-&gt;getAttachedObject(0);
+             Ogre::MeshPtr mesh = obj-&gt;getMesh();
+ 
+-                        // get scale, if attached to node
+-                        Ogre::Node * node = obj-&gt;getParentNode();
+-                        if (node) scale = node-&gt;getScale();
++                       
++            // get scale, if attached to node
++            Ogre::Node * node = obj-&gt;getParentNode();
++            if (node) scale = node-&gt;getScale();
++            if (forceScale != Ogre::Vector3::ZERO) scale = forceScale;
+ 
+             //find number of submeshes
+             unsigned short sub = mesh-&gt;getNumSubMeshes();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001943.html">[Dsa-hl-svn] r4886 - in modules/common: materials materials/model	models
+</A></li>
+	<LI>Next message: <A HREF="001945.html">[Dsa-hl-svn] r4888 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1944">[ date ]</a>
+              <a href="thread.html#1944">[ thread ]</a>
+              <a href="subject.html#1944">[ subject ]</a>
+              <a href="author.html#1944">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

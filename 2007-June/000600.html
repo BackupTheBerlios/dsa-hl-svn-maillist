@@ -1,0 +1,345 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3529 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3529%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706112214.l5BMEWcZ032139%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000599.html">
+   <LINK REL="Next"  HREF="000601.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3529 - in rl/trunk/engine/rules: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3529%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706112214.l5BMEWcZ032139%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3529 - in rl/trunk/engine/rules: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun 12 00:14:32 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000599.html">[Dsa-hl-svn] r3528 - in rl/trunk/engine: startup/src ui/include
+</A></li>
+        <LI>Next message: <A HREF="000601.html">[Dsa-hl-svn] r3530 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#600">[ date ]</a>
+              <a href="thread.html#600">[ thread ]</a>
+              <a href="subject.html#600">[ subject ]</a>
+              <a href="author.html#600">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-12 00:14:21 +0200 (Tue, 12 Jun 2007)
+New Revision: 3529
+
+Modified:
+   rl/trunk/engine/rules/include/MovingCreature.h
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+- setting torque to mass*acc*40 due to bug setting the inertia of a game-object
+- implemented crossfading for animation &quot;Walk&quot; from &quot;Run&quot; and from &quot;Idle&quot;
+
+Modified: rl/trunk/engine/rules/include/MovingCreature.h
+===================================================================
+--- rl/trunk/engine/rules/include/MovingCreature.h	2007-06-10 14:06:01 UTC (rev 3528)
++++ rl/trunk/engine/rules/include/MovingCreature.h	2007-06-11 22:14:21 UTC (rev 3529)
+@@ -31,6 +31,7 @@
+ {
+     class AbstractMovement;
+     class MovingCreatureManager;
++    class MeshAnimation;
+ 
+     /** 
+      * This class provides an interface to control the movement of a creature.
+@@ -132,15 +133,19 @@
+         int getCurrentGS() const;
+         Ogre::Vector3 getVelocity() const; // in local axes
+         Ogre::Vector3 getOmega() const;
+-        void setAnimation(const Ogre::String &amp;name, 
++        MeshAnimation *setAnimation(const Ogre::String &amp;name, 
+                           Ogre::Real speed = 1, 
+                           unsigned int timesToPlay = 0, 
+-                          const Ogre::String &amp;collisionName = &quot;&quot; // the name of the animation the collision is based on
++                          const Ogre::String &amp;collisionName = &quot;&quot;, // the name of the animation the collision is based on
++                          Ogre::Real weight = 1 // the weight of the animation, the weight of the last animation is set to 1-weight
+                           );
+ 
+ 
+         /// this method will return the yaw, the creature tries to turn to, if a rotation-movement is activated. if not, it will return the current yaw
+         Ogre::Radian getYaw();
++        Ogre::Real getLastMovementChange() const { return mLastMovementChange; }
++        MovementType getLastMovementType() const { return mLastMovementType; }
++        Ogre::Real getAnimationTimePlayed() const; // this is a relative value between 0 and 1
+ 
+ 
+     protected:
+@@ -148,6 +153,8 @@
+         AbstractLocation mAbstractLocation;
+         
+         AbstractMovement *mMovement;
++        MovementType mLastMovementType;
++        Ogre::Real mLastMovementChange;
+         Ogre::Vector3 mDirection;
+         Ogre::Vector3 mRotation;
+ 
+@@ -162,6 +169,7 @@
+         Ogre::String mLastAnimationName;
+         Ogre::String mLastCollisionName;
+         Ogre::Real mLastAnimationSpeed;
++        Ogre::String mStillWeightedAnimationName;
+ 
+         // only used in userProcess
+         Ogre::Real mLastFloorContact;
+
+Modified: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-10 14:06:01 UTC (rev 3528)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-11 22:14:21 UTC (rev 3529)
+@@ -189,14 +189,23 @@
+             Vector3 omega = body-&gt;getOmega();
+             omega.x = omega.z = 0;
+             Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+-            torque = mass * springAcc;
++
++            /// @ todo change this
++            //torque = springAcc * inertia; // this would be correct
++            torque = springAcc * mass * 40;
+         }
+         virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
+             mYaw += Radian(rotation.y);
+             while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+             while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+-            return rotation.y != 0.0f;
++            
++            OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++            Quaternion orientation;
++            Vector3 position;
++            body-&gt;getPositionOrientation(position, orientation);
++
++            return orientation.getYaw() != mYaw;
+         }
+         virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+         {
+@@ -207,8 +216,8 @@
+         virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+         {
+             Vector3 oldRotation(rotation);
+-            rotation.x = rotation.y = 0;
+-            return oldRotation.x == 0 &amp;&amp; oldRotation.y == 0;
++            rotation.x = rotation.z = 0;
++            return oldRotation.x == 0 &amp;&amp; oldRotation.z == 0;
+         }
+     protected:
+         Ogre::Radian mYaw;
+@@ -258,7 +267,35 @@
+             //MeshObject* charMesh = dynamic_cast&lt;MeshObject*&gt;(mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getControlledObject());
+             //Real length = charMesh-&gt;getAnimation(&quot;Run&quot;)-&gt;getLength();
+             Real length = 5./3.;
+-            mMovingCreature-&gt;setAnimation(&quot;Walk&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length) );
++            Real weight = 1;
++            Real relTimeOffset = 0;
++            
++            switch( mMovingCreature-&gt;getLastMovementType() )
++            {
++            case MovingCreature::MT_NONE:
++                break;
++            case MovingCreature::MT_STEHEN:
++                relTimeOffset = 0.25;
++                break;
++            case MovingCreature::MT_JOGGEN:
++            case MovingCreature::MT_LAUFEN:
++            case MovingCreature::MT_RENNEN:
++                relTimeOffset = mMovingCreature-&gt;getAnimationTimePlayed();
++                if( mMovingCreature-&gt;getLastMovementChange() &lt; 1.0f )
++                    weight = mMovingCreature-&gt;getLastMovementChange() / 1.0f;
++                break;
++            default:
++                break;
++            }
++
++
++            // apply relTimeOffset only once
++            if( mMovingCreature-&gt;getLastMovementChange() &gt; elapsedTime )
++                relTimeOffset = 0;
++
++            MeshAnimation *meshAnim = mMovingCreature-&gt;setAnimation(&quot;Walk&quot;, -mMovingCreature-&gt;getVelocity().z / (step / length), 0, &quot;Walk&quot;, weight );
++            if( meshAnim != NULL )
++                meshAnim-&gt;doAddTime(relTimeOffset*meshAnim-&gt;getLength());
+         }
+     };
+ 
+@@ -953,11 +990,14 @@
+         mCreature(creature),
+         mAbstractLocation(AL_AIRBORNE),
+         mMovement(NULL),
++        mLastMovementType(MT_NONE),
++        mLastMovementChange(0),
+         mDirection(Vector3::ZERO),
+         mRotation(Vector3::ZERO),
+         mLastAnimationName(&quot;&quot;),
+         mLastCollisionName(&quot;&quot;),
+         mLastAnimationSpeed(1),
++        mStillWeightedAnimationName(&quot;&quot;),
+         mLastFloorContact(0)
+     {
+         MovingCreatureManager::getSingleton().add(this);
+@@ -1038,10 +1078,11 @@
+         return max(act_gs,1);
+     }
+ 
+-    void MovingCreature::setAnimation(const Ogre::String &amp;name, Ogre::Real speed, unsigned int timesToPlay, const Ogre::String &amp;collisionName)
++    MeshAnimation *MovingCreature::setAnimation(const Ogre::String &amp;name, Ogre::Real speed, unsigned int timesToPlay, const Ogre::String &amp;collisionName, Real weight)
+     {
+         MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
+         PhysicalThing* pt = mCreature-&gt;getActor()-&gt;getPhysicalThing();
++        MeshAnimation *meshAnim(NULL);
+         
+         if( mLastAnimationName != name)
+         {
+@@ -1054,23 +1095,78 @@
+                 pt-&gt;fitToPose(*pCollisionName);
+                 mLastCollisionName = *pCollisionName;
+             }
+-            mesh-&gt;stopAllAnimations();
+ 
+-            mesh-&gt;startAnimation(name, speed, timesToPlay);
+-            mLastAnimationName = name;
+-            mLastAnimationSpeed = speed;
++
++            if ( mStillWeightedAnimationName != &quot;&quot; )
++            {
++                mesh-&gt;stopAnimation(mStillWeightedAnimationName);
++                mStillWeightedAnimationName = &quot;&quot;;
++            }
++
++
++            if( mesh-&gt;hasAnimation(mLastAnimationName) )
++            {
++                if ( weight == 1 )
++                    mesh-&gt;stopAnimation(mLastAnimationName);
++                else
++                {
++                    MeshAnimation *lastAnimation = mesh-&gt;getAnimation(mLastAnimationName);
++                    if( lastAnimation != NULL )
++                    {
++                        mStillWeightedAnimationName = mLastAnimationName;
++                        lastAnimation-&gt;setWeight(1-weight);
++                    }
++                }
++            }
++
++            meshAnim = mesh-&gt;startAnimation(name, speed, timesToPlay);
++            if( meshAnim )
++            {
++                meshAnim-&gt;setWeight(weight);
++                mLastAnimationName = name;
++                mLastAnimationSpeed = speed;
++            }
+         }
+         else
+         {
++            meshAnim = mesh-&gt;getAnimation(name);
+             if( mLastAnimationSpeed != speed )
+             {
+-                MeshAnimation *meshAnim = mesh-&gt;getAnimation(name);
+                 meshAnim-&gt;setSpeed(speed);
+                 mLastAnimationSpeed = speed;
++                meshAnim-&gt;setWeight(weight);
+             }
++            if( mStillWeightedAnimationName != &quot;&quot; )
++            {
++                MeshAnimation *lastAnimation = mesh-&gt;getAnimation(mStillWeightedAnimationName);
++                if( lastAnimation !=  NULL )
++                {
++                    lastAnimation-&gt;setWeight(1-weight);
++                    if( weight == 1 )
++                    {
++                        mesh-&gt;stopAnimation(mStillWeightedAnimationName);
++                        mStillWeightedAnimationName = &quot;&quot;;
++                    }
++                }
++                else
++                {
++                    mStillWeightedAnimationName = &quot;&quot;;
++                }
++            }
+         }
++
++        return meshAnim;
+     }
+ 
++    Ogre::Real MovingCreature::getAnimationTimePlayed() const
++    {
++        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
++        MeshAnimation *meshAnim = mesh-&gt;getAnimation(mLastAnimationName);
++        if( meshAnim != NULL )
++            return meshAnim-&gt;getTimePlayed()/meshAnim-&gt;getLength();
++        return 0;
++    }
++
+     Ogre::Vector3 MovingCreature::getVelocity() const
+     {
+         return 
+@@ -1087,6 +1183,7 @@
+     {
+         if(mMovement != NULL)
+         {
++            mLastMovementChange += elapsedTime;
+             if( !mMovement-&gt;isPossible() )
+             {
+                 setMovement(mMovement-&gt;getFallBackMovement(), mDirection, mRotation);
+@@ -1221,12 +1318,20 @@
+             if(movement-&gt;isPossible())
+             {
+                 MovingCreatureManager::getSingleton().setActive(this); // runs the old movement if idle!
+-                if(mMovement != NULL)
++                if(mMovement == NULL)
++                {
++                    mLastMovementType = MT_NONE;
++                }
++                else
++                {
++                    mLastMovementType = mMovement-&gt;getId();
+                     mMovement-&gt;deactivate();
++                }
+                 mMovement = movement;
+                 mMovement-&gt;activate();
+                 mDirection = direction;
+                 mRotation = rotation;
++                mLastMovementChange = 0;
+                 return true;
+             }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000599.html">[Dsa-hl-svn] r3528 - in rl/trunk/engine: startup/src ui/include
+</A></li>
+	<LI>Next message: <A HREF="000601.html">[Dsa-hl-svn] r3530 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#600">[ date ]</a>
+              <a href="thread.html#600">[ thread ]</a>
+              <a href="subject.html#600">[ subject ]</a>
+              <a href="author.html#600">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

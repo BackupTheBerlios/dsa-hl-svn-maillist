@@ -1,0 +1,588 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3286 - modules/regressiontest/scripts	rl/trunk/engine/core rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3286%20-%20modules/regressiontest/scripts%0A%09rl/trunk/engine/core%20rl/trunk/engine/core/include%0A%09rl/trunk/engine/core/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704122322.l3CNMcRx024769%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000356.html">
+   <LINK REL="Next"  HREF="000358.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3286 - modules/regressiontest/scripts	rl/trunk/engine/core rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3286%20-%20modules/regressiontest/scripts%0A%09rl/trunk/engine/core%20rl/trunk/engine/core/include%0A%09rl/trunk/engine/core/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704122322.l3CNMcRx024769%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3286 - modules/regressiontest/scripts	rl/trunk/engine/core rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr 13 01:22:38 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000356.html">[Dsa-hl-svn] r3285 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="000358.html">[Dsa-hl-svn] r3287 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#357">[ date ]</a>
+              <a href="thread.html#357">[ thread ]</a>
+              <a href="subject.html#357">[ subject ]</a>
+              <a href="author.html#357">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-13 01:22:27 +0200 (Fri, 13 Apr 2007)
+New Revision: 3286
+
+Added:
+   rl/trunk/engine/core/include/LightZone.h
+   rl/trunk/engine/core/src/LightZone.cpp
+Modified:
+   modules/regressiontest/scripts/LightzoneTest.rb
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/GameAreaListener.h
+   rl/trunk/engine/core/include/LightObject.h
+   rl/trunk/engine/core/include/Makefile.am
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/LightObject.cpp
+   rl/trunk/engine/core/src/Makefile.am
+   rl/trunk/engine/script/swig/RlCore.head.swig
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+Lightzones (trigger can be a sphere only by now) + Test
+
+Modified: modules/regressiontest/scripts/LightzoneTest.rb
+===================================================================
+--- modules/regressiontest/scripts/LightzoneTest.rb	2007-04-12 23:18:57 UTC (rev 3285)
++++ modules/regressiontest/scripts/LightzoneTest.rb	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -1,37 +1,28 @@
+ require 'testcase.rb'
+ 
+-class Lightzone &lt; GameAreaListener
+-  def initialize()
+-    super()
+-  end
+-
+-  def areaLeft(anEvent)
+-   p &quot;left&quot;
+-  end
+-
+-  def areaEntered(anEvent)
+-   p &quot;entered&quot;
+-  end
+-end
+-
+ class LightzoneTest &lt; TestCase
+   def initialize(center)
+     super(center)
+ 
+     	# Define a base box to place everything else on.
+       height = 0.1
+-      min_base = [-10, 0.05, -10]
+-      max_base = [10, height, 10]
++      min_base = [-3, 0.05, -3]
++      max_base = [3, height, 3]
+       base = $AM.createBoxPrimitiveActor(&quot;LightzoneTestBase&quot;,
+                                          min_base, max_base, &quot;alpha_green&quot;)
+       base.placeIntoScene(center);
+-      
+-      
+-      # Add a zone trigger mesh
+-      lzone = Lightzone.new();
+-      kugelDings = $AM.createEmptyActor( &quot;Light zone center&quot; );
+-	    kugelDings.placeIntoScene( center );
+-	    $GameEveMgr.addSphereAreaListener( kugelDings, 10.000, lzone, RlScript::QUERYFLAG_PLAYER );
++
++      sunlight = $AM.createLightActor(&quot;sunlight&quot;, LightObject::LT_DIRECTIONAL);
++      sunlight.getControlledObject().setDirection(0.7, -2.0, 0.8);
++      sunlight.getControlledObject().setDiffuseColour(1, 1, 1);
++      LightZoneManager.getSingleton().getDefaultLightZone().addLight(sunlight)
++
++      interiorlight = $AM.createLightActor(&quot;interiorlight&quot;, LightObject::LT_POINT);
++      interiorlight.getControlledObject().setDiffuseColour(1, 0, 0);
++      interiorlight.placeIntoScene(center);
++      interiorlight.setVisible(false)
++      lzone = LightZoneManager.getSingleton().createLightZone(center, 3, RlScript::QUERYFLAG_PLAYER);
++      lzone.addLight(interiorlight)
+   end
+ end
+ 
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+ 	ProjectType=&quot;Visual C++&quot;
+-	Version=&quot;8.00&quot;
++	Version=&quot;8,00&quot;
+ 	Name=&quot;RlCore&quot;
+ 	ProjectGUID=&quot;{0935F495-4540-40E3-AC8F-AA54C85DC5B2}&quot;
+ 	RootNamespace=&quot;RlCore&quot;
+@@ -457,6 +457,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\LightZone.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\LineSetPrimitive.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -694,6 +698,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\LightZone.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\LineSetPrimitive.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -46,6 +46,7 @@
+ class SoundManager;
+ class DebugVisualsManager;
+ class JobScheduler;
++class LightZoneManager;
+ 
+ typedef _RlCoreExport std::map&lt;Ogre::String, ContentModule*&gt; ModuleMap;
+ 
+@@ -140,6 +141,7 @@
+     SoundManager* mSoundManager;
+     DebugVisualsManager* mDebugVisualsManager;
+     JobScheduler* mJobScheduler;
++	LightZoneManager* mLightZoneManager;
+ 
+     /** Runs the setup methods  */
+     bool initializeCoreSubsystem();
+
+Modified: rl/trunk/engine/core/include/GameAreaListener.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaListener.h	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/include/GameAreaListener.h	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -39,12 +39,12 @@
+      *  
+      * @param anEvent Das verantwortliche Ereignis
+      */
+-    virtual void areaLeft(GameAreaEvent *anEvent) const = 0;
++    virtual void areaLeft(GameAreaEvent *anEvent) = 0;
+     /** Diese Methode wird aufgerufen wenn ein Aktor das Areal betreten hat
+     *  
+     * @param anEvent Das verantwortliche Ereignis
+     */
+-    virtual void areaEntered(GameAreaEvent *anEvent) const = 0;
++    virtual void areaEntered(GameAreaEvent *anEvent) = 0;
+ 
+     /// K&#252;mmert sich um das Aufrufen benannter Methoden aus Reasons
+     virtual bool eventRaised(GameAreaEvent *anEvent);
+
+Modified: rl/trunk/engine/core/include/LightObject.h
+===================================================================
+--- rl/trunk/engine/core/include/LightObject.h	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/include/LightObject.h	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -46,6 +46,7 @@
+ 		void setSpotlightRange( Ogre::Real innerAngle, Ogre::Real outerAngle,
+ 			Ogre::Real falloff = 1.0);
+ 		void setCastShadows( bool cast );
++        void setVisible(bool enabled);
+     };
+ }
+ #endif
+
+Added: rl/trunk/engine/core/include/LightZone.h
+===================================================================
+--- rl/trunk/engine/core/include/LightZone.h	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/include/LightZone.h	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -0,0 +1,65 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#ifndef __LightZone_H__
++#define __LightZone_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++#include &quot;GameAreaListener.h&quot;
++
++namespace rl {
++
++	class LightObject;
++
++	///@todo: Inheritance is wrong, LightZone should be a GameAreaEventSource, LightZoneManager a GameAreaListener
++	class _RlCoreExport LightZone : public GameAreaListener
++	{
++	public:
++		LightZone();
++
++		void addLight(Actor* light);
++		std::vector&lt;Actor*&gt; getLights() const;
++
++		virtual void areaLeft(GameAreaEvent *anEvent);
++	    virtual void areaEntered(GameAreaEvent *anEvent);
++
++	private:
++		std::vector&lt;Actor*&gt; mLights;
++	};
++
++	class _RlCoreExport LightZoneManager : public Ogre::Singleton&lt;LightZoneManager&gt;
++	{
++	public:
++		LightZoneManager();
++		~LightZoneManager();
++
++		LightZone* createLightZone(const Ogre::Vector3&amp; position, const Ogre::Real radius, unsigned long queryflags);
++		LightZone* getDefaultLightZone() const;
++
++		void areaLeft(LightZone* zone);
++	    void areaEntered(LightZone* zone);
++		
++	private:
++		std::vector&lt;LightZone*&gt; mLightZones;
++		std::list&lt;LightZone*&gt; mActiveLightZones;
++		LightZone* mDefaultLightZone;
++
++		void switchLights();
++	};
++
++}
++
++#endif // __LightZone_H__
+
+
+Property changes on: rl/trunk/engine/core/include/LightZone.h
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: rl/trunk/engine/core/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/include/Makefile.am	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/include/Makefile.am	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -27,6 +27,7 @@
+ 	JobListener.h \
+ 	JobScheduler.h \
+ 	LightObject.h \
++	LightZone.h \
+ 	LineSetPrimitive.h \
+ 	ListenerMovable.h \
+ 	ListenerObject.h \
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -33,6 +33,7 @@
+ #include &quot;Exception.h&quot;
+ #include &quot;GameEventManager.h&quot;
+ #include &quot;GameLoop.h&quot;
++#include &quot;LightZone.h&quot;
+ #include &quot;Logger.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+ #include &quot;RubyInterpreter.h&quot;
+@@ -72,7 +73,8 @@
+         mSoundManager(NULL),
+         mDebugVisualsManager(NULL),
+         mJobScheduler(NULL),
+-        mRenderWindow(NULL)
++        mRenderWindow(NULL),
++		mLightZoneManager(NULL)
+     {
+         initializeCoreSubsystem();
+     }
+@@ -81,11 +83,12 @@
+     {
+         mCoreEventCaster.removeEventListeners();
+ 
+-        delete mWorld;
++        delete mLightZoneManager;
++        delete mGameEventManager;
++		delete mWorld;
+         delete mGameLoop;
+         delete mJobScheduler;
+         delete mActorManager;
+-        delete mGameEventManager;
+         delete mAnimationManager;
+         delete mDebugVisualsManager;
+         delete mPhysicsManager;
+@@ -268,6 +271,9 @@
+         GameLoop::getSingleton().addTask(mJobScheduler, GameLoop::TG_GRAPHICS);
+         LOG_MESSAGE(Logger::CORE,&quot;JobScheduler erzeugt&quot;);
+ 
++		mLightZoneManager = new LightZoneManager();
++        LOG_MESSAGE(Logger::CORE,&quot;LightZoneManager erzeugt&quot;);
++
+         return true;
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/LightObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/LightObject.cpp	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/src/LightObject.cpp	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -32,7 +32,7 @@
+ 
+     Light* LightObject::getLight()
+     {
+-        return reinterpret_cast&lt;Light*&gt;(mMovableObject);
++        return static_cast&lt;Light*&gt;(mMovableObject);
+     }
+ 
+     String LightObject::getObjectType()
+@@ -71,4 +71,9 @@
+ 	{
+ 		getLight()-&gt;setCastShadows( cast );
+ 	}
++
++    void LightObject::setVisible(bool enabled)
++    {
++        getLight()-&gt;setVisible(enabled);
++    }
+ }
+
+Added: rl/trunk/engine/core/src/LightZone.cpp
+===================================================================
+--- rl/trunk/engine/core/src/LightZone.cpp	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/src/LightZone.cpp	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -0,0 +1,122 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;LightZone.h&quot;
++
++#include &quot;ActorManager.h&quot;
++#include &quot;GameAreaEvent.h&quot;
++#include &quot;GameEventManager.h&quot;
++
++template&lt;&gt; rl::LightZoneManager* Ogre::Singleton&lt;rl::LightZoneManager&gt;::ms_Singleton = 0;
++
++namespace rl {
++
++	LightZone::LightZone()
++		: GameAreaListener()
++	{
++	}
++
++	void LightZone::areaLeft(GameAreaEvent *anEvent)
++	{
++		LightZoneManager::getSingleton().areaLeft(this);
++	}
++
++    void LightZone::areaEntered(GameAreaEvent *anEvent)
++	{		
++		LightZoneManager::getSingleton().areaEntered(this);
++	}
++
++	void LightZone::addLight(Actor* lo)
++	{
++		mLights.push_back(lo);
++	}
++
++	std::vector&lt;Actor*&gt; LightZone::getLights() const
++	{
++		std::vector&lt;Actor*&gt; rval(mLights);
++		return rval;
++	}
++
++	LightZoneManager::LightZoneManager()
++		: Ogre::Singleton&lt;LightZoneManager&gt;()
++	{
++		// the default light zone is active when no other lightzone is active
++		mDefaultLightZone = new LightZone();
++		mLightZones.push_back(mDefaultLightZone);
++		mActiveLightZones.push_front(mDefaultLightZone); 
++	}
++
++	LightZoneManager::~LightZoneManager()
++	{
++		for (std::vector&lt;LightZone*&gt;::iterator it = mLightZones.begin(); it != mLightZones.end(); ++it)
++		{
++			delete *it;
++		}
++	}
++
++	LightZone* LightZoneManager::getDefaultLightZone() const
++	{
++		return mDefaultLightZone;
++	}
++
++	LightZone* LightZoneManager::createLightZone(const Ogre::Vector3&amp; position, const Ogre::Real radius, unsigned long queryflags)
++	{
++		LightZone* lz = new LightZone();
++		mLightZones.push_back(lz);
++
++		Actor* kugelDings = ActorManager::getSingleton().createEmptyActor(&quot;Light zone center&quot;);
++		kugelDings-&gt;placeIntoScene(position);
++		GameEventManager::getSingleton().addSphereAreaListener(kugelDings, radius, lz, queryflags);
++
++		return lz;
++	}
++
++	void LightZoneManager::areaLeft(LightZone* zone)
++	{
++		mActiveLightZones.remove(zone);
++		switchLights();
++	}
++
++	void LightZoneManager::areaEntered(LightZone* zone)
++	{
++		mActiveLightZones.push_front(zone);
++		switchLights();
++	}
++
++	void LightZoneManager::switchLights()
++	{
++		LightZone* currentLightZone = mActiveLightZones.front();
++		std::set&lt;Actor*&gt; activeLights;
++
++		std::vector&lt;Actor*&gt; curLights = currentLightZone-&gt;getLights();
++		for (std::vector&lt;Actor*&gt;::const_iterator it = curLights.begin(); it != curLights.end(); it++)
++		{
++			activeLights.insert(*it);
++			(*it)-&gt;setVisible(true);
++		}
++
++		for (std::vector&lt;LightZone*&gt;::const_iterator it = mLightZones.begin(); it != mLightZones.end(); it++)
++		{
++			std::vector&lt;Actor*&gt; curLights = (*it)-&gt;getLights();
++			for (std::vector&lt;Actor*&gt;::const_iterator it = curLights.begin(); it != curLights.end(); it++)
++			{
++				if (activeLights.find(*it) == activeLights.end())
++				{
++					(*it)-&gt;setVisible(false);
++				}
++			}
++		}
++	}
++}
+
+
+Property changes on: rl/trunk/engine/core/src/LightZone.cpp
+___________________________________________________________________
+Name: svn:executable
+   + *
+
+Modified: rl/trunk/engine/core/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/src/Makefile.am	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/core/src/Makefile.am	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -32,6 +32,7 @@
+ 	Job.cpp \
+ 	JobScheduler.cpp \
+ 	LightObject.cpp \
++	LightZone.cpp \
+ 	LineSetPrimitive.cpp \
+ 	ListenerObject.cpp \
+ 	ListenerMovable.cpp \
+
+Modified: rl/trunk/engine/script/swig/RlCore.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.head.swig	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/script/swig/RlCore.head.swig	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -55,6 +55,7 @@
+ #include &quot;JobListener.h&quot;
+ #include &quot;PlaySoundJob.h&quot;
+ #include &quot;PlayAnimationJob.h&quot;
++#include &quot;LightZone.h&quot;
+ #undef message
+ #undef send
+ %}
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-04-12 23:18:57 UTC (rev 3285)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-04-12 23:22:27 UTC (rev 3286)
+@@ -173,8 +173,8 @@
+ {
+ public:
+ 	virtual ~GameAreaListener();
+-    virtual void areaLeft(rl::GameAreaEvent *anEvent) const = 0;
+-    virtual void areaEntered(rl::GameAreaEvent *anEvent) const = 0;
++    virtual void areaLeft(rl::GameAreaEvent *anEvent) = 0;
++    virtual void areaEntered(rl::GameAreaEvent *anEvent) = 0;
+ };
+ 
+ class GameAreaType
+@@ -836,4 +836,19 @@
+ 		Ogre::Real delay=0.0f);
+ };
+ 
++class LightZone
++{
++public:
++	void addLight(Actor* light);
++};
++
++class LightZoneManager
++{
++public:
++	static const LightZoneManager&amp; getSingleton();
++	LightZone* createLightZone(const Ogre::Vector3&amp; position, const Ogre::Real radius, unsigned long queryflags);
++	LightZone* getDefaultLightZone() const;
++};
++
++
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000356.html">[Dsa-hl-svn] r3285 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="000358.html">[Dsa-hl-svn] r3287 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#357">[ date ]</a>
+              <a href="thread.html#357">[ thread ]</a>
+              <a href="subject.html#357">[ subject ]</a>
+              <a href="author.html#357">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

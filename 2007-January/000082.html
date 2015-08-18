@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3011 - in rl/trunk/engine: script/swig ui/include	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3011%20-%20in%20rl/trunk/engine%3A%20script/swig%20ui/include%0A%09ui/src&In-Reply-To=%3C200701281027.l0SARFJZ018113%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000081.html">
+   <LINK REL="Next"  HREF="000083.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3011 - in rl/trunk/engine: script/swig ui/include	ui/src</H1>
+    <B>melven at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3011%20-%20in%20rl/trunk/engine%3A%20script/swig%20ui/include%0A%09ui/src&In-Reply-To=%3C200701281027.l0SARFJZ018113%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3011 - in rl/trunk/engine: script/swig ui/include	ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Jan 28 11:27:15 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000081.html">[Dsa-hl-svn] r3010 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="000083.html">[Dsa-hl-svn] r3012 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-01-28 11:27:15 +0100 (Sun, 28 Jan 2007)
+New Revision: 3011
+
+Modified:
+   rl/trunk/engine/script/swig/RlUi.inc
+   rl/trunk/engine/ui/include/InputManager.h
+   rl/trunk/engine/ui/include/UiSubsystem.h
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+Ruby-Methode hinzugef?\195?\188gt ($UI.linkKeyToRubyCommand(&quot;&lt;key&gt;&quot;, &quot;&lt;command&gt;&quot;)) die es erlaubt einen Ruby befehl an eine Taste zu binden. 
+
+Modified: rl/trunk/engine/script/swig/RlUi.inc
+===================================================================
+--- rl/trunk/engine/script/swig/RlUi.inc	2007-01-28 09:52:00 UTC (rev 3010)
++++ rl/trunk/engine/script/swig/RlUi.inc	2007-01-28 10:27:15 UTC (rev 3011)
+@@ -76,6 +76,7 @@
+ 	rl::CharacterController* getCharacterController() const;
+ 	rl::CharacterController::ControllerType getCharacterControllerType() const;
+ 	void setCharacterController(rl::CharacterController::ControllerType type);
++	void linkKeyToRubyCommand(const rl::CeGuiString &amp;key, const rl::CeGuiString &amp;command);
+ };
+ 
+ class GameLoggerWindow
+
+Modified: rl/trunk/engine/ui/include/InputManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/InputManager.h	2007-01-28 09:52:00 UTC (rev 3010)
++++ rl/trunk/engine/ui/include/InputManager.h	2007-01-28 10:27:15 UTC (rev 3011)
+@@ -87,6 +87,8 @@
+ 
+         virtual const Ogre::String&amp; getName() const;
+ 
++        void linkKeyToRubyCommand(const CeGuiString &amp;key, const CeGuiString &amp;command);
++
+     private:
+         enum { NUM_MOUSE_BUTTON=4, NUM_KEYS=256 };
+         enum Modifiers {ALT_MASK = 1, CTRL_MASK = 2, SHIFT_MASK = 4, SUPER_MASK = 8};
+@@ -112,6 +114,9 @@
+         KeyCharMap mKeyMapAlt;
+         KeyNameMap mKeyNames;
+ 
++        typedef std::map&lt;int, CeGuiString&gt; KeyCommandMap;
++        KeyCommandMap mKeyRubyCommand;
++
+         int mNumActiveWindowsMouseInput;
+         int mNumActiveWindowsKeyboardInput;
+         int mNumActiveWindowsAllInput;
+
+Modified: rl/trunk/engine/ui/include/UiSubsystem.h
+===================================================================
+--- rl/trunk/engine/ui/include/UiSubsystem.h	2007-01-28 09:52:00 UTC (rev 3010)
++++ rl/trunk/engine/ui/include/UiSubsystem.h	2007-01-28 10:27:15 UTC (rev 3011)
+@@ -89,6 +89,9 @@
+ 
+         void initializeSubsystem();
+ 
++        /// this method is here because it is easier to include it in swig here (actually really defined in InputManager)
++        void linkKeyToRubyCommand(const CeGuiString &amp;key, const CeGuiString &amp;command);
++
+     private:
+         CharacterController* mCharacterController;
+ 		CharacterController::ControllerType mCharacterControllerType;
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-01-28 09:52:00 UTC (rev 3010)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-01-28 10:27:15 UTC (rev 3011)
+@@ -41,6 +41,7 @@
+ #include &quot;DialogWindow.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;GameObject.h&quot;
++#include &quot;RubyInterpreter.h&quot;
+ #include &quot;UiSubsystem.h&quot;
+ #include &quot;WindowFactory.h&quot;
+ 
+@@ -278,9 +279,24 @@
+ 		}
+         else
+         {
++            int code = CommandMapper::encodeKey(e.key, getModifierCode());
++
++            // is there a ruby script command linked?
++            KeyCommandMap::iterator it;
++            it = mKeyRubyCommand.find(code);
++            if( it != mKeyRubyCommand.end() )
++            {
++                if( it-&gt;second.length() &gt; 0 )
++                {
++                    bool error = CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(it-&gt;second.c_str());
++                    LOG_MESSAGE(Logger::UI, &quot; (keyboard shortcut) execution of ruby command '&quot; + it-&gt;second + &quot;' &quot; + (error == false ? &quot;success.&quot; : &quot;failure.&quot;));
++                    return true;
++                }
++            }
++
+             if (mCharacterController != NULL)
+             {
+-                mCharacterController-&gt;injectKeyDown(CommandMapper::encodeKey(e.key, getModifierCode()));
++                mCharacterController-&gt;injectKeyDown(code);
+             }
+         }
+ 
+@@ -579,4 +595,41 @@
+         return NAME;
+     }
+ 
++
++    void InputManager::linkKeyToRubyCommand(const CeGuiString &amp;keyStr, const CeGuiString &amp;command)
++    {
++        stringstream ss;
++
++        ss &lt;&lt; &quot;InputManager::linkKeyToRubyCommand called: &quot;;
++        int key = getScanCode(keyStr);
++        if( command.length() == 0 ) // delete
++        {
++            KeyCommandMap::iterator it = mKeyRubyCommand.find(key);
++            ss &lt;&lt; &quot;Requesting to delete link from Key '&quot; &lt;&lt; keyStr &lt;&lt; &quot;'... &quot;;
++            if( it != mKeyRubyCommand.end() )
++            {
++                ss &lt;&lt; &quot;Link to command '&quot; &lt;&lt; it-&gt;second &lt;&lt; &quot;' deleted.&quot;;
++                mKeyRubyCommand.erase(it);
++            }
++        }
++        else
++        {
++            KeyCommandMap::iterator it = mKeyRubyCommand.find(key);
++            if( it == mKeyRubyCommand.end() )
++            {
++                ss &lt;&lt; &quot;New linking Key '&quot;;
++                mKeyRubyCommand.insert(make_pair(key, command));
++            }
++            else
++            {
++                ss &lt;&lt; &quot;Setting link from key '&quot;;
++                it-&gt;second = command;
++            }
++            ss &lt;&lt; keyStr &lt;&lt; &quot;' to command '&quot; &lt;&lt; command &lt;&lt; &quot;'.&quot;;
++            
++        }
++
++        LOG_MESSAGE(Logger::UI, ss.str());
++    }
++
+ }
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-28 09:52:00 UTC (rev 3010)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-01-28 10:27:15 UTC (rev 3011)
+@@ -322,4 +322,9 @@
+         return NAME;
+     }
+ 
++    void UiSubsystem::linkKeyToRubyCommand(const CeGuiString &amp;key, const CeGuiString &amp;command)
++    {
++        InputManager::getSingleton().linkKeyToRubyCommand(key,command);
++    }
++
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000081.html">[Dsa-hl-svn] r3010 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="000083.html">[Dsa-hl-svn] r3012 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

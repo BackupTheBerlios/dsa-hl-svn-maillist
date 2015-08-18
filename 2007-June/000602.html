@@ -1,0 +1,526 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3531 - in rl/trunk/engine/ai: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3531%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200706112219.l5BMJr8w032455%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000601.html">
+   <LINK REL="Next"  HREF="000603.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3531 - in rl/trunk/engine/ai: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3531%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200706112219.l5BMJr8w032455%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3531 - in rl/trunk/engine/ai: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun 12 00:19:53 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000601.html">[Dsa-hl-svn] r3530 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000603.html">[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#602">[ date ]</a>
+              <a href="thread.html#602">[ thread ]</a>
+              <a href="subject.html#602">[ subject ]</a>
+              <a href="author.html#602">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-12 00:19:43 +0200 (Tue, 12 Jun 2007)
+New Revision: 3531
+
+Modified:
+   rl/trunk/engine/ai/include/AiWorld.h
+   rl/trunk/engine/ai/include/FuzzyState.h
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/AiWorld.cpp
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+Log:
+using DebugVisualisable to debug NewtonWorldAsObstacle and steering behavior
+
+Modified: rl/trunk/engine/ai/include/AiWorld.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiWorld.h	2007-06-11 22:16:22 UTC (rev 3530)
++++ rl/trunk/engine/ai/include/AiWorld.h	2007-06-11 22:19:43 UTC (rev 3531)
+@@ -17,6 +17,7 @@
+ #define __RlAI_World_H__
+ 
+ #include &quot;OpenSteer/Obstacle.h&quot;
++#include &quot;DebugVisualisable.h&quot;
+ #include &lt;OgreNewt.h&gt;
+ #include &lt;vector&gt;
+ 
+@@ -51,7 +52,8 @@
+ 
+     /** Wrapper f&#252;r Newton-World
+ 	 */
+-    class NewtonWorldAsObstacle : public OpenSteer::Obstacle
++    class NewtonWorldAsObstacle : public OpenSteer::Obstacle,
++        public DebugVisualisable
+     {
+     public:
+ 		/** default constructor.
+@@ -63,6 +65,16 @@
+ 		 */
+         virtual void findIntersectionWithVehiclePath (const OpenSteer::AbstractVehicle&amp; vehicle,
+                                               PathIntersection&amp; pi) const;
++        
++        // derived from debugvisualisable
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
++    protected:
++        // derived from debugvisualisable
++        virtual void doCreatePrimitive();
++        typedef std::pair&lt;Ogre::Vector3,Ogre::Vector3&gt; Vector3Pair;
++        mutable std::vector&lt; Vector3Pair &gt; mDebugRaycasts;
++
+     private:
+ 		//! different types of raycasting directions
+         enum RaycastType
+
+Modified: rl/trunk/engine/ai/include/FuzzyState.h
+===================================================================
+--- rl/trunk/engine/ai/include/FuzzyState.h	2007-06-11 22:16:22 UTC (rev 3530)
++++ rl/trunk/engine/ai/include/FuzzyState.h	2007-06-11 22:19:43 UTC (rev 3531)
+@@ -37,7 +37,7 @@
+ 		 * @param controller sets the controller object
+ 		 */
+ 		FuzzyState&lt;Controller&gt;(FuzzyState* parent, Controller* controller)
+-			: mActivationLevel(), mParent(parent), mController(controller) {}
++			: mActivationLevel(1.0), mParent(parent), mController(controller) {}
+ 
+ 		/** explicit virtual destructor
+ 		 */
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-11 22:16:22 UTC (rev 3530)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-11 22:19:43 UTC (rev 3531)
+@@ -18,6 +18,8 @@
+ 
+ #include &quot;AiPrerequisites.h&quot;
+ #include &quot;AgentManager.h&quot;
++#include &quot;DebugVisualisable.h&quot;
++#include &quot;LineSetPrimitive.h&quot;
+ #include &quot;OgreVector3.h&quot;
+ #include &quot;OpenSteer/SteerLibrary.h&quot;
+ 
+@@ -51,7 +53,8 @@
+ 	 *
+ 	 * Maybe this should be used as interface instead of AbstractVehicle
+ 	 */
+-	class _RlAiExport SteeringVehicle : public SimpleVehicle_2
++        class _RlAiExport SteeringVehicle : public SimpleVehicle_2,
++                                            public DebugVisualisable
+ 	{
+ 	public:
+ 		/** Constructor.
+@@ -320,6 +323,11 @@
+ 		 * @returns Actor that is controlled by the SteeringVehicle
+ 		 */
+         const Actor* getActor(void) const;
++
++
++        // derived from debugvisualisable
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
+ 	protected:
+ 		/** initializes
+ 		 */
+@@ -385,6 +393,14 @@
+ 
+         // measure path curvature (1/turning-radius), maintain smoothed version
+       //  void measurePathCurvature (const float elapsedTime);
+-	};
++
++
++        // derived from debugvisualisable
++        virtual void doCreatePrimitive();
++
++        Ogre::Vector3 mDebugSteer;
++        Ogre::Vector3 mDebugWander;
++        Ogre::Vector3 mDebugAvoidObstacles;
++    };
+ }
+ #endif
+
+Modified: rl/trunk/engine/ai/src/AiWorld.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiWorld.cpp	2007-06-11 22:16:22 UTC (rev 3530)
++++ rl/trunk/engine/ai/src/AiWorld.cpp	2007-06-11 22:19:43 UTC (rev 3531)
+@@ -15,12 +15,15 @@
+  */
+ #include &quot;AiWorld.h&quot;
+ #include &quot;PhysicsManager.h&quot;
++#include &quot;LineSetPrimitive.h&quot;
++#include &quot;CoreSubsystem.h&quot;
+ #include &lt;OgreNewt.h&gt;
+ #include &quot;SteeringVehicle.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &quot;PhysicalThing.h&quot;
+ #include &quot;OgreVector3.h&quot;
+ #include &quot;PhysicsMaterialRaycast.h&quot;
++#include &quot;World.h&quot;
+ 
+ using namespace OpenSteer;
+ using namespace Ogre;
+@@ -86,12 +89,13 @@
+ 
+     pi.intersect = false;
+     RaycastInfo info;
++    RaycastInfo infoNearest;
+     // versuche bis zu 5 raycasts mit der Mitte und den &quot;Ecken:&quot; oben, unten, links, rechts!
+     // Dadurch ist ungefaehr der Umriss gesichert!
+     // Habe bisher keine elegantere Loesung gefunden
+     RaycastType raycastType;
+     Vec3 _pos = vehicle.position();
+-    Vec3 _futPos = vehicle.forward() * 5 + _pos;
++    Vec3 _futPos = vehicle.forward() * vehicle.speed() * 3 + _pos;
+ 
+ 
+     if( _pos == _futPos )
+@@ -109,8 +113,15 @@
+     const SteeringVehicle *steerVec = static_cast&lt;const SteeringVehicle *&gt; (&amp;vehicle);
+     // falls nich geklappt, ist das Ergebnis NULL, das wird spaeter abgefragt!
+ 
++    if( steerVec != NULL )
++    {
++        pos = pos + Ogre::Vector3::UNIT_Y*steerVec-&gt;height()/2.0;
++        futPos = futPos + Ogre::Vector3::UNIT_Y*steerVec-&gt;height()/2.0;
++    }
+ 
+-    bool foundObstacle(false);
++
++    RaycastType nearestRayCast(NONE);
++    infoNearest.mDistance = 2;
+     for( int i = 0; i &lt; 5; i++ )
+     {
+         Ogre::Vector3 castPos, castFutPos;  // die Koordinaten, die zum Casten verwendet werden
+@@ -129,20 +140,18 @@
+             // so wir ham ne normale und machen uns nen Y
+             if( vehicle.radius() == 0 )
+                 continue;
+-            Ogre::Vector3 offset(velocityNorm.crossProduct(Ogre::Vector3::UNIT_Y));
+-            offset = offset.normalise() * vehicle.radius();
+-            castPos = pos + offset;
+-            castFutPos = futPos + offset;
++            Vec3 offset = vehicle.side().normalize() * (vehicle.radius() - 0.1);
++            castPos = pos + Vector3(offset.x, offset.y, offset.z);
++            castFutPos = futPos + Vector3(offset.x, offset.y, offset.z);
+         }
+         else if( raycastType == LEFT )
+         {
+             // wie bei right ...
+             if( vehicle.radius() == 0 )
+                 continue;
+-            Ogre::Vector3 offset(velocityNorm.crossProduct(Ogre::Vector3::UNIT_Y));
+-            offset = offset.normalise() * vehicle.radius();
+-            castPos = pos - offset;
+-            castFutPos = futPos - offset;
++            Vec3 offset = vehicle.side().normalize() * (vehicle.radius() - 0.1);
++            castPos = pos - Vector3(offset.x, offset.y, offset.z);
++            castFutPos = futPos - Vector3(offset.x, offset.y, offset.z);
+         }
+         else
+         {
+@@ -154,19 +163,23 @@
+             if( raycastType == TOP )
+             {
+                 castPos = pos;
+-                pos.y += height;
++                castPos.y += height*0.5;
+                 castFutPos = futPos;
+-                futPos.y += height;
++                castFutPos.y += height*0.5;
+             }
+             else if( raycastType == BOTTOM )
+             {
+                 castPos = pos;
+-                pos.y -= height;
++                castPos.y -= height*0.5-0.4;
+                 castFutPos = futPos;
+-                futPos.y -= height;
++                castFutPos.y -= height*0.5-0.4;
+             }
+         }
+ 
++        if( DebugVisualisable::isShown() )
++            mDebugRaycasts.push_back(std::make_pair(castPos,castFutPos));
++
++
+         // so alles richtig gesetzt!
+         info = materialRaycast.execute(
+             mNewtonWorld,
+@@ -177,40 +190,71 @@
+ 
+         if( info.mBody )
+         {
+-            if( !info.mNormal.directionEquals(Ogre::Vector3::UNIT_Y, Degree(20)) )
++            if( !info.mNormal.directionEquals(Ogre::Vector3::UNIT_Y, Degree(5)) )
+             {
+-                foundObstacle = true;
+-                break;
++                nearestRayCast = raycastType;
++                if( info.mDistance &lt; infoNearest.mDistance )
++                    infoNearest = info;
+             }
+         }
+     }
+ 
+-    if( !foundObstacle )
+-        return;
+ 
+ 
+-    switch(raycastType)
++    switch(nearestRayCast)
+     {
+     case NONE:
+         return;
+     default:
+         pi.intersect = true;
+         pi.obstacle = this;
+-        pi.distance = info.mDistance * (futPos - pos).length();
+-        pi.surfacePoint = _pos + (vehicle.forward() * pi.distance);
++        pi.distance = infoNearest.mDistance * (futPos - pos).length();
++        pi.surfacePoint =
++        vehicle.position() + (vehicle.forward() * pi.distance);
+ 
+         // Die normale muss zu uns zeigen! koennte aber auch in die entgegengesetzte Richtung sein!
+-        pi.surfaceNormal = Vec3(info.mNormal.x, info.mNormal.y, info.mNormal.z);
+-        pi.surfaceNormal.normalize();
++        pi.surfaceNormal = Vec3(infoNearest.mNormal.x, infoNearest.mNormal.y, infoNearest.mNormal.z);
++/*        pi.surfaceNormal.normalize();
+         // jedenfalls gilt dafuer, dass der abstand zwischen surfacePoint+surfaceNormal und _pos minimal sein muss
+         if( ((pi.surfacePoint + pi.surfaceNormal) - _pos).length() &gt; 
+             ((pi.surfacePoint - pi.surfaceNormal) - _pos).length() )
+             pi.surfaceNormal = -pi.surfaceNormal;
+-        pi.vehicleOutside = true; // egal?
++*/        pi.vehicleOutside = true; // egal?
++
++        // do we need different handling for right and left?
+         pi.steerHint = pi.surfaceNormal;
+-        //pi.steerHint.normalize();
+         return;
+     }
+ }
+ 
++
++
++// methods from debugvisualisable
++DebugVisualisableFlag NewtonWorldAsObstacle::getFlag() const
++{
++    return DVF_BOT;
+ }
++
++void NewtonWorldAsObstacle::updatePrimitive()
++{
++    if( mSceneNode-&gt;getParent() == NULL )
++    {
++        SceneManager* mgr = 
++            CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;getSceneManager();
++        mgr-&gt;getRootSceneNode()-&gt;addChild(mSceneNode);
++    }
++
++    LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++    lineSet-&gt;clear();
++    for( size_t i = 0; i &lt; mDebugRaycasts.size(); i++)
++        lineSet-&gt;addLine(mDebugRaycasts[i].first, mDebugRaycasts[i].second, Ogre::ColourValue::Blue);
++    mDebugRaycasts.clear();
++}
++
++void NewtonWorldAsObstacle::doCreatePrimitive()
++{
++    mPrimitive = new LineSetPrimitive();
++}
++
++
++}
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-11 22:16:22 UTC (rev 3530)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-11 22:19:43 UTC (rev 3531)
+@@ -40,7 +40,10 @@
+       //mYaw(115),
+ 	  mParent(parent),
+ 	  mCreature(character),
+-      mMovingCreature(NULL)
++      mMovingCreature(NULL),
++      mDebugSteer(Vector3::ZERO),
++      mDebugWander(Vector3::ZERO),
++      mDebugAvoidObstacles(Vector3::ZERO)
+       //mHeight(0)
+ {
+ 	initialize();
+@@ -145,7 +148,10 @@
+ 
+     //  regenerate local space (by default: align vehicle's forward axis with
+     //  new velocity, but this behavior may be overridden by derived classes.)
+-	if (speed() &gt; 0) regenerateOrthonormalBasisUF (newVelocity / speed());
++    // use future orientation or not??
++    orientation = Quaternion(mMovingCreature-&gt;getYaw(), Ogre::Vector3::UNIT_Y);
++    Vector3 newUnitForward = orientation*Vector3::NEGATIVE_UNIT_Z;
++    regenerateOrthonormalBasisUF (Vec3(newUnitForward.x,newUnitForward.y,newUnitForward.z));
+ 
+ // end of inserting from playervehicle
+ 
+@@ -161,6 +167,8 @@
+ // calculate the result of the force    
+     Vector3 result = mCurrentForce;// + mCurrentVelocity;
+ 
++     mDebugSteer = mCurrentForce;
++
+ // @todo remove this
+ if( mCreature-&gt;getAu() &lt;= 6 )
+     mCreature-&gt;modifyAu(20,true);
+@@ -204,55 +212,47 @@
+ Vector3 SteeringVehicle::calcWander(const float elapsedTime)
+ {
+ 	Vec3 rVal(mForwardVector.x, mForwardVector.y, mForwardVector.z);
+-	rVal += steerForWander(elapsedTime).setYtoZero();
+-	return Vector3(rVal.x, rVal.y, rVal.z);
++	
++    rVal += steerForWander(elapsedTime/12.0f).setYtoZero();
++
++    Vector3 steering(rVal.x, rVal.y, rVal.z);
++    mDebugWander = steering;
++	return steering;
+ }
+ 
+ Vector3 SteeringVehicle::calcSeek(const Vector3&amp; target)
+ {
+ 	Vec3 rVal = steerForSeek(Vec3(target.x, target.y, target.z)).setYtoZero();
+-	rVal = rVal.normalize();
+-	//rVal *= -0.1; //adjustment for newton
+-	//rVal.z=0;
+-	return Vector3(rVal.x, rVal.y, rVal.z);
++    Vector3 steering(rVal.x, rVal.y, rVal.z);
++	return steering;
+ }
+ 
+ Vector3 SteeringVehicle::calcFlee(const Vector3&amp; target)
+ {
+ 	Vec3 rVal = steerForFlee(Vec3(target.x, target.y, target.z)).setYtoZero();
+-	rVal *= -0.1;
+-	return Vector3(rVal.x, rVal.y, rVal.z);
++    Vector3 steering(rVal.x, rVal.y, rVal.z);
++	return steering;
+ }
+ 
+ Vector3 SteeringVehicle::calcPursuit(Agent* agent)
+ {
+ 	Vec3 rVal = steerForPursuit(*(agent-&gt;getVehicle())).setYtoZero();
+-	rVal = rVal.normalize();
+-	rVal.z = 0;
+-	return Vector3(rVal.x, rVal.y, rVal.z);
++    Vector3 steering(rVal.x, rVal.y, rVal.z);
++	return steering;
+ }
+ 
+ Vector3 SteeringVehicle::calcAvoidObstacles(const float minTimeToCollision)
+ {
+     ObstacleGroup obstacles = getObstacles();
+ 	Vec3 rVal = steerToAvoidObstacles(minTimeToCollision, obstacles).setYtoZero();
+-	if(rVal.x != 0.0f || rVal.z != 0.0f)
+-	{
+-		rVal = rVal;
+-	}
+-	rVal = rVal.normalize();
+-	//rVal *= 0.0001;
+-	return Vector3(rVal.x, rVal.y, rVal.z);
++    Vector3 steering(rVal.x, rVal.y, rVal.z);
++    mDebugAvoidObstacles = steering;
++	return steering;
+ }
+ 
+ Vector3 SteeringVehicle::calcAvoidNeighbors(const float minTimeToCollision)
+ {
+ 	Vec3 rVal = steerToAvoidNeighbors(minTimeToCollision, getNeighbors()).setYtoZero();
+-	if(rVal.x != 0.0f || rVal.z != 0.0f)
+-	{
+-		rVal = rVal;
+-	}
+-//	rVal *= -1;
+ 	return Vector3(rVal.x, rVal.y, rVal.z);
+ }
+ 		
+@@ -444,4 +444,44 @@
+ }
+ */
+ 
++
++
++
++// methods from debugvisualisable
++DebugVisualisableFlag SteeringVehicle::getFlag() const
++{
++    return DVF_BOT;
+ }
++
++void SteeringVehicle::updatePrimitive()
++{
++    if (mSceneNode-&gt;getParent() == NULL)
++    {
++        mCreature-&gt;getActor()-&gt;_getSceneNode()-&gt;addChild(mSceneNode);
++    }
++
++    LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++    lineSet-&gt;clear();
++    
++    if(mDebugSteer != Vector3::ZERO)
++    {
++        lineSet-&gt;addLine(Vector3::UNIT_Y*2, Vector3::UNIT_Y*2 + mDebugSteer.normalisedCopy()*0.5, ColourValue::Black);
++        mDebugSteer = Vector3::ZERO;
++    }
++    if(mDebugWander != Vector3::ZERO)
++    {
++        lineSet-&gt;addLine(Vector3::UNIT_Y*2, Vector3::UNIT_Y*2 + mDebugWander.normalisedCopy()*0.5, ColourValue::Green);
++        mDebugWander = Vector3::ZERO;
++    }
++    if(mDebugAvoidObstacles != Vector3::ZERO)
++    {
++        lineSet-&gt;addLine(Vector3::UNIT_Y*2, Vector3::UNIT_Y*2 + mDebugAvoidObstacles.normalisedCopy()*0.5, ColourValue::Red);
++        mDebugAvoidObstacles = Vector3::ZERO;
++    }
++}
++
++void SteeringVehicle::doCreatePrimitive()
++{
++    mPrimitive = new LineSetPrimitive();
++}
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000601.html">[Dsa-hl-svn] r3530 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000603.html">[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#602">[ date ]</a>
+              <a href="thread.html#602">[ thread ]</a>
+              <a href="subject.html#602">[ subject ]</a>
+              <a href="author.html#602">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

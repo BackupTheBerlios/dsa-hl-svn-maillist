@@ -1,0 +1,346 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4659 - modules/kanalisation/materials
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4659%20-%20modules/kanalisation/materials&In-Reply-To=%3C200812311313.mBVDDIE7002551%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001715.html">
+   <LINK REL="Next"  HREF="001717.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4659 - modules/kanalisation/materials</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4659%20-%20modules/kanalisation/materials&In-Reply-To=%3C200812311313.mBVDDIE7002551%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4659 - modules/kanalisation/materials">timm at mail.berlios.de
+       </A><BR>
+    <I>Wed Dec 31 14:13:18 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001715.html">[Dsa-hl-svn] r4658 - in rl/trunk: . cmake engine/core	engine/core/include engine/core/src engine/rules engine/ui plugins
+</A></li>
+        <LI>Next message: <A HREF="001717.html">[Dsa-hl-svn] r4660 - in rl/branches/persistence: common/include	common/src core core/include core/src rules rules/include	rules/src script/src script/swig ui
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1716">[ date ]</a>
+              <a href="thread.html#1716">[ thread ]</a>
+              <a href="subject.html#1716">[ subject ]</a>
+              <a href="author.html#1716">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-12-31 14:13:10 +0100 (Wed, 31 Dec 2008)
+New Revision: 4659
+
+Added:
+   modules/kanalisation/materials/TotalReflectDirtWaterPixel_hlsl.source
+   modules/kanalisation/materials/TotalReflectDirtWaterVertex_hlsl.source
+Modified:
+   modules/kanalisation/materials/DirtyWater.material
+Log:
+rewritten dirty water shader in hlsl
+
+Modified: modules/kanalisation/materials/DirtyWater.material
+===================================================================
+--- modules/kanalisation/materials/DirtyWater.material	2008-12-30 22:25:45 UTC (rev 4658)
++++ modules/kanalisation/materials/DirtyWater.material	2008-12-31 13:13:10 UTC (rev 4659)
+@@ -2,19 +2,18 @@
+ // Distortion effects
+ //----------------------------
+ 
+-vertex_program TotalReflectDirtWaterVP cg
++vertex_program TotalReflectDirtWaterVS hlsl
+ {
+-	source TotalReflectDirtWater.source
+-	entry_point main_vp
+-	profiles vs_1_1 arbvp1
++	source TotalReflectDirtWaterVertex_hlsl.source
++	entry_point vs_main
++	target vs_2_0
+ }
+ 
+-fragment_program TotalReflectDirtWaterFP cg
++fragment_program TotalReflectDirtWaterPS hlsl
+ {
+-	source TotalReflectDirtWater.source
+-	entry_point main_fp
+-	// sorry, ps_1_1 and fp20 can't do this
+-	profiles ps_2_0 arbfp1
++	source TotalReflectDirtWaterPixel_hlsl.source
++	entry_point ps_main
++	target ps_2_0
+ }
+ 
+ material DirtyWater
+@@ -26,20 +25,37 @@
+ 		{
+ 			ambient 0.609804 0.609804 0.609804 1
+ 			
+-			vertex_program_ref TotalReflectDirtWaterVP
++			vertex_program_ref TotalReflectDirtWaterVS
+ 			{
+ 				param_named_auto worldViewProjMatrix worldviewproj_matrix
+ 				param_named_auto eyePosition camera_position_object_space
+-				param_named_auto lightPosition light_position_object_space 0
+-				param_named_auto lightDiffuse light_diffuse_colour 0
++				
++				param_named_auto Light1_attenuation light_attenuation 0
++				param_named_auto Light1_color light_diffuse_colour 0
++				param_named_auto Light1_position light_position_object_space 0
++				param_named Light1_spec_power float 0.3
++				
++				param_named_auto Light2_attenuation light_attenuation 1
++				param_named_auto Light2_color light_diffuse_colour 1
++				param_named_auto Light2_position light_position_object_space 1
++				param_named Light2_spec_power float 0.3
++				
++				param_named_auto Light3_attenuation light_attenuation 2
++				param_named_auto Light3_color light_diffuse_colour 2
++				param_named_auto Light3_position light_position_object_space 2
++				param_named Light3_spec_power float 0.3
++				
+ 				param_named_auto timeVal time 0.05
+-				param_named_auto ambient ambient_light_colour
++				//param_named_auto ambient ambient_light_colour
++				param_named skycolor float4 0.8 0.8 0.8 1.0
++				param_named groundcolor float4 0.40 0.40 0.40 1.0
++				
+ 				param_named scroll float 1  
+ 				param_named scale float 1 
+ 				param_named noise float 1 
+ 				// scroll and noisePos will need updating per frame
+ 			}
+-			fragment_program_ref TotalReflectDirtWaterFP
++			fragment_program_ref TotalReflectDirtWaterPS
+ 			{
+ 				param_named fresnelBias float -0.1 
+ 				param_named fresnelScale float 1.8 
+
+Added: modules/kanalisation/materials/TotalReflectDirtWaterPixel_hlsl.source
+===================================================================
+--- modules/kanalisation/materials/TotalReflectDirtWaterPixel_hlsl.source	2008-12-30 22:25:45 UTC (rev 4658)
++++ modules/kanalisation/materials/TotalReflectDirtWaterPixel_hlsl.source	2008-12-31 13:13:10 UTC (rev 4659)
+@@ -0,0 +1,42 @@
++//pixel shader
++float noiseScale;
++float fresnelBias;
++float fresnelScale;
++float fresnelPower;
++
++sampler2D noiseMap;
++sampler2D reflectMap;
++sampler2D dirtMap;
++
++struct PS_INPUT
++{
++	float3 NoiseCoord : TEXCOORD0;
++	float4 ProjectionCoord : TEXCOORD1;
++	float3 EyeDir : TEXCOORD2;
++	float3 Normal : TEXCOORD3;
++	float2 Tex    : TEXCOORD4;
++	float4 Color   : COLOR;
++};
++
++float4 ps_main(PS_INPUT Input) : COLOR
++{
++	// Do the tex projection manually so we can distort _after_
++	float2 final = Input.ProjectionCoord.xy / Input.ProjectionCoord.w;
++
++	// Noise
++	float3 noiseNormal = (tex2D(noiseMap, (Input.NoiseCoord.xy )).rgb - 0.5).rbg * noiseScale;
++	final += noiseNormal.xz;
++
++	// Fresnel
++	//normal = normalize(Input.Normal + noiseNormal.xz);
++	float fresnel = fresnelBias + fresnelScale * (saturate(pow(1 + dot(Input.EyeDir, Input.Normal), fresnelPower)+0.2));
++
++	// Reflection / refraction
++	float4 reflectionColour = tex2D(reflectMap, final);
++	float4 dirtColour = tex2D(dirtMap, Input.Tex) * Input.Color;
++
++	// Final colour
++	float4 col = lerp(dirtColour, reflectionColour, fresnel);
++	
++	return col;
++}
+
+Added: modules/kanalisation/materials/TotalReflectDirtWaterVertex_hlsl.source
+===================================================================
+--- modules/kanalisation/materials/TotalReflectDirtWaterVertex_hlsl.source	2008-12-30 22:25:45 UTC (rev 4658)
++++ modules/kanalisation/materials/TotalReflectDirtWaterVertex_hlsl.source	2008-12-31 13:13:10 UTC (rev 4659)
+@@ -0,0 +1,143 @@
++//vertex shader
++
++float4x4 worldViewProjMatrix;
++float3 eyePosition; // object space
++float timeVal;
++float scale;  // the amount to scale the noise texture by
++float scroll; // the amount by which to scroll the noise
++float noise;  // the noise perturb as a factor of the  time
++float4 ambient;  //ambient light color
++
++//lights
++float4 skycolor;
++float4 groundcolor;
++float4 Light1_attenuation;
++float4 Light1_position;
++float4 Light1_color;
++float4 Light1_spec_power;
++
++float4 Light2_attenuation;
++float4 Light2_position;
++float4 Light2_color;
++float4 Light2_spec_power;
++
++float4 Light3_attenuation;
++float4 Light3_position;
++float4 Light3_color;
++float4 Light3_spec_power;
++
++struct VS_INPUT 
++{
++   float4 Position : POSITION;
++   float2 Texcoord : TEXCOORD0;
++   float3 Normal   : NORMAL;   
++};
++
++struct VS_OUTPUT
++{
++	float4 Position		: POSITION;
++	float3 NoiseCoord 	: TEXCOORD0;
++	float4 ProjectionCoord 	: TEXCOORD1;
++	float3 EyeDir 	: TEXCOORD2;
++	float3 Normal 	: TEXCOORD3;
++	float2 Tex    	: TEXCOORD4;
++	float4 Color   	: COLOR;
++};
++
++VS_OUTPUT vs_main(VS_INPUT Input)
++{
++	VS_OUTPUT Output = (VS_OUTPUT) 0;
++	
++	Output.Position = mul(worldViewProjMatrix, Input.Position);
++	
++	
++	//Output color
++	Output.Color = lerp(skycolor,groundcolor,(dot(Input.Normal, float3(0,-1,0))+1)/2 );
++	
++	
++   // Light1
++   
++   float3 LightDir = Light1_position - Input.Position * Light1_position.w;
++   float Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   float AngleAttn = saturate( dot(Input.Normal ,LightDir));
++   
++   float3 EyeVect = normalize(Input.Position - eyePosition);
++   float3 HalfVect = normalize(LightDir - EyeVect);
++   
++   float SpecAttn = Light1_color * Light1_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),32);
++   
++   float DistAttn = clamp(1/ (Light1_attenuation.y +
++                              Light1_attenuation.z * Dist +
++                              Light1_attenuation.w * Dist * Dist)*saturate(Light1_attenuation.x-Dist)
++                          ,0,1);
++   
++   Output.Color += (Light1_color * AngleAttn + SpecAttn) * DistAttn ;
++   
++   
++   // Light3
++   
++   LightDir = Light3_position - Input.Position * Light3_position.w;
++   Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   AngleAttn = saturate( dot(Input.Normal ,LightDir));
++
++   HalfVect = normalize(LightDir - EyeVect);
++   
++   SpecAttn = Light3_color * Light3_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),32);
++   
++   DistAttn = clamp(1/ (Light3_attenuation.y +
++                              Light3_attenuation.z * Dist +
++                              Light3_attenuation.w * Dist * Dist)*saturate(Light3_attenuation.x-Dist)
++                          ,0,1);
++   
++   Output.Color += (Light3_color * AngleAttn + SpecAttn) * DistAttn ;
++   
++   
++   // Light2
++   
++   LightDir = Light2_position - Input.Position * Light2_position.w;
++   Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   AngleAttn = saturate( dot(Input.Normal ,LightDir));
++   
++   HalfVect = normalize(LightDir - EyeVect);
++   
++   SpecAttn = Light2_color *Light2_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),32);
++   
++   DistAttn = clamp(1/ (Light2_attenuation.y +
++                        Light2_attenuation.z * Dist +
++                        Light2_attenuation.w * Dist * Dist)*saturate(Light2_attenuation.x-Dist)
++                        ,0,1);
++   
++   Output.Color += (Light2_color * AngleAttn + SpecAttn) * DistAttn ;
++	
++	//end color
++	
++	float4x4 scalemat = float4x4(0.5,   0,   0, 0.5, 
++	                               0,-0.5,   0, 0.5,
++								   0,   0, 0.5, 0.5,
++								   0,   0,   0,   1);
++
++	//output projection coord
++	Output.ProjectionCoord = mul(scalemat, Output.Position);
++	
++	//Noise Texture
++	Output.NoiseCoord.xy = (Input.Texcoord + (timeVal * scroll)) * scale;
++	Output.NoiseCoord.z = noise * timeVal;
++	
++	//Output Eye Dir
++	Output.EyeDir = normalize(Input.Position.xyz - eyePosition);
++	
++	//Output Normale
++	Output.Normal = Input.Normal.rgb; 
++	
++	//Output UV Texture
++	Output.Tex = Input.Texcoord;
++	
++	return Output;
++}
++
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001715.html">[Dsa-hl-svn] r4658 - in rl/trunk: . cmake engine/core	engine/core/include engine/core/src engine/rules engine/ui plugins
+</A></li>
+	<LI>Next message: <A HREF="001717.html">[Dsa-hl-svn] r4660 - in rl/branches/persistence: common/include	common/src core core/include core/src rules rules/include	rules/src script/src script/swig ui
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1716">[ date ]</a>
+              <a href="thread.html#1716">[ thread ]</a>
+              <a href="subject.html#1716">[ subject ]</a>
+              <a href="author.html#1716">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

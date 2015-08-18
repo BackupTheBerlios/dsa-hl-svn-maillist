@@ -1,0 +1,316 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4813 - in dependencies/OgreNewt: . inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4813%20-%20in%20dependencies/OgreNewt%3A%20.%20inc%20src&In-Reply-To=%3C200903091129.n29BTQ3T030911%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001869.html">
+   <LINK REL="Next"  HREF="001871.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4813 - in dependencies/OgreNewt: . inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4813%20-%20in%20dependencies/OgreNewt%3A%20.%20inc%20src&In-Reply-To=%3C200903091129.n29BTQ3T030911%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4813 - in dependencies/OgreNewt: . inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  9 12:29:26 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001869.html">[Dsa-hl-svn] r4812 - in rl/trunk/engine: core/src script/src
+</A></li>
+        <LI>Next message: <A HREF="001871.html">[Dsa-hl-svn] r4814 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1870">[ date ]</a>
+              <a href="thread.html#1870">[ thread ]</a>
+              <a href="subject.html#1870">[ subject ]</a>
+              <a href="author.html#1870">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-03-09 12:29:24 +0100 (Mon, 09 Mar 2009)
+New Revision: 4813
+
+Modified:
+   dependencies/OgreNewt/CMakeLists.txt
+   dependencies/OgreNewt/inc/OgreNewt.h
+   dependencies/OgreNewt/inc/OgreNewt_Debugger.h
+   dependencies/OgreNewt/src/OgreNewt_BasicFrameListener.cpp
+   dependencies/OgreNewt/src/OgreNewt_Body.cpp
+   dependencies/OgreNewt/src/OgreNewt_Debugger.cpp
+Log:
+-added BasicFrameListener
+-fixed several bugs (e.g. exception when deleting the debugger...)
+
+
+Modified: dependencies/OgreNewt/CMakeLists.txt
+===================================================================
+--- dependencies/OgreNewt/CMakeLists.txt	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/CMakeLists.txt	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -70,6 +70,7 @@
+ 
+ SET(OgreNewt_LIB_SRCS
+ src/OgreNewt_BasicJoints.cpp
++src/OgreNewt_BasicFrameListener.cpp
+ src/OgreNewt_Body.cpp
+ src/OgreNewt_BodyInAABBIterator.cpp
+ src/OgreNewt_Collision.cpp
+
+Modified: dependencies/OgreNewt/inc/OgreNewt.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt.h	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/inc/OgreNewt.h	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -39,6 +39,7 @@
+ #include &quot;OgreNewt_Tools.h&quot;
+ #include &quot;OgreNewt_BodyInAABBIterator.h&quot;
+ #include &quot;OgreNewt_Debugger.h&quot;
++#include &quot;OgreNewt_BasicFrameListener.h&quot;
+ 
+ /*! \mainpage OgreNewt Library version 2.00
+ 
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_Debugger.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_Debugger.h	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/inc/OgreNewt_Debugger.h	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -15,6 +15,7 @@
+ #include &quot;OgreNewt_Prerequisites.h&quot;
+ #include &quot;OgreNewt_Tools.h&quot;
+ 
++
+ namespace OgreNewt
+ {
+ 
+@@ -28,7 +29,7 @@
+ 		This class implements a debug view of the Newton world. You can access it via World::getDebugger().
+         It needs to be initialized (call World::getDebugger().init(...)).
+ 	*/
+-	class _OgreNewtExport Debugger
++	class _OgreNewtExport Debugger : public Ogre::Node::Listener
+ 	{
+ 	
+ 	public:
+@@ -43,6 +44,9 @@
+ 		//! de-init the debugger (cleantup)
+ 		void deInit();
+ 
++        //! called when one of the nodes used in this class are destroyed
++        virtual void nodeDestroyed (const Ogre::Node *);
++
+ 		//! show the newton world
+ 		/*!
+ 			Draws the Newton world as 3D lines with informative text above each body
+@@ -120,7 +124,10 @@
+         //! create debug information for one body
+         void processBody(Body* body);
+ 
++        //! clear debug data cache fo bodies (m_cachemap)
++        void clearBodyDebugDataCache();
+ 
++
+     private:
+         //! this function is declared private, so nobody can use it!
+         Debugger() {}
+
+Modified: dependencies/OgreNewt/src/OgreNewt_BasicFrameListener.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_BasicFrameListener.cpp	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/src/OgreNewt_BasicFrameListener.cpp	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -5,8 +5,8 @@
+ namespace OgreNewt
+ {
+ 
+-	BasicFrameListener::BasicFrameListener( Ogre::RenderWindow* win, Ogre::SceneManager* mgr, OgreNewt::World* W, int update_framerate) :
+-		FrameListener()
++BasicFrameListener::BasicFrameListener( Ogre::RenderWindow* win, Ogre::SceneManager* mgr, OgreNewt::World* W, int update_framerate) :
++        FrameListener()
+ {
+ 	m_World = W;
+ 	desired_framerate = update_framerate;
+@@ -84,11 +84,11 @@
+ 
+ 	if (mKeyboard-&gt;isKeyDown(OIS::KC_F3))
+ 	{
+-		m_world-&gt;getDebugger().showDebugInformation( m_World );
++		m_World-&gt;getDebugger().showDebugInformation();
+ 	}
+ 	else
+ 	{
+-		m_world-&gt;getDebugger().hideDebugInformation();
++		m_World-&gt;getDebugger().hideDebugInformation();
+ 	}
+ 
+ 	
+
+Modified: dependencies/OgreNewt/src/OgreNewt_Body.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_Body.cpp	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/src/OgreNewt_Body.cpp	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -223,7 +223,7 @@
+ 	if (m_matid)
+ 		return m_matid;
+ 	else
+-		return NULL;
++        return m_world-&gt;getDefaultMaterialID();		
+ }
+ 
+ 
+
+Modified: dependencies/OgreNewt/src/OgreNewt_Debugger.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_Debugger.cpp	2009-03-08 22:03:18 UTC (rev 4812)
++++ dependencies/OgreNewt/src/OgreNewt_Debugger.cpp	2009-03-09 11:29:24 UTC (rev 4813)
+@@ -35,11 +35,13 @@
+     if( !m_debugnode )
+     {
+         m_debugnode = smgr-&gt;getRootSceneNode()-&gt;createChildSceneNode(&quot;__OgreNewt__Debugger__Node__&quot;);
++        m_debugnode-&gt;setListener(this);
+     }
+ 
+     if( !m_raycastsnode )
+     {
+         m_raycastsnode = smgr-&gt;getRootSceneNode()-&gt;createChildSceneNode(&quot;__OgreNewt__Raycasts_Debugger__Node__&quot;);
++        m_raycastsnode-&gt;setListener(this);
+     }
+ }
+ 
+@@ -47,12 +49,44 @@
+ {
+ 	if (m_debugnode)
+ 	{
++        m_debugnode-&gt;setListener(NULL);
+ 		m_debugnode-&gt;removeAllChildren();
+ 		m_debugnode-&gt;getParentSceneNode()-&gt;removeAndDestroyChild( m_debugnode-&gt;getName() );
+ 		m_debugnode = NULL;
+ 	}
+ 
+ 
++    clearBodyDebugDataCache();
++
++
++    clearRaycastsRecorded();
++    if( m_raycastsnode )
++    {
++        m_raycastsnode-&gt;setListener(NULL);
++		m_raycastsnode-&gt;removeAndDestroyAllChildren();
++		m_raycastsnode-&gt;getParentSceneNode()-&gt;removeAndDestroyChild( m_raycastsnode-&gt;getName() );
++		m_raycastsnode = NULL;
++    }
++}
++
++void Debugger::nodeDestroyed (const Ogre::Node *node)
++{
++    if(node == m_debugnode)
++    {
++        m_debugnode = NULL;
++        clearBodyDebugDataCache();
++    }
++
++    if(node == m_raycastsnode)
++    {
++        m_raycastsnode = NULL;
++        clearRaycastsRecorded();
++    }
++}
++
++
++void Debugger::clearBodyDebugDataCache()
++{
+         for(BodyDebugDataMap::iterator it = m_cachemap.begin(); it != m_cachemap.end(); it++)
+         {
+             Ogre::ManualObject* mo = it-&gt;second.m_lines;
+@@ -61,18 +95,14 @@
+         }
+         m_cachemap.clear();
+ 
+-    clearRaycastsRecorded();
+-    if( m_raycastsnode )
+-    {
+-		m_raycastsnode-&gt;removeAndDestroyAllChildren();
+-		m_raycastsnode-&gt;getParentSceneNode()-&gt;removeAndDestroyChild( m_debugnode-&gt;getName() );
+-		m_raycastsnode = NULL;
+-    }
+ }
+ 
+ 
+ void Debugger::showDebugInformation( )
+ {
++    if (!m_debugnode)
++        return;
++
+     m_debugnode-&gt;removeAllChildren();
+ 
+     // make the new lines.
+@@ -281,6 +311,9 @@
+ 
+ void Debugger::addRay(const Ogre::Vector3 &amp;startpt, const Ogre::Vector3 &amp;endpt)
+ {
++    if (!m_raycastsnode)
++        return;
++
+     static int i = 0;
+     std::ostringstream oss;
+     oss &lt;&lt; &quot;__OgreNewt__Raycast_Debugger__Lines__Raycastline__&quot; &lt;&lt; i++ &lt;&lt; &quot;__&quot;;
+@@ -297,6 +330,9 @@
+ 
+ void Debugger::addConvexRay(const OgreNewt::Collision* col, const Ogre::Vector3 &amp;startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3 &amp;endpt)
+ {
++    if (!m_raycastsnode)
++        return;
++
+     static int i = 0;
+     // lines from aab
+     std::ostringstream oss;
+@@ -343,6 +379,9 @@
+ 
+ void Debugger::addDiscardedBody(const OgreNewt::Body* body)
+ {
++    if (!m_raycastsnode)
++        return;
++
+     static int i = 0;
+     float matrix[16];
+     Ogre::Vector3 pos;
+@@ -365,6 +404,9 @@
+ 
+ void Debugger::addHitBody(const OgreNewt::Body* body)
+ {
++    if (!m_raycastsnode)
++        return;
++
+     static int i = 0;
+     float matrix[16];
+     Ogre::Vector3 pos;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001869.html">[Dsa-hl-svn] r4812 - in rl/trunk/engine: core/src script/src
+</A></li>
+	<LI>Next message: <A HREF="001871.html">[Dsa-hl-svn] r4814 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1870">[ date ]</a>
+              <a href="thread.html#1870">[ thread ]</a>
+              <a href="subject.html#1870">[ subject ]</a>
+              <a href="author.html#1870">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

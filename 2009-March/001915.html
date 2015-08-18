@@ -1,0 +1,258 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4858 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4858%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903220818.n2M8IYHA030016%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001914.html">
+   <LINK REL="Next"  HREF="001916.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4858 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4858%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903220818.n2M8IYHA030016%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4858 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 22 09:18:34 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001914.html">[Dsa-hl-svn] r4857 - in rl/trunk/editors/Lockenwickler/src: . media	media/icons
+</A></li>
+        <LI>Next message: <A HREF="001916.html">[Dsa-hl-svn] r4859 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1915">[ date ]</a>
+              <a href="thread.html#1915">[ thread ]</a>
+              <a href="subject.html#1915">[ subject ]</a>
+              <a href="author.html#1915">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-22 09:18:32 +0100 (Sun, 22 Mar 2009)
+New Revision: 4858
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- some bugfixes
+- new options dialog for the module explorer
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-21 22:48:06 UTC (rev 4857)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-22 08:18:32 UTC (rev 4858)
+@@ -22,6 +22,36 @@
+ from PyQt4.QtGui import *
+ import ogre.renderer.OGRE as og
+ 
++class ExplorerOptionsDlg(QDialog):
++    def __init__(self, lights, gameObjects, entities, zones, parent = None):
++        super(ExplorerOptionsDlg, self).__init__(parent)
++        
++        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
++        layout = QVBoxLayout()
++        
++        self.lightCheckBox = QCheckBox(&quot;Show Lights&quot;)
++        self.lightCheckBox.setChecked(lights)        
++        layout.addWidget(self.lightCheckBox)
++        
++        self.gameObjectsCheckBox = QCheckBox(&quot;Show Game-Objects&quot;)
++        self.gameObjectsCheckBox.setChecked(gameObjects)        
++        layout.addWidget(self.gameObjectsCheckBox)
++        
++        self.entitiesCheckBox = QCheckBox(&quot;Show Entities&quot;)
++        self.entitiesCheckBox.setChecked(entities)        
++        layout.addWidget(self.entitiesCheckBox)
++        
++        self.zonesCheckBox = QCheckBox(&quot;Show Zones&quot;)
++        self.zonesCheckBox.setChecked(zones)        
++        layout.addWidget(self.zonesCheckBox)
++        
++        layout.addWidget(buttonBox)
++        layout.setContentsMargins(2, 2, 2, 2)
++        self.setLayout(layout)
++        
++        self.connect(buttonBox, SIGNAL(&quot;accepted()&quot;), self, SLOT(&quot;accept()&quot;))        
++        self.connect(buttonBox, SIGNAL(&quot;rejected()&quot;), self, SLOT(&quot;reject()&quot;))
++
+ class NameInputDlg(QDialog):
+     def __init__(self, parent = None):
+         super(NameInputDlg, self).__init__(parent)
+@@ -78,6 +108,11 @@
+         self.lastSelectedMap = None
+         self.onMenuPoint = None
+         
++        self.showLights = True
++        self.showGameObjects = True
++        self.showEntities = True
++        self.showZones = True
++        
+     def onClick(self, item, column):
+         if self.mapSelectedCallback is None:
+             return
+@@ -142,8 +177,22 @@
+                 newZoneAction = QAction(&quot;New Zone&quot;,  self)
+                 menu.addAction(newZoneAction)
+                 self.connect(newZoneAction, SIGNAL(&quot;triggered()&quot;), self.onNewZone)
+-                
++            
++            menu.addSeparator()
++            optionsAction= QAction(&quot;Open Explorer Options&quot;,  self)
++            menu.addAction(optionsAction)
++            self.connect(optionsAction, SIGNAL(&quot;triggered()&quot;), self.onOptions)
++            
+             menu.exec_(QCursor().pos())
++    
++    def onOptions(self):
++        dlg = ExplorerOptionsDlg(self.showLights, self.showGameObjects, self.showEntities, self.showZones, self)
++        if dlg.exec_():
++            self.showLights = dlg.lightCheckBox.isChecked()
++            self.showGameObjects = dlg.gameObjectsCheckBox.isChecked()
++            self.showEntities = dlg.entitiesCheckBox.isChecked()
++            self.showZones = dlg.zonesCheckBox.isChecked()
++            self.updateView()
+             
+     def onHideMap(self):
+         if self.module:
+@@ -193,6 +242,7 @@
+ 
+     def parseMap(self, map, sceneRootItem):
+         childItem =  QTreeWidgetItem(sceneRootItem)
++        sceneRootItem.setExpanded(True)
+         mn = &quot;Map: &quot; + map.mapName
+         
+         childItem.setIcon(1 , QIcon(&quot;media/icons/14_layer_visible.png&quot;))
+@@ -202,24 +252,35 @@
+         childItem.setText(0, mn)
+         if mn == self.lastSelectedMap:
+             childItem.setSelected(True)
+-            childItem.parent().setExpanded(True)
++            childItem.setExpanded(True)
+             
++        if self.showZones:
+             self.parseZone(map, childItem)
++            
+         i = 0
+-        while i &lt; map.mapNode.numChildren():                
+-            childItem2 = QTreeWidgetItem(childItem) 
+-            childItem2.setText(0, map.mapNode.getChild(i).getName())            
+-            
+-            thetype = None
+-            try:
+-                thetype = str(type(map.mapNode.getChild(i).getAttachedObject(0)))
+-            except:
+-                i = i+1
+-                continue
+-                
+-            childItem3 = QTreeWidgetItem(childItem2) 
+-            childItem3.setText(0, thetype)
++        while i &lt; map.mapNode.numChildren(): 
++            if map.mapNode.getChild(i).getName().startswith(&quot;light_&quot;) and self.showLights:
++                childItem2 = QTreeWidgetItem(childItem) 
++                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
++            elif map.mapNode.getChild(i).getName().startswith(&quot;gameobject_&quot;) and self.showGameObjects:
++                childItem2 = QTreeWidgetItem(childItem) 
++                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
++            elif map.mapNode.getChild(i).getName().startswith(&quot;entity_&quot;) and self.showEntities:
++                childItem2 = QTreeWidgetItem(childItem) 
++                childItem2.setText(0, map.mapNode.getChild(i).getName()) 
+             i = i+1
++
++        
++#            thetype = None
++#            try:
++#                thetype = str(type(map.mapNode.getChild(i).getAttachedObject(0)))
++#            except:
++#                i = i+1
++#                continue
++#                
++#            childItem3 = QTreeWidgetItem(childItem2) 
++#            childItem3.setText(0, thetype)
++#            i = i+1
+             
+ 
+ # this crashed in linux
+@@ -236,6 +297,10 @@
+             childItem.setText(0, &quot;Zone: &quot; + zone.name)
+             childItem.setIcon(0, QIcon(&quot;media/icons/dissociatecell.png&quot;))
+         
++            for area in zone.areaList:
++                childItem2 = QTreeWidgetItem(childItem)
++                childItem2.setText(0, &quot;Area &quot; + str(area.id))
++                
+     def setCurrentModule(self, module):
+         self.module = module
+         self.updateView()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-21 22:48:06 UTC (rev 4857)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-22 08:18:32 UTC (rev 4858)
+@@ -55,7 +55,7 @@
+         if not parentZone:
+            raise Exception(&quot;No parentZone&quot;)
+ 
+-        
++        self.id = id
+         self.areaNode = parentZone.zoneNode.createChildSceneNode(&quot;area_&quot; + parentZone.name + &quot; &quot; + str(id))
+         self.meshFile = meshFile
+         self.areaEntity = None
+@@ -188,20 +188,20 @@
+     def onZoneNameTriggered(self, zone, type):
+         if self.newAreaPosition is not None:
+             if type == &quot;box&quot;:
+-                zone.addArea(self.sceneManager, &quot;box&quot;, self.newAreaPosition, None, None)
++                zone.addArea(&quot;box&quot;, self.newAreaPosition, None, None)
+             elif type == &quot;sphere&quot;:
+-                zone.addArea(self.sceneManager, &quot;sphere&quot;, self.newAreaPosition, None, None)
++                zone.addArea(&quot;sphere&quot;, self.newAreaPosition, None, None)
+             elif type == &quot;mesh&quot;:
+                 resName = self.entityUnderMouse.getMesh().getName()
+                 parentNode = self.entityUnderMouse.getParentSceneNode()
+-                zone.addArea(self.sceneManager, &quot;mesh&quot;, parentNode.getPosition(), parentNode.getOrientation(), parentNode.getScale(), resName)
++                zone.addArea(&quot;mesh&quot;, parentNode.getPosition(), parentNode.getOrientation(), parentNode.getScale(), resName)
+             elif type == &quot;othermesh&quot;:
+                 dlg = NameInputDlg(QApplication.focusWidget())
+                 resName = &quot;&quot;
+                 if dlg.exec_():
+                     resName = str(dlg.nameInput.text())
+ 
+-                zone.addArea(self.sceneManager, &quot;othermesh&quot;, self.newAreaPosition, None, None, resName)
++                zone.addArea(&quot;othermesh&quot;, self.newAreaPosition, None, None, resName)
+                 
+     def getZone(self, name):
+         for zone in self.zoneList:
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001914.html">[Dsa-hl-svn] r4857 - in rl/trunk/editors/Lockenwickler/src: . media	media/icons
+</A></li>
+	<LI>Next message: <A HREF="001916.html">[Dsa-hl-svn] r4859 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1915">[ date ]</a>
+              <a href="thread.html#1915">[ thread ]</a>
+              <a href="subject.html#1915">[ subject ]</a>
+              <a href="author.html#1915">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

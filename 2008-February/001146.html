@@ -1,0 +1,235 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4075 - in rl/trunk/engine: core/include core/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4075%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200802212152.m1LLq2dV009708%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001145.html">
+   <LINK REL="Next"  HREF="001147.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4075 - in rl/trunk/engine: core/include core/src	ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4075%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200802212152.m1LLq2dV009708%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4075 - in rl/trunk/engine: core/include core/src	ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Feb 21 22:52:02 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001145.html">[Dsa-hl-svn] r4074 - in rl/trunk/engine: core/include core/src	rules/src
+</A></li>
+        <LI>Next message: <A HREF="001147.html">[Dsa-hl-svn] r4076 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1146">[ date ]</a>
+              <a href="thread.html#1146">[ thread ]</a>
+              <a href="subject.html#1146">[ subject ]</a>
+              <a href="author.html#1146">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-02-21 22:51:56 +0100 (Thu, 21 Feb 2008)
+New Revision: 4075
+
+Modified:
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+   rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+Log:
+keying save games by name and module id
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2008-02-20 23:57:22 UTC (rev 4074)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2008-02-21 21:51:56 UTC (rev 4075)
+@@ -63,7 +63,7 @@
+ 
+     typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+-    typedef std::map&lt;CeGuiString, SaveGameFile*&gt; SaveGameEntryMap;
++    typedef std::map&lt;std::pair&lt;CeGuiString,CeGuiString&gt;, SaveGameFile*&gt; SaveGameEntryMap; //pair: save game name, module id
+ 
+     class _RlCoreExport SaveGameManager : public Ogre::Singleton&lt;SaveGameManager&gt;, public Ogre::ScriptLoader
+     {
+@@ -75,9 +75,9 @@
+         SaveGameEntryMap listSaveGames(const CeGuiString &amp;moduleId);
+         void saveSaveGameFile(const CeGuiString &amp;name);
+         void loadSaveGameFile(const CeGuiString &amp;name, const CeGuiString&amp; moduleID);
+-        void deleteSaveGameFile(const CeGuiString &amp;name);
+-        bool SaveGameFileExists(const CeGuiString &amp;name);
+-        SaveGameFile* getSaveGameFile(const CeGuiString &amp;name);
++        void deleteSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
++        bool SaveGameFileExists(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
++        SaveGameFile* getSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
+ 
+         virtual const Ogre::StringVector&amp;  getScriptPatterns(void) const;
+         virtual void parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2008-02-20 23:57:22 UTC (rev 4074)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2008-02-21 21:51:56 UTC (rev 4075)
+@@ -82,7 +82,7 @@
+         SaveGameEntryMap entries;
+         for(SaveGameEntryMap::const_iterator iter = mSaveGames.begin(); iter != mSaveGames.end(); iter++)
+         {
+-            if(iter-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString() == moduleId)
++            if(iter-&gt;first.second == moduleId)
+             {
+                 entries[iter-&gt;first] = iter-&gt;second;
+             }
+@@ -102,7 +102,7 @@
+         file-&gt;setProperty(SaveGameFile::PROPERTY_TIME, Property(printTimeAsString(localTime)));
+         file-&gt;setProperty(SaveGameFile::PROPERTY_MODULEID, Property(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()));
+ 
+-        mSaveGames[name] = file;
++        mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, file-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString())] = file;
+ 
+         SaveGameFileWriter writer;
+         writer.buildSaveGameFile(file, mSaveGameDataOrderMap);
+@@ -115,14 +115,14 @@
+         MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameSaved&gt;();
+     }
+ 
+-    void SaveGameManager::loadSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleID)
++    void SaveGameManager::loadSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        if(SaveGameFileExists(name))
++        if(SaveGameFileExists(name, moduleId))
+         {
+             MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoading&gt;();
+ 
+             SaveGameFile file(name);
+-            file.setProperty(SaveGameFile::PROPERTY_MODULEID, Property(moduleID));
++            file.setProperty(SaveGameFile::PROPERTY_MODULEID, Property(moduleId));
+             SaveGameFileReader reader;
+             reader.parseSaveGameFile(&amp;file, mSaveGameDataOrderMap);
+             ///@todo: SaveGameReader
+@@ -131,26 +131,26 @@
+         }
+     }
+ 
+-    void SaveGameManager::deleteSaveGameFile(const CeGuiString &amp;name)
++    void SaveGameManager::deleteSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        if(SaveGameFileExists(name))
++        if(SaveGameFileExists(name, moduleId))
+         {
+-            static_cast&lt;SaveGameFile*&gt;(mSaveGames[name])-&gt;deleteFileFromStorage();
+-            delete mSaveGames[name];
+-            mSaveGames.erase(name);
++            static_cast&lt;SaveGameFile*&gt;(mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)])-&gt;deleteFileFromStorage();
++            delete mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)];
++            mSaveGames.erase(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId));
+         }
+     }
+ 
+-    bool SaveGameManager::SaveGameFileExists(const CeGuiString &amp;name)
++    bool SaveGameManager::SaveGameFileExists(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        if(mSaveGames.find(name) != mSaveGames.end())
++        if(mSaveGames.find(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)) != mSaveGames.end())
+             return true;
+         return false;
+     }
+ 
+-    SaveGameFile* SaveGameManager::getSaveGameFile(const CeGuiString &amp;name)
++    SaveGameFile* SaveGameManager::getSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        SaveGameEntryMap::const_iterator it = mSaveGames.find(name);
++        SaveGameEntryMap::const_iterator it = mSaveGames.find(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId));
+         if(it != mSaveGames.end())
+             return it-&gt;second;
+         return NULL;
+@@ -179,7 +179,7 @@
+         SaveGameFileReader reader;
+         reader.parseSaveGameFileHeader(stream, groupName, file);
+         
+-        mSaveGames[name] = file;
++        mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, file-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString())] = file;
+     }
+ 
+     void SaveGameManager::registerSaveGameData(SaveGameData* data)
+
+Modified: rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-02-20 23:57:22 UTC (rev 4074)
++++ rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-02-21 21:51:56 UTC (rev 4075)
+@@ -120,7 +120,7 @@
+         if(filename != &quot;&quot;)
+         {
+ 
+-            if(SaveGameManager::getSingleton().SaveGameFileExists(filename))
++            if(SaveGameManager::getSingleton().SaveGameFileExists(filename, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()))
+                 SaveGameManager::getSingleton().loadSaveGameFile(filename, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId());
+             else
+             {
+@@ -163,9 +163,9 @@
+     bool GameSaveLoadWindow::handleDeleteEvent()
+     {
+         LOG_MESSAGE(Logger::UI, &quot;Delete Button pressed&quot;);
+-        if(SaveGameManager::getSingleton().SaveGameFileExists(mFilename-&gt;getText()))
++        if(SaveGameManager::getSingleton().SaveGameFileExists(mFilename-&gt;getText(), CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()))
+         {
+-            SaveGameManager::getSingleton().deleteSaveGameFile(mFilename-&gt;getText());
++            SaveGameManager::getSingleton().deleteSaveGameFile(mFilename-&gt;getText(), CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId());
+             listSaveGames();
+         }
+         return true;
+@@ -184,7 +184,7 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first), 0, saveGameNum);
++            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first.first), 0, saveGameNum);
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME)), 1, saveGameNum);
+             saveGameNum++;
+         }
+
+Modified: rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-02-20 23:57:22 UTC (rev 4074)
++++ rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-02-21 21:51:56 UTC (rev 4075)
+@@ -141,7 +141,7 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first), 0, saveGameNum);
++            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first.first), 0, saveGameNum);
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString()), 1, saveGameNum);
+             LOG_MESSAGE(Logger::UI, &quot;Module ID: &quot; + it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString());
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME).toString()), 2, saveGameNum);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001145.html">[Dsa-hl-svn] r4074 - in rl/trunk/engine: core/include core/src	rules/src
+</A></li>
+	<LI>Next message: <A HREF="001147.html">[Dsa-hl-svn] r4076 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1146">[ date ]</a>
+              <a href="thread.html#1146">[ thread ]</a>
+              <a href="subject.html#1146">[ subject ]</a>
+              <a href="author.html#1146">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

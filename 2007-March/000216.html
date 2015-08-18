@@ -1,0 +1,265 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3145%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200703071659.l27GxAkV001595%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000215.html">
+   <LINK REL="Next"  HREF="000217.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3145%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200703071659.l27GxAkV001595%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3145 - in rl/trunk/engine/ai: include src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  7 17:59:10 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000215.html">[Dsa-hl-svn] r3144 - in modules/aitest/scripts: . maps
+</A></li>
+        <LI>Next message: <A HREF="000217.html">[Dsa-hl-svn] r3146 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#216">[ date ]</a>
+              <a href="thread.html#216">[ thread ]</a>
+              <a href="subject.html#216">[ subject ]</a>
+              <a href="author.html#216">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-07 17:59:04 +0100 (Wed, 07 Mar 2007)
+New Revision: 3145
+
+Modified:
+   rl/trunk/engine/ai/include/AStar.h
+   rl/trunk/engine/ai/include/AStarWayPointNode.h
+   rl/trunk/engine/ai/src/AStar.cpp
+Log:
+greater than bug eliminated that prevented a* from working properly
+
+Modified: rl/trunk/engine/ai/include/AStar.h
+===================================================================
+--- rl/trunk/engine/ai/include/AStar.h	2007-03-07 16:58:04 UTC (rev 3144)
++++ rl/trunk/engine/ai/include/AStar.h	2007-03-07 16:59:04 UTC (rev 3145)
+@@ -104,6 +104,10 @@
+ 		 */
+         virtual void doCreatePrimitive();
+ 
++        /** creates the primitive from the searchpath
++         */
++        virtual void createPrimitive(const AStarPath&amp; searchPath);
++
+ 		// End of Overrides from DebugVisualisable
+ 
+ 		/** sets up everyting needed for the search.
+@@ -138,6 +142,15 @@
+ 		//! contains the CLOSED set
+ 		AStarSet mClosed;
+ 
++        /** debug variable - prevents regenerating the lineprimitive.
++         * When nothing has changed this is set to false and prevents
++         * the regeneration
++         */
++        //bool mChanged;
++
++        //! to be able to turn debug on/off per AStar object
++        bool mDebugAstar;
++
+ 	};
+ 	
+ }; // namespace
+
+Modified: rl/trunk/engine/ai/include/AStarWayPointNode.h
+===================================================================
+--- rl/trunk/engine/ai/include/AStarWayPointNode.h	2007-03-07 16:58:04 UTC (rev 3144)
++++ rl/trunk/engine/ai/include/AStarWayPointNode.h	2007-03-07 16:59:04 UTC (rev 3145)
+@@ -60,18 +60,17 @@
+          * does not work.
+          * @param wp pointer to an AStarWayPointNode
+ 		 */
+-		inline bool Equal ( const AStarWayPointNode* wp )
++		inline bool EqualPosition ( const AStarWayPointNode* wp )
+ 		{
+-			return (mWP == wp-&gt;mWP) &amp;&amp; (mG == wp-&gt;mG) &amp;&amp; (mH == wp-&gt;mH);
++			return (mWP == wp-&gt;mWP); //&amp;&amp; (mG == wp-&gt;mG) &amp;&amp; (mH == wp-&gt;mH);
+ 		}
+ 
+ 		/** 2 nodes compared for equilibrium by comparing their values.
+ 		 * (really needed?) 
+ 		 */
+-		static inline bool Equal ( const AStarWayPointNode* wp1 , const AStarWayPointNode* wp2 )
++		static inline bool EqualPosition ( const AStarWayPointNode* wp1 , const AStarWayPointNode* wp2 )
+ 		{
+-			
+-			return (wp1-&gt;mWP == wp2-&gt;mWP) &amp;&amp; (wp1-&gt;mG == wp2-&gt;mG) &amp;&amp; (wp1-&gt;mH == wp2-&gt;mH);
++			return (wp1-&gt;mWP == wp2-&gt;mWP);
+ 		}
+ 
+ 		/** 2 nodes compared by comparing their f value.
+@@ -90,10 +89,10 @@
+             //float wp1F = wp1-&gt;mG+wp1-&gt;mH;
+             //float wp2F = wp2-&gt;mG+wp2-&gt;mH;
+             //if (wp1F == wp2F)
+-            //    return wp1-&gt;mG &lt; wp2-&gt;mG;
++            //    return wp1-&gt;mG &gt; wp2-&gt;mG;
+ 
+-            //return wp1F &lt; wp2F;
+-			return (wp1-&gt;mG+wp1-&gt;mH) &lt; (wp2-&gt;mG+wp2-&gt;mH);
++            //return wp1F &gt; wp2F;
++			return (wp1-&gt;mG+wp1-&gt;mH) &gt; (wp2-&gt;mG+wp2-&gt;mH);
+ 		}
+ 
+ 		/** fetches the G value (cost til now)
+
+Modified: rl/trunk/engine/ai/src/AStar.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AStar.cpp	2007-03-07 16:58:04 UTC (rev 3144)
++++ rl/trunk/engine/ai/src/AStar.cpp	2007-03-07 16:59:04 UTC (rev 3145)
+@@ -36,7 +36,8 @@
+ 	mStartPos(StartPos),
+ 	mEndPos(EndPos),
+ 	mANStart(NULL),
+-	mANEnd(NULL)
++	mANEnd(NULL),
++    mDebugAstar(false)
+ {
+ }
+ 
+@@ -72,6 +73,9 @@
+ 	// first find 'real' start and end positions by searching for the corresponding waypoints
+ 	mANStart = new AStarWayPointNode( mWPGraph-&gt;getNearestWayPoint(mStartPos) );
+ 	mANEnd = new AStarWayPointNode( mWPGraph-&gt;getNearestWayPoint(mEndPos) );
++
++    mOpen.clear();
++    mClosed.clear();
+ }
+ 
+ void AStar::searchFromTo(AStarPath&amp; resultPath, const Ogre::Vector3&amp; StartPos,
+@@ -116,18 +120,20 @@
+ 	// While there are still unvisited nodes
+     while( !mOpen.empty() )
+ 	{
+-		Node = mOpen.front();
++        Node = mOpen.front();
+ 		pop_heap(mOpen.begin(), mOpen.end(), AStarWayPointNode::SortMethod);
+ 		mOpen.pop_back();
++
+ 		mClosed.push_back(Node);
+ 
+ 		// check if goal reached
+-        if ( Node-&gt;Equal(mANEnd) ) {
++        if ( Node-&gt;EqualPosition(mANEnd) ) {
+ 			// create result
+-			for (; Node-&gt;getParent(); Node = Node-&gt;getParent())
++            for (; Node; Node = Node-&gt;getParent())
+ 			{
+ 				resultPath.push_back(Node-&gt;getWP()-&gt;getPosition());
+ 			}
++            createPrimitive(resultPath);
+ 			// terminate search
+ 			break;
+ 		}
+@@ -201,8 +207,8 @@
+      * so this is not going to work at the moment with the current sortMethod ...
+      */
+     
+-    AStarWayPointNode* help = NULL;
+-    bool found = std::binary_search(Set.begin(), Set.end(), Node, AStarWayPointNode::SortMethod);
++    //AStarWayPointNode* help = NULL;
++    //bool found = std::binary_search(Set.begin(), Set.end(), Node, AStarWayPointNode::SortMethod);
+     //while (it != Set.end())
+     //{
+     //    if ( (*it)-&gt;Equal(Node) ) // if equal, then Node was 'found'
+@@ -214,19 +220,38 @@
+     
+ 	for (it = Set.begin(); it != Set.end(); it++) 
+ 	{
+-        if ( (*it)-&gt;Equal(Node) )
++        if ( (*it)-&gt;EqualPosition(Node) )
+ 			return it;
+ 	}
+ 
+ 	return it;
+ }
+ 
+-/*		
+-const AStarSet&amp; AStar::getWayPointList()
++void AStar::createPrimitive(const AStarPath&amp; searchPath)
+ {
+-	// search must be finished ? or just invoke it here then ?
++    // if there is no line primitive just skip this here
++    if (!mPrimitive)
++        return;
++
++    AStarPath::const_iterator it = searchPath.begin();
++    AStarPath::const_iterator pit;
++	LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++
++	lineSet-&gt;clear();
++    if (it == searchPath.end())
++        return;
++
++    Ogre::Vector3 From;
++    Ogre::Vector3 To;
++    for (it++ ; it != searchPath.end(); it++) 
++    {
++        pit = it - 1;
++        From = (*pit) + Ogre::Vector3(0,0.5,0);
++        To = (*it) + Ogre::Vector3(0,0.5,0);
++
++        lineSet-&gt;addLine(From, To, Ogre::ColourValue::Green);
++    }
+ }
+-*/
+ 
+ DebugVisualisableFlag AStar::getFlag() const
+ {
+@@ -241,12 +266,8 @@
+ 		CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;getSceneManager()-&gt;
+ 			getRootSceneNode()-&gt;addChild(mSceneNode);
+     }
+-
+-	LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+-
+-	lineSet-&gt;clear();
+-
+-	//lineSet-&gt;addLine(wp1Vec, (*nit).second-&gt;getPosition(), Ogre::ColourValue::Blue);
++    // no update here because updates are only necessary when a search
++    // has finished
+ }
+ 
+ void AStar::doCreatePrimitive()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000215.html">[Dsa-hl-svn] r3144 - in modules/aitest/scripts: . maps
+</A></li>
+	<LI>Next message: <A HREF="000217.html">[Dsa-hl-svn] r3146 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#216">[ date ]</a>
+              <a href="thread.html#216">[ thread ]</a>
+              <a href="subject.html#216">[ subject ]</a>
+              <a href="author.html#216">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

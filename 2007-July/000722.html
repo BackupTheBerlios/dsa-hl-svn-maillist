@@ -1,0 +1,688 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3651 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3651%20-%20modules/common/scripts/jobs%0A%09modules/regressiontest/scripts%20rl/trunk/engine/core/include%0A%09rl/trunk/engine/core/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200707311652.l6VGq9c3016604%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000721.html">
+   <LINK REL="Next"  HREF="000723.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3651 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3651%20-%20modules/common/scripts/jobs%0A%09modules/regressiontest/scripts%20rl/trunk/engine/core/include%0A%09rl/trunk/engine/core/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200707311652.l6VGq9c3016604%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3651 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/core/include	rl/trunk/engine/core/src rl/trunk/engine/script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Jul 31 18:52:09 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000721.html">[Dsa-hl-svn] r3650 - rl/trunk/tools
+</A></li>
+        <LI>Next message: <A HREF="000723.html">[Dsa-hl-svn] r3652 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#722">[ date ]</a>
+              <a href="thread.html#722">[ thread ]</a>
+              <a href="subject.html#722">[ subject ]</a>
+              <a href="author.html#722">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-07-31 18:51:43 +0200 (Tue, 31 Jul 2007)
+New Revision: 3651
+
+Modified:
+   modules/common/scripts/jobs/closurejobs.rb
+   modules/common/scripts/jobs/jobsequence.rb
+   modules/regressiontest/scripts/JobSequenceTest.rb
+   rl/trunk/engine/core/include/JobQueue.h
+   rl/trunk/engine/core/src/JobQueue.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+   rl/trunk/engine/script/swig/RlCore.head.swig
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlExports.i
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/script/swig/RlUi.swig
+Log:
+* removed reinterpret_casts from dynamic downcasts in swig code
+* implemented JobQueue and JobSet
+
+Modified: modules/common/scripts/jobs/closurejobs.rb
+===================================================================
+--- modules/common/scripts/jobs/closurejobs.rb	2007-07-31 11:09:51 UTC (rev 3650)
++++ modules/common/scripts/jobs/closurejobs.rb	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -2,7 +2,7 @@
+ 
+ class ClosureJob &lt; Job
+   def initialize()
+-    super(true, true)
++    super(false, true)
+   end
+ 
+   def setCode(&amp;code)
+
+Modified: modules/common/scripts/jobs/jobsequence.rb
+===================================================================
+--- modules/common/scripts/jobs/jobsequence.rb	2007-07-31 11:09:51 UTC (rev 3650)
++++ modules/common/scripts/jobs/jobsequence.rb	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -19,3 +19,30 @@
+     }
+ end
+ 
++# A queue of jobs.
++# jobs is an array of Jobs and Numerics. Numerics are accumulated pauses
++# till the next job starts.
++def jobQueue (jobs)
++    start = 0
++    p &quot;start&quot;
++	queue = JobQueue.new()
++    jobs.each { |x|
++		if x.is_a? Array:
++			set = JobSet.new()
++			x.each { |y|
++				set.add(y) 
++			}
++			queue.add(set)
++#       elsif x.is_a? Numeric:
++#            # This is a time, we add it to the start time, of jobs
++#            # later in the queue
++#            start += x
++#            p &quot;starttime #start&quot;
++        elsif x.is_a? Job
++            queue.add(x)
++            p &quot;job added&quot;
++        end
++    }
++	$JS.addJob(queue, 20)
++end
++
+
+Modified: modules/regressiontest/scripts/JobSequenceTest.rb
+===================================================================
+--- modules/regressiontest/scripts/JobSequenceTest.rb	2007-07-31 11:09:51 UTC (rev 3650)
++++ modules/regressiontest/scripts/JobSequenceTest.rb	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -5,7 +5,7 @@
+ 
+ class JobSequenceTestAction &lt; Action
+   def initialize
+-    super(&quot;checktime&quot;, &quot;Zeit ansagen lassen.&quot;);
++    super(&quot;sequence&quot;, &quot;Test job sequence.&quot;);
+   end
+   
+   def canDo(go, user)
+@@ -31,27 +31,34 @@
+   end
+ end
+ 
+-#class JobQueueTestAction &lt; Action
+-#  def initialize
+-#    super(&quot;checktime&quot;, &quot;Zeit ansagen lassen.&quot;);
+-#  end
++class JobQueueTestAction &lt; Action
++  def initialize
++    super(&quot;queue&quot;, &quot;Test job queue&quot;);
++  end
+   
+-#  def canDo(go, user)
+-#    true
+-#  end
++  def canDo(go, user)
++    true
++  end
+   
+-#  def doAction(go, user, target)
+-#    jobQueue(
+-#            [
+-#                jobSequence([_PlayAnimation(go.getActor(), &quot;auf&quot;), _PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())],
+-#				_PlaySound3d(&quot;lachen.ogg&quot;, go.getPosition()),
+-#                jobSequence([_PlayAnimation(go.getActor(), &quot;zu&quot;), _PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())],
+-#				2,
+-#				_ExecuteJob {$UI.requestExit}
+-#            ]
+-#    );
+-#  end
+-#end
++  def doAction(go, user, target)
++    jobQueue(
++            [
++                [
++					_PlayAnimation(go.getActor(), &quot;auf&quot;), 
++					_PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())
++				],
++				_PlaySound3d(&quot;lachen.ogg&quot;, go.getPosition()),
++				[
++					_PlayAnimation(go.getActor(), &quot;zu&quot;), 
++					_PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())
++				],
++				2,
++				_Execute {provokeEror},
++				_Execute {p &quot;FOO&quot;}
++            ]
++    )
++  end
++end
+ 
+ class JobSequenceTest &lt; TestCase
+     def execute()
+@@ -66,6 +73,7 @@
+         chest = $GOM.createGameObject(
+             &quot;JobSequenceTestChest&quot;);
+         chest.addAction(JobSequenceTestAction.new());
++        chest.addAction(JobQueueTestAction.new());
+         chest.placeIntoScene();
+         chest.setPosition(rel_pos([0.0, height, 0.0]));
+ 
+
+Modified: rl/trunk/engine/core/include/JobQueue.h
+===================================================================
+--- rl/trunk/engine/core/include/JobQueue.h	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/core/include/JobQueue.h	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -16,24 +16,39 @@
+ #ifndef __JOBQUEUE_H__
+ #define __JOBQUEUE_H__
+ 
++#include &quot;CorePrerequisites.h&quot;
++
+ #include &quot;Job.h&quot;
+ 
+ namespace rl
+ {
+ 
+-    class JobQueue : public Job
++    class _RlCoreExport JobQueue : public Job
+     {
+     public:
+         JobQueue();
+         ~JobQueue();
+ 
+-        void addJob(Job* job);
++        void add(Job* job);
+         virtual bool execute(Ogre::Real elapsedTime);
+ 
+     private:
+         std::list&lt;Job*&gt; mQueue;
+     };
+ 
++    class _RlCoreExport JobSet : public Job
++    {
++    public:
++        JobSet();
++        ~JobSet();
++
++        void add(Job* job);
++        virtual bool execute(Ogre::Real elapsedTime);
++
++    private:
++        std::set&lt;Job*&gt; mSet;
++    };
++
+ }
+ 
+ #endif // __JOBQUEUE_H__
+
+Modified: rl/trunk/engine/core/src/JobQueue.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobQueue.cpp	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/core/src/JobQueue.cpp	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -21,7 +21,7 @@
+ {
+ 
+ JobQueue::JobQueue()
+-: Job(true, true)
++: Job(false, true)
+ {
+ }
+ 
+@@ -29,9 +29,90 @@
+ {
+ }
+ 
++void JobQueue::add(Job* job)
++{
++    mQueue.push_back(job);
++}
++
+ bool JobQueue::execute(Ogre::Real elapsedTime)
+ {
+-    return true; ///@todo
++    Job* cur = *mQueue.begin();
++    bool finished = cur-&gt;execute(elapsedTime);
++    if (finished)
++    {
++        mQueue.pop_front();
++        if (cur-&gt;isDiscardable())
++        {
++            cur-&gt;discard();
++        }
++        if (cur-&gt;destroyWhenDone())
++        {
++            delete cur;
++        }
++    }
++
++    if (mQueue.empty())
++    {
++        return true;
++    }
++    else
++    {
++        return false;
++    }
+ }
+ 
++JobSet::JobSet()
++: Job(false, true)
++{
+ }
++
++JobSet::~JobSet()
++{
++}
++
++void JobSet::add(Job* job)
++{
++    mSet.insert(job);
++}
++
++bool JobSet::execute(Ogre::Real elapsedTime)
++{
++    std::set&lt;Job*&gt; toDelete;
++
++    for (std::set&lt;Job*&gt;::iterator it = mSet.begin(); 
++        it != mSet.end(); ++it)
++    {
++        Job* cur = *it;
++        bool finished = cur-&gt;execute(elapsedTime);
++        if (finished)
++        {
++            toDelete.insert(cur);
++        }
++    }
++
++    for (std::set&lt;Job*&gt;::iterator it = toDelete.begin(); 
++        it != toDelete.end(); ++it)
++    {
++        Job* cur = *it;
++        mSet.erase(cur);
++        if (cur-&gt;isDiscardable())
++        {
++            cur-&gt;discard();
++        }
++        if (cur-&gt;destroyWhenDone())
++        {
++            delete cur;
++        }
++    }
++
++    if (mSet.empty())
++    {
++        return true;
++    }
++    else
++    {
++        return false;
++    }
++}
++
++}
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -16,9 +16,9 @@
+ 
+ %include std_vector.i
+ 
+-namespace std {
+-	%template(Ogrevec3Vector) vector&lt;Ogre::Vector3 &gt;;
+-};
++//namespace std {
++//	%template(Ogrevec3Vector) vector&lt;Ogre::Vector3 &gt;;
++//};
+ 
+ namespace rl 
+ {
+@@ -271,27 +271,27 @@
+ %{
+ static swig_type_info *AStarHeuristic_dynamic_cast(void **ptr)
+ {
+-    rl::AStarHeuristic **ppAStarHeuristic = reinterpret_cast&lt;rl::AStarHeuristic**&gt;(ptr);
++    rl::AStarHeuristic *pAStarHeuristic = static_cast&lt;rl::AStarHeuristic*&gt;(*ptr);
+ 
+-    rl::ManhattanDistance *pManhattanDistance=dynamic_cast&lt;rl::ManhattanDistance*&gt;(*ppAStarHeuristic);
++    rl::ManhattanDistance *pManhattanDistance=dynamic_cast&lt;rl::ManhattanDistance*&gt;(pAStarHeuristic);
+     if (pManhattanDistance)
+     {
+         *ptr=pManhattanDistance;
+         return SWIGTYPE_p_rl__ManhattanDistance;
+     }
+-    rl::DiagonalDistance *pDiagonalDistance=dynamic_cast&lt;rl::DiagonalDistance*&gt;(*ppAStarHeuristic);
++    rl::DiagonalDistance *pDiagonalDistance=dynamic_cast&lt;rl::DiagonalDistance*&gt;(pAStarHeuristic);
+     if (pDiagonalDistance)
+     {
+         *ptr=pDiagonalDistance;
+         return SWIGTYPE_p_rl__DiagonalDistance;
+     }
+-    rl::EuclideanDistance *pEuclideanDistance=dynamic_cast&lt;rl::EuclideanDistance*&gt;(*ppAStarHeuristic);
++    rl::EuclideanDistance *pEuclideanDistance=dynamic_cast&lt;rl::EuclideanDistance*&gt;(pAStarHeuristic);
+     if (pEuclideanDistance)
+     {
+         *ptr=pEuclideanDistance;
+         return SWIGTYPE_p_rl__EuclideanDistance;
+     }
+-    rl::EuclideanDistanceSquared *pEuclideanDistanceSquared=dynamic_cast&lt;rl::EuclideanDistanceSquared*&gt;(*ppAStarHeuristic);
++    rl::EuclideanDistanceSquared *pEuclideanDistanceSquared=dynamic_cast&lt;rl::EuclideanDistanceSquared*&gt;(pAStarHeuristic);
+     if (pEuclideanDistanceSquared)
+     {
+         *ptr=pEuclideanDistanceSquared;
+@@ -307,9 +307,9 @@
+ %{
+ static swig_type_info *AStarCosts_dynamic_cast(void **ptr)
+ {
+-    rl::AStarCosts **ppAStarCosts = reinterpret_cast&lt;rl::AStarCosts**&gt;(ptr);
++    rl::AStarCosts *pAStarCosts = static_cast&lt;rl::AStarCosts*&gt;(*ptr);
+ 
+-    rl::AStarCostsDefault *pAStarCostsDefault=dynamic_cast&lt;rl::AStarCostsDefault*&gt;(*ppAStarCosts);
++    rl::AStarCostsDefault *pAStarCostsDefault=dynamic_cast&lt;rl::AStarCostsDefault*&gt;(pAStarCosts);
+     if (pAStarCostsDefault)
+     {
+         *ptr=pAStarCostsDefault;
+
+Modified: rl/trunk/engine/script/swig/RlCore.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.head.swig	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlCore.head.swig	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -53,6 +53,7 @@
+ #include &quot;SoundEvents.h&quot;
+ #include &quot;JobScheduler.h&quot;
+ #include &quot;Job.h&quot;
++#include &quot;JobQueue.h&quot;
+ #include &quot;JobListener.h&quot;
+ #include &quot;PlaySoundJob.h&quot;
+ #include &quot;PlayAnimationJob.h&quot;
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -17,9 +17,9 @@
+ namespace rl {
+ %{
+ static swig_type_info *GameAreaType_dynamic_cast(void **ptr) {
+-    rl::GameAreaType **ppGameAreaType = reinterpret_cast&lt;rl::GameAreaType **&gt;(ptr);
++    rl::GameAreaType *pGameAreaType = static_cast&lt;rl::GameAreaType *&gt;(*ptr);
+     
+-    rl::GameSphereAreaType *pGameSphereAreaType = dynamic_cast&lt;rl::GameSphereAreaType*&gt;(*ppGameAreaType);
++    rl::GameSphereAreaType *pGameSphereAreaType = dynamic_cast&lt;rl::GameSphereAreaType*&gt;(pGameAreaType);
+     if (pGameSphereAreaType){
+       *ptr=pGameSphereAreaType;
+       return SWIGTYPE_p_rl__GameSphereAreaType;
+@@ -34,19 +34,19 @@
+ 
+ %{
+ static swig_type_info *BaseAnimation_dynamic_cast(void **ptr) {
+-    rl::BaseAnimation **ppBaseAnimation = reinterpret_cast&lt;rl::BaseAnimation **&gt;(ptr);
++    rl::BaseAnimation *pBaseAnimation = static_cast&lt;rl::BaseAnimation *&gt;(*ptr);
+     
+-    rl::FadeAnimation *pFadeAnimation = dynamic_cast&lt;rl::FadeAnimation*&gt;(*ppBaseAnimation);
++    rl::FadeAnimation *pFadeAnimation = dynamic_cast&lt;rl::FadeAnimation*&gt;(pBaseAnimation);
+     if (pFadeAnimation){
+       *ptr=pFadeAnimation;
+       return SWIGTYPE_p_rl__FadeAnimation;
+     }    
+-    rl::MeshAnimation *pMeshAnimation = dynamic_cast&lt;rl::MeshAnimation*&gt;(*ppBaseAnimation);
++    rl::MeshAnimation *pMeshAnimation = dynamic_cast&lt;rl::MeshAnimation*&gt;(pBaseAnimation);
+     if (pMeshAnimation){
+       *ptr=pMeshAnimation;
+       return SWIGTYPE_p_rl__MeshAnimation;
+     }    
+-    rl::TrackAnimation *pTrackAnimation = dynamic_cast&lt;rl::TrackAnimation*&gt;(*ppBaseAnimation);
++    rl::TrackAnimation *pTrackAnimation = dynamic_cast&lt;rl::TrackAnimation*&gt;(pBaseAnimation);
+     if (pTrackAnimation){
+       *ptr=pTrackAnimation;
+       return SWIGTYPE_p_rl__TrackAnimation;
+@@ -61,35 +61,35 @@
+ %{
+ static swig_type_info *ActorControlledObject_dynamic_cast(void **ptr)
+ {
+-    rl::ActorControlledObject **ppActorControlledObject =
+-        reinterpret_cast&lt;rl::ActorControlledObject**&gt;(ptr);
++    rl::ActorControlledObject *pActorControlledObject =
++        static_cast&lt;rl::ActorControlledObject*&gt;(*ptr);
+ 
+-    rl::MergeableMeshObject *pMergeableMeshObject=dynamic_cast&lt;rl::MergeableMeshObject*&gt;(*ppActorControlledObject);
++    rl::MergeableMeshObject *pMergeableMeshObject=dynamic_cast&lt;rl::MergeableMeshObject*&gt;(pActorControlledObject);
+     if (pMergeableMeshObject) {
+         *ptr=pMergeableMeshObject;
+         return SWIGTYPE_p_rl__MergeableMeshObject;
+     }
+-    rl::MeshObject *pMeshObject=dynamic_cast&lt;rl::MeshObject*&gt;(*ppActorControlledObject);
++    rl::MeshObject *pMeshObject=dynamic_cast&lt;rl::MeshObject*&gt;(pActorControlledObject);
+     if (pMeshObject) {
+         *ptr=pMeshObject;
+         return SWIGTYPE_p_rl__MeshObject;
+     }
+-    rl::CameraObject *pCameraObject=dynamic_cast&lt;rl::CameraObject*&gt;(*ppActorControlledObject);
++    rl::CameraObject *pCameraObject=dynamic_cast&lt;rl::CameraObject*&gt;(pActorControlledObject);
+     if (pCameraObject) {
+         *ptr=pCameraObject;
+         return SWIGTYPE_p_rl__CameraObject;
+     }
+-    rl::LightObject *pLightObject=dynamic_cast&lt;rl::LightObject*&gt;(*ppActorControlledObject);
++    rl::LightObject *pLightObject=dynamic_cast&lt;rl::LightObject*&gt;(pActorControlledObject);
+     if (pLightObject) {
+         *ptr=pLightObject;
+         return SWIGTYPE_p_rl__LightObject;
+     }
+-    rl::ParticleSystemObject *pParticleSystemObject=dynamic_cast&lt;rl::ParticleSystemObject*&gt;(*ppActorControlledObject);
++    rl::ParticleSystemObject *pParticleSystemObject=dynamic_cast&lt;rl::ParticleSystemObject*&gt;(pActorControlledObject);
+     if (pParticleSystemObject) {
+         *ptr=pParticleSystemObject;
+         return SWIGTYPE_p_rl__ParticleSystemObject;
+     }
+-    rl::SoundObject *pSoundObject=dynamic_cast&lt;rl::SoundObject*&gt;(*ppActorControlledObject);
++    rl::SoundObject *pSoundObject=dynamic_cast&lt;rl::SoundObject*&gt;(pActorControlledObject);
+     if (pSoundObject) {
+         *ptr=pSoundObject;
+         return SWIGTYPE_p_rl__SoundObject;
+@@ -101,24 +101,34 @@
+ 
+ %{
+ static swig_type_info *Job_dynamic_cast(void **ptr) {
+-    rl::Job **ppJob = reinterpret_cast&lt;rl::Job **&gt;(ptr);
++    rl::Job *ppJob = static_cast&lt;rl::Job*&gt;(*ptr);
+       
+     
+-    rl::PlayAnimationJob *pPlayAnimationJob = dynamic_cast&lt;rl::PlayAnimationJob*&gt;(*ppJob);
++    rl::PlayAnimationJob *pPlayAnimationJob = dynamic_cast&lt;rl::PlayAnimationJob*&gt;(ppJob);
+     if (pPlayAnimationJob){
+       *ptr=pPlayAnimationJob;
+       return SWIGTYPE_p_rl__PlayAnimationJob;
+     }    
+-    rl::PlaySound3dJob *pPlaySound3dJob = dynamic_cast&lt;rl::PlaySound3dJob*&gt;(*ppJob);
++    rl::PlaySound3dJob *pPlaySound3dJob = dynamic_cast&lt;rl::PlaySound3dJob*&gt;(ppJob);
+     if (pPlaySound3dJob){
+       *ptr=pPlaySound3dJob;
+       return SWIGTYPE_p_rl__PlaySound3dJob;
+     }    
+-    rl::PlaySound2dJob *pPlaySound2dJob = dynamic_cast&lt;rl::PlaySound2dJob*&gt;(*ppJob);
++    rl::PlaySound2dJob *pPlaySound2dJob = dynamic_cast&lt;rl::PlaySound2dJob*&gt;(ppJob);
+     if (pPlaySound2dJob){
+       *ptr=pPlaySound2dJob;
+       return SWIGTYPE_p_rl__PlaySound2dJob;
+-    }  
++    }
++    rl::JobQueue *pJobQueue = dynamic_cast&lt;rl::JobQueue*&gt;(ppJob);
++    if (pJobQueue) {
++      *ptr=pJobQueue;
++      return SWIGTYPE_p_rl__JobQueue;
++    }
++    rl::JobSet *pJobSet = dynamic_cast&lt;rl::JobSet*&gt;(ppJob);
++    if (pJobSet) {
++      *ptr=pJobSet;
++      return SWIGTYPE_p_rl__JobSet;
++    }
+     
+     return 0;
+ }
+@@ -840,6 +850,28 @@
+ //    virtual bool execute(Ogre::Real time);
+ //};
+ 
++class JobQueue : public rl::Job
++{
++public:
++    JobQueue();
++    virtual ~JobQueue();
++    void add(Job* job);
++    
++private:
++    bool execute(Ogre::Real time);
++};
++
++class JobSet : public rl::Job
++{
++public:
++    JobSet();
++    virtual ~JobSet();
++    void add(Job* job);
++    
++private:
++    bool execute(Ogre::Real time);
++};
++
+ class JobScheduler
+ {
+ public:
+
+Modified: rl/trunk/engine/script/swig/RlExports.i
+===================================================================
+--- rl/trunk/engine/script/swig/RlExports.i	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlExports.i	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -13,6 +13,7 @@
+  *  along with this program; if not you can get it here
+  *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+  */
++#include &quot;stdinc.h&quot;	
+ 
+ // Activate Directors and name the module RlScript
+ %module(directors=&quot;1&quot;) RlScript
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -809,14 +809,14 @@
+ %{
+ static swig_type_info *Selector_dynamic_cast(void **ptr)
+ {
+-	rl::Selector **ppSelector = reinterpret_cast&lt;rl::Selector**&gt;(ptr);
+-	rl::HalfSphereSelector *pHalfSphereSel = dynamic_cast&lt;rl::HalfSphereSelector*&gt;(*ppSelector);
++	rl::Selector *pSelector = static_cast&lt;rl::Selector*&gt;(*ptr);
++	rl::HalfSphereSelector *pHalfSphereSel = dynamic_cast&lt;rl::HalfSphereSelector*&gt;(pSelector);
+ 	if (pHalfSphereSel)
+ 	{
+ 		*ptr = pHalfSphereSel;
+ 		return SWIGTYPE_p_rl__HalfSphereSelector;
+ 	}
+-	rl::RaySelector *pRaySel = dynamic_cast&lt;rl::RaySelector*&gt;(*ppSelector);
++	rl::RaySelector *pRaySel = dynamic_cast&lt;rl::RaySelector*&gt;(pSelector);
+ 	if (pRaySel)
+ 	{
+ 		*ptr = pRaySel;
+@@ -826,34 +826,34 @@
+ 	
+ static swig_type_info *GameObject_dynamic_cast(void **ptr)
+ {
+-    rl::GameObject **ppGameObject = reinterpret_cast&lt;rl::GameObject**&gt;(ptr);
++    rl::GameObject *pGameObject = static_cast&lt;rl::GameObject*&gt;(*ptr);
+ 
+-    rl::Person *pPerson=dynamic_cast&lt;rl::Person*&gt;(*ppGameObject);
++    rl::Person *pPerson=dynamic_cast&lt;rl::Person*&gt;(pGameObject);
+     if (pPerson) {
+         *ptr=pPerson;
+         return SWIGTYPE_p_rl__Person;
+     }
+-    rl::Creature *pCreature=dynamic_cast&lt;rl::Creature*&gt;(*ppGameObject);
++    rl::Creature *pCreature=dynamic_cast&lt;rl::Creature*&gt;(pGameObject);
+     if (pCreature) {
+         *ptr=pCreature;
+         return SWIGTYPE_p_rl__Creature;
+     }
+-    rl::Weapon *pWeapon=dynamic_cast&lt;rl::Weapon*&gt;(*ppGameObject);
++    rl::Weapon *pWeapon=dynamic_cast&lt;rl::Weapon*&gt;(pGameObject);
+     if (pWeapon) {
+         *ptr=pWeapon;
+         return SWIGTYPE_p_rl__Weapon;
+     }
+-    rl::Armor *pArmor=dynamic_cast&lt;rl::Armor*&gt;(*ppGameObject);
++    rl::Armor *pArmor=dynamic_cast&lt;rl::Armor*&gt;(pGameObject);
+     if (pArmor) {
+         *ptr=pArmor;
+         return SWIGTYPE_p_rl__Armor;
+     }
+-    rl::Container *pContainer=dynamic_cast&lt;rl::Container*&gt;(*ppGameObject);
++    rl::Container *pContainer=dynamic_cast&lt;rl::Container*&gt;(pGameObject);
+     if (pContainer) {
+         *ptr=pContainer;
+         return SWIGTYPE_p_rl__Container;
+     }
+-    rl::Item *pItem=dynamic_cast&lt;rl::Item*&gt;(*ppGameObject);
++    rl::Item *pItem=dynamic_cast&lt;rl::Item*&gt;(pGameObject);
+     if (pItem) {
+         *ptr=pItem;
+         return SWIGTYPE_p_rl__Item;
+
+Modified: rl/trunk/engine/script/swig/RlUi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlUi.swig	2007-07-31 11:09:51 UTC (rev 3650)
++++ rl/trunk/engine/script/swig/RlUi.swig	2007-07-31 16:51:43 UTC (rev 3651)
+@@ -137,11 +137,11 @@
+ %{
+ static swig_type_info *ControlState_dynamic_cast(void **ptr)
+ {
+-    rl::ControlState **ppControlState =
+-        reinterpret_cast&lt;rl::ControlState**&gt;(ptr);
++    rl::ControlState *pControlState =
++        static_cast&lt;rl::ControlState*&gt;(*ptr);
+ 
+     rl::CutsceneControlState *pCutSceneCS =
+-        dynamic_cast&lt;rl::CutsceneControlState*&gt;(*ppControlState);
++        dynamic_cast&lt;rl::CutsceneControlState*&gt;(pControlState);
+     if (pCutSceneCS != NULL) {
+         *ptr=pCutSceneCS;
+         return SWIGTYPE_p_rl__CutsceneControlState;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000721.html">[Dsa-hl-svn] r3650 - rl/trunk/tools
+</A></li>
+	<LI>Next message: <A HREF="000723.html">[Dsa-hl-svn] r3652 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#722">[ date ]</a>
+              <a href="thread.html#722">[ thread ]</a>
+              <a href="subject.html#722">[ subject ]</a>
+              <a href="author.html#722">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

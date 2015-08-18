@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3467 - in rl/trunk/engine: core/src rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3467%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200705202020.l4KKKOMa003742%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000537.html">
+   <LINK REL="Next"  HREF="000539.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3467 - in rl/trunk/engine: core/src rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3467%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200705202020.l4KKKOMa003742%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3467 - in rl/trunk/engine: core/src rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun May 20 22:20:24 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000537.html">[Dsa-hl-svn] r3466 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="000539.html">[Dsa-hl-svn] r3468 - in modules/regressiontest: dsa scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#538">[ date ]</a>
+              <a href="thread.html#538">[ thread ]</a>
+              <a href="subject.html#538">[ subject ]</a>
+              <a href="author.html#538">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-20 22:20:17 +0200 (Sun, 20 May 2007)
+New Revision: 3467
+
+Modified:
+   rl/trunk/engine/core/src/MergeableMeshObject.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+Small fixes:
+* update MergeableMeshObject when removing a SubmeshSlot
+* only merge meshes when they are in scene (think about delayed state change: what to do when the merge is first and then the mesh is placed into scene)
+
+Modified: rl/trunk/engine/core/src/MergeableMeshObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MergeableMeshObject.cpp	2007-05-20 20:15:45 UTC (rev 3466)
++++ rl/trunk/engine/core/src/MergeableMeshObject.cpp	2007-05-20 20:20:17 UTC (rev 3467)
+@@ -97,6 +97,7 @@
+ 		if (it != mMeshes.end())
+ 		{
+ 			mMeshes.erase(it);
++			updateMesh();
+ 		}
+ 		else
+ 		{
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-05-20 20:15:45 UTC (rev 3466)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-05-20 20:20:17 UTC (rev 3467)
+@@ -84,31 +84,38 @@
+ 
+     void SubmeshSlot::setItem(Item* item)
+     {
+-		//@todo: move to actor
+-		MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
+-			mOwner-&gt;getActor()-&gt;getControlledObject());
+-		if (mmo != NULL)
++		///@todo: what to do if actor is null?
++		if (mOwner-&gt;getActor() != NULL)
+ 		{
+-			if (item == NULL)
++			MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
++				mOwner-&gt;getActor()-&gt;getControlledObject());
++			if (mmo != NULL)
+ 			{
+-				MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
+-				if (it != mOwner-&gt;getMeshParts().end())
++				if (item == NULL)
+ 				{
+-					mmo-&gt;replaceSubmesh(
+-						mSubmesh,
+-						(*it).second);
++					MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
++					if (it != mOwner-&gt;getMeshParts().end())
++					{
++						mmo-&gt;replaceSubmesh(
++							mSubmesh,
++							(*it).second);
++					}
++					else
++					{
++						mmo-&gt;removeSubmesh(mSubmesh);
++					}
++					mItem = NULL;
+ 				}
+-				mItem = NULL;
+-			}
+-			else
+-			{
+-				if (isAllowed(item))
+-				{			
+-					item-&gt;setState(GOS_IN_POSSESSION);
+-					mmo-&gt;replaceSubmesh(
+-						mSubmesh, 
+-						item-&gt;getMeshfile().c_str());
+-					mItem = item;
++				else
++				{
++					if (isAllowed(item))
++					{			
++						item-&gt;setState(GOS_IN_POSSESSION);
++						mmo-&gt;replaceSubmesh(
++							mSubmesh, 
++							item-&gt;getMeshfile().c_str());
++						mItem = item;
++					}
+ 				}
+ 			}
+ 		}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000537.html">[Dsa-hl-svn] r3466 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="000539.html">[Dsa-hl-svn] r3468 - in modules/regressiontest: dsa scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#538">[ date ]</a>
+              <a href="thread.html#538">[ thread ]</a>
+              <a href="subject.html#538">[ subject ]</a>
+              <a href="author.html#538">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4129 - in rl/trunk/engine: core/src rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4129%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%20ui/src&In-Reply-To=%3C200803042118.m24LI9wf019186%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001199.html">
+   <LINK REL="Next"  HREF="001201.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4129 - in rl/trunk/engine: core/src rules/src ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4129%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%20ui/src&In-Reply-To=%3C200803042118.m24LI9wf019186%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4129 - in rl/trunk/engine: core/src rules/src ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  4 22:18:09 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001199.html">[Dsa-hl-svn] r4128 - in modules/common/gui: imagesets windows	windows/buttons
+</A></li>
+        <LI>Next message: <A HREF="001201.html">[Dsa-hl-svn] r4130 - modules/techdemo2/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1200">[ date ]</a>
+              <a href="thread.html#1200">[ thread ]</a>
+              <a href="subject.html#1200">[ subject ]</a>
+              <a href="author.html#1200">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-04 22:18:06 +0100 (Tue, 04 Mar 2008)
+New Revision: 4129
+
+Modified:
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+Log:
+loading save games from main menu
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 20:57:51 UTC (rev 4128)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 21:18:06 UTC (rev 4129)
+@@ -238,7 +238,7 @@
+         {
+             mHighestSaveGameNumber = std::max(mHighestSaveGameNumber, Ogre::StringConverter::parseInt(name));
+ 
+-            SaveGameFile* file = new SaveGameFile(&quot;&quot;, mHighestSaveGameNumber);        
++            SaveGameFile* file = new SaveGameFile(&quot;&quot;, Ogre::StringConverter::parseInt(name));        
+             
+             LOG_MESSAGE(Logger::RULES, &quot;Parsing header of save game: &quot; + name + &quot;.save&quot;);
+             SaveGameFileReader reader;
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-04 20:57:51 UTC (rev 4128)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-04 21:18:06 UTC (rev 4129)
+@@ -304,6 +304,7 @@
+     
+     void GameObjectManager::writeData(SaveGameFileWriter *writer)
+     {
++        LOG_MESSAGE(Logger::RULES, &quot;Saving Game Objects&quot;);
+         DOMElement* gameobjects = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+ 
+         std::list&lt;const GameObject*&gt; gos = getAllGameObjects();
+@@ -353,7 +354,7 @@
+                         applyProperties(object, &amp;properties);
+                         // Placing the actor a a little bit higher in the scene. The actor will fall onto ground.
+                         // Avoiding problems with the physics, because the character the creature is transfixed to ground
+-                        if(state == GameObjectState::GOS_IN_SCENE)
++                        if(state == GOS_IN_SCENE)
+                         {
+                             object-&gt;setProperty(GameObject::PROPERTY_POSITION, 
+ 	                            Property(object-&gt;getProperty(GameObject::PROPERTY_POSITION).toVector3() + Ogre::Vector3(0.0f,0.01f,0.0f)));
+
+Modified: rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 20:57:51 UTC (rev 4128)
++++ rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 21:18:06 UTC (rev 4129)
+@@ -100,20 +100,17 @@
+     bool MainMenuLoadWindow::handleLoadEvent()
+     {
+         LOG_MESSAGE(Logger::UI, &quot;Load Button pressed&quot;);
+-
+-		setVisible(false);
+-		mMainMenuWindow-&gt;setVisible(false);
+-
+-		if(mSaveGameTable-&gt;getFirstSelectedItem())
++        if(mSaveGameTable-&gt;getFirstSelectedItem())
+ 		{
+-			CEGUI::uint SelectedRow = mSaveGameTable-&gt;getRowWithID(mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getID());
+-			CeGuiString moduleName = mSaveGameTable-&gt;getItemAtGridReference(CEGUI::MCLGridRef(SelectedRow,1))-&gt;getText();
++            setVisible(false);
++		    mMainMenuWindow-&gt;setVisible(false);
++		
++            CeGuiString moduleId = ((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString();
+ 			ContentModule* module = NULL;
+-			module = CoreSubsystem::getSingleton().getModule(moduleName.c_str());
++			module = CoreSubsystem::getSingleton().getModule(moduleId.c_str());
+ 			assert(module != NULL /*MainMenuLoadWindow::handleLoadEvent()*/);
+ 			CoreSubsystem::getSingleton().startAdventureModule(module);
+-			CeGuiString saveGameName = mSaveGameTable-&gt;getItemAtGridReference(CEGUI::MCLGridRef(SelectedRow,0))-&gt;getText();
+-			SaveGameManager::getSingleton().loadSaveGameFile(saveGameName, moduleName);
++			SaveGameManager::getSingleton().loadSaveGameFile(((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getId());
+ 		}
+ 
+         return true;
+@@ -149,10 +146,15 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
+-            mSaveGameTable-&gt;setUserData(it-&gt;second);
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getName()), 0, saveGameNum);
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString()), 1, saveGameNum);
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME).toString()), 2, saveGameNum);
++            CEGUI::ListboxTextItem* item = new CEGUI::ListboxTextItem(it-&gt;second-&gt;getName());
++            item-&gt;setUserData(it-&gt;second);
++            mSaveGameTable-&gt;setItem(item, 0, saveGameNum);
++            item = new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString());
++            item-&gt;setUserData(it-&gt;second);
++            mSaveGameTable-&gt;setItem(item, 1, saveGameNum);
++            item = new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME).toString());
++            item-&gt;setUserData(it-&gt;second);
++            mSaveGameTable-&gt;setItem(item, 2, saveGameNum);
+             saveGameNum++;
+         }
+         /*mSaveGameTable-&gt;autoSizeColumnHeader(0);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001199.html">[Dsa-hl-svn] r4128 - in modules/common/gui: imagesets windows	windows/buttons
+</A></li>
+	<LI>Next message: <A HREF="001201.html">[Dsa-hl-svn] r4130 - modules/techdemo2/materials
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1200">[ date ]</a>
+              <a href="thread.html#1200">[ thread ]</a>
+              <a href="subject.html#1200">[ subject ]</a>
+              <a href="author.html#1200">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

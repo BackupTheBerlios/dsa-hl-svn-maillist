@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4178 - rl/trunk/engine/core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4178%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200803061032.m26AWRYO024941%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001248.html">
+   <LINK REL="Next"  HREF="001250.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4178 - rl/trunk/engine/core/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4178%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200803061032.m26AWRYO024941%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4178 - rl/trunk/engine/core/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  6 11:32:27 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001248.html">[Dsa-hl-svn] r4177 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001250.html">[Dsa-hl-svn] r4179 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1249">[ date ]</a>
+              <a href="thread.html#1249">[ thread ]</a>
+              <a href="subject.html#1249">[ subject ]</a>
+              <a href="author.html#1249">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-06 11:32:13 +0100 (Thu, 06 Mar 2008)
+New Revision: 4178
+
+Modified:
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/MergeableMeshObject.cpp
+Log:
+fixed bug: queryflags for actors with MergeableMeshObjects were not set correctly when changing mesh
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2008-03-06 09:55:08 UTC (rev 4177)
++++ rl/trunk/engine/core/src/Actor.cpp	2008-03-06 10:32:13 UTC (rev 4178)
+@@ -161,6 +161,8 @@
+             &quot;Aktor &quot;+mName+&quot;: Es ist bereits ein Objekt an diesem Aktor befestigt.&quot;);
+ 
+         mActorControlledObject = act;
++        if( act-&gt;getMovableObject() )
++            act-&gt;getMovableObject()-&gt;setQueryFlags(0);
+     }
+ 
+     const String&amp; Actor::getName() const
+@@ -170,14 +172,26 @@
+ 
+     unsigned long Actor::getQueryFlags() const
+     {
+-        return mActorControlledObject ?
+-            mActorControlledObject-&gt;getMovableObject()-&gt;getQueryFlags() : 0;
++        if( mActorControlledObject )
++        {
++            if( mActorControlledObject-&gt;getMovableObject() )
++            {
++                unsigned long flags = mActorControlledObject-&gt;getMovableObject()-&gt;getQueryFlags();
++                return flags;
++            }
++        }
++        return 0;
+     }
+ 
+     void Actor::setQueryFlags( unsigned long flags )
+     {
+         if( mActorControlledObject &amp;&amp; mActorControlledObject-&gt;getMovableObject())
+             mActorControlledObject-&gt;getMovableObject()-&gt;setQueryFlags( flags );
++        else
++        {
++            if( flags != NULL )
++                LOG_ERROR(Logger::CORE, &quot;Queryflags could not be set, because ActorControlledObject was NULL&quot;);
++        }
+     }
+ 
+     void Actor::addQueryFlag( unsigned long flag  )
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-06 09:55:08 UTC (rev 4177)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-06 10:32:13 UTC (rev 4178)
+@@ -173,6 +173,8 @@
+ 
+     bool CoreSubsystem::initializeCoreSubsystem()
+     {
++        // set default queryflags to zero
++        Ogre::MovableObject::setDefaultQueryFlags(0);
+         // By not specifying the first two parameters, OGRE will not try
+         // to load plugins.cfg and ogre.cfg
+         mOgreRoot = new Root(&quot;&quot;, &quot;&quot;, ConfigurationManager::getSingleton().getOgreLogFile());
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2008-03-06 09:55:08 UTC (rev 4177)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2008-03-06 10:32:13 UTC (rev 4178)
+@@ -170,7 +170,8 @@
+     {
+         if( actor )
+         {
+-            if( actor-&gt;getQueryFlags() &amp; mQueryMask )
++            unsigned long flags = actor-&gt;getQueryFlags();
++            if( flags &amp; mQueryMask )
+                 mFoundActors[actor-&gt;getName()] = actor;
+         }
+     }
+
+Modified: rl/trunk/engine/core/src/MergeableMeshObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MergeableMeshObject.cpp	2008-03-06 09:55:08 UTC (rev 4177)
++++ rl/trunk/engine/core/src/MergeableMeshObject.cpp	2008-03-06 10:32:13 UTC (rev 4178)
+@@ -132,6 +132,9 @@
+ 		Entity* newEnt = CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+ 			-&gt;getSceneManager()-&gt;createEntity(oldEnt-&gt;getName()+&quot;_&quot;, newMesh-&gt;getName());
+ 
++        // queryflags uebernehmen
++        newEnt-&gt;setQueryFlags( oldEnt-&gt;getQueryFlags() );
++
+ 		TagPoint* parentTp = dynamic_cast&lt;TagPoint*&gt;(oldEnt-&gt;getParentNode());
+ 		if (parentTp)
+ 		{
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001248.html">[Dsa-hl-svn] r4177 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001250.html">[Dsa-hl-svn] r4179 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1249">[ date ]</a>
+              <a href="thread.html#1249">[ thread ]</a>
+              <a href="subject.html#1249">[ subject ]</a>
+              <a href="author.html#1249">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

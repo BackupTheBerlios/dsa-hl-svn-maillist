@@ -1,0 +1,501 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3314 - in modules: combattest/scripts/maps	common/scripts intro/scripts regressiontest/dialogs
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3314%20-%20in%20modules%3A%20combattest/scripts/maps%0A%09common/scripts%20intro/scripts%20regressiontest/dialogs&In-Reply-To=%3C200704182008.l3IK8cgv025068%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000384.html">
+   <LINK REL="Next"  HREF="000386.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3314 - in modules: combattest/scripts/maps	common/scripts intro/scripts regressiontest/dialogs</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3314%20-%20in%20modules%3A%20combattest/scripts/maps%0A%09common/scripts%20intro/scripts%20regressiontest/dialogs&In-Reply-To=%3C200704182008.l3IK8cgv025068%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3314 - in modules: combattest/scripts/maps	common/scripts intro/scripts regressiontest/dialogs">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 18 22:08:38 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000384.html">[Dsa-hl-svn] r3313 - in rl/trunk/engine: core/include core/src	dialog/include dialog/src script script/swig ui ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="000386.html">[Dsa-hl-svn] r3315 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#385">[ date ]</a>
+              <a href="thread.html#385">[ thread ]</a>
+              <a href="subject.html#385">[ subject ]</a>
+              <a href="author.html#385">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-18 22:08:19 +0200 (Wed, 18 Apr 2007)
+New Revision: 3314
+
+Modified:
+   modules/combattest/scripts/maps/combattest.rb
+   modules/common/scripts/dialog.rb
+   modules/common/scripts/global-actions.rb
+   modules/common/scripts/global-settings.rb
+   modules/common/scripts/globals.rb
+   modules/common/scripts/npc.rb
+   modules/intro/scripts/intro.rb
+   modules/regressiontest/dialogs/testperson.xml
+Log:
+* ConfigurationManager now uses Strings to identify sections rather than a hard-wired enum.
+* Remove defunct and unused CommandMapperWindow. The functionality will be provided by the options window.
+*Action keys are now stored as global and as per control state.
+* Controllers are now managed by InputManager and the Controller interface has been changed. ControlStates are now managed as a stack rather than an amorphous mass. Each control state now handles all non-global input and can be paused and resumed.
+*DialogWindow/DialogController-interaction improved. But still much to do here.
+DialogWindow is now reused instead of created/discarded for each dialog.
+* DialogController is now a concrete class. former abstract methods got a default implementation.
+
+Modified: modules/combattest/scripts/maps/combattest.rb
+===================================================================
+--- modules/combattest/scripts/maps/combattest.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/combattest/scripts/maps/combattest.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -22,6 +22,7 @@
+ wolf = $GOM.createGameObjectProxy(&quot;Wolf&quot;).getGameObject()
+ wolf.placeIntoScene
+ wolf.setPosition [0.0,0.0,-5.0]
++wolf.setAlignment(Creature::ALIGNMENT_ENEMY)
+ 
+ $SCRIPT.log(&quot;map 'combattest' initialisiert.&quot;)
+ 
+
+Modified: modules/common/scripts/dialog.rb
+===================================================================
+--- modules/common/scripts/dialog.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/common/scripts/dialog.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -1,26 +1,5 @@
+ load &quot;embed.rb&quot;
+ 
+-class GameActorScriptOne 
+-	def initialize( name ) 
+-		@name = name;
+-	end
+-	
+-	def OnPlaySound()
+-		print( &quot;So was, &quot;<A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">+ at name+</A>&quot; hat gebeept. &quot; );
+-	end 
+-	
+-	def TestReturner()
+-		print( &quot;Blupp&quot; )
+-		return 4
+-	end
+-
+-	def Multiply(n,m)
+-		 return n.to_i() * m.to_i()
+-	end
+-end
+-
+-
+-
+ class DialogCharTest &lt; DialogCharacter
+ 	def initialize()
+ 		super()
+
+Modified: modules/common/scripts/global-actions.rb
+===================================================================
+--- modules/common/scripts/global-actions.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/common/scripts/global-actions.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -2,7 +2,7 @@
+ 
+ class ShowActionMenuAction &lt; Action
+   def initialize
+-    super(&quot;act_showactions&quot;, &quot;Aktionen anzeigen&quot;)
++    super(&quot;showactions&quot;, &quot;Aktionen anzeigen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -12,7 +12,7 @@
+ 
+ class QuitGameAction &lt; Action
+   def initialize
+-    super(&quot;act_quitgame&quot;, &quot;Das Spiel beenden&quot;)
++    super(&quot;quitgame&quot;, &quot;Das Spiel beenden&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -22,7 +22,7 @@
+ 
+ class ForceQuitGameAction &lt; Action
+   def initialize
+-    super(&quot;act_forcequitgame&quot;, &quot;Das Spiel ohne Nachfrage beenden&quot;)
++    super(&quot;forcequitgame&quot;, &quot;Das Spiel ohne Nachfrage beenden&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -32,7 +32,7 @@
+ 
+ class ToggleConsoleAction &lt; Action
+   def initialize
+-    super(&quot;act_toggleconsole&quot;, &quot;Konsole zeigen/verstecken&quot;)
++    super(&quot;toggleconsole&quot;, &quot;Konsole zeigen/verstecken&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -42,7 +42,7 @@
+ 
+ class ToggleDebugWindowAction &lt; Action
+   def initialize
+-    super(&quot;act_toggledebugwindow&quot;, &quot;DebugWindow zeigen/verstecken&quot;)
++    super(&quot;toggledebugwindow&quot;, &quot;DebugWindow zeigen/verstecken&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -52,7 +52,7 @@
+ 
+ class ToggleGameLogWindowAction &lt; Action
+     def initialize
+-        super(&quot;act_togglegamelogwindow&quot;, &quot;Game Log zeigen/verstecken&quot;)
++        super(&quot;togglegamelogwindow&quot;, &quot;Game Log zeigen/verstecken&quot;)
+     end
+ 
+     def doAction(object, actor, target)
+@@ -62,18 +62,18 @@
+ 
+ class ToggleViewModeAction &lt; Action
+   def initialize
+-    super(&quot;act_toggleviewmode&quot;, &quot;First/ThirdPerson umschalten&quot;)
++    super(&quot;toggleviewmode&quot;, &quot;First/ThirdPerson umschalten&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+-    gc = $UI.getCharacterController();
++    gc = $IM.getControlState();
+     gc.toggleViewMode()
+   end
+ end
+ 
+ class ToggleInGameGlobalMenuAction &lt; Action
+   def initialize
+-    super(&quot;act_toggleingameglobalmenu&quot;, &quot;Spielmen&#252; anzeigen&quot;)
++    super(&quot;toggleingameglobalmenu&quot;, &quot;Spielmen&#252; anzeigen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -83,7 +83,7 @@
+ 
+ class ToggleInventoryAction &lt; Action
+ 	def initialize
+-		super(&quot;act_toggleinventorywindow&quot;, &quot;Das Inventar des aktiven Helden anzeigen&quot;)
++		super(&quot;toggleinventorywindow&quot;, &quot;Das Inventar des aktiven Helden anzeigen&quot;)
+ 	end
+ 
+ 	def doAction(object, actor, target)
+@@ -93,18 +93,18 @@
+ 
+ class ResetCameraAction &lt; Action
+   def initialize
+-    super(&quot;act_resetcamera&quot;, &quot;Kamera zur&#252;cksetzen&quot;)
++    super(&quot;resetcamera&quot;, &quot;Kamera zur&#252;cksetzen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+-    gc = $UI.getCharacterController();
++    gc = $IM.getControlState();
+     gc.resetCamera();
+   end
+ end
+ 
+ class MakeScreenshotAction &lt; Action
+   def initialize
+-    super(&quot;act_makescreenshot&quot;, &quot;Screenshot erstellen&quot;)
++    super(&quot;makescreenshot&quot;, &quot;Screenshot erstellen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -114,7 +114,7 @@
+ 
+ class ToggleCollisionDebugAction &lt; Action
+   def initialize
+-    super(&quot;act_togglecollisiondebug&quot;, &quot;Kollisionsk&#246;rper anzeigen&quot;)
++    super(&quot;togglecollisiondebug&quot;, &quot;Kollisionsk&#246;rper anzeigen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -124,7 +124,7 @@
+ 
+ class ToggleDebugVisualisationAction &lt; Action
+   def initialize
+-    super(&quot;act_toggledebugvisualisation&quot;, &quot;Debug-Helfer anzeigen&quot;)
++    super(&quot;toggledebugvisualisation&quot;, &quot;Debug-Helfer anzeigen&quot;)
+     @isShown = false
+   end
+ 
+@@ -140,7 +140,7 @@
+ 
+ class ToggleCharacterStateWindowAction &lt; Action
+     def initialize
+-        super(&quot;act_togglecharacterstatewindow&quot;, &quot;Charakterstatus zeigen/verstecken&quot;)
++        super(&quot;togglecharacterstatewindow&quot;, &quot;Charakterstatus zeigen/verstecken&quot;)
+     end
+ 
+     def doAction(object, actor, target)
+@@ -150,7 +150,7 @@
+ 
+ class ShowCharacterSheetAction &lt; Action
+   def initialize
+-    super(&quot;act_showcharactersheet&quot;, &quot;Charakterblatt des aktiven Helden anzeigen&quot;)
++    super(&quot;showcharactersheet&quot;, &quot;Charakterblatt des aktiven Helden anzeigen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -160,7 +160,7 @@
+ 
+ class ShowTargetWindowAction &lt; Action
+   def initialize
+-    super(&quot;act_showtargetwindow&quot;, &quot;Zielauswahl&quot;)
++    super(&quot;showtargetwindow&quot;, &quot;Zielauswahl&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -170,7 +170,7 @@
+ 
+ class ShowJournalWindowAction &lt; Action
+   def initialize
+-    super(&quot;act_showjournalwindow&quot;, &quot;Tagebuch&quot;)
++    super(&quot;showjournalwindow&quot;, &quot;Tagebuch&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -204,7 +204,7 @@
+ 
+ class ShowAboutWindowAction &lt; Action
+   def initialize
+-    super(&quot;act_showaboutwindow&quot;, &quot;&#220;ber&quot;)
++    super(&quot;showaboutwindow&quot;, &quot;&#220;ber&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -214,7 +214,7 @@
+ 
+ class ShowGameSettingsAction &lt; Action
+   def initialize
+-    super(&quot;act_showgamesettings&quot;, &quot;Spieleinstellungen&quot;)
++    super(&quot;showgamesettings&quot;, &quot;Spieleinstellungen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -224,7 +224,7 @@
+ 
+ class ShowLogfilesAction &lt; Action
+   def initialize
+-    super(&quot;act_showlogfiles&quot;, &quot;Logfiles anzeigen&quot;)
++    super(&quot;showlogfiles&quot;, &quot;Logfiles anzeigen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -234,7 +234,7 @@
+ 
+ class ShowNextDebugWindowPageAction &lt; Action
+   def initialize
+-    super(&quot;act_shownextdebugwindowpage&quot;, &quot;Zur n&#228;chsten Info-Seite wechseln&quot;)
++    super(&quot;shownextdebugwindowpage&quot;, &quot;Zur n&#228;chsten Info-Seite wechseln&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -244,7 +244,7 @@
+ 
+ class CloseCurrentWindowAction &lt; Action
+   def initialize
+-    super(&quot;act_closecurrentwindow&quot;, &quot;Oberstes Fenster schliessen&quot;)
++    super(&quot;closecurrentwindow&quot;, &quot;Oberstes Fenster schliessen&quot;)
+   end
+ 
+   def doAction(object, actor, target)
+@@ -252,25 +252,9 @@
+   end
+ end
+ 
+-class ToggleCharacterControllerAction &lt; Action
+-  def initialize
+-    super(&quot;act_togglecharactercontroller&quot;,
+-        &quot;Freeflight- / Movement-Controller umschalten&quot;)
+-  end
+-
+-  def doAction(object, actor, target)
+-    cctype = $UI.getCharacterControllerType();
+-    if (cctype == CharacterController::CTRL_FREEFLIGHT)
+-        $UI.setCharacterController(CharacterController::CTRL_MOVEMENT);
+-    elsif (cctype == CharacterController::CTRL_MOVEMENT)
+-        $UI.setCharacterController(CharacterController::CTRL_FREEFLIGHT);
+-    end
+-  end
+-end
+-
+ class ShowContainerContentAction &lt; Action
+   def initialize
+-    super(&quot;act_showcontainercontent&quot;, &quot;Inhalt anzeigen&quot;)
++    super(&quot;showcontainercontent&quot;, &quot;Inhalt anzeigen&quot;)
+   end
+   
+   def doAction(object, actor, target)
+
+Modified: modules/common/scripts/global-settings.rb
+===================================================================
+--- modules/common/scripts/global-settings.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/common/scripts/global-settings.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -8,54 +8,28 @@
+       $grpHelp = ActionGroup.new(&quot;Hilfe&quot;)
+       $grpOptions = ActionGroup.new(&quot;Optionen&quot;)
+ 
+-      $act1 = ShowActionMenuAction.new()
+-      $act4 = ToggleConsoleAction.new()
+-      $act5 = ToggleDebugWindowAction.new()
+-      $act6 = ToggleGameLogWindowAction.new()
+-      $act7 = ToggleCollisionDebugAction.new()
+-      $act9 = ToggleViewModeAction.new()
+-      $act10 = ResetCameraAction.new()
+-      $act11 = ShowCharacterSheetAction.new()
+-      $act12 = QuitGameAction.new()
+-      $act13 = MakeScreenshotAction.new()
+-      $act14 = ToggleCharacterStateWindowAction.new()
+-      $act15 = ShowTargetWindowAction.new()
+-      $act16 = ToggleInGameGlobalMenuAction.new()
+-      $act19 = ShowAboutWindowAction.new()
+-      $act20 = ShowJournalWindowAction.new()
+-      $act21 = CloseCurrentWindowAction.new()
+-      $act22 = ShowGameSettingsAction.new()
+-      $act23 = ShowLogfilesAction.new()
+-      $act24 = ToggleCharacterControllerAction.new()
+-      $act25 = ShowNextDebugWindowPageAction.new()
+-	  $act26 = ToggleInventoryAction.new()
+-	  $act27 = ToggleDebugVisualisationAction.new()
+-      $act28 = ForceQuitGameAction.new()
++      actionManager.registerInGameGlobalAction(ShowActionMenuAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleConsoleAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleDebugWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleGameLogWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleCollisionDebugAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ResetCameraAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ShowCharacterSheetAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleCharacterStateWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ShowTargetWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ToggleInGameGlobalMenuAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ShowJournalWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(CloseCurrentWindowAction.new(), $grpView)
++      actionManager.registerInGameGlobalAction(ShowNextDebugWindowPageAction.new(), $grpView)
++	  actionManager.registerInGameGlobalAction(ToggleInventoryAction.new(), $grpView)
++	  actionManager.registerInGameGlobalAction(ToggleDebugVisualisationAction.new(), $grpView)
++	  actionManager.registerInGameGlobalAction(ForceQuitGameAction.new(), $grpView)
+ 
+-      actionManager.registerInGameGlobalAction($act1, $grpView)
+-      actionManager.registerInGameGlobalAction($act4, $grpView)
+-      actionManager.registerInGameGlobalAction($act5, $grpView)
+-      actionManager.registerInGameGlobalAction($act6, $grpView)
+-      actionManager.registerInGameGlobalAction($act7, $grpView)
+-      actionManager.registerInGameGlobalAction($act9, $grpView)
+-      actionManager.registerInGameGlobalAction($act10, $grpView)
+-      actionManager.registerInGameGlobalAction($act11, $grpView)
+-      actionManager.registerInGameGlobalAction($act14, $grpView)
+-      actionManager.registerInGameGlobalAction($act15, $grpView)
+-      actionManager.registerInGameGlobalAction($act16, $grpView)
+-      actionManager.registerInGameGlobalAction($act20, $grpView)
+-      actionManager.registerInGameGlobalAction($act21, $grpView)
+-      actionManager.registerInGameGlobalAction($act24, $grpView)
+-      actionManager.registerInGameGlobalAction($act25, $grpView)
+-	  actionManager.registerInGameGlobalAction($act26, $grpView)
+-	  actionManager.registerInGameGlobalAction($act27, $grpView)
+-	  actionManager.registerInGameGlobalAction($act28, $grpView)
++      actionManager.registerInGameGlobalAction(QuitGameAction.new(), $grpOptions)
++      actionManager.registerInGameGlobalAction(MakeScreenshotAction.new(), $grpOptions)
++      actionManager.registerInGameGlobalAction(ShowGameSettingsAction.new(), $grpOptions)
++      actionManager.registerInGameGlobalAction(ShowLogfilesAction.new(), $grpOptions)
+ 
+-      actionManager.registerInGameGlobalAction($act12, $grpOptions)
+-      actionManager.registerInGameGlobalAction($act13, $grpOptions)
+-      actionManager.registerInGameGlobalAction($act22, $grpOptions)
+-      actionManager.registerInGameGlobalAction($act23, $grpOptions)
+-
+-      actionManager.registerInGameGlobalAction($act19, $grpHelp)
++      actionManager.registerInGameGlobalAction(ShowAboutWindowAction.new(), $grpHelp)
+   end
+ end
+
+Modified: modules/common/scripts/globals.rb
+===================================================================
+--- modules/common/scripts/globals.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/common/scripts/globals.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -17,6 +17,7 @@
+ $WPGM = WayPointGraphManager.getSingleton();
+ $DVM = DebugVisualsManager.getSingleton();
+ $SCRIPT = ScriptSubsystem.getSingleton();
++$IM = InputManager.getSingleton();
+ 
+ $GameEveMgr = GameEventManager.getSingleton();
+ $AnimMgr = AnimationManager.getSingleton();
+
+Modified: modules/common/scripts/npc.rb
+===================================================================
+--- modules/common/scripts/npc.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/common/scripts/npc.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -13,7 +13,7 @@
+     if ( not bot.nil? )
+       bot.setPlayerCharacter( actor );
+       bot.setNonPlayerCharacter( object );
+-      WindowFactory.getSingleton().showDialog(bot);
++      $IM.pushControlState(CST_DIALOG);
+     end
+   end
+ end
+
+Modified: modules/intro/scripts/intro.rb
+===================================================================
+--- modules/intro/scripts/intro.rb	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/intro/scripts/intro.rb	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -10,7 +10,7 @@
+ sunlight.getControlledObject().setDiffuseColour(1.0,1.0,0.9);
+ $SCRIPT.log(&quot;Tageslicht erstellt.&quot;);
+ 
+-$UI.setCharacterController(CharacterController::CTRL_CUTSCENE);
++$IM.pushControlState(InputManager::CST_CUTSCENE);
+ 
+ $World.setFog( World::FOG_EXP, [0.7,0.6,0.5,0.5], 0.00009, 0.5, 1.0);
+ 
+
+Modified: modules/regressiontest/dialogs/testperson.xml
+===================================================================
+--- modules/regressiontest/dialogs/testperson.xml	2007-04-18 20:06:35 UTC (rev 3313)
++++ modules/regressiontest/dialogs/testperson.xml	2007-04-18 20:08:19 UTC (rev 3314)
+@@ -3,7 +3,6 @@
+ &lt;aiml-startup version='1.0'&gt;
+ 	&lt;bot name='TestPerson' voice=''&gt;
+ 		&lt;learn src='testdialog.aiml'/&gt;
+-        &lt;script src='dialog.rb' class='DialogCharTest'/&gt;
+ 	&lt;/bot&gt;
+ &lt;/aiml-startup&gt;
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000384.html">[Dsa-hl-svn] r3313 - in rl/trunk/engine: core/include core/src	dialog/include dialog/src script script/swig ui ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="000386.html">[Dsa-hl-svn] r3315 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#385">[ date ]</a>
+              <a href="thread.html#385">[ thread ]</a>
+              <a href="subject.html#385">[ subject ]</a>
+              <a href="author.html#385">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

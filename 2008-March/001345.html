@@ -1,0 +1,940 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4274 - in rl/trunk/engine/ai: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4274%20-%20in%20rl/trunk/engine/ai%3A%20.%20include%20src&In-Reply-To=%3C200803082102.m28L2BLA028964%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001344.html">
+   <LINK REL="Next"  HREF="001346.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4274 - in rl/trunk/engine/ai: . include src</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4274%20-%20in%20rl/trunk/engine/ai%3A%20.%20include%20src&In-Reply-To=%3C200803082102.m28L2BLA028964%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4274 - in rl/trunk/engine/ai: . include src">iblis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 22:02:11 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001344.html">[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001346.html">[Dsa-hl-svn] r4275 - rl/trunk/engine/ai/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1345">[ date ]</a>
+              <a href="thread.html#1345">[ thread ]</a>
+              <a href="subject.html#1345">[ subject ]</a>
+              <a href="author.html#1345">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-08 22:02:10 +0100 (Sat, 08 Mar 2008)
+New Revision: 4274
+
+Added:
+   rl/trunk/engine/ai/include/SimpleVehicle.h
+   rl/trunk/engine/ai/src/SimpleVehicle.cpp
+Modified:
+   rl/trunk/engine/ai/RlAI2005.vcproj
+   rl/trunk/engine/ai/include/AgentManager.h
+   rl/trunk/engine/ai/include/AiWorld.h
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/AgentManager.cpp
+   rl/trunk/engine/ai/src/AiWorld.cpp
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+Log:
+introduced SimpleVehicle, to allow other creatures to be added as &quot;dynamic obstacles&quot; to AiWorld, without giving them steering behaviour
+
+Modified: rl/trunk/engine/ai/RlAI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ai/RlAI2005.vcproj	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/RlAI2005.vcproj	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -395,6 +395,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\SimpleVehicle.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\stdinc.cpp&quot;
+ 				&gt;
+ 				&lt;FileConfiguration
+@@ -569,6 +573,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\SimpleVehicle.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\stdinc.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/ai/include/AgentManager.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentManager.h	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/include/AgentManager.h	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -21,13 +21,7 @@
+ #include &quot;GameTask.h&quot;
+ #include &quot;GameObjectStateListener.h&quot;
+ #include &quot;FuzzyState.h&quot;
+-#include &quot;OpenSteer/Proximity.h&quot;
+ 
+-namespace OpenSteer
+-{
+-    class AbstractVehicle;
+-}
+-
+ namespace rl
+ {
+ 	class Creature;
+@@ -36,7 +30,6 @@
+     class Agent;
+ 
+     typedef FuzzyState&lt;SteeringVehicle&gt; SteeringBehaviour;
+-    typedef OpenSteer::AbstractProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityDatabase;
+ 
+     class _RlAiExport BehaviourFactory
+     {
+@@ -118,8 +111,7 @@
+ 
+         //! Factory to create behaviours with.
+         BehaviourFactory* mBehaviourFactory;
+-        ProximityDatabase* mAgentProximityCheck;
+-		//! List of registered agents (includes mPlayer)
++ 		//! List of registered agents (includes mPlayer)
+ 		AgentMap mAgents;
+ 		//! Agent representing the player
+ 		Agent* mPlayer;
+
+Modified: rl/trunk/engine/ai/include/AiWorld.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiWorld.h	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/include/AiWorld.h	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -18,14 +18,22 @@
+ 
+ #include &quot;OpenSteer/Obstacle.h&quot;
+ #include &quot;DebugVisualisable.h&quot;
++#include &quot;SimpleVehicle.h&quot;
+ #include &lt;OgreNewt.h&gt;
+ #include &lt;vector&gt;
+ 
++namespace OpenSteer
++{
++    class AbstractVehicle;
++}
++
+ namespace rl
+ {
++    typedef OpenSteer::AbstractProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityDatabase;
+ 	/** Representation of the GameWorld for Steering and Pathing.
+-	 * Is a container for obstacles that have to be avoided when
+-	 * creating a path.
++	 * Is a container for obstacles and vehicles that can be avoided.
++     * Obstacles are static geometry or not moving entities,
++     * Vehicles are dynamically moveable creatures / agents
+ 	 */
+ 	class AiWorld
+ 	{
+@@ -38,15 +46,23 @@
+ 		/** Returns a list of obstacles for OpenSteer.
+ 		 */
+ 		const OpenSteer::ObstacleGroup&amp; getSteeringObstacles();
+-		/** Adds an obstacle to the internal list of obstacles
++		/** Adds an obstacle to the internal list of obstacles.
++         * Agents will avoid these obstacles.
+ 		 */
+ 		void addObstacle(OpenSteer::Obstacle* obstacle);
+ 		/** Removes and deletes all internally stored obstacle objects.
+ 		 */
+ 		void removeAllObstacles();
++
++        /**
++         * adds a Vehicle to the AiWorld. 
++         * Vehicles are moving ojects in the world which Agents should avoid.
++         */
++        void addVehicle(SimpleVehicle* vehicle);
+ 	private:
+ 		//! list of obstacles
+ 		OpenSteer::ObstacleGroup mObstacles;
++        ProximityDatabase* mProximityCheck;
+ 	};
+ 
+ 
+
+Added: rl/trunk/engine/ai/include/SimpleVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SimpleVehicle.h	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/include/SimpleVehicle.h	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -0,0 +1,97 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright(C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#ifndef __RlAI_SimpleVehicle_H__
++#define __RlAI_SimpleVehicle_H__
++
++#include &quot;AiPrerequisites.h&quot;
++#include &quot;OpenSteer/AbstractVehicle.h&quot;
++#include &quot;OpenSteer/Proximity.h&quot;
++
++namespace rl
++{
++    class Actor;
++    class Creature;
++    class CreatureController;
++
++    class _RlAiExport SimpleVehicle : public OpenSteer::AbstractVehicle
++    {        
++    protected:
++        SimpleVehicle();
++    public:
++        typedef OpenSteer::AbstractTokenForProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityToken;
++        SimpleVehicle(Creature* creature);
++        virtual ~SimpleVehicle();
++        
++        inline void setCreature(Creature* creature) { mCreature = creature; }
++        inline void setProximityToken(ProximityToken* token) { mProximityToken = token; }
++
++        // convenience functions
++        CreatureController* getCreatureController() const;
++        const Actor* getActor() const;
++        
++        virtual float getMass(void) const;
++        virtual float setMass(float);
++
++        /** 
++         * size of bounding sphere, for obstacle avoidance, etc.
++         */
++        virtual float getRadius(void) const;
++        virtual float setRadius(float);
++
++        /**
++         * velocity of vehicle
++         */
++        virtual Ogre::Vector3 getVelocity() const;
++
++        /** 
++         * speed of vehicle  (may be faster than taking magnitude of velocity)
++         */
++        virtual float getSpeed(void) const;
++        virtual float setSpeed(float);
++
++        /**
++         * predict position of this vehicle at some time in the future
++         */
++        virtual Vector3 predictFuturePosition(const float predictionTime) const;
++
++  
++        /**
++         * the maximum steering force this vehicle can apply
++         */
++        virtual float getMaxForce(void) const;
++        virtual float setMaxForce(float);
++
++        /**
++         * the maximum speed this vehicle is allowed to move
++         */
++        virtual float getMaxSpeed(void) const;
++        virtual float setMaxSpeed(float);
++
++
++        float SimpleVehicle::getHeight() const;
++
++		/**
++         * Can be used to update the entity, eg. for steering, flocking etc.pp...
++         */
++		virtual void update(const float currentTime, const float elapsedTime);
++    protected:
++        Creature* mCreature;
++        ProximityToken* mProximityToken;
++    };
++}
++
++
++#endif
+\ No newline at end of file
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -22,17 +22,19 @@
+ #include &quot;LineSetPrimitive.h&quot;
+ #include &quot;OgreVector3.h&quot;
+ #include &quot;OpenSteer/SteerLibrary.h&quot;
++#include &quot;SimpleVehicle.h&quot;
+ #include &quot;MessagePump.h&quot;
+ 
+-
+ namespace rl
+ {
+-	/*	SimpleVehicle_1 adds concrete LocalSpace methods to AbstractVehicle.
++	/**
++     * SimpleVehicle_1 adds concrete LocalSpace methods to AbstractVehicle.
+ 	 * OpenSteer::LocalSpaceMixin contains functionality to convert from one
+ 	 * coordinate system to an other.
+ 	 */
+-	typedef OpenSteer::LocalSpaceMixin&lt;OpenSteer::AbstractVehicle&gt; SimpleVehicle_1;
+-	/*	SimpleVehicle_2 adds concrete steering methods to SimpleVehicle_1.
++	typedef OpenSteer::LocalSpaceMixin&lt;SimpleVehicle&gt; SimpleVehicle_1;
++	/**
++     * SimpleVehicle_2 adds concrete steering methods to SimpleVehicle_1.
+ 	 * OpenSteer::SteerLibraryMixin adds the &quot;steering library&quot;
+ 	 * functionality to a given base class.  SteerLibraryMixin assumes its base
+      * class supports the AbstractVehicle interface.
+@@ -40,22 +42,19 @@
+ 	 * according to behaviours.
+ 	 */
+ 	typedef OpenSteer::SteerLibraryMixin&lt;SimpleVehicle_1&gt; SimpleVehicle_2;
+-    typedef OpenSteer::AbstractTokenForProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt; ProximityToken;
++    
+ 
+ 	class Actor;
+ 	class Agent;
+-	class PhysicalThing;
+     class CreatureController;
+ 
+ 	/**
+ 	 * Realises steering for NPCs
+ 	 * Provides different steering behaviours through methods that calculate
+ 	 * steering forces
+-	 *
+-	 * Maybe this should be used as interface instead of AbstractVehicle
+ 	 */
+     class _RlAiExport SteeringVehicle : public SimpleVehicle_2,
+-                                            public DebugVisualisable
++                                        public DebugVisualisable
+ 	{
+ 	public:
+ 		/** Constructor.
+@@ -66,7 +65,7 @@
+ 		 */
+ 		virtual ~SteeringVehicle(void);
+ 
+-        CreatureController* getCreatureController();
++        
+ 		/**
+ 		 * Add a force to the current force of the vehicle
+ 		 * @param  force value as force vector
+@@ -169,81 +168,81 @@
+ 		 * predict position of this vehicle at some time in the future
+ 		 *(assumes velocity remains constant)
+ 		 */
+-		Ogre::Vector3 predictFuturePosition(const float predictionTime) const;
++		//Ogre::Vector3 predictFuturePosition(const float predictionTime) const;
+ 
+ 		void resetLocalSpace();
+ 
+ 		/** get mass
+ 		 * @returns mass of physical object
+ 		 */
+-		float getMass() const;
++		//float getMass() const;
+ 		/** does not set mass but is necessary for AbstractVehicle.
+ 		 * throws an exception on invocation.
+ 		 * @param m mass
+ 		 */
+-		float setMass(float m);
++		//float setMass(float m);
+ 
+ 		/** retrieve velocity of vehicle
+ 		 * @returns velocity of the vehicle
+ 		 */
+-		Ogre::Vector3 getVelocity() const {return mCurrentVelocity;}
++		//Ogre::Vector3 getVelocity() const {return mCurrentVelocity;}
+ 
+ 		/** retrieves speed of vehicle.
+ 		 * may be faster than taking mag of velocity
+ 		 */
+-		float getSpeed() const;
++		//float getSpeed() const;
+ 		/** sets speed of vehicle.
+ 		 * may be faster than taking mag of velocity
+ 		 * @param s new speed to set
+ 		 * @returns float new speed set.
+ 		 */
+-		float setSpeed(float s);
++		//float setSpeed(float s);
+ 
+ 		/** radius for size of bounding sphere.
+ 		 * used for obstacle avoidance, etc.
+ 		 * TODO: this should be handled by size of NewtonBody
+ 		 * @returns float the radius
+ 	    */
+-		float getRadius() const;
++		//float getRadius() const;
+ 		/** sets radius for size of bounding sphere.
+ 		 * used for obstacle avoidance, etc.
+ 		 * TODO: this should be handled by size of NewtonBody
+ 		 * @returns float the radius
+ 	    */
+-		float setRadius(float m);
++		//float setRadius(float m);
+ 
+ 		/** height for size of bounding sphere.
+ 		 * used for obstacle avoidance, etc.
+ 		 * TODO: this should be handled by height of NewtonBody
+ 		 * @returns float the height
+ 	    */
+-        float getHeight() const;
++        //float getHeight() const;
+ 		/** height for size of bounding sphere.
+ 		 * used for obstacle avoidance, etc.
+ 		 * TODO: this should be handled by height of NewtonBody
+ 		 * @returns float the height
+ 	    */
+-        float setHeight(float h);
++        //float setHeight(float h);
+ 
+ 		/** retrieves maximum force.
+ 		 * @returns float containing maximum force.
+ 		 */
+-		float getMaxForce() const; 
++		//float getMaxForce() const; 
+ 		/** sets maximum force.
+ 		 * TODO: should not be set here, throw excpetion or so
+ 		 * @returns float containing maximum force set.
+ 		 */
+-		float setMaxForce(float mf);
++		//float setMaxForce(float mf);
+ 
+ 		/** retrieves maximum speed.
+ 		 * @returns float containing maximum speed
+ 		 */
+-		float getMaxSpeed() const;
++		//float getMaxSpeed() const;
+ 		/** retrieves maximum speed.
+ 		 * TODO: should not be set here, throw excpetion or so
+ 		 * @returns float containing maximum speed
+ 		 */
+-		float setMaxSpeed(float ms);
++		//float setMaxSpeed(float ms);
+ 
+ 		/**
+ 		 * adjust the steering force passed to applySteeringForce.
+@@ -261,8 +260,6 @@
+         virtual DebugVisualisableFlag getFlag() const;
+         virtual void updatePrimitive();
+ 
+-        inline void setProximityToken(ProximityToken* token) { mProximityToken = token; }
+-
+ 	protected:
+ 		/** initializes
+ 		 */
+@@ -296,10 +293,6 @@
+ 		//! the yaw angle in radians
+ 		//Ogre::Radian mYaw;
+ 
+-        ProximityToken* mProximityToken;
+-
+-        //! Creature object steered by this vehicle(and controlled by Agent).
+-        Creature* mCreature;
+         int mCreatureId;
+ 
+         bool refetchCreature();
+
+Modified: rl/trunk/engine/ai/src/AgentManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentManager.cpp	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/src/AgentManager.cpp	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -15,8 +15,9 @@
+  */
+ #include &quot;stdinc.h&quot;
+ 
++#include &quot;AiSubsystem.h&quot;
+ #include &quot;AgentManager.h&quot;
+-
++#include &quot;AiWorld.h&quot;
+ #include &quot;Agent.h&quot;
+ #include &quot;AgentCombatState.h&quot;
+ #include &quot;AgentSteeringState.h&quot;
+@@ -40,24 +41,12 @@
+     // Register self as CombatantFactory with the CombatManager, so that State is switched
+     // when agent is taking part in a combat.
+     CombatManager::getSingleton().registerCombatantFactory(&quot;default&quot;, this);
+-    // initialize the proximity database that keeps track of the positions of all Agents.
+-    // this is used to query all current neighbours of an Agent so that he can avoid them 
+-    const Vector3 center;
+-    const float div = 20.0f;
+-    const Vector3 divisions (div, 1.0f, div);
+-    const float diameter = 80.0f; //XXX need better way to get this
+-    const Vector3 dimensions (diameter, diameter, diameter);
+-    mAgentProximityCheck = new OpenSteer::LQProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt;(center, dimensions, divisions);
+ }
+ 
+ AgentManager::~AgentManager(void)
+ {
+     GameObjectManager::getSingleton().unregisterGameObjectStateListener(this);
+ 	removeAllAgents();
+-    if(mAgentProximityCheck != NULL)
+-    {
+-        delete mAgentProximityCheck;
+-    }
+ }
+ 
+ Agent* AgentManager::createAgent(Creature* character)
+@@ -91,7 +80,7 @@
+ {
+     RlAssert(agent, &quot;Agent is NULL&quot;);
+     // add the agent to the proximity database
+-    agent-&gt;setProximityToken(mAgentProximityCheck-&gt;allocateToken(agent));
++    AiSubsystem::getSingleton().getWorld()-&gt;addVehicle(agent);
+     // add him to the internal agent list
+     mAgents.insert(std::make_pair(agent-&gt;getControlledCreature(), agent));
+     LOG_MESSAGE(Logger::AI, 
+
+Modified: rl/trunk/engine/ai/src/AiWorld.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiWorld.cpp	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/src/AiWorld.cpp	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -28,14 +28,26 @@
+ #include &quot;OgreVector3.h&quot;
+ #include &quot;PhysicsMaterialRaycast.h&quot;
+ #include &quot;World.h&quot;
++#include &quot;OpenSteer/Proximity.h&quot;
+ 
+ using namespace OpenSteer;
+ using namespace Ogre;
+ 
+ namespace rl {
+ 
+-AiWorld::AiWorld(void) : mObstacles()
++AiWorld::AiWorld(void) 
++    : mObstacles()
+ {
++    // initialize the proximity database that keeps track of the positions of all Agents.
++    // this is used to query all current neighbours of an Agent so that he can avoid them 
++    const Vector3 center;
++    const float div = 20.0f;
++    const Vector3 divisions (div, 1.0f, div);
++    const float diameter = 80.0f; //XXX need better way to get this
++    const Vector3 dimensions (diameter, diameter, diameter);
++    mProximityCheck = new OpenSteer::LQProximityDatabase&lt;OpenSteer::AbstractVehicle*&gt;(center, dimensions, divisions);
++
++    // Example for creating an OpenSteer::BoxObstacle
+ //  create an obstacle as bounding box of the walkarea for npcs
+ //  this should be accessable through scripting, the Obstacles should have names
+ //  for easier access
+@@ -50,12 +62,15 @@
+ 	o-&gt;setPosition(Vector3(-31.5f,-10.0f, -3.5f));
+ 	o-&gt;setForward(0,0,-1);
+ 	addObstacle(o); */
+-
+ }
+ 
+ AiWorld::~AiWorld(void)
+ {
+ 	removeAllObstacles();
++    if(mProximityCheck != NULL)
++    {
++        delete mProximityCheck;
++    }
+ }
+ 
+ void AiWorld::addObstacle(Obstacle* obstacle)
+@@ -78,6 +93,13 @@
+ 	mObstacles.clear();
+ }
+ 
++void AiWorld::addVehicle(SimpleVehicle* vehicle)
++{
++    // adds the vehicle to the proximity check for near neighbors.
++    // vehicles can easily be removed by just deleteing the token in the vehicle
++    vehicle-&gt;setProximityToken(mProximityCheck-&gt;allocateToken(vehicle));
++}
++
+ NewtonWorldAsObstacle::NewtonWorldAsObstacle(void)
+ {
+     mMaterialsToConsider.push_back(PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
+
+Added: rl/trunk/engine/ai/src/SimpleVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SimpleVehicle.cpp	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/src/SimpleVehicle.cpp	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -0,0 +1,139 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright(C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot;
++
++#include &quot;SimpleVehicle.h&quot;
++#include &quot;PhysicalThing.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;CreatureController.h&quot;
++#include &quot;CreatureControllerManager.h&quot;
++
++namespace rl
++{
++
++SimpleVehicle::SimpleVehicle()
++    : mCreature(NULL)
++{
++}
++
++SimpleVehicle::SimpleVehicle(Creature* creature)
++    : mCreature(creature)
++{
++}
++
++SimpleVehicle::~SimpleVehicle()
++{
++    if(mProximityToken != NULL)
++    {
++        delete mProximityToken;
++    }
++}
++
++CreatureController* SimpleVehicle::getCreatureController() const
++{ 
++    return CreatureControllerManager::getSingleton().getCreatureController(mCreature);
++}
++        
++const Actor* SimpleVehicle::getActor() const 
++{ 
++    return mCreature-&gt;getActor(); 
++}
++
++void SimpleVehicle::update(const float currentTime, const float elapsedTime)
++{
++    mProximityToken-&gt;updateForNewPosition(mCreature-&gt;getPosition());
++}
++
++float SimpleVehicle::getMass() const 
++{
++    return mCreature-&gt;getMass();
++}
++
++float SimpleVehicle::setMass(float m) 
++{
++	// don't set mass here TODO: throw exception
++	return 1;
++}
++
++float SimpleVehicle::getRadius() const 
++{
++	// this is only the radius in x axis, but i think, this is the value that should be used here
++    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
++    return(aab.getMaximum().x - aab.getMinimum().x)/2;
++}
++
++float SimpleVehicle::setRadius(float m) 
++{
++	// don't set mass here TODO: throw exception
++	return 1;
++}
++
++Ogre::Vector3 SimpleVehicle::getVelocity() const
++{
++    return mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getVelocity();
++}
++
++float SimpleVehicle::getSpeed() const 
++{
++	return 1.0f;
++}
++
++float SimpleVehicle::setSpeed(float s) 
++{
++    // TODO: should not be set here, throw excpetion or so
++	return 1.0f;
++}
++
++Vector3 SimpleVehicle::predictFuturePosition(const float predictionTime) const
++{
++	return mCreature-&gt;getPosition() + (getVelocity() * predictionTime);
++}
++
++float SimpleVehicle::getMaxForce() const 
++{
++	return 10000.0f;
++} 
++
++float SimpleVehicle::setMaxForce(float mf) 
++{
++	 // TODO: should not be set here, throw excpetion or so
++	return 1.0f; //_maxForce = mf;
++}
++
++float SimpleVehicle::getMaxSpeed() const 
++{
++	return getCreatureController()-&gt;getMaximumSpeed();
++}
++
++float SimpleVehicle::setMaxSpeed(float ms) 
++{
++	 // TODO: should not be set here, throw excpetion or so
++	return 1;
++}
++
++float SimpleVehicle::getHeight() const 
++{
++    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
++    return aab.getMaximum().y - aab.getMinimum().y;
++}
++/*
++float SimpleVehicle::setHeight(float h) 
++{
++	// don't set mass here TODO: throw exception
++	return 1;
++}*/
++
++}
+\ No newline at end of file
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2008-03-08 20:48:57 UTC (rev 4273)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2008-03-08 21:02:10 UTC (rev 4274)
+@@ -41,15 +41,15 @@
+ 	  mCurrentForce(Vector3::ZERO), 
+ 	  mCurrentVelocity(Vector3::ZERO),
+ 	  mForwardVector(Vector3::NEGATIVE_UNIT_Z),
+-      mProximityToken(NULL),
+-	  mCreature(creature),
+-      mCreatureId(mCreature-&gt;getId()),
++      mCreatureId(creature-&gt;getId()),
+       mController(NULL),
+       mDebugSteer(Vector3::ZERO),
+       mDebugWander(Vector3::ZERO),
+       mDebugAvoidObstacles(Vector3::ZERO)
+ {
++    setCreature(creature);
+ 	initialize();
++
+     mController = CreatureControllerManager::getSingleton().getCreatureController(
+         mCreature);
+     mMessageType_GameObjectsLoaded_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_GameObjectsLoaded&gt;(
+@@ -58,10 +58,6 @@
+ 
+ SteeringVehicle::~SteeringVehicle()
+ {
+-    if(mProximityToken != NULL)
+-    {
+-        delete mProximityToken;
+-    }
+ }
+ 
+ void SteeringVehicle::resetLocalSpace()
+@@ -91,11 +87,6 @@
+ }
+ 
+ 
+-CreatureController* SteeringVehicle::getCreatureController()
+-{
+-    return CreatureControllerManager::getSingleton().getCreatureController(mCreature);
+-}
+-
+ void SteeringVehicle::addForce(const Ogre::Vector3&amp; force)
+ {
+ 	mCurrentForce += force;
+@@ -103,13 +94,12 @@
+ 
+ void SteeringVehicle::update(const float currentTime, const float elapsedTime)
+ {
+-    // from PlayerVehicle
+-    // since physics schould by handled by movingcreature
++    SimpleVehicle::update(currentTime, elapsedTime);
+ 
+-	OgreNewt::Body* body = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+     Vector3 pos = mCreature-&gt;getPosition();
+ 	setPosition(pos);
+-    mProximityToken-&gt;updateForNewPosition(pos);
++    
++    OgreNewt::Body* body = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+     //  Get the velocity vector
+ 	mCurrentVelocity = body-&gt;getVelocity();
+ 	//  enforce speed limit
+@@ -125,10 +115,6 @@
+     Vector3 newUnitForward = orientation*Vector3::NEGATIVE_UNIT_Z;
+     regenerateOrthonormalBasisUF(newUnitForward);
+ 
+-    // end of inserting from playervehicle
+-
+-
+-
+     // only process if mMovingCreature not NULL
+     if (mController == NULL || mCreature-&gt;getQueryFlags() &amp; QUERYFLAG_PLAYER)
+     {
+@@ -136,17 +122,16 @@
+         return;
+     }
+     
+-// calculate the result of the force    
++    // calculate the result of the force    
+     Vector3 result = mCurrentForce;// + mCurrentVelocity;
++    
++    mDebugSteer = mCurrentForce;
+ 
+-     mDebugSteer = mCurrentForce;
+-
+     // @todo remove this
+     if (mCreature-&gt;getAu() &lt;= 6)
+         mCreature-&gt;modifyAu(20,true);
+ 
+-
+-    AbstractMovement *mov_drehen = mController-&gt;getMovementFromId(CreatureController::MT_DREHEN);
++    AbstractMovement* mov_drehen = mController-&gt;getMovementFromId(CreatureController::MT_DREHEN);
+     Real vel_drehen(0);
+     Radian max_drehen = Degree(0);
+     if (mov_drehen-&gt;calculateBaseVelocity(vel_drehen))
+@@ -250,6 +235,7 @@
+ AVGroup SteeringVehicle::getNeighbors(const float maxRadius) const
+ {
+ 	AVGroup neighbors;
++    //std::vector&lt;SimpleVehicle*&gt; neighbors;
+     if(mProximityToken != NULL)
+     {
+         mProximityToken-&gt;findNeighbors(getPosition(), maxRadius, neighbors);
+@@ -277,91 +263,19 @@
+ 	return mCreature-&gt;getPosition();
+ }
+ */
+-float SteeringVehicle::getMass() const 
+-{
+-    return mCreature-&gt;getMass();
+-}
+ 
+-float SteeringVehicle::setMass(float m) 
+-{
+-	// don't set mass here TODO: throw exception
+ 
+-	return 1;
+-} 
+-
+-float SteeringVehicle::getSpeed() const 
+-{
+-	return mSpeed;
+-}
+-
+-float SteeringVehicle::setSpeed(float s) 
+-{
+-	return 1;
+-}
+-
+-float SteeringVehicle::getRadius() const 
+-{
+-	// this is only the radius in x axis, but i think, this is the value that should be used here
+-    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
+-    return(aab.getMaximum().x - aab.getMinimum().x)/2;
+-}
+-
+-float SteeringVehicle::setRadius(float m) 
+-{
+-	// don't set mass here TODO: throw exception
+-	return 1;
+-}
+-
+-float SteeringVehicle::getHeight() const 
+-{
+-    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
+-    return aab.getMaximum().y - aab.getMinimum().y;
+-}
+-
+-float SteeringVehicle::setHeight(float h) 
+-{
+-	// don't set mass here TODO: throw exception
+-	return 1;
+-}
+-
+-const Actor* SteeringVehicle::getActor() const  
+-{ 
+-	return mCreature-&gt;getActor(); 
+-}
+-
+-float SteeringVehicle::getMaxForce() const 
+-{
+-	return 10000.0f;
+-} 
+-
+-float SteeringVehicle::setMaxForce(float mf) 
+-{
+-	 // TODO: should not be set here, throw excpetion or so
+-	return _maxForce = mf;
+-}
+-
+-float SteeringVehicle::getMaxSpeed() const 
+-{
+-	return mController-&gt;getMaximumSpeed();
+-}
+-
+-float SteeringVehicle::setMaxSpeed(float ms) 
+-{
+-	 // TODO: should not be set here, throw excpetion or so
+-	return 1;
+-}
+-
+ const ObstacleGroup&amp; SteeringVehicle::getObstacles() const
+ {
+ 	return AiSubsystem::getSingleton().getWorld()-&gt;getSteeringObstacles();
+ }
+-
++/*
+ Vector3 SteeringVehicle::predictFuturePosition(const float predictionTime) const
+ {
+ 	//return position() +(velocity() * predictionTime);
+ 	return getVelocity() * predictionTime;
+ }
+-
++*/
+ Vector3 SteeringVehicle::adjustRawSteeringForce(const Vector3&amp; force)
+ {
+     const float maxAdjustedSpeed = 0.2f * getMaxSpeed();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001344.html">[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001346.html">[Dsa-hl-svn] r4275 - rl/trunk/engine/ai/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1345">[ date ]</a>
+              <a href="thread.html#1345">[ thread ]</a>
+              <a href="subject.html#1345">[ subject ]</a>
+              <a href="author.html#1345">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

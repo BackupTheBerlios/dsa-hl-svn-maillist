@@ -1,0 +1,538 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4611 - in rl/trunk: . cmake plugins	plugins/fmod4driver
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4611%20-%20in%20rl/trunk%3A%20.%20cmake%20plugins%0A%09plugins/fmod4driver&In-Reply-To=%3C200811261352.mAQDqP4h026776%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001667.html">
+   <LINK REL="Next"  HREF="001669.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4611 - in rl/trunk: . cmake plugins	plugins/fmod4driver</H1>
+    <B>chrber at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4611%20-%20in%20rl/trunk%3A%20.%20cmake%20plugins%0A%09plugins/fmod4driver&In-Reply-To=%3C200811261352.mAQDqP4h026776%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4611 - in rl/trunk: . cmake plugins	plugins/fmod4driver">chrber at mail.berlios.de
+       </A><BR>
+    <I>Wed Nov 26 14:52:25 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001667.html">[Dsa-hl-svn] r4610 - modules/regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="001669.html">[Dsa-hl-svn] r4612 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1668">[ date ]</a>
+              <a href="thread.html#1668">[ thread ]</a>
+              <a href="subject.html#1668">[ subject ]</a>
+              <a href="author.html#1668">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: chrber
+Date: 2008-11-26 14:52:22 +0100 (Wed, 26 Nov 2008)
+New Revision: 4611
+
+Added:
+   rl/trunk/CMakeLists.txt
+   rl/trunk/cmake/
+   rl/trunk/cmake/FindCEGUI.cmake
+   rl/trunk/cmake/FindFMODEx.cmake
+   rl/trunk/cmake/FindOGRE.cmake
+   rl/trunk/plugins/CMakeLists.txt
+   rl/trunk/plugins/fmod4driver/CMakeLists.txt
+Log:
+First incarnation of new cmake based build system
+
+
+Added: rl/trunk/CMakeLists.txt
+===================================================================
+--- rl/trunk/CMakeLists.txt	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/CMakeLists.txt	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,49 @@
++PROJECT(RL)
++
++CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
++
++# Cmake handles escaping of preprocessor directives
++CMAKE_POLICY(SET CMP0005 NEW)
++
++# Include required cmake macros
++INCLUDE(FeatureSummary)
++
++# Add directory with RL's own macro definitions
++# (checked before ${CMAKE_ROOT}/Modules)
++SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
++
++# Set convenience variables for Rastullah's own include directories
++SET(RL_AI_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/ai/include INTERNAL)
++SET(RL_COMMON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/common/include INTERNAL)
++SET(RL_CORE_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/core/include INTERNAL)
++SET(RL_RULES_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/rules/include INTERNAL)
++SET(RL_SCRIPT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/script/include INTERNAL)
++SET(RL_UI_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/engine/ui/include INTERNAL)
++
++# Check for required components
++FIND_PACKAGE(OGRE 1.6 REQUIRED)
++FIND_PACKAGE(CEGUI REQUIRED)
++FIND_PACKAGE(Boost 1.34 REQUIRED filesystem)
++FIND_PACKAGE(SWIG REQUIRED)
++IF (NOT SWIG_DIR MATCHES -rl$)
++	SET_FEATURE_INFO(SWIG &quot;&quot; &quot;&quot; &quot;You use an unsupported version of SWIG.&quot;)
++ENDIF(NOT SWIG_DIR MATCHES -rl$)
++
++# Path options
++SET(BINDIR &quot;bin&quot; CACHE STRING &quot;Where to install binaries&quot;)
++SET(DATAROOTDIR &quot;${CMAKE_INSTALL_PREFIX}/share&quot; CACHE STRING &quot;Sets the root of data directories to a non-default location&quot;)
++SET(DATADIRNAME &quot;rastullah&quot; CACHE STRING &quot;change the name of the directory for the read-only architecture-independent game data&quot;)
++
++# Game options
++SET(ENABLE_FMOD4 &quot;Enable FMOD 4.xx (FMODex) sound support&quot; ON)
++SET(ENABLE_OPENAL &quot;Enable OpenAL sound support (unsupported)&quot; OFF)
++
++# Handle options
++SET(DATADIR ${DATAROOTDIR}/${DATADIRNAME})
++ADD_DEFINITIONS(-DDATADIR=${DATADIR})
++
++# Include subdirectories
++ADD_SUBDIRECTORY(engine)
++ADD_SUBDIRECTORY(plugins)
++
++PRINT_ENABLED_FEATURES()
+\ No newline at end of file
+
+Added: rl/trunk/cmake/FindCEGUI.cmake
+===================================================================
+--- rl/trunk/cmake/FindCEGUI.cmake	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/cmake/FindCEGUI.cmake	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,124 @@
++# - Find CEGUI includes and library
++#
++# This module defines
++#  CEGUI_INCLUDE_DIRS
++#  CEGUI_LIBRARIES, the libraries to link against to use CEGUI.
++#  CEGUI_LIBRARY_DIRS, the location of the libraries
++#  CEGUI_FOUND, If false, do not try to use CEGUI
++#
++# Copyright &#169; 2007-2008, Matt Williams
++#
++# Redistribution and use is allowed according to the terms of the BSD license.
++# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
++
++IF (CEGUI_LIBRARIES AND CEGUI_INCLUDE_DIRS)
++	SET(CEGUI_FIND_QUIETLY TRUE)
++ENDIF (CEGUI_LIBRARIES AND CEGUI_INCLUDE_DIRS)
++
++#SET(OGRESDK $ENV{OGRE_HOME})
++#STRING(REGEX REPLACE &quot;[\\]&quot; &quot;/&quot; OGRESDK &quot;${OGRESDK}&quot;)
++FILE(TO_CMAKE_PATH &quot;$ENV{OGRE_HOME}&quot; OGRESDK)
++SET(CEGUI_INCLUDE_SEARCH_DIRS
++	${INCLUDE_SEARCH_DIRS}
++	${CMAKE_LIBRARY_PATH}
++	/usr/include
++	/usr/local/include
++	/usr/include/CEGUI
++	/usr/local/include/CEGUI
++	/opt/include/CEGUI
++	/opt/CEGUI/include
++	$ENV{OGRE_HOME}/samples/CEGUI
++	$ENV{OGRE_HOME}/Dependencies/include
++	$ENV{OGRE_HOME}/Dependencies/include/CEGUI
++	CACHE STRING &quot;&quot;
++)
++
++SET(CEGUI_LIBRARY_SEARCH_DIRS
++	${LIBRARY_SEARCH_DIRS}
++	${CMAKE_LIBRARY_PATH}
++	/usr/lib
++	/usr/lib64
++	/usr/local/lib
++	/usr/local/lib64
++	/opt/lib
++	/opt/lib64
++	/opt/CEGUI/lib
++	/opt/CEGUI/lib64
++	$ENV{OGRE_HOME}/lib
++	$ENV{OGRE_HOME}/lib64
++	CACHE STRING &quot;&quot;
++)
++
++IF (WIN32) #Windows
++	MESSAGE(STATUS &quot;Looking for CEGUI&quot;)
++	FIND_PATH(CEGUI_INCLUDE_DIRS CEGUI.h ${CEGUI_INCLUDE_SEARCH_DIRS})
++	FIND_LIBRARY(CEGUI_LIBRARIES debug CEGUIBase_d optimized CEGUIBase PATHS ${CEGUI_LIBRARY_SEARCH_DIRS})
++	
++# 	SET(OGRESOURCE $ENV{OGRE_NEW})
++# 	IF (OGRESDK)
++# 		MESSAGE(STATUS &quot;Using CEGUI in OGRE SDK&quot;)
++# 		SET(OGRESDK $ENV{OGRE_HOME})
++# 		STRING(REGEX REPLACE &quot;[\\]&quot; &quot;/&quot; OGRESDK &quot;${OGRESDK}&quot; )
++# 		SET(CEGUI_INCLUDE_DIRS ${OGRESDK}/include/CEGUI)
++# 		SET(CEGUI_LIBRARY_DIRS ${OGRESDK}/lib)
++# 		SET(CEGUI_LIBRARIES debug CEGUIBase_d optimized CEGUIBase)
++# 	ELSEIF (OGRESOURCE)
++# 		MESSAGE(STATUS &quot;Using CEGUI in OGRE dependencies&quot;)
++# 		SET(CEGUI_INCLUDE_DIRS C:/ogrenew/Dependencies/include C:/ogrenew/Dependencies/include/CEGUI)
++# 		SET(CEGUI_LIBRARY_DIRS C:/ogrenew/Dependencies/lib/Release C:/ogrenew/Dependencies/lib/Debug)
++# 		SET(CEGUI_LIBRARIES debug CEGUIBase_d optimized CEGUIBase)
++# 	ELSE (OGRESDK)
++# 		IF (NOT DEPENDENCIES_PATH)
++# 			MESSAGE(STATUS &quot;Please set DEPENDENCIES_PATH (the directory containing 'common' and 'dependencies')&quot;)
++# 		ELSE (NOT DEPENDENCIES_PATH)
++# 			SET(CEGUI_INCLUDE_DIRS ${DEPENDENCIES_PATH}/dependencies/Ogre/CEGUI)
++# 			SET(CEGUI_LIBRARIES optimized CEGUIBase debug CEGUIBase_d)
++# 			SET(CEGUI_LIBRARY_DIRS optimized ${DEPENDENCIES_PATH}/dependencies/lib/release debug ${DEPENDENCIES_PATH}/dependencies/lib/debug)
++# 		ENDIF (NOT DEPENDENCIES_PATH)
++# 	ENDIF (OGRESDK)
++ELSE (WIN32) #Unix
++	SET(CEGUI_INCLUDE_DIRS ${CEGUI_INCLUDE_DIRSS})
++	SET(CEGUI_LIBRARY_DIRS ${CEGUI_LIBDIR})
++	SET(CEGUI_LIBRARIES ${CEGUI_LIBRARIES})
++
++	CMAKE_MINIMUM_REQUIRED(VERSION 2.4.7 FATAL_ERROR)
++	FIND_PACKAGE(PkgConfig)
++	IF(PKG_CONFIG_FOUND)
++		PKG_SEARCH_MODULE(CEGUI CEGUI)
++		SET(CEGUI_INCLUDE_DIRS ${CEGUI_INCLUDE_DIRS})
++		SET(CEGUI_LIBRARY_DIRS ${CEGUI_LIBDIR})
++		SET(CEGUI_LIBRARIES ${CEGUI_LIBRARIES} CACHE STRING &quot;&quot;)
++	ENDIF(PKG_CONFIG_FOUND)
++	IF(NOT CEGUI_FOUND) #If PkgConfig couldn't find OGRE...
++		IF (NOT CEGUI_FIND_QUIETLY)
++			MESSAGE(STATUS &quot; Manually searching for CEGUI&quot;)
++		ENDIF (NOT CEGUI_FIND_QUIETLY)
++		FIND_PATH(CEGUI_INCLUDE_DIRS Ogre.h ${CEGUI_INCLUDE_SEARCH_DIRS})
++		FIND_LIBRARY(CEGUI_LIBRARIES CEGUIBase PATHS ${CEGUI_LIBRARY_SEARCH_DIRS})
++	ENDIF(NOT CEGUI_FOUND)
++ENDIF (WIN32)
++
++#Do some preparation
++SEPARATE_ARGUMENTS(CEGUI_INCLUDE_DIRS)
++SEPARATE_ARGUMENTS(CEGUI_LIBRARIES)
++
++SET(CEGUI_INCLUDE_DIRS ${CEGUI_INCLUDE_DIRS})
++SET(CEGUI_LIBRARIES ${CEGUI_LIBRARIES})
++SET(CEGUI_LIBRARY_DIRS ${CEGUI_LIBRARY_DIRS})
++
++MARK_AS_ADVANCED(CEGUI_INCLUDE_DIRS CEGUI_LIBRARIES CEGUI_LIBRARY_DIRS)
++
++IF (CEGUI_INCLUDE_DIRS AND CEGUI_LIBRARIES)
++	SET(CEGUI_FOUND TRUE)
++ENDIF (CEGUI_INCLUDE_DIRS AND CEGUI_LIBRARIES)
++
++IF (CEGUI_FOUND)
++	IF (NOT CEGUI_FIND_QUIETLY)
++		MESSAGE(STATUS &quot;  libraries : ${CEGUI_LIBRARIES} from ${CEGUI_LIBRARY_DIRS}&quot;)
++		MESSAGE(STATUS &quot;  includes  : ${CEGUI_INCLUDE_DIRS}&quot;)
++	ENDIF (NOT CEGUI_FIND_QUIETLY)
++ELSE (CEGUI_FOUND)
++	IF (CEGUI_FIND_REQUIRED)
++		MESSAGE(FATAL_ERROR &quot;Could not find CEGUI. Make sure you have the CEGUI development headers are installed. Otherwise, try setting LIBRARY_SEARCH_DIRS and INCLUDE_SEARCH_DIRS to the place CEGUI was installed with -DLIBRARY_SEARCH_DIRS=&lt;path/to/lib&gt; -DINCLUDE_SEARCH_DIRS=&lt;path/to/include&gt;&quot;)
++	ENDIF (CEGUI_FIND_REQUIRED)
++ENDIF (CEGUI_FOUND)
+
+Added: rl/trunk/cmake/FindFMODEx.cmake
+===================================================================
+--- rl/trunk/cmake/FindFMODEx.cmake	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/cmake/FindFMODEx.cmake	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,122 @@
++# Find FMODEx
++#
++# This module defines
++# FMODEX_FOUND
++# FMODEX_INCLUDE_DIR
++# FMODEX_LIBRARY
++#
++# Based on the CMakeLists.txt of zdoom and FindFMOD.cmake of openfrag
++#
++# Redistribution and use is allowed according to the terms of the BSD license.
++# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
++
++# On a new cmake run, we do not need to be verbose
++IF(FMODEX_INCLUDE_DIR AND FMODEX_LIBRARY)
++	SET(FMODEX_FIND_QUIETLY TRUE)
++ENDIF(FMODEX_INCLUDE_DIR AND FMODEX_LIBRARY)
++
++# Check for for 32/64 bit architecture
++IF(CMAKE_SIZEOF_VOID_P MATCHES &quot;8&quot;)
++	SET(X64 64)
++ENDIF(CMAKE_SIZEOF_VOID_P MATCHES &quot;8&quot;)
++
++IF(WIN32)
++	SET(FMODEX_INC_DIR_SUFFIXES PATH_SUFFIXES inc)
++	SET(FMODEX_LIB_DIR_SUFFIXES PATH_SUFFIXES lib)
++ELSE(WIN32)
++	SET(FMODEX_INCLUDE_SEARCH_DIRS
++	    /usr/include
++	    /usr/local/include
++	    /opt/fmodex/fmodex/include
++            /opt/include)
++	SET(FMODEX_LIBRARY_SEARCH_DIRS
++	    /usr/lib
++	    /usr/lib64
++	    /usr/local/lib
++	    /usr/local/lib64
++	    /opt/fmodex/lib
++	    /opt/fmodex/lib64)
++	SET(FMODEX_INC_DIR_SUFFIXES PATH_SUFFIXES fmodex)
++ENDIF(WIN32)
++
++# Decide on the name of the FMODEx library we want to use
++IF(NOT FMODEX_LIBRARY_NAME AND MSVC)
++	SET(FMODEX_LIBRARY_NAME fmodex${X64}_vc)
++ENDIF(NOT FMODEX_LIBRARY_NAME AND MSVC)
++
++IF(NOT FMODEX_LIBRARY_NAME AND BORLAND)
++	SET(FMODEX_LIBRARY_NAME fmodex${X64}_bc)
++ENDIF(NOT FMODEX_LIBRARY_NAME AND BORLAND)
++
++IF(NOT FMODEX_LIBRARY_NAME)
++	SET(FMODEX_LIBRARY_NAME fmodex${X64})
++ENDIF(NOT FMODEX_LIBRARY_NAME)
++
++IF (NOT FMODEX_FIND_QUIETLY)
++	MESSAGE(STATUS &quot;Checking for FMODEx&quot;)
++ENDIF(NOT FMODEX_FIND_QUIETLY)
++
++# Search for header files and libraries
++FIND_PATH(FMODEX_INCLUDE_DIR fmod.h
++          PATHS ${FMODEX_INCLUDE_SEARCH_PATHS}
++          PATH_SUFFIXES ${FMODEX_INC_DIR_SUFFIXES})
++IF(FMODEX_INCLUDE_DIR)
++	IF (NOT FMODEX_FIND_QUIETLY)
++		MESSAGE(STATUS &quot;  includes: ${FMODEX_INCLUDE_DIR}&quot;)
++	ENDIF(NOT FMODEX_FIND_QUIETLY)
++ELSE(FMODEX_INCLUDE_DIR)
++	MESSAGE(SEND_ERROR &quot;FMODEx include files could not be found.&quot;)
++ENDIF(FMODEX_INCLUDE_DIR)
++
++FIND_LIBRARY(FMODEX_LIBRARY ${FMODEX_LIBRARY_NAME}
++             PATHS ${FMODEX_LIBRARY_SEARCH_DIRS}
++             PATH_SUFFIXES ${FMOD_LIB_DIR_SUFFIXES})
++IF(FMODEX_LIBRARY)
++	IF (NOT FMODEX_FIND_QUIETLY)
++		MESSAGE(STATUS &quot;  libraries: ${FMODEX_LIBRARY}&quot;)
++	ENDIF(NOT FMODEX_FIND_QUIETLY)
++ELSE(FMODEX_LIBRARY)
++	MESSAGE(SEND_ERROR, &quot;FMODex library could not be found.&quot;)
++ENDIF(FMODEX_LIBRARY)
++
++IF(FMODEX_INCLUDE_DIR AND FMODEX_LIBRARY)
++	SET(FMODEX_FOUND TRUE)
++ENDIF(FMODEX_INCLUDE_DIR AND FMODEX_LIBRARY)
++
++# Allow customisation of paths
++SET(FMODEX_INCLUDE_DIR ${FMODEX_INCLUDE_DIR})
++SET(FMODEX_LIBRARY ${FMODEX_LIBRARY})
++
++IF(FMODEX_INCLUDE_DIR)
++	# Extract the library version from the header file
++	SET(FMODEX_VERSION 0)
++	FILE(READ &quot;${FMODEX_INCLUDE_DIR}/fmod.h&quot;
++	     _FMODEX_FMOD_H_CONTENTS)
++	STRING(REGEX REPLACE &quot;.*#define FMOD_VERSION    0x([0-9]+).*&quot; &quot;\\1&quot;
++	       FMODEX_VERSION &quot;${_FMODEX_FMOD_H_CONTENTS}&quot;)
++	IF(NOT &quot;${FMODEX_VERSION}&quot; STREQUAL 0)
++		MATH(EXPR FMODEX_MAJOR_VERSION &quot;${FMODEX_VERSION} / 10000&quot;)
++		MATH(EXPR FMODEX_MINOR_VERSION &quot;${FMODEX_VERSION} / 100 % 100&quot;)
++		MATH(EXPR FMODEX_PATCH_VERSION &quot;${FMODEX_VERSION} % 100&quot;)
++		SET(FMODEX_VERSION &quot;${FMODEX_MAJOR_VERSION}.${FMODEX_MINOR_VERSION}.${FMODEX_PATCH_VERSION}&quot;)
++	ENDIF(NOT &quot;${FMODEX_VERSION}&quot; STREQUAL 0)
++
++	# Compare installed and required version
++	IF(FMODEx_FIND_VERSION)
++		# Major and minor version are required
++		IF(NOT FMODEx_FIND_VERSION_MINOR)
++			MESSAGE(SEND_ERROR &quot;When requesting a specific version of FMODEx , you must provide at least the major and minor version numbers, e.g., 4.20&quot;)
++		ENDIF(NOT FMODEx_FIND_VERSION_MINOR)
++
++		IF (&quot;${FMOD_VERSION}&quot; VERSION_LESS &quot;${FMODEx_FIND_VERSION}&quot;)
++			SET(FMODEX_FOUND FALSE)
++			MESSAGE(STATUS &quot;Detected version of FMODEx ${FMODEX_VERSION} is too old. At least version ${FMODEx_FIND_VERSION} is required.&quot;)
++		ENDIF(&quot;${FMOD_VERSION}&quot; VERSION_LESS &quot;${FMODEx_FIND_VERSION}&quot;)
++	ENDIF(FMODEx_FIND_VERSION)
++ENDIF(FMODEX_INCLUDE_DIR)
++
++IF(FMODEX_FOUND)
++	IF(NOT FMODEX_FIND_QUIETLY)
++		MESSAGE(STATUS &quot;  version: ${FMODEX_VERSION}&quot;)
++	ENDIF(NOT FMODEX_FIND_QUIETLY)
++ENDIF(FMODEX_FOUND)
+\ No newline at end of file
+
+Added: rl/trunk/cmake/FindOGRE.cmake
+===================================================================
+--- rl/trunk/cmake/FindOGRE.cmake	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/cmake/FindOGRE.cmake	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,96 @@
++# Find OGRE includes and library
++#
++# This module defines
++#  OGRE_INCLUDE_DIRS
++#  OGRE_LIBRARIES, the libraries to link against to use OGRE.
++#  OGRE_LIBRARY_DIRS, the location of the libraries
++#  OGRE_FOUND, If false, do not try to use OGRE
++#
++# Copyright &#169; 2007-2008, Matt Williams
++#
++# Redistribution and use is allowed according to the terms of the BSD license.
++# For details see the accompanying COPYING-CMAKE-SCRIPTS file.
++
++IF (OGRE_LIBRARIES AND OGRE_INCLUDE_DIRS)
++	SET(OGRE_FIND_QUIETLY TRUE) # Already in cache, be silent
++ENDIF (OGRE_LIBRARIES AND OGRE_INCLUDE_DIRS)
++
++#Set the library and include search paths
++#SET(OGRESDK $ENV{OGRE_HOME})
++#STRING(REGEX REPLACE &quot;[\\]&quot; &quot;/&quot; OGRESDK &quot;${OGRESDK}&quot;)
++FILE(TO_CMAKE_PATH &quot;$ENV{OGRE_HOME}&quot; OGRESDK)
++SET(OGRE_INCLUDE_SEARCH_DIRS #                 this &lt;-
++	${INCLUDE_SEARCH_DIRS} #TODO Cache this, not ^
++	${CMAKE_LIBRARY_PATH}
++	/usr/include/OGRE
++	/usr/local/include/OGRE
++	/opt/include/OGRE
++	/opt/OGRE/include
++	${OGRESDK}/include
++	${OGRESDK}/OgreMain/include
++	CACHE STRING &quot;&quot;
++)
++
++SET(OGRE_LIBRARY_SEARCH_DIRS
++	${LIBRARY_SEARCH_DIRS}
++	${CMAKE_LIBRARY_PATH}
++	/usr/lib
++	/usr/lib64
++	/usr/local/lib
++	/usr/local/lib64
++	/opt/lib
++	/opt/lib64
++	/opt/OGRE/lib
++	/opt/OGRE/lib64
++	${OGRESDK}/lib
++	${OGRESDK}/lib64
++	CACHE STRING &quot;&quot;
++)
++
++#Search for the headers and libraries
++IF (WIN32) #Windows
++	MESSAGE(STATUS &quot;Looking for OGRE&quot;)
++	FIND_PATH(OGRE_INCLUDE_DIRS Ogre.h ${OGRE_INCLUDE_SEARCH_DIRS})
++	FIND_LIBRARY(OGRE_LIBRARIES debug OgreMain_d optimized OgreMain PATHS ${OGRE_LIBRARY_SEARCH_DIRS})
++ELSE (WIN32) #Unix/OSX
++	FIND_PACKAGE(PkgConfig)
++	IF(PKG_CONFIG_FOUND)
++		CMAKE_MINIMUM_REQUIRED(VERSION 2.4.7)
++		PKG_SEARCH_MODULE(OGRE OGRE)
++		SET(OGRE_INCLUDE_DIRS ${OGRE_INCLUDE_DIRS})
++		SET(OGRE_LIBRARY_DIRS ${OGRE_LIBDIR})
++		SET(OGRE_LIBRARIES ${OGRE_LIBRARIES} CACHE STRING &quot;&quot;)
++	ENDIF(PKG_CONFIG_FOUND)
++	IF(NOT OGRE_FOUND) #If PkgConfig couldn't find OGRE...
++		IF (NOT OGRE_FIND_QUIETLY)
++			MESSAGE(STATUS &quot; Manually searching for OGRE&quot;)
++		ENDIF (NOT OGRE_FIND_QUIETLY)
++		FIND_PATH(OGRE_INCLUDE_DIRS Ogre.h ${OGRE_INCLUDE_SEARCH_DIRS})
++		FIND_LIBRARY(OGRE_LIBRARIES OgreMain PATHS ${OGRE_LIBRARY_SEARCH_DIRS})
++	ENDIF(NOT OGRE_FOUND)
++ENDIF (WIN32)
++
++#Do some preparation
++SEPARATE_ARGUMENTS(OGRE_INCLUDE_DIRS)
++SEPARATE_ARGUMENTS(OGRE_LIBRARIES)
++
++SET(OGRE_INCLUDE_DIRS ${OGRE_INCLUDE_DIRS})
++SET(OGRE_LIBRARIES ${OGRE_LIBRARIES})
++SET(OGRE_LIBRARY_DIRS ${OGRE_LIBRARY_DIRS})
++
++MARK_AS_ADVANCED(OGRE_INCLUDE_DIRS OGRE_LIBRARIES OGRE_LIBRARY_DIRS) #So they don't show in the default GUI
++
++IF (OGRE_INCLUDE_DIRS AND OGRE_LIBRARIES)
++	SET(OGRE_FOUND TRUE)
++ENDIF (OGRE_INCLUDE_DIRS AND OGRE_LIBRARIES)
++
++IF (OGRE_FOUND)
++	IF (NOT OGRE_FIND_QUIETLY)
++		MESSAGE(STATUS &quot;  libraries : ${OGRE_LIBRARIES} from ${OGRE_LIBRARY_DIRS}&quot;)
++		MESSAGE(STATUS &quot;  includes  : ${OGRE_INCLUDE_DIRS}&quot;)
++	ENDIF (NOT OGRE_FIND_QUIETLY)
++ELSE (OGRE_FOUND)
++	IF (OGRE_FIND_REQUIRED)
++		MESSAGE(FATAL_ERROR &quot;Could not find OGRE. Make sure you have the OGRE development headers installed. Otherwise, try setting LIBRARY_SEARCH_DIRS and INCLUDE_SEARCH_DIRS to the place OGRE was installed with -DLIBRARY_SEARCH_DIRS=&lt;path/to/lib&gt; -DINCLUDE_SEARCH_DIRS=&lt;path/to/include&gt;&quot;)
++	ENDIF (OGRE_FIND_REQUIRED)
++ENDIF (OGRE_FOUND)
+
+Added: rl/trunk/plugins/CMakeLists.txt
+===================================================================
+--- rl/trunk/plugins/CMakeLists.txt	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/plugins/CMakeLists.txt	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,13 @@
++IF (ENABLE_FMOD4)
++	FIND_PACKAGE(FMODEx 4.20)
++	IF (FMODEX_FOUND)
++		ADD_SUBDIRECTORY(fmod4driver)
++	ENDIF (FMODEX_FOUND)
++ENDIF (ENABLE_FMOD4)
++
++IF (ENABLE_OPENAL)
++	FIND_PACKAGE(OpenAL)
++	IF (OPENAL_FOUND)
++		ADD_SUBDIRECTORY(openaldriver)
++	ENDIF (OPENAL_FOUND)
++ENDIF (ENABLE_OPENAL)
+\ No newline at end of file
+
+Added: rl/trunk/plugins/fmod4driver/CMakeLists.txt
+===================================================================
+--- rl/trunk/plugins/fmod4driver/CMakeLists.txt	2008-11-25 20:52:42 UTC (rev 4610)
++++ rl/trunk/plugins/fmod4driver/CMakeLists.txt	2008-11-26 13:52:22 UTC (rev 4611)
+@@ -0,0 +1,17 @@
++INCLUDE_DIRECTORIES(
++${CMAKE_CURRENT_SOURCE_DIR}/include
++${FMODEX_INCLUDE_DIR}
++${OGRE_INCLUDE_DIRS}
++${CEGUI_INCLUDE_DIRS}
++${RL_COMMON_INCLUDE_DIR}
++${RL_CORE_INCLUDE_DIR}
++${RL_UI_INCLUDE_DIR})
++
++SET(RlFmod4Driver_LIB_SRCS
++src/Fmod4ConfigComponent.cpp
++src/Fmod4Driver.cpp
++src/Fmod4DriverDllMain.cpp
++src/Fmod4Listener.cpp
++src/Fmod4Sound.cpp)
++
++ADD_LIBRARY(RlFmod4Driver SHARED ${RlFmod4Driver_LIB_SRCS})
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001667.html">[Dsa-hl-svn] r4610 - modules/regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="001669.html">[Dsa-hl-svn] r4612 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1668">[ date ]</a>
+              <a href="thread.html#1668">[ thread ]</a>
+              <a href="subject.html#1668">[ subject ]</a>
+              <a href="author.html#1668">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

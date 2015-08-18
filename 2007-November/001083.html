@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4012 - in rl/trunk/engine: ai/include ai/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4012%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20ui/src&In-Reply-To=%3C200711290053.lAT0rnm6000778%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001082.html">
+   <LINK REL="Next"  HREF="001084.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4012 - in rl/trunk/engine: ai/include ai/src ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4012%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20ui/src&In-Reply-To=%3C200711290053.lAT0rnm6000778%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4012 - in rl/trunk/engine: ai/include ai/src ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Nov 29 01:53:50 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001082.html">[Dsa-hl-svn] r4011 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+        <LI>Next message: <A HREF="001084.html">[Dsa-hl-svn] r4013 - modules/common/dsa modules/common/materials	modules/common/scripts modules/kanalisation/materials	modules/kanalisation/scripts	modules/regressiontest/scripts/maps modules/techdemo/dsa	modules/techdemo/scripts modules/techdemo/scripts/maps	rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1083">[ date ]</a>
+              <a href="thread.html#1083">[ thread ]</a>
+              <a href="subject.html#1083">[ subject ]</a>
+              <a href="author.html#1083">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-11-29 01:53:46 +0100 (Thu, 29 Nov 2007)
+New Revision: 4012
+
+Modified:
+   rl/trunk/engine/ai/include/Dialog.h
+   rl/trunk/engine/ai/src/Dialog.cpp
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+Log:
+Stop talk animation on dialog end
+
+Modified: rl/trunk/engine/ai/include/Dialog.h
+===================================================================
+--- rl/trunk/engine/ai/include/Dialog.h	2007-11-29 00:48:00 UTC (rev 4011)
++++ rl/trunk/engine/ai/include/Dialog.h	2007-11-29 00:53:46 UTC (rev 4012)
+@@ -41,6 +41,8 @@
+         void initialize();
+         Creature* getNpc(int id) const;
+         Creature* getPc(int id) const;
++        std::vector&lt;Creature*&gt; getNonPlayerCharacters() const;
++        std::vector&lt;Creature*&gt; getPlayerCharacters() const;
+ 		bool isExitRequested() const;
+         CeGuiString getVariableValue(const Ogre::String&amp; variableName) const;
+ 
+
+Modified: rl/trunk/engine/ai/src/Dialog.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Dialog.cpp	2007-11-29 00:48:00 UTC (rev 4011)
++++ rl/trunk/engine/ai/src/Dialog.cpp	2007-11-29 00:53:46 UTC (rev 4012)
+@@ -99,4 +99,15 @@
+     {
+         return getProperty(key).getAsString();
+     }
++
++    std::vector&lt;Creature*&gt; Dialog::getNonPlayerCharacters() const
++    {
++        return mNonPlayerCharacters;
++    }
++
++    std::vector&lt;Creature*&gt; Dialog::getPlayerCharacters() const
++    {
++        return mPlayerCharacters;
++    }
++
+ }
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-29 00:48:00 UTC (rev 4011)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-29 00:53:46 UTC (rev 4012)
+@@ -476,12 +476,26 @@
+ 		mSubtitleWindow-&gt;setVisible(false, true);
+         mDialogWindow = NULL;
+         mSubtitleWindow = NULL;
++        const std::vector&lt;Creature*&gt; list = mDialog-&gt;getPlayerCharacters();
++        for (std::vector&lt;Creature*&gt;::const_iterator it = list.begin(); it != list.end(); ++it)
++        {
++            Actor* actor = (*it)-&gt;getActor();
++            if (actor != NULL)
++            {
++                MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++                if (mesh != NULL &amp;&amp; mesh-&gt;hasAnimation(&quot;reden&quot;))
++                {
++                    mesh-&gt;stopAnimation(&quot;reden&quot;);
++                }
++            }        
++        }
+ 		return true;
+ 	}
+ 
+ 	bool DialogControlState::requestDialogClose()
+ 	{
+ 	//	handleClose is called automatically
++        handleDialogClose();
+ 		//@todo
+ 		return true;
+ 	}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001082.html">[Dsa-hl-svn] r4011 - in rl/trunk/engine: core/include core/src	script/swig
+</A></li>
+	<LI>Next message: <A HREF="001084.html">[Dsa-hl-svn] r4013 - modules/common/dsa modules/common/materials	modules/common/scripts modules/kanalisation/materials	modules/kanalisation/scripts	modules/regressiontest/scripts/maps modules/techdemo/dsa	modules/techdemo/scripts modules/techdemo/scripts/maps	rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1083">[ date ]</a>
+              <a href="thread.html#1083">[ thread ]</a>
+              <a href="subject.html#1083">[ subject ]</a>
+              <a href="author.html#1083">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

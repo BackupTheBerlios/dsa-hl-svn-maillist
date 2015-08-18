@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4628 - in rl/trunk/engine/ui: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4628%20-%20in%20rl/trunk/engine/ui%3A%20.%20include%20src&In-Reply-To=%3C200812030652.mB36qjcb004767%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001684.html">
+   <LINK REL="Next"  HREF="001686.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4628 - in rl/trunk/engine/ui: . include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4628%20-%20in%20rl/trunk/engine/ui%3A%20.%20include%20src&In-Reply-To=%3C200812030652.mB36qjcb004767%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4628 - in rl/trunk/engine/ui: . include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Dec  3 07:52:45 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001684.html">[Dsa-hl-svn] r4627 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001686.html">[Dsa-hl-svn] r4629 - in rl/trunk: . cmake engine/ai engine/ai/src	engine/common engine/common/include engine/common/src	engine/core engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1685">[ date ]</a>
+              <a href="thread.html#1685">[ thread ]</a>
+              <a href="subject.html#1685">[ subject ]</a>
+              <a href="author.html#1685">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-12-03 07:52:41 +0100 (Wed, 03 Dec 2008)
+New Revision: 4628
+
+Modified:
+   rl/trunk/engine/ui/RlUI2005.vcproj
+   rl/trunk/engine/ui/include/WindowManager.h
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+Remove all windows before a scene change
+
+Modified: rl/trunk/engine/ui/RlUI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ui/RlUI2005.vcproj	2008-12-03 06:51:56 UTC (rev 4627)
++++ rl/trunk/engine/ui/RlUI2005.vcproj	2008-12-03 06:52:41 UTC (rev 4628)
+@@ -432,6 +432,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\include\CharacterSelectionWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\include\CharacterSheetWindow.h&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+@@ -677,6 +681,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\src\CharacterSelectionWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\src\CharacterSheetWindow.cpp&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Modified: rl/trunk/engine/ui/include/WindowManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowManager.h	2008-12-03 06:51:56 UTC (rev 4627)
++++ rl/trunk/engine/ui/include/WindowManager.h	2008-12-03 06:52:41 UTC (rev 4628)
+@@ -19,6 +19,8 @@
+ 
+ #include &quot;UiPrerequisites.h&quot;
+ 
++#include &quot;MessagePump.h&quot;
++
+ namespace rl {
+ 
+ 	class AbstractWindow;
+@@ -33,6 +35,7 @@
+ 		void registerWindow(AbstractWindow* window);
+ 		void unregisterWindow(AbstractWindow* window);
+ 		void destroyWindow(AbstractWindow* window);
++        bool destroyAllWindows();
+ 		void closeTopWindow();
+ 		bool handleMovedToFront(AbstractWindow* window);
+ 		bool handleMovedToBack(AbstractWindow* window);
+@@ -47,6 +50,7 @@
+ 
+ 	private:
+ 		std::list&lt;AbstractWindow*&gt; mWindowList;
++        MessagePump::ScopedConnection mSceneClearConnection;
+ 
+         unsigned short mNumActiveWindowsMouseInput;
+         unsigned short mNumActiveWindowsKeyboardInput;
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2008-12-03 06:51:56 UTC (rev 4627)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2008-12-03 06:52:41 UTC (rev 4628)
+@@ -18,8 +18,9 @@
+ #include &quot;WindowManager.h&quot;
+ #include &lt;CEGUIWindowManager.h&gt;
+ 
++#include &quot;AbstractWindow.h&quot;
++#include &quot;CoreMessages.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+-#include &quot;AbstractWindow.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;UiSubsystem.h&quot;
+@@ -35,6 +36,8 @@
+           mNumActiveWindowsMouseInput(0),
+           mNumActiveWindowsKeyboardInput(0)
+ 	{
++        mSceneClearConnection = MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneClearing&gt;(
++            boost::bind(&amp;WindowManager::destroyAllWindows, this));
+ 	}
+ 
+ 	WindowManager::~WindowManager()
+@@ -123,10 +126,9 @@
+     AbstractWindow* WindowManager::getActiveWindow()
+     {
+         // iterate through windows
+-        std::list&lt;AbstractWindow*&gt;::iterator it;
+-        for( it = mWindowList.begin(); it != mWindowList.end(); it++ )
++        for (std::list&lt;AbstractWindow*&gt;::iterator it = mWindowList.begin(); it != mWindowList.end(); it++ )
+         {
+-            if( (*it)-&gt;getWindow()-&gt;isActive() )
++            if ( (*it)-&gt;getWindow()-&gt;isActive() )
+             {
+                 return *it;
+             }
+@@ -134,4 +136,23 @@
+ 
+         return NULL;
+     }
++
++    bool WindowManager::destroyAllWindows()
++    {
++        for (std::list&lt;AbstractWindow*&gt;::iterator it = mWindowList.begin(); it != mWindowList.end(); it++ )
++        {
++            AbstractWindow* cur = *it;
++//			if (cur-&gt;isVisible())
++//			{
++				cur-&gt;setVisible(false, true);
++//			}
++//          else 
++//          {
++//              delete cur;
++//          }
++        }
++
++        mWindowList.clear();
++        return true;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001684.html">[Dsa-hl-svn] r4627 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001686.html">[Dsa-hl-svn] r4629 - in rl/trunk: . cmake engine/ai engine/ai/src	engine/common engine/common/include engine/common/src	engine/core engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1685">[ date ]</a>
+              <a href="thread.html#1685">[ thread ]</a>
+              <a href="subject.html#1685">[ subject ]</a>
+              <a href="author.html#1685">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

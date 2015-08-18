@@ -1,0 +1,629 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3911 - in rl/trunk/engine: core/include core/src	rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3911%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200710142224.l9EMO94U001370%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000981.html">
+   <LINK REL="Next"  HREF="000983.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3911 - in rl/trunk/engine: core/include core/src	rules/include rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3911%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200710142224.l9EMO94U001370%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3911 - in rl/trunk/engine: core/include core/src	rules/include rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Mon Oct 15 00:24:09 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000981.html">[Dsa-hl-svn] r3910 - rl/trunk/engine/common/src
+</A></li>
+        <LI>Next message: <A HREF="000983.html">[Dsa-hl-svn] r3912 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#982">[ date ]</a>
+              <a href="thread.html#982">[ thread ]</a>
+              <a href="subject.html#982">[ subject ]</a>
+              <a href="author.html#982">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-10-15 00:23:55 +0200 (Mon, 15 Oct 2007)
+New Revision: 3911
+
+Modified:
+   rl/trunk/engine/core/include/SaveGameFileReader.h
+   rl/trunk/engine/core/include/SaveGameFileWriter.h
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/SaveGameFileReader.cpp
+   rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/include/CreatureControllerManager.h
+   rl/trunk/engine/rules/include/GameObjectManager.h
+   rl/trunk/engine/rules/include/QuestBook.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/rules/src/QuestBook.cpp
+Log:
+
+
+Modified: rl/trunk/engine/core/include/SaveGameFileReader.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameFileReader.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/include/SaveGameFileReader.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -23,7 +23,7 @@
+ namespace rl
+ {
+     class SaveGameData;
+-    typedef std::set&lt;SaveGameData*&gt; SaveGameDataSet;
++    typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+     class _RlCoreExport SaveGameFileReader : public XmlPropertyReader
+     {
+@@ -31,7 +31,7 @@
+         XERCES_CPP_NAMESPACE::DOMDocument* mDocument;
+     public:
+         SaveGameFileReader();
+-        void parseSaveGameFile(SaveGameFile* file, const SaveGameDataSet &amp;set);
++        void parseSaveGameFile(SaveGameFile* file, const SaveGameDataOrderMap &amp;map);
+         void parseSaveGameFileHeader(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName, SaveGameFile* file);
+ 
+         XERCES_CPP_NAMESPACE::DOMDocument* getDocument() {return mDocument;}
+
+Modified: rl/trunk/engine/core/include/SaveGameFileWriter.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameFileWriter.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/include/SaveGameFileWriter.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -26,13 +26,13 @@
+ namespace rl
+ {
+     class SaveGameData;
+-    typedef std::set&lt;SaveGameData*&gt; SaveGameDataSet;
++    typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+     class _RlCoreExport SaveGameFileWriter 
+         : public XmlPropertyWriter
+     {
+     public:
+-        void buildSaveGameFile(SaveGameFile *file, const SaveGameDataSet &amp;set);
++        void buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map);
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -24,6 +24,8 @@
+ #include &lt;XmlPropertyWriter.h&gt;
+ #include &lt;XmlPropertyReader.h&gt;
+ 
++//#include &lt;multimap&gt;
++
+ namespace rl
+ {
+     class _RlCoreExport SaveGameData
+@@ -34,9 +36,11 @@
+         virtual CeGuiString getXmlNodeIdentifier() const = 0;
+         virtual void writeData(SaveGameFileWriter* writer) = 0;
+         virtual void readData(SaveGameFileReader* reader) = 0;
++        /// defines the loading/saving order higher priority are saved last and loaded first
++        virtual int getPriority() const = 0;
+     };
+ 
+-    typedef std::set&lt;SaveGameData*&gt; SaveGameDataSet;
++    typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+     typedef std::map&lt;CeGuiString, SaveGameFile*&gt; SaveGameEntryMap;
+ 
+@@ -64,7 +68,7 @@
+         Ogre::StringVector mScriptPatterns;
+         SaveGameEntryMap mSaveGames;
+ 
+-        SaveGameDataSet mSaveGameDataSet;
++        SaveGameDataOrderMap mSaveGameDataOrderMap;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -550,6 +550,21 @@
+     void CoreSubsystem::makeScreenshot( const Ogre::String&amp; sName )
+     {
+         mRenderWindow-&gt;writeContentsToTimestampedFile(sName, &quot;.png&quot;);
++        
++        Ogre::TexturePtr texture = mWorld-&gt;getSceneManager()-&gt;getShadowTexture(0);
++        HardwarePixelBufferSharedPtr readbuffer;
++        readbuffer = texture-&gt;getBuffer(0, 0);
++        readbuffer-&gt;lock(HardwareBuffer::HBL_NORMAL );
++        const PixelBox &amp;readrefpb = readbuffer-&gt;getCurrentLock();	
++        uchar *readrefdata = static_cast&lt;uchar*&gt;(readrefpb.data);		
++
++        Image img;
++        img = img.loadDynamicImage (readrefdata, texture-&gt;getWidth(),
++            texture-&gt;getHeight(), texture-&gt;getFormat());	
++        img.save(&quot;shadow.png&quot;);
++        img.save(&quot;shadow.bmp&quot;);
++        
++        readbuffer-&gt;unlock();
+     }
+ 
+     ContentModule* CoreSubsystem::getActiveAdventureModule() const
+
+Modified: rl/trunk/engine/core/src/SaveGameFileReader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/src/SaveGameFileReader.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -30,15 +30,15 @@
+     {
+     }
+ 
+-    void SaveGameFileReader::parseSaveGameFile(SaveGameFile* file, const SaveGameDataSet &amp;set)
++    void SaveGameFileReader::parseSaveGameFile(SaveGameFile* file, const SaveGameDataOrderMap &amp;map)
+     {
+         initializeXml();
+ 
+         mDocument = loadDocument(file-&gt;getDataStream());
+ 
+-        for(SaveGameDataSet::const_iterator data_iter = set.begin(); data_iter != set.end(); data_iter++)
++        for(SaveGameDataOrderMap::const_iterator data_iter = map.end(); data_iter != map.begin(); data_iter--)
+         {
+-            (*data_iter)-&gt;readData(this);
++            data_iter-&gt;second-&gt;readData(this);
+         }
+ 
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -39,7 +39,7 @@
+ 
+ namespace rl
+ {
+-    void SaveGameFileWriter::buildSaveGameFile(SaveGameFile *file, const SaveGameDataSet &amp;set)
++    void SaveGameFileWriter::buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map)
+     {
+         //@toto: build
+         initializeXml();
+@@ -77,9 +77,9 @@
+         TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
+         setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
+ 
+-        for(SaveGameDataSet::const_iterator data_iter = set.begin(); data_iter != set.end(); data_iter++)
++        for(SaveGameDataOrderMap::const_iterator data_iter = map.begin(); data_iter != map.end(); data_iter++)
+         {
+-            (*data_iter)-&gt;writeData(this);
++            data_iter-&gt;second-&gt;writeData(this);
+         }
+ 
+         mWriter-&gt;writeNode(mTarget, *mDocument);
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -90,7 +90,7 @@
+         mSaveGames[name] = file;
+ 
+         SaveGameFileWriter writer;
+-        writer.buildSaveGameFile(file, mSaveGameDataSet);
++        writer.buildSaveGameFile(file, mSaveGameDataOrderMap);
+ 
+         freeSaveGameMap();
+ 
+@@ -104,7 +104,7 @@
+         {
+             SaveGameFile file(name);
+             SaveGameFileReader reader;
+-            reader.parseSaveGameFile(&amp;file, mSaveGameDataSet);
++            reader.parseSaveGameFile(&amp;file, mSaveGameDataOrderMap);
+             ///@todo: SaveGameReader
+         }
+     }
+@@ -152,12 +152,26 @@
+ 
+     void SaveGameManager::registerSaveGameData(SaveGameData* data)
+     {
+-        mSaveGameDataSet.insert(data);
++        mSaveGameDataOrderMap.insert(SaveGameDataOrderMap::value_type(data-&gt;getPriority(),data));
+     }
+ 
+     void SaveGameManager::unregisterSaveGameData(SaveGameData* data)
+     {
+-        mSaveGameDataSet.erase(data);
++        int order = data-&gt;getPriority();
++        SaveGameDataOrderMap::iterator oi = mSaveGameDataOrderMap.find(order);
++        while (oi != mSaveGameDataOrderMap.end() &amp;&amp; oi-&gt;first == order)
++        {
++            if (oi-&gt;second == data)
++            {
++                // erase does not invalidate on multimap, except current
++                SaveGameDataOrderMap::iterator del = oi++;
++                mSaveGameDataOrderMap.erase(del);
++            }
++            else
++            {
++                ++oi;
++            }
++        }
+     }
+ 
+     void SaveGameManager::freeSaveGameMap()
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/include/CreatureController.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -39,9 +39,12 @@
+      */
+     class _RlRulesExport CreatureController :
+         public PhysicsController,
+-        public PhysicsGenericContactCallback
++        public PhysicsGenericContactCallback,
++        public PropertyHolder
+     {
+     public:
++        static const Ogre::String PROPERTY_CREATUREID;
++
+         /** Constructor.
+ 		 * @param creature the creature of the bot/char
+ 		 * @param actor the actor of the bot/char
+@@ -62,6 +65,7 @@
+         int userProcess();
+ 
+         Creature* getCreature() {return mCreature;}
++        void refetchCreature();
+ 
+         /** 
+          * the different movements a creature can perform, 
+@@ -148,9 +152,13 @@
+         MovementType getLastMovementType() const { return mLastMovementType; }
+         Ogre::Real getAnimationTimePlayed() const; // this is a relative value between 0 and 1
+ 
+-
++        
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        virtual PropertySet* getAllProperties() const;
+     protected:
+         Creature *mCreature;
++        int mGameObjectId;
+         AbstractLocation mAbstractLocation;
+         
+         AbstractMovement *mMovement;
+
+Modified: rl/trunk/engine/rules/include/CreatureControllerManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureControllerManager.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/include/CreatureControllerManager.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -21,6 +21,7 @@
+ #include &quot;RulesPrerequisites.h&quot;
+ #include &quot;GameTask.h&quot;
+ #include &quot;PhysicsGenericContactCallback.h&quot;
++#include &lt;SaveGameManager.h&gt;
+ #include &lt;vector&gt;
+ #include &lt;map&gt;
+ 
+@@ -37,7 +38,8 @@
+     class _RlRulesExport CreatureControllerManager : 
+         public GameTask,
+         public Ogre::Singleton&lt;CreatureControllerManager&gt;,
+-        public PhysicsGenericContactCallback
++        public PhysicsGenericContactCallback,
++        public SaveGameData
+     {
+     public:
+         CreatureControllerManager();
+@@ -47,6 +49,7 @@
+         /// There is only one controller per Creature at a given time.
+         /// If no such controller exists yet, it is created.
+         CreatureController* getCreatureController(Creature* creature);
++        std::list&lt;CreatureController*&gt; getAllCreatureController() const;
+ 
+         /// This function detaches a controller attached to the given Creature, if any.
+         void detachController(Creature* creature);
+@@ -58,6 +61,11 @@
+ 
+         // Newton Contact Callback
+         int userProcess();
++
++        virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual void writeData(SaveGameFileWriter* writer);
++        virtual void readData(SaveGameFileReader* reader);
++        virtual int getPriority() const;
+     protected:
+         typedef std::map&lt;Creature*, CreatureController*&gt; ControllerMap;
+         ControllerMap mControllers;
+
+Modified: rl/trunk/engine/rules/include/GameObjectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObjectManager.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/include/GameObjectManager.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -83,7 +83,7 @@
+         virtual CeGuiString getXmlNodeIdentifier() const;
+         virtual void writeData(SaveGameFileWriter* writer);
+         virtual void readData(SaveGameFileReader* reader);
+-
++        virtual int getPriority() const;
+     private:
+         typedef std::map&lt;const Ogre::String, PropertySet*&gt; ClassPropertyMap;
+         typedef std::set&lt;GameObjectStateListener*&gt; GameObjectStateListenerSet;
+
+Modified: rl/trunk/engine/rules/include/QuestBook.h
+===================================================================
+--- rl/trunk/engine/rules/include/QuestBook.h	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/include/QuestBook.h	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -86,7 +86,7 @@
+     virtual CeGuiString getXmlNodeIdentifier() const;
+     virtual void writeData(SaveGameFileWriter* writer);
+     virtual void readData(SaveGameFileReader* reader);
+-
++    virtual int getPriority() const;
+ private:
+ 	Quest* getQuest(Quest* parent, const CeGuiString id) const;
+     void clear();
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -25,6 +25,7 @@
+ #include &quot;PhysicsManager.h&quot;
+ #include &quot;PhysicalThing.h&quot;
+ #include &quot;TimeSource.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ 
+ 
+@@ -34,7 +35,9 @@
+ 
+ namespace rl
+ {
++    const Ogre::String CreatureController::PROPERTY_CREATUREID = &quot;creature_id&quot;;
+ 
++
+     class Stehen : public AbstractMovement
+     {
+     public:
+@@ -1139,6 +1142,8 @@
+         mStillWeightedAnimationName(&quot;&quot;),
+         mLastFloorContact(TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock())
+     {
++        mGameObjectId = mCreature-&gt;getId();
++
+         mOldMaterialId = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getMaterialGroupID();
+         const OgreNewt::MaterialID *material = PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;);
+         mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(material);
+@@ -1501,4 +1506,34 @@
+ 
+         return Radian(drehen-&gt;getMovementDefinedValue());
+     }
++
++    const Property CreatureController::getProperty(const Ogre::String&amp; key) const
++    {
++        if(key == PROPERTY_CREATUREID)
++        {
++            return Property(mCreature-&gt;getId());
++        }
++        else
++            return Property();
++    }
++
++    void CreatureController::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    {
++        if(key == PROPERTY_CREATUREID)
++        {
++            mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(value.toInt()));
++        }
++    }
++
++    PropertySet* CreatureController::getAllProperties() const
++    {
++        PropertySet* ps = new PropertySet();
++        ps-&gt;setProperty(PROPERTY_CREATUREID, getProperty(PROPERTY_CREATUREID));
++        return ps;
++    }
++
++    void CreatureController::refetchCreature()
++    {
++        mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(mGameObjectId));
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -96,7 +96,23 @@
+         return rval;
+     }
+ 
++    std::list&lt;CreatureController*&gt; CreatureControllerManager::getAllCreatureController() const
++    {
++        std::list&lt;CreatureController*&gt; cos;
++        ControllerMap::const_iterator it;
+ 
++        //
++        //    Run through all GOs and put them into the list
++        //
++        for( it=mControllers.begin(); it!=mControllers.end(); ++it )
++        {
++            cos.push_back(it-&gt;second);
++        }
++
++        return cos;
++    }
++
++
+     void CreatureControllerManager::detachController(Creature* creature)
+     {
+         if( creature == NULL)
+@@ -152,7 +168,68 @@
+ 
+     const Ogre::String&amp; CreatureControllerManager::getName() const
+     {
+-        static String name = &quot;CreatureControllerManager&quot;;
++        static Ogre::String name = &quot;CreatureControllerManager&quot;;
+         return name;
+     }
++
++    CeGuiString CreatureControllerManager::getXmlNodeIdentifier() const
++    {
++        return &quot;creaturecontrollermanager&quot;;
++    }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void CreatureControllerManager::writeData(SaveGameFileWriter* writer)
++    {
++        /*DOMElement* controllersElem = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(),
++            getXmlNodeIdentifier().c_str());
++
++        std::list&lt;CreatureController*&gt; controllers = getAllCreatureController();
++
++        for(std::list&lt;CreatureController*&gt;::const_iterator it_controllers = controllers.begin();
++            it_controllers != controllers.end(); it_controllers++)
++        {
++            DOMElement* controller = writer-&gt;appendChildElement(writer-&gt;getDocument(), controllersElem, &quot;creaturecontroller&quot;);
++            PropertyMap map = (*it_controllers)-&gt;getAllProperties()-&gt;toPropertyMap();
++            writer-&gt;writeEachProperty(controller, map);
++        }*/
++    }
++
++    void CreatureControllerManager::readData(SaveGameFileReader* reader)
++    {
++        std::list&lt;CreatureController*&gt; controllers = getAllCreatureController();
++
++        for(std::list&lt;CreatureController*&gt;::const_iterator it_controllers = controllers.begin();
++            it_controllers != controllers.end(); it_controllers++)
++        {
++            (*it_controllers)-&gt;refetchCreature();
++        }
++        /*reader-&gt;initializeXml();
++
++        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++
++        if(rootNodeList-&gt;getLength())
++        {
++            DOMNodeList* xmlControllers = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;creaturecontroller&quot;).data()); //there should be only one &quot;gameobjects&quot; node
++            if(xmlGameObjects-&gt;getLength())
++            {
++                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlControllers-&gt;getLength(); childIdx1++)
++                {
++                    DOMNode* xmlController = xmlGameObjects-&gt;item(childIdx1);
++                    if(xmlController-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++                        PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlController));
++                        applyProperties(object, &amp;properties);
++                    }
++                }
++            }
++        }  
++
++        reader-&gt;shutdownXml();*/
++    }
++
++    int CreatureControllerManager::getPriority() const
++    {
++        return 1;
++    }
+  }
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -302,7 +302,7 @@
+     {
+         DOMElement* gameobjects = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+ 
+-        std::list&lt;const GameObject*&gt; gos = GameObjectManager::getSingleton().getAllGameObjects();
++        std::list&lt;const GameObject*&gt; gos = getAllGameObjects();
+ 
+         for(std::list&lt;const GameObject*&gt;::const_iterator it_gameobjects = gos.begin(); it_gameobjects != gos.end(); it_gameobjects++)
+         {
+@@ -317,6 +317,8 @@
+ 
+     void GameObjectManager::readData(SaveGameFileReader *reader)
+     {
++        deleteAllGameObjects();
++
+         reader-&gt;initializeXml();
+ 
+         DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
+@@ -334,6 +336,8 @@
+                         int ID = reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ID&quot;);
+                         Ogre::String classID = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ClassID&quot;);
+                         PropertySet properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlGameObject));
++                        GameObject* object = createGameObject(classID, ID);
++                        applyProperties(object, &amp;properties);
+                     }
+                 }
+             }
+@@ -341,4 +345,9 @@
+ 
+         reader-&gt;shutdownXml();
+     }
++
++    int GameObjectManager::getPriority() const
++    {
++        return 100;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/QuestBook.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-14 18:42:14 UTC (rev 3910)
++++ rl/trunk/engine/rules/src/QuestBook.cpp	2007-10-14 22:23:55 UTC (rev 3911)
+@@ -309,4 +309,9 @@
+ 
+         createRoot();
+     }
++
++    int QuestBook::getPriority() const
++    {
++        return 101;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000981.html">[Dsa-hl-svn] r3910 - rl/trunk/engine/common/src
+</A></li>
+	<LI>Next message: <A HREF="000983.html">[Dsa-hl-svn] r3912 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#982">[ date ]</a>
+              <a href="thread.html#982">[ thread ]</a>
+              <a href="subject.html#982">[ subject ]</a>
+              <a href="author.html#982">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

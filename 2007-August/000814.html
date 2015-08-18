@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3743 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3743%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200708251058.l7PAwI9p002467%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000813.html">
+   <LINK REL="Next"  HREF="000815.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3743 - rl/trunk/engine/ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3743%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200708251058.l7PAwI9p002467%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3743 - rl/trunk/engine/ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Aug 25 12:58:18 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000813.html">[Dsa-hl-svn] r3742 - modules/common/scripts/effects
+</A></li>
+        <LI>Next message: <A HREF="000815.html">[Dsa-hl-svn] r3744 - in modules/common: dsa scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#814">[ date ]</a>
+              <a href="thread.html#814">[ thread ]</a>
+              <a href="subject.html#814">[ subject ]</a>
+              <a href="author.html#814">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-25 12:58:07 +0200 (Sat, 25 Aug 2007)
+New Revision: 3743
+
+Modified:
+   rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/ItemDragContainer.cpp
+Log:
+some bug fixes
+
+Modified: rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-25 08:47:42 UTC (rev 3742)
++++ rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-25 10:58:07 UTC (rev 3743)
+@@ -90,40 +90,19 @@
+ 				evtArgs.dragDropItem);
+ 			Item* item = dragcont-&gt;getItem();
+ 
+-			if (dragcont-&gt;getItemParentContainer() != NULL)
+-			{
+-				dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
+-				mContainer-&gt;addItem(item);
++			if( mContainer-&gt;addItem(item) )
++            {
++			    dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
++			    std::pair&lt;unsigned int, unsigned int&gt; pos = mContainer-&gt;getItemPosition(item);
++			    mContentWindow-&gt;addChildWindow(dragcont);
++			    dragcont-&gt;setPosition(
++				    UVector2(
++					    cegui_absdim(pos.first*30),
++					    cegui_absdim(pos.second*30)));
++			    dragcont-&gt;setItemParent(mContainer);
+ 
+-				dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-				std::pair&lt;unsigned int, unsigned int&gt; pos = mContainer-&gt;getItemPosition(item);
+-				mContentWindow-&gt;addChildWindow(dragcont);
+-				dragcont-&gt;setPosition(
+-					UVector2(
+-						cegui_absdim(pos.first*30),
+-						cegui_absdim(pos.second*30)));
+-				dragcont-&gt;setItemParent(mContainer);
+-
+-				///@todo Swap with old content (if there is some)
+-			}
+-			else if (dragcont-&gt;getItemParentSlot() != &quot;&quot;)
+-			{
+-				dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
+-				mContainer-&gt;addItem(item);
+-
+-				dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-				std::pair&lt;unsigned int, unsigned int&gt; pos = mContainer-&gt;getItemPosition(item);
+-				mContentWindow-&gt;addChildWindow(dragcont);
+-				dragcont-&gt;setPosition(
+-					UVector2(
+-						cegui_absdim(pos.first*30),
+-						cegui_absdim(pos.second*30)));
+-				dragcont-&gt;setItemParent(mContainer);
+-
+-				///@todo Swap with old content (if there is some)
+-			}
+-
+-			return true;
++			    return true;
++            }
+ 		}
+ 		return false;
+ 	}
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-25 08:47:42 UTC (rev 3742)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-25 10:58:07 UTC (rev 3743)
+@@ -52,6 +52,7 @@
+ 		mWorldBackground = getWindow(&quot;InventoryWindow/Background&quot;);
+         getWindow(&quot;InventoryWindow&quot;)-&gt;subscribeEvent(FrameWindow::EventCloseClicked,
+ 			boost::bind(&amp;InventoryWindow::destroyWindow, this));
++        mWorldBackground-&gt;setZOrderingEnabled(false);
+ 
+         createSlotWindows(inventory);
+         initInventoryWindow(inventory);
+
+Modified: rl/trunk/engine/ui/src/ItemDragContainer.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-25 08:47:42 UTC (rev 3742)
++++ rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-25 10:58:07 UTC (rev 3743)
+@@ -20,6 +20,7 @@
+ #include &lt;CEGUIWindowManager.h&gt;
+ 
+ #include &quot;AbstractWindow.h&quot;
++#include &quot;Creature.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
+ #include &quot;WindowFactory.h&quot;
+@@ -32,7 +33,8 @@
+ 		mItem(item),
+ 		mParentContainer(NULL),
+ 		mParentSlot(&quot;&quot;),
+-		mContentWindow(NULL)
++		mContentWindow(NULL),
++        mInventory(NULL)
+ 	{
+ 	}
+ 
+@@ -108,7 +110,7 @@
+ 		const CEGUI::MouseEventArgs&amp; mevt = static_cast&lt;const CEGUI::MouseEventArgs&amp;&gt;(evt);
+ 		if (mevt.button == CEGUI::LeftButton)
+ 		{
+-			item-&gt;doDefaultAction(mInventory-&gt;getOwner(), NULL);
++            item-&gt;doDefaultAction(static_cast&lt;Creature*&gt;(item-&gt;getOwner()), NULL);
+ 			return true;
+ 		}
+ 		else
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000813.html">[Dsa-hl-svn] r3742 - modules/common/scripts/effects
+</A></li>
+	<LI>Next message: <A HREF="000815.html">[Dsa-hl-svn] r3744 - in modules/common: dsa scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#814">[ date ]</a>
+              <a href="thread.html#814">[ thread ]</a>
+              <a href="subject.html#814">[ subject ]</a>
+              <a href="author.html#814">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

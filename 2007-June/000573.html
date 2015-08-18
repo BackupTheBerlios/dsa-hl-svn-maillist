@@ -1,0 +1,270 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3502 - in rl/trunk/engine/ai: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3502%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200706051840.l55Ie5xI018075%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000572.html">
+   <LINK REL="Next"  HREF="000574.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3502 - in rl/trunk/engine/ai: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3502%20-%20in%20rl/trunk/engine/ai%3A%20include%20src&In-Reply-To=%3C200706051840.l55Ie5xI018075%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3502 - in rl/trunk/engine/ai: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun  5 20:40:05 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000572.html">[Dsa-hl-svn] r3501 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000574.html">[Dsa-hl-svn] r3503 - dependencies/dsa4wz/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#573">[ date ]</a>
+              <a href="thread.html#573">[ thread ]</a>
+              <a href="subject.html#573">[ subject ]</a>
+              <a href="author.html#573">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-05 20:39:51 +0200 (Tue, 05 Jun 2007)
+New Revision: 3502
+
+Modified:
+   rl/trunk/engine/ai/include/AiWorld.h
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/AiWorld.cpp
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+Log:
+NewtonWorldAsObstacle: 
+-test for multiple materials (but the whole class doesn't seem to work correctly)
+
+SteeringVehicle: 
+-implemented some empty methods
+-using future orientation of movingcreature
+
+Modified: rl/trunk/engine/ai/include/AiWorld.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiWorld.h	2007-06-05 18:36:56 UTC (rev 3501)
++++ rl/trunk/engine/ai/include/AiWorld.h	2007-06-05 18:39:51 UTC (rev 3502)
+@@ -18,6 +18,7 @@
+ 
+ #include &quot;OpenSteer/Obstacle.h&quot;
+ #include &lt;OgreNewt.h&gt;
++#include &lt;vector&gt;
+ 
+ namespace rl
+ {
+@@ -74,7 +75,7 @@
+             BOTTOM
+         };
+ 		//! newton material id
+-        const OgreNewt::MaterialID *mLevelMaterial;
++        std::vector&lt;const OgreNewt::MaterialID *&gt; mMaterialsToConsider;
+ 		//! newton world
+         OgreNewt::World *mNewtonWorld;
+     };
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-05 18:36:56 UTC (rev 3501)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-05 18:39:51 UTC (rev 3502)
+@@ -360,12 +360,12 @@
+ 		//! mass of the steering vehicle retrieved from Newton body (is this really necessary ?)
+ 		//Ogre::Real mMass;
+ 		//! radius of for the bounding sphere (use newton to get this from)
+-		Ogre::Real mRadius;
++		//Ogre::Real mRadius;
+ 		//! speed of the vehicle
+ 		Ogre::Real mSpeed;	
+ 
+ 		//! height of the vehicle ? (use newton to get this)
+-        float mHeight;
++        //float mHeight;
+ 
+ 		//! current force 
+ 		Ogre::Vector3 mCurrentForce;
+
+Modified: rl/trunk/engine/ai/src/AiWorld.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiWorld.cpp	2007-06-05 18:36:56 UTC (rev 3501)
++++ rl/trunk/engine/ai/src/AiWorld.cpp	2007-06-05 18:39:51 UTC (rev 3502)
+@@ -73,7 +73,8 @@
+ 
+ NewtonWorldAsObstacle::NewtonWorldAsObstacle(void)
+ {
+-    mLevelMaterial = PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;);
++    mMaterialsToConsider.push_back(PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
++    mMaterialsToConsider.push_back(PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
+     mNewtonWorld = PhysicsManager::getSingleton()._getNewtonWorld();
+ }
+ 
+@@ -90,7 +91,7 @@
+     // Habe bisher keine elegantere Loesung gefunden
+     RaycastType raycastType;
+     Vec3 _pos = vehicle.position();
+-    Vec3 _futPos = vehicle.forward() * 2 + _pos;
++    Vec3 _futPos = vehicle.forward() * 5 + _pos;
+ 
+ 
+     if( _pos == _futPos )
+@@ -105,10 +106,11 @@
+ 
+ 
+     // Versuchen wir mal das Casten, um das urspruengliche SteelingVehicle zu kriegen
+-    const SteeringVehicle *steerVec = dynamic_cast&lt;const SteeringVehicle *&gt; (&amp;vehicle);
++    const SteeringVehicle *steerVec = static_cast&lt;const SteeringVehicle *&gt; (&amp;vehicle);
+     // falls nich geklappt, ist das Ergebnis NULL, das wird spaeter abgefragt!
+ 
+ 
++    bool foundObstacle(false);
+     for( int i = 0; i &lt; 5; i++ )
+     {
+         Ogre::Vector3 castPos, castFutPos;  // die Koordinaten, die zum Casten verwendet werden
+@@ -168,21 +170,29 @@
+         // so alles richtig gesetzt!
+         info = materialRaycast.execute(
+             mNewtonWorld,
+-            mLevelMaterial,
++            &amp;mMaterialsToConsider,
+             castPos,
+             castFutPos);
+ 
+ 
+         if( info.mBody )
+-            break;
++        {
++            if( !info.mNormal.directionEquals(Ogre::Vector3::UNIT_Y, Degree(20)) )
++            {
++                foundObstacle = true;
++                break;
++            }
++        }
+     }
+ 
++    if( !foundObstacle )
++        return;
+ 
++
+     switch(raycastType)
+     {
+     case NONE:
+         return;
+-    case MIDDLE:
+     default:
+         pi.intersect = true;
+         pi.obstacle = this;
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-05 18:36:56 UTC (rev 3501)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-05 18:39:51 UTC (rev 3502)
+@@ -32,7 +32,7 @@
+ 	: _maxForce(1.0f),
+       _maxSpeed(1.0f),
+       //mMass(),
+-      mRadius(),
++      //mRadius(),
+       mSpeed(1.0f),
+ 	  mCurrentForce(Vector3::ZERO), 
+ 	  mCurrentVelocity(Vector3::ZERO),
+@@ -40,8 +40,8 @@
+       //mYaw(115),
+ 	  mParent(parent),
+ 	  mCreature(character),
+-      mMovingCreature(NULL),
+-      mHeight(0)
++      mMovingCreature(NULL)
++      //mHeight(0)
+ {
+ 	initialize();
+ 
+@@ -97,7 +97,7 @@
+ //  reset SteerLibraryMixin state
+ 	SimpleVehicle_2::reset ();
+ 
+-	setRadius (0.5f);     // size of bounding sphere
++//	setRadius (0.5f);     // size of bounding sphere
+ 
+ 	setMaxForce (1.0f);   // steering force is clipped to this magnitude
+ 	setMaxSpeed (1.0f);   // velocity is clipped to this magnitude
+@@ -174,7 +174,8 @@
+         max_drehen = Degree(vel_drehen * 360 * elapsedTime);
+     }
+ 
+-    Ogre::Vector3 creatureDirection = orientation * Ogre::Vector3::NEGATIVE_UNIT_Z;
++    Ogre::Quaternion future_orientation(mMovingCreature-&gt;getYaw(), Ogre::Vector3::UNIT_Y);
++    Ogre::Vector3 creatureDirection = future_orientation * Ogre::Vector3::NEGATIVE_UNIT_Z;
+     Radian yaw(0);
+     creatureDirection.y = result.y = 0;
+     yaw = creatureDirection.getRotationTo(result, Ogre::Vector3::UNIT_Y).getYaw();
+@@ -343,26 +344,27 @@
+ 
+ float SteeringVehicle::radius (void) const 
+ {
+-	// TODO: this should be handled by size of NewtonBody
+-	return mRadius;
++	// this is only the radius in x axis, but i think, this is the value that should be used here
++    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
++    return (aab.getMaximum().x - aab.getMinimum().x)/2;
+ }
+ 
+ float SteeringVehicle::setRadius (float m) 
+ {
+-	// TODO: this should be handled by size of NewtonBody
+-	return mRadius = m;
++	// don't set mass here TODO: throw exception
++	return 1;
+ }
+ 
+ float SteeringVehicle::height (void) const 
+ {
+-	// TODO: this should be handled by height of NewtonBody
+-	return mHeight;
++    Ogre::AxisAlignedBox aab = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getCollision()-&gt;getAABB();
++    return aab.getMaximum().y - aab.getMinimum().y;
+ }
+ 
+ float SteeringVehicle::setHeight (float h) 
+ {
+-	// TODO: this should be handled by height of NewtonBody
+-	return mHeight = h;
++	// don't set mass here TODO: throw exception
++	return 1;
+ }
+ 
+ const Actor* SteeringVehicle::getActor(void) const  
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000572.html">[Dsa-hl-svn] r3501 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000574.html">[Dsa-hl-svn] r3503 - dependencies/dsa4wz/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#573">[ date ]</a>
+              <a href="thread.html#573">[ thread ]</a>
+              <a href="subject.html#573">[ subject ]</a>
+              <a href="author.html#573">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

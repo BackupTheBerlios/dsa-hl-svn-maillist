@@ -1,0 +1,221 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3479 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3479%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200705221942.l4MJg02u001473%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000549.html">
+   <LINK REL="Next"  HREF="000551.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3479 - in rl/trunk/engine/rules: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3479%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200705221942.l4MJg02u001473%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3479 - in rl/trunk/engine/rules: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue May 22 21:42:00 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000549.html">[Dsa-hl-svn] r3478 - in rl/trunk/engine/ai: include src
+</A></li>
+        <LI>Next message: <A HREF="000551.html">[Dsa-hl-svn] r3480 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#550">[ date ]</a>
+              <a href="thread.html#550">[ thread ]</a>
+              <a href="subject.html#550">[ subject ]</a>
+              <a href="author.html#550">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-05-22 21:41:53 +0200 (Tue, 22 May 2007)
+New Revision: 3479
+
+Modified:
+   rl/trunk/engine/rules/include/MovingCreature.h
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+removed programming error (wrong pointer after the end of dialogcharactercontroller)
+
+Modified: rl/trunk/engine/rules/include/MovingCreature.h
+===================================================================
+--- rl/trunk/engine/rules/include/MovingCreature.h	2007-05-22 19:10:27 UTC (rev 3478)
++++ rl/trunk/engine/rules/include/MovingCreature.h	2007-05-22 19:41:53 UTC (rev 3479)
+@@ -143,7 +143,6 @@
+         Creature *mCreature;
+         AbstractLocation mAbstractLocation;
+         
+-        
+         AbstractMovement *mMovement;
+         Ogre::Vector3 mDirection;
+         Ogre::Vector3 mRotation;
+@@ -153,6 +152,16 @@
+ 
+         // in order to copy the contactcallback members correctly;
+         friend class MovingCreatureManager;
++
++    private:
++        // only used in setAnimation
++        Ogre::String mLastAnimationName;
++        Ogre::String mLastCollisionName;
++        Ogre::Real mLastAnimationSpeed;
++
++        // only used in userProcess
++        Ogre::Real mLastFloorContact;
++
+     };
+ 
+     /// this is the base class of all movements
+
+Modified: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-05-22 19:10:27 UTC (rev 3478)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-05-22 19:41:53 UTC (rev 3479)
+@@ -36,7 +36,7 @@
+     class Stehen : public AbstractMovement
+     {
+     public:
+-        Stehen(MovingCreature *creature) : AbstractMovement(creature), mVelocity(Vector3::ZERO) {}
++        Stehen(MovingCreature *creature) : AbstractMovement(creature), mVelocity(Vector3::ZERO), mRotationMovement(NULL) {}
+         virtual MovingCreature::MovementType getId() const {return MovingCreature::MT_STEHEN;}
+         virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
+         virtual void activate()
+@@ -117,19 +117,18 @@
+         }
+     protected:
+         Ogre::Vector3 mVelocity;
++        mutable AbstractMovement *mRotationMovement;
+         virtual AbstractMovement* getRotationMovement() const
+         {
+-            static AbstractMovement *stehen_drehen(NULL);
+-
+-            if( stehen_drehen == NULL)
++            if( mRotationMovement == NULL)
+             {                
+-                stehen_drehen = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
++                mRotationMovement = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
+             }
+-            if( stehen_drehen == NULL )
++            if( mRotationMovement == NULL )
+             {
+                 Throw(NullPointerException, &quot;Konnte Movement mit der Id MT_STEHEN_DREHEN nicht finden.&quot;);
+             }
+-            return stehen_drehen;
++            return mRotationMovement;
+         }
+     };
+ 
+@@ -917,7 +916,11 @@
+         mAbstractLocation(AL_AIRBORNE),
+         mMovement(NULL),
+         mDirection(Vector3::ZERO),
+-        mRotation(Vector3::ZERO)
++        mRotation(Vector3::ZERO),
++        mLastAnimationName(&quot;&quot;),
++        mLastCollisionName(&quot;&quot;),
++        mLastAnimationSpeed(1),
++        mLastFloorContact(0)
+     {
+         MovingCreatureManager::getSingleton().add(this);
+         
+@@ -999,37 +1002,34 @@
+ 
+     void MovingCreature::setAnimation(const Ogre::String &amp;name, Ogre::Real speed, unsigned int timesToPlay, const Ogre::String &amp;collisionName)
+     {
+-        static Ogre::String lastName(&quot;&quot;);
+-        static Ogre::String lastCollisionName(&quot;&quot;);
+-        static Real lastSpeed(1);
+         MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
+         PhysicalThing* pt = mCreature-&gt;getActor()-&gt;getPhysicalThing();
+         
+-        if( lastName != name)
++        if( mLastAnimationName != name)
+         {
+             const Ogre::String *pCollisionName = &collisionName;
+             if( collisionName == &quot;&quot; )
+                 pCollisionName = &name;
+ 
+-            if( *pCollisionName != lastCollisionName )
++            if( *pCollisionName != mLastCollisionName )
+             {
+                 pt-&gt;fitToPose(*pCollisionName);
+-                lastCollisionName = *pCollisionName;
++                mLastCollisionName = *pCollisionName;
+             }
+             mesh-&gt;stopAllAnimations();
+ 
+ 
+             mesh-&gt;startAnimation(name, speed, timesToPlay);
+-            lastName = name;
+-            lastSpeed = speed;
++            mLastAnimationName = name;
++            mLastAnimationSpeed = speed;
+         }
+         else
+         {
+-            if( lastSpeed != speed )
++            if( mLastAnimationSpeed != speed )
+             {
+                 MeshAnimation *meshAnim = mesh-&gt;getAnimation(name);
+                 meshAnim-&gt;setSpeed(speed);
+-                lastSpeed = speed;
++                mLastAnimationSpeed = speed;
+             }
+         }
+     }
+@@ -1115,19 +1115,18 @@
+         if( stepHeight &lt; 0.5f )
+             isFloorCollision = true;
+ 
+-        static Real lastFloorContact(0.0f);
+         if ( isFloorCollision )
+         {
+             setAbstractLocation(AL_FLOOR);
+             if(stepHeight &gt; 0.1f)
+                 setContactNormalAcceleration(10);
+             setContactElasticity(0.0f);
+-            lastFloorContact = 0.0f;
++            mLastFloorContact = 0.0f;
+         }
+         else
+         {
+-            lastFloorContact += PhysicsManager::getSingleton()._getNewtonWorld()-&gt;getTimeStep();
+-            if(lastFloorContact &gt;= 2.2f || getAbstractLocation() == AL_AIRBORNE)
++            mLastFloorContact += PhysicsManager::getSingleton()._getNewtonWorld()-&gt;getTimeStep();
++            if(mLastFloorContact &gt;= 2.2f || getAbstractLocation() == AL_AIRBORNE)
+                 setAbstractLocation(AL_AIRBORNE);
+         }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000549.html">[Dsa-hl-svn] r3478 - in rl/trunk/engine/ai: include src
+</A></li>
+	<LI>Next message: <A HREF="000551.html">[Dsa-hl-svn] r3480 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#550">[ date ]</a>
+              <a href="thread.html#550">[ thread ]</a>
+              <a href="subject.html#550">[ subject ]</a>
+              <a href="author.html#550">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

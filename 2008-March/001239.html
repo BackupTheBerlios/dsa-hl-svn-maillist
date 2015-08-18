@@ -1,0 +1,186 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4168 - in rl/trunk/engine: core/include core/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4168%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200803052159.m25Lxrak011617%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001238.html">
+   <LINK REL="Next"  HREF="001240.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4168 - in rl/trunk/engine: core/include core/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4168%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/swig&In-Reply-To=%3C200803052159.m25Lxrak011617%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4168 - in rl/trunk/engine: core/include core/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  5 22:59:53 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001238.html">[Dsa-hl-svn] r4167 - in rl/trunk: engine/ai/include engine/ai/src	engine/common/include engine/common/src engine/core/include	engine/core/src engine/rules/include engine/rules/src	engine/script/include engine/script/src engine/startup/src	engine/ui/include engine/ui/src plugins/fmod4driver/include	plugins/openaldriver/include
+</A></li>
+        <LI>Next message: <A HREF="001240.html">[Dsa-hl-svn] r4169 - in rl/trunk: engine/ai/include engine/ai/src	engine/common/include engine/common/src engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/rules/include	engine/rules/src engine/script/include engine/script/src	engine/script/swig engine/startup/src engine/ui/include	engine/ui/src plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1239">[ date ]</a>
+              <a href="thread.html#1239">[ thread ]</a>
+              <a href="subject.html#1239">[ subject ]</a>
+              <a href="author.html#1239">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-05 22:59:45 +0100 (Wed, 05 Mar 2008)
+New Revision: 4168
+
+Modified:
+   rl/trunk/engine/core/include/GameAreaTypes.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+added the possibility to ask if an actor is in a zone (ZoneManager::isInZone(zone, actor))
+
+Modified: rl/trunk/engine/core/include/GameAreaTypes.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaTypes.h	2008-03-05 21:53:05 UTC (rev 4167)
++++ rl/trunk/engine/core/include/GameAreaTypes.h	2008-03-05 21:59:45 UTC (rev 4168)
+@@ -76,6 +76,9 @@
+     /// Der minimale abstand, den ein aktor von der zone haben muss, um die zone zu verlassen (um st&#65533;ndige wechsel in und aus der zone zu vermeiden)
+     virtual Ogre::Real getTransitionDistance() const = 0;
+     virtual void setTransitionDistance(Ogre::Real dist) = 0;
++
++    /// Gibt true zurueck, wenn sich der Actor in der Area befindet
++    virtual bool isInside(Actor *actor) = 0;
+ };
+ 
+ /** GameSphereAreaType
+@@ -157,6 +160,9 @@
+ 
+     Ogre::Real getTransitionDistance() const;
+     void setTransitionDistance(Ogre::Real dist);
++
++    /// Gibt true zurueck, wenn sich der Actor in der Area befindet
++    virtual bool isInside(Actor *actor);
+ protected:
+     OgreNewt::Body* mBody;
+     ActorMap mFoundActors;
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2008-03-05 21:53:05 UTC (rev 4167)
++++ rl/trunk/engine/core/include/ZoneManager.h	2008-03-05 21:59:45 UTC (rev 4168)
+@@ -93,6 +93,13 @@
+         /// asks wether this zone is currently activated
+         bool isZoneActive(const Zone* zone) const;
+ 
++        /*
++         * asks if the actor is currently in the specified Zone (expensive function!)
++         * the querymask of the actor doesn't need to fit the mask of the zone.
++         * this function probably isn't very accurate, it may only use the distance!
++        */
++        bool isInZone(Zone* zone, Actor *actor);
++
+ 		void areaLeft(GameAreaEvent* gae);
+ 	    void areaEntered(GameAreaEvent* gae);
+ 
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2008-03-05 21:53:05 UTC (rev 4167)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2008-03-05 21:59:45 UTC (rev 4168)
+@@ -180,6 +180,11 @@
+         mFoundActors.clear();
+     }
+ 
++    bool GameNewtonBodyAreaType::isInside(Actor *actor)
++    {
++        return getDistance(actor) &lt;= 0;
++    }
++
+     ActorMap GameNewtonBodyAreaType::performQuery()
+     {
+         return mFoundActors;
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2008-03-05 21:53:05 UTC (rev 4167)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2008-03-05 21:59:45 UTC (rev 4168)
+@@ -177,6 +177,32 @@
+         return iter != mActiveZones.end();
+     }
+ 
++    bool ZoneManager::isInZone(Zone* zone, Actor *actor)
++    {
++        if( zone == NULL || actor == NULL )
++            return false;
++
++        if( zone == mDefaultZone )
++            return true;
++
++        int x = 0;
++        GameAreaEventSourceList &amp;gal = zone-&gt;getEventSources();
++        GameAreaEventSourceList::iterator it = gal.begin();
++        for( ; it != gal.end(); it++ )
++        {
++            // diese funktion hier notwendig um die mask zu ignorieren
++            if( (*it)-&gt;getGameAreaType()-&gt;isInside(actor) )
++            {
++                if( (*it)-&gt;getId() &lt; 0 )
++                    x--;
++                else
++                    x++;
++            }
++        }
++
++        return x &gt; 0;
++    }
++
+     void ZoneManager::addAreaToZone(const Ogre::String&amp; name, 
+         AxisAlignedBox aabb, GeometryType geom,
+         Vector3 position, Vector3 offset, Quaternion orientation,
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2008-03-05 21:53:05 UTC (rev 4167)
++++ rl/trunk/engine/script/swig/RlCore.swig	2008-03-05 21:59:45 UTC (rev 4168)
+@@ -967,6 +967,7 @@
+ 	rl::Zone* getZone(const Ogre::String&amp; name);
+     rl::Zone* getZone(long id);
+     bool isZoneActive(const rl::Zone *zone) const;
++    bool isInZone(Zone* zone, Actor *actor);
+ };
+ 
+ %feature(&quot;director&quot;) Trigger;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001238.html">[Dsa-hl-svn] r4167 - in rl/trunk: engine/ai/include engine/ai/src	engine/common/include engine/common/src engine/core/include	engine/core/src engine/rules/include engine/rules/src	engine/script/include engine/script/src engine/startup/src	engine/ui/include engine/ui/src plugins/fmod4driver/include	plugins/openaldriver/include
+</A></li>
+	<LI>Next message: <A HREF="001240.html">[Dsa-hl-svn] r4169 - in rl/trunk: engine/ai/include engine/ai/src	engine/common/include engine/common/src engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver engine/rules/include	engine/rules/src engine/script/include engine/script/src	engine/script/swig engine/startup/src engine/ui/include	engine/ui/src plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1239">[ date ]</a>
+              <a href="thread.html#1239">[ thread ]</a>
+              <a href="subject.html#1239">[ subject ]</a>
+              <a href="author.html#1239">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

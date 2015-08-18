@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4581 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4581%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200811081255.mA8CtqA9026562%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001637.html">
+   <LINK REL="Next"  HREF="001639.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4581 - in rl/trunk/engine/rules: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4581%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200811081255.mA8CtqA9026562%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4581 - in rl/trunk/engine/rules: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Nov  8 13:55:52 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001637.html">[Dsa-hl-svn] r4580 - in modules/kanalisation: maps scripts	scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001639.html">[Dsa-hl-svn] r4582 - in rl/branches/persistence: ai/include ai/src	core/include core/src rules/include rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1638">[ date ]</a>
+              <a href="thread.html#1638">[ thread ]</a>
+              <a href="subject.html#1638">[ subject ]</a>
+              <a href="author.html#1638">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-11-08 13:55:50 +0100 (Sat, 08 Nov 2008)
+New Revision: 4581
+
+Modified:
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/src/Combat.cpp
+Log:
+Fix Combat class
+
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-11-07 17:57:51 UTC (rev 4580)
++++ rl/trunk/engine/rules/include/Combat.h	2008-11-08 12:55:50 UTC (rev 4581)
+@@ -120,6 +120,10 @@
+ 
+         unsigned short mCurrentRound;
+ 		unsigned short mNextActionId;
++		
++		/// Maximum distance to enemies, a combatant is  this exceededing distance to its enemies
++		/// he is considered fleeing
++		Ogre::Real mMaxDistance;
+ 
+ 		MessagePump::ScopedConnection mLifeStateChangeConnection;
+ 
+@@ -139,8 +143,9 @@
+ 		/// destroy combatants owned by this combat instance.
+ 		void clearRemovedCombatantSet();
+ 
++		bool isOutOfCombatRange(Combatant* combatant, const CombatantSet&amp; enemies) const;
++
+         // Message handlers
+-
+         bool onGameObjectLifeStateChanged(GameObject*, Effect::LifeState, Effect::LifeState);
+     };
+ }
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-11-07 17:57:51 UTC (rev 4580)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-11-08 12:55:50 UTC (rev 4581)
+@@ -70,7 +70,8 @@
+ 		  mRemovedCombatants(),
+           mCurrentRound(0),
+ 		  mNextActionId(0),
+-		  mAnimationSequenceTicket(0)
++		  mAnimationSequenceTicket(0),
++		  mMaxDistance(maxDistance)
+     {
+         LOG_MESSAGE(&quot;Combat&quot;, &quot;Register message handler&quot;);
+ 		mLifeStateChangeConnection =
+@@ -403,14 +404,14 @@
+         // check for fleeing from combat
+         for (CombatantSet::iterator it = mAllies.begin(); it != mAllies.end(); ++it)
+         {
+-            if (outOfCombatRange(*it, mOpponents))
++            if (isOutOfCombatRange(*it, mOpponents))
+             {
+                 removeAlly(*it);
+             }
+         }
+         for (CombatantSet::iterator it = mOpponents.begin(); it != mOpponents.end(); ++it)
+         {
+-            if (outOfCombatRange(*it, mAllies))
++            if (isOutOfCombatRange(*it, mAllies))
+             {
+                 removeOpponent(*it);
+             }
+@@ -578,4 +579,19 @@
+ 		}
+ 		return false;
+ 	}
++
++	bool Combat::isOutOfCombatRange(Combatant* combatant, const Combat::CombatantSet&amp; enemies) const
++	{
++		Vector3 pos = combatant-&gt;getPosition();
++		Ogre::Real sqD = mMaxDistance * mMaxDistance;
++		for (CombatantSet::const_iterator it = enemies.begin(); it != enemies.end(); ++it)
++		{
++			if (pos.squaredDistance((*it)-&gt;getPosition()) &lt;= sqD)
++			{
++				return false;
++			}
++		}
++
++		return true;
++	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001637.html">[Dsa-hl-svn] r4580 - in modules/kanalisation: maps scripts	scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001639.html">[Dsa-hl-svn] r4582 - in rl/branches/persistence: ai/include ai/src	core/include core/src rules/include rules/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1638">[ date ]</a>
+              <a href="thread.html#1638">[ thread ]</a>
+              <a href="subject.html#1638">[ subject ]</a>
+              <a href="author.html#1638">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

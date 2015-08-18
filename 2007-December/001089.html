@@ -1,0 +1,219 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4018 - in rl/trunk/engine: rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4018%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200712051948.lB5Jmq3g014940%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001088.html">
+   <LINK REL="Next"  HREF="001090.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4018 - in rl/trunk/engine: rules/src ui/include ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4018%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200712051948.lB5Jmq3g014940%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4018 - in rl/trunk/engine: rules/src ui/include ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Wed Dec  5 20:48:52 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001088.html">[Dsa-hl-svn] r4017 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001090.html">[Dsa-hl-svn] r4019 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1089">[ date ]</a>
+              <a href="thread.html#1089">[ thread ]</a>
+              <a href="subject.html#1089">[ subject ]</a>
+              <a href="author.html#1089">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-12-05 20:48:29 +0100 (Wed, 05 Dec 2007)
+New Revision: 4018
+
+Modified:
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/ui/include/UiSubsystem.h
+   rl/trunk/engine/ui/src/CharacterStateWindow.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+- setting material id in create controller
+- removing game objects from scene before loading
+- fix a crash after removing the actors from scene
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-12-05 19:45:10 UTC (rev 4017)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-12-05 19:48:29 UTC (rev 4018)
+@@ -1779,6 +1779,14 @@
+     bool CreatureController::refetchCreature()
+     {
+         mCreature = static_cast&lt;Creature*&gt;(GameObjectManager::getSingleton().getGameObject(mGameObjectId));
++
++        //mOldMaterialId = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getMaterialGroupID();
++
++        const OgreNewt::MaterialID *material = PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;);
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(material);
++
++        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
++
+         return false;
+     }
+ }
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-12-05 19:45:10 UTC (rev 4017)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2007-12-05 19:48:29 UTC (rev 4018)
+@@ -176,7 +176,7 @@
+         {
+             GameObject* go = itr-&gt;second;
+             mGameObjects.erase(itr++);
+-            //go-&gt;setState(GOS_LOADED);  // this causes problems here, because of the relations between gofs
++            go-&gt;setState(GOS_LOADED);  // this causes problems here, because of the relations between gofs
+             delete go;
+         }
+     }
+
+Modified: rl/trunk/engine/ui/include/UiSubsystem.h
+===================================================================
+--- rl/trunk/engine/ui/include/UiSubsystem.h	2007-12-05 19:45:10 UTC (rev 4017)
++++ rl/trunk/engine/ui/include/UiSubsystem.h	2007-12-05 19:48:29 UTC (rev 4018)
+@@ -61,13 +61,18 @@
+         void setActiveCharacter(Person* person);
+ 
+         virtual bool onBeforeClearScene();
++        virtual bool onBeforeGameObjectsLoaded();
++        virtual bool onGameObjectsLoaded();
+ 
+         void initializeSubsystem();
+ 
+     private:
+         Person* mCharacter;
++        int mCharacterId;
+ 
+ 	    MessagePump::ScopedConnection mSceneClearingConnection;
++        MessagePump::ScopedConnection mGameObjectsLoadedConnection;
++        MessagePump::ScopedConnection mBeforeLoadingGameObjectsConnection;
+ 
+         // Singletons
+         InputManager* mInputManager;
+
+Modified: rl/trunk/engine/ui/src/CharacterStateWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CharacterStateWindow.cpp	2007-12-05 19:45:10 UTC (rev 4017)
++++ rl/trunk/engine/ui/src/CharacterStateWindow.cpp	2007-12-05 19:48:29 UTC (rev 4018)
+@@ -53,7 +53,8 @@
+ 		mCharacter-&gt;removeObjectStateChangeListener(this);
+ 
+ 	mCharacter = person;
+-	mCharacter-&gt;addObjectStateChangeListener(this);
++    if(mCharacter)
++        mCharacter-&gt;addObjectStateChangeListener(this);
+ 	update();
+ }
+ 
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-12-05 19:45:10 UTC (rev 4017)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-12-05 19:48:29 UTC (rev 4018)
+@@ -39,6 +39,7 @@
+ #include &quot;SoundManager.h&quot;
+ #include &quot;WindowFactory.h&quot;
+ #include &quot;WindowManager.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ using namespace Ogre;
+ template&lt;&gt; rl::UiSubsystem* Singleton&lt;rl::UiSubsystem&gt;::ms_Singleton = 0;
+@@ -58,6 +59,12 @@
+         mSceneClearingConnection =
+             MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneClearing&gt;(
+ 			    boost::bind(&amp;UiSubsystem::onBeforeClearScene, this));
++        mGameObjectsLoadedConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType&lt;RLMSG_SAVEGAME_GOS_LOADED&gt;&gt;(
++                boost::bind(&amp;UiSubsystem::onGameObjectsLoaded, this));
++        mBeforeLoadingGameObjectsConnection = 
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType&lt;RLMSG_SAVEGAME_LOADING&gt;&gt;(
++                boost::bind(&amp;UiSubsystem::onBeforeGameObjectsLoaded, this));
+         mWindowFactory = new WindowFactory();
+     }
+ 
+@@ -187,4 +194,43 @@
+ 
+         return true;
+     }
++
++    bool UiSubsystem::onGameObjectsLoaded()
++    {
++        if(mCharacterId != -1)
++        {
++            Person* person = static_cast&lt;Person*&gt;(GameObjectManager::getSingleton().getGameObject(mCharacterId));
++
++            ScriptWrapper::getSingleton().owned( person );
++            mCharacter = person;
++
++            mWindowFactory-&gt;setActiveCharacter(person);
++
++            mCharacter-&gt;getActor()-&gt;attach(SoundManager::getSingleton().getListenerActor());
++            LOG_MESSAGE(Logger::UI, &quot;SoundListener attached.&quot;);
++
++            // Reset control stack for the new Character and set to movement.
++            //mInputManager-&gt;setControlState(CST_MOVEMENT);
++        }
++        return false;
++    }
++
++    bool UiSubsystem::onBeforeGameObjectsLoaded()
++    {
++        LOG_MESSAGE(Logger::UI, &quot;UiSubsystem::onBeforeGameObjectsLoaded()&quot;);
++        if(mCharacter)
++        {
++            ScriptWrapper::getSingleton().disowned( mCharacter );
++            mCharacter-&gt;getActor()-&gt;detach(SoundManager::getSingleton().getListenerActor());
++
++            mWindowFactory-&gt;setActiveCharacter(NULL);
++
++            mCharacterId = mCharacter-&gt;getId();
++        }
++        else
++            mCharacterId = -1;
++
++        //mInputManager-&gt;clearControlStates();
++        return false;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001088.html">[Dsa-hl-svn] r4017 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001090.html">[Dsa-hl-svn] r4019 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1089">[ date ]</a>
+              <a href="thread.html#1089">[ thread ]</a>
+              <a href="subject.html#1089">[ subject ]</a>
+              <a href="author.html#1089">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

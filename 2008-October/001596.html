@@ -1,0 +1,1063 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4537 - in dependencies/OgreNewt_ngt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4537%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200810011614.m91GEM02005404%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="001595.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4537 - in dependencies/OgreNewt_ngt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4537%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200810011614.m91GEM02005404%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4537 - in dependencies/OgreNewt_ngt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Oct  1 18:14:22 CEST 2008</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="001595.html">[Dsa-hl-svn] r4538 - in rl/branches/newton20/engine: core/include	core/src script/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1596">[ date ]</a>
+              <a href="thread.html#1596">[ thread ]</a>
+              <a href="subject.html#1596">[ subject ]</a>
+              <a href="author.html#1596">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-10-01 18:14:19 +0200 (Wed, 01 Oct 2008)
+New Revision: 4537
+
+Modified:
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp
+Log:
+improved debugging, the debug lines can now be updated every frame and an informative text (mass, position, velocity...) is shown above each body
+
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h	2008-09-29 15:43:00 UTC (rev 4536)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h	2008-10-01 16:14:19 UTC (rev 4537)
+@@ -15,6 +15,8 @@
+ #include &lt;Ogre.h&gt;
+ #include &lt;Newton.h&gt;
+ #include &quot;OgreNewt_World.h&quot;
++#include &quot;OgreNewt_Body.h&quot;
++#include &quot;OgreNewt_Tools.h&quot;
+ 
+ namespace OgreNewt
+ {
+@@ -43,13 +45,13 @@
+ 
+ 		//! show the newton world
+ 		/*!
+-			Draws the Newton world as 3D lines.
++			Draws the Newton world as 3D lines with informative text above each body
+ 			\param world pointer to the OgreNewt::World
+ 		*/
+-		void showLines( OgreNewt::World* world );
++		void showDebugInformation( OgreNewt::World* world );
+ 
+-		//! remove lines drawn.
+-		void hideLines();
++		//! remove lines and text drawn
++		void hideDebugInformation();
+ 	
+         //! set default color
+         void setDefaultColor(Ogre::ColourValue col);
+@@ -62,12 +64,23 @@
+ 	
+ 	private:
+ 		Ogre::SceneNode*		m_debugnode;
+-		Ogre::ManualObject*		m_debuglines;
+         typedef std::map&lt;int, Ogre::ColourValue&gt; MaterialIdColorMap;
+         MaterialIdColorMap      m_materialcolors;
+         Ogre::ColourValue       m_defaultcolor;
+ 
++        struct BodyDebugData
++        {
++            BodyDebugData() : m_lastcol(NULL), m_node(NULL), m_lines(NULL), m_text(NULL), m_updated(false) {}
++            const Collision* m_lastcol;
++            Ogre::SceneNode* m_node;
++            Ogre::ManualObject* m_lines;
++            OgreNewt::OgreAddons::MovableText* m_text;
++            int m_updated;
++        };            
++        typedef std::map&lt;OgreNewt::Body*, BodyDebugData&gt; BodyDebugDataMap;
++        BodyDebugDataMap m_cachemap;
+ 
++
+ 		static void newtonPerBody( const NewtonBody* body );
+ 		static void _CDECL newtonPerPoly( void* userData, int vertexCount, const float* faceVertec, int id );
+ 	};
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h	2008-09-29 15:43:00 UTC (rev 4536)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h	2008-10-01 16:14:19 UTC (rev 4537)
+@@ -13,6 +13,8 @@
+ 
+ 
+ #include &lt;Ogre.h&gt;
++#include &lt;OgreMovableObject.h&gt;
++#include &lt;OgreRenderable.h&gt;
+ #include &lt;Newton.h&gt;
+ #include &quot;OgreNewt_World.h&quot;
+ #include &quot;OgreNewt_Collision.h&quot;
+@@ -175,6 +177,115 @@
+ 	
+ 	}	// end namespace SPRINGS
+ 
++        namespace OgreAddons
++        {
++            /**
++            * File: MovableText.h
++            *
++            * description: This create create a billboarding object that display a text.
++            * 
++            * @author  2003 by cTh see <A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">gavocanov at rambler.ru</A>
++            * @update  2006 by barraq see <A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">nospam at barraquand.com</A>
++            */
++
++
++            using namespace Ogre;
++
++            class MovableText : public MovableObject, public Renderable
++            {
++                /******************************** MovableText data ****************************/
++            public:
++                enum HorizontalAlignment    {H_LEFT, H_CENTER};
++                enum VerticalAlignment      {V_BELOW, V_ABOVE, V_CENTER};
++            
++            protected:
++                String          mFontName;
++                String          mType;
++                String          mName;
++                String          mCaption;
++                HorizontalAlignment mHorizontalAlignment;
++                VerticalAlignment   mVerticalAlignment;
++            
++                ColourValue     mColor;
++                RenderOperation mRenderOp;
++                AxisAlignedBox  mAABB;
++                LightList       mLList;
++            
++                Real            mCharHeight;
++                Real            mSpaceWidth;
++            
++                bool            mNeedUpdate;
++                bool            mUpdateColors;
++                bool            mOnTop;
++            
++                Real            mTimeUntilNextToggle;
++                Real            mRadius;
++            
++                Vector3            mGlobalTranslation;
++                Vector3            mLocalTranslation;
++            
++                Camera          *mpCam;
++                RenderWindow    *mpWin;
++                Font            *mpFont;
++                MaterialPtr     mpMaterial;
++                MaterialPtr     mpBackgroundMaterial;
++            
++                /******************************** public methods ******************************/
++            public:
++                MovableText(const String &amp;name, const String &amp;caption, const String &amp;fontName, Real charHeight, const ColourValue &amp;color = ColourValue::White);
++                virtual ~MovableText();
++            
++                // Set settings
++                void    setFontName(const String &amp;fontName);
++                void    setCaption(const String &amp;caption);
++                void    setColor(const ColourValue &amp;color);
++                void    setCharacterHeight(Real height);
++                void    setSpaceWidth(Real width);
++                void    setTextAlignment(const HorizontalAlignment&amp; horizontalAlignment, const VerticalAlignment&amp; verticalAlignment);
++                void    setGlobalTranslation( Vector3 trans );
++                void    setLocalTranslation( Vector3 trans );
++                void    showOnTop(bool show=true);
++            
++                // Get settings
++                const   String          &amp;getFontName() const {return mFontName;}
++                const   String          &amp;getCaption() const {return mCaption;}
++                const   ColourValue     &amp;getColor() const {return mColor;}
++                
++                Real    getCharacterHeight() const {return mCharHeight;}
++                Real    getSpaceWidth() const {return mSpaceWidth;}
++                Vector3    getGlobalTranslation() const {return mGlobalTranslation;}
++                Vector3    getLocalTranslation() const {return mLocalTranslation;}
++                bool    getShowOnTop() const {return mOnTop;}
++                AxisAlignedBox          GetAABB(void) { return mAABB; }
++            
++                /******************************** protected methods and overload **************/
++            protected:
++            
++                // from MovableText, create the object
++                void    _setupGeometry();
++                void    _updateColors();
++            
++                // from MovableObject
++                void    getWorldTransforms(Matrix4 *xform) const;
++                Real    getBoundingRadius(void) const {return mRadius;};
++                Real    getSquaredViewDepth(const Camera *cam) const {return 0;};
++                const   Quaternion        &amp;getWorldOrientation(void) const;
++                const   Vector3           &amp;getWorldPosition(void) const;
++                const   AxisAlignedBox    &amp;getBoundingBox(void) const {return mAABB;};
++                const   String            &amp;getName(void) const {return mName;};
++                const   String            &amp;getMovableType(void) const {static Ogre::String movType = &quot;MovableText&quot;; return movType;};
++            
++                void    _notifyCurrentCamera(Camera *cam);
++                void    _updateRenderQueue(RenderQueue* queue);
++            
++                // from renderable
++                void    getRenderOperation(RenderOperation &amp;op);
++                const   MaterialPtr       &amp;getMaterial(void) const {assert(!mpMaterial.isNull());return mpMaterial;};
++                const   LightList         &amp;getLights(void) const {return mLList;};
++            };
++
++        }
++
+ }	// end NAMESPACE OgreNewt
+ 
+ #endif
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp	2008-09-29 15:43:00 UTC (rev 4536)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp	2008-10-01 16:14:19 UTC (rev 4537)
+@@ -83,11 +83,11 @@
+ 
+ 	if (mKeyboard-&gt;isKeyDown(OIS::KC_F3))
+ 	{
+-		Debugger::getSingleton().showLines( m_World );
++		Debugger::getSingleton().showDebugInformation( m_World );
+ 	}
+ 	else
+ 	{
+-		Debugger::getSingleton().hideLines();
++		Debugger::getSingleton().hideDebugInformation();
+ 	}
+ 
+ 	
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp	2008-09-29 15:43:00 UTC (rev 4536)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp	2008-10-01 16:14:19 UTC (rev 4537)
+@@ -1,4 +1,5 @@
+ #include &quot;OgreNewt_Debugger.h&quot;
++#include &lt;sstream&gt;
+ 
+ namespace OgreNewt
+ {
+@@ -8,61 +9,72 @@
+ //////////////////////////////////////////////////////////
+ Debugger::Debugger()
+ {
+-	m_debuglines = NULL;
+-	m_debugnode = NULL;
++    m_debugnode = NULL;
+     m_defaultcolor = Ogre::ColourValue::White;
+ }
+ 
+ Debugger::~Debugger()
+ {
+-	Debugger::getSingleton().deInit();
++    Debugger::getSingleton().deInit();
+ }
+ 
+ Debugger&amp; Debugger::getSingleton()
+ {
+-	static Debugger instance;
+-	return instance;
++    static Debugger instance;
++    return instance;
+ }
+ 		
+ void Debugger::init( Ogre::SceneManager* smgr )
+ {
+-	m_debugnode = smgr-&gt;getRootSceneNode()-&gt;createChildSceneNode(&quot;__OgreNewt__Debugger__&quot;);
+-	m_debuglines = NULL;
+-	m_debuglines = new Ogre::ManualObject(&quot;__OgreNewt__Debugger__&quot;);
++    if( !m_debugnode )
++    {
++        m_debugnode = smgr-&gt;getRootSceneNode()-&gt;createChildSceneNode(&quot;__OgreNewt__Debugger__Node__&quot;);
++        //m_debuglines = new Ogre::ManualObject(&quot;__OgreNewt__Debugger__Lines__&quot;);
++    }
+ }
+ 
+ void Debugger::deInit()
+ {
+ 	if (m_debugnode)
+ 	{
+-		m_debugnode-&gt;detachAllObjects();
+-		if (m_debuglines) { delete m_debuglines; m_debuglines = NULL; }
++		m_debugnode-&gt;removeAndDestroyAllChildren();
+ 		m_debugnode-&gt;getParentSceneNode()-&gt;removeAndDestroyChild( m_debugnode-&gt;getName() );
+ 		m_debugnode = NULL;
+ 	}
++
++        for(BodyDebugDataMap::iterator it = m_cachemap.begin(); it != m_cachemap.end(); it++)
++        {
++            Ogre::ManualObject* mo = it-&gt;second.m_lines;
++            if( mo )
++                delete mo;
++        }
++        m_cachemap.clear();
+ }
+ 
+ 
+-void Debugger::showLines( OgreNewt::World* world )
++void Debugger::showDebugInformation( OgreNewt::World* world )
+ {
+-	m_debugnode-&gt;detachAllObjects();
+-	m_debuglines-&gt;clear();
+-	m_debuglines-&gt;begin(&quot;BaseWhiteNoLighting&quot;, Ogre::RenderOperation::OT_LINE_LIST );
++    m_debugnode-&gt;removeAllChildren();
+ 
+     // make the new lines.
+     for( const NewtonBody* body = NewtonWorldGetFirstBody(world-&gt;getNewtonWorld()); body; body = NewtonWorldGetNextBody(world-&gt;getNewtonWorld(), body) )
+         newtonPerBody(body);
+ 
+-    m_debuglines-&gt;end();
+-	m_debugnode-&gt;attachObject(m_debuglines); 
+-	
++
++    // delete old entries
++    BodyDebugDataMap newmap;
++    for(BodyDebugDataMap::iterator it = Debugger::getSingleton().m_cachemap.begin(); it != Debugger::getSingleton().m_cachemap.end(); it++)
++    {
++        if( it-&gt;second.m_updated )
++            newmap.insert(*it);
++    }
++    Debugger::getSingleton().m_cachemap.swap(newmap);
+ }
+ 
+-void Debugger::hideLines()
++void Debugger::hideDebugInformation()
+ {
+ 	// erase any existing lines!
+-	m_debugnode-&gt;detachAllObjects();
+-	m_debuglines-&gt;clear(); 
++	m_debugnode-&gt;removeAllChildren();
+ }
+ 
+ void Debugger::setMaterialColor(const MaterialID* mat, Ogre::ColourValue col)
+@@ -81,29 +93,115 @@
+     MaterialIdColorMap::iterator it = 
+         debugger.m_materialcolors.find( NewtonBodyGetMaterialGroupID(body) );
+ 
+-    if( it != debugger.m_materialcolors.end() )
+-        debugger.m_debuglines-&gt;colour(it-&gt;second);
++
++    Body *bod = (OgreNewt::Body*)NewtonBodyGetUserData(body);
++    Ogre::Vector3 pos;
++    Ogre::Quaternion ori;
++    bod-&gt;getPositionOrientation(pos, ori);
++
++
++    // ----------- create debug-text ------------
++    std::ostringstream oss_name;
++    oss_name &lt;&lt; &quot;__OgreNewt__Debugger__Body__&quot; &lt;&lt; bod &lt;&lt; &quot;__&quot;;
++    std::ostringstream oss_info;
++    oss_info.precision(2);
++    oss_info.setf(std::ios::fixed,std::ios::floatfield);
++    Ogre::Vector3 inertia;
++    Ogre::Real mass;
++    bod-&gt;getMassMatrix(mass, inertia);
++    oss_info &lt;&lt; &quot;mass: &quot; &lt;&lt; mass &lt;&lt; std::endl &lt;&lt; &quot;inertia: &quot; &lt;&lt; inertia &lt;&lt; std::endl;
++    oss_info &lt;&lt; &quot;pos: &quot; &lt;&lt; pos &lt;&lt; std::endl &lt;&lt; &quot;ori: &quot; &lt;&lt; ori &lt;&lt; std::endl;
++    oss_info &lt;&lt; &quot;vel: &quot; &lt;&lt; bod-&gt;getVelocity() &lt;&lt; std::endl &lt;&lt; &quot;omega: &quot; &lt;&lt; bod-&gt;getOmega() &lt;&lt; std::endl;
++    // ----------- ------------------ ------------
++
++
++
++    // look for cached data
++    BodyDebugData* data = &amp;Debugger::getSingleton().m_cachemap[bod];
++    if( data-&gt;m_lastcol == bod-&gt;getCollision() ) // use cached data
++    {
++        // set new position...
++        data-&gt;m_node-&gt;setPosition(pos);
++        data-&gt;m_node-&gt;setOrientation(ori);
++        data-&gt;m_updated = 1;
++        Debugger::getSingleton().m_debugnode-&gt;addChild(data-&gt;m_node);
++        data-&gt;m_text-&gt;setCaption(oss_info.str());
++        data-&gt;m_text-&gt;setLocalTranslation(bod-&gt;getAABB().getSize().y*1.1*Ogre::Vector3::UNIT_Y);
++    }
+     else
+-        debugger.m_debuglines-&gt;colour(debugger.m_defaultcolor);
++    {
++        data-&gt;m_lastcol = bod-&gt;getCollision();
++        data-&gt;m_updated = 1;
+ 
+-    float matrix[16];
+-    NewtonBodyGetMatrix(body, &amp;matrix[0]);
+-    NewtonCollisionForEachPolygonDo( NewtonBodyGetCollision(body), &amp;matrix[0], newtonPerPoly, NULL );
++        if( data-&gt;m_node )
++        {
++            data-&gt;m_node-&gt;detachAllObjects();
++            data-&gt;m_node-&gt;setPosition(pos);
++            data-&gt;m_node-&gt;setOrientation(ori);
++        }
++        else
++            data-&gt;m_node = Debugger::getSingleton().m_debugnode-&gt;createChildSceneNode(pos, ori);
++
++        if( data-&gt;m_lines )
++            data-&gt;m_lines-&gt;clear();
++        else
++        {
++            std::ostringstream oss;
++            oss &lt;&lt; &quot;__OgreNewt__Debugger__Lines__&quot; &lt;&lt; body &lt;&lt; &quot;__&quot;;
++            data-&gt;m_lines = new Ogre::ManualObject(oss.str());
++        }
++
++        if( data-&gt;m_text )
++        {
++            data-&gt;m_text-&gt;setCaption(oss_info.str());
++            data-&gt;m_text-&gt;setLocalTranslation(bod-&gt;getAABB().getMaximum().y*1.1*Ogre::Vector3::UNIT_Y);
++        }
++        else
++        {
++            data-&gt;m_text = new OgreNewt::OgreAddons::MovableText( oss_name.str(), oss_info.str(), &quot;VeraSerifBold-16&quot;,0.2);
++            data-&gt;m_text-&gt;setLocalTranslation(bod-&gt;getAABB().getMaximum().y/2*Ogre::Vector3::UNIT_Y+Ogre::Vector3::UNIT_Y*0.1);
++            data-&gt;m_text-&gt;setTextAlignment( OgreNewt::OgreAddons::MovableText::H_LEFT, OgreNewt::OgreAddons::MovableText::V_ABOVE );
++        }
++        data-&gt;m_node-&gt;attachObject(data-&gt;m_text);
++        
++
++
++        data-&gt;m_lines-&gt;begin(&quot;BaseWhiteNoLighting&quot;, Ogre::RenderOperation::OT_LINE_LIST );
++
++        // set color
++        if( it != debugger.m_materialcolors.end() )
++            data-&gt;m_lines-&gt;colour(it-&gt;second);
++        else
++            data-&gt;m_lines-&gt;colour(debugger.m_defaultcolor);
++
++        float matrix[16];
++        Converters::QuatPosToMatrix(Ogre::Quaternion::IDENTITY, Ogre::Vector3::ZERO, &amp;matrix[0]);
++        
++        NewtonCollisionForEachPolygonDo( NewtonBodyGetCollision(body), &amp;matrix[0], newtonPerPoly, data );
++        
++        data-&gt;m_lines-&gt;end();
++        data-&gt;m_node-&gt;attachObject(data-&gt;m_lines);
++    }
+ }
+ 
+ void _CDECL Debugger::newtonPerPoly( void* userData, int vertexCount, const float* faceVertec, int id )
+ {
++        BodyDebugData* data = (BodyDebugData*)userData;
+ 	Ogre::Vector3 p0, p1;
+ 
++        if( vertexCount &lt; 2 )
++            return;
++
+ 	int i= vertexCount - 1;
+ 	p0 = Ogre::Vector3( faceVertec[(i*3) + 0], faceVertec[(i*3) + 1], faceVertec[(i*3) + 2] );
+ 
++
+ 	for (i=0;i&lt;vertexCount;i++)
+ 	{
+ 		p1 = Ogre::Vector3( faceVertec[(i*3) + 0], faceVertec[(i*3) + 1], faceVertec[(i*3) + 2] );
+ 
+-		Debugger::getSingleton().m_debuglines-&gt;position( p0 );
+-		Debugger::getSingleton().m_debuglines-&gt;position( p1 );
++		data-&gt;m_lines-&gt;position( p0 );
++		data-&gt;m_lines-&gt;position( p1 );
+ 
+ 		p0 = p1;
+ 	}
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp	2008-09-29 15:43:00 UTC (rev 4536)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp	2008-10-01 16:14:19 UTC (rev 4537)
+@@ -1,6 +1,6 @@
+ #include &quot;OgreNewt_Tools.h&quot;
+ #include &lt;iostream&gt;
+-using namespace std;
++#include &lt;OgreFontManager.h&gt;
+ 
+ namespace OgreNewt
+ {
+@@ -190,5 +190,542 @@
+ 		}
+ 	}
+ 
++
++        namespace OgreAddons
++        {
++            /**
++             * File: MovableText.cpp
++             *
++             * description: This create create a billboarding object that display a text.
++             * 
++             * @author  2003 by cTh see <A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">gavocanov at rambler.ru</A>
++             * @update  2006 by barraq see <A HREF="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">nospam at barraquand.com</A>
++            */
++
++
++            using namespace Ogre;
++
++            const unsigned short POS_TEX_BINDING = 0;
++            const unsigned short COLOUR_BINDING = 1;
++
++            MovableText::MovableText(const String &amp;name, const String &amp;caption, const String &amp;fontName, Real charHeight, const ColourValue &amp;color)
++                : mpCam(NULL)
++                  , mpWin(NULL)
++                  , mpFont(NULL)
++                  , mName(name)
++                  , mCaption(caption)
++                  , mFontName(fontName)
++                  , mCharHeight(charHeight)
++                  , mColor(color)
++                  , mType(&quot;MovableText&quot;)
++                  , mTimeUntilNextToggle(0)
++                  , mSpaceWidth(0)
++                  , mUpdateColors(true)
++                  , mOnTop(false)
++                  , mHorizontalAlignment(H_LEFT)
++                  , mVerticalAlignment(V_BELOW)
++                  , mGlobalTranslation(0.0)
++                  , mLocalTranslation(0.0)
++            {
++                if (name == &quot;&quot;)
++                    throw Exception(Exception::ERR_INVALIDPARAMS, &quot;Trying to create MovableText without name&quot;, &quot;MovableText::MovableText&quot;);
++
++                if (caption == &quot;&quot;)
++                    throw Exception(Exception::ERR_INVALIDPARAMS, &quot;Trying to create MovableText without caption&quot;, &quot;MovableText::MovableText&quot;);
++
++                mRenderOp.vertexData = NULL;
++                this-&gt;setFontName(mFontName);
++                this-&gt;_setupGeometry();
++            }
++
++            MovableText::~MovableText()
++            {
++                if (mRenderOp.vertexData)
++                    delete mRenderOp.vertexData;
++                // May cause crashing... check this and comment if it does
++                if (!mpMaterial.isNull())
++                    MaterialManager::getSingletonPtr()-&gt;remove(mpMaterial-&gt;getName());
++            }
++
++            void MovableText::setFontName(const String &amp;fontName)
++            {
++                if((Ogre::MaterialManager::getSingletonPtr()-&gt;resourceExists(mName + &quot;Material&quot;))) 
++                { 
++                    Ogre::MaterialManager::getSingleton().remove(mName + &quot;Material&quot;); 
++                }
++
++                if (mFontName != fontName || mpMaterial.isNull() || !mpFont)
++                {
++                    mFontName = fontName;
++                    mpFont = (Font *)FontManager::getSingleton().getByName(mFontName).getPointer();
++                    if (!mpFont)
++                        throw Exception(Exception::ERR_ITEM_NOT_FOUND, &quot;Could not find font &quot; + fontName, &quot;MovableText::setFontName&quot;);
++
++                    mpFont-&gt;load();
++                    if (!mpMaterial.isNull())
++                    {
++                        MaterialManager::getSingletonPtr()-&gt;remove(mpMaterial-&gt;getName());
++                        mpMaterial.setNull();
++                    }
++
++                    mpMaterial = mpFont-&gt;getMaterial()-&gt;clone(mName + &quot;Material&quot;);
++                    if (!mpMaterial-&gt;isLoaded())
++                        mpMaterial-&gt;load();
++
++                    mpMaterial-&gt;setDepthCheckEnabled(!mOnTop);
++                    mpMaterial-&gt;setDepthBias(1.0,1.0);
++                    mpMaterial-&gt;setDepthWriteEnabled(mOnTop);
++                    mpMaterial-&gt;setLightingEnabled(false);
++                    mNeedUpdate = true;
++                }
++            }
++
++            void MovableText::setCaption(const String &amp;caption)
++            {
++                if (caption != mCaption)
++                {
++                    mCaption = caption;
++                    mNeedUpdate = true;
++                }
++            }
++
++            void MovableText::setColor(const ColourValue &amp;color)
++            {
++                if (color != mColor)
++                {
++                    mColor = color;
++                    mUpdateColors = true;
++                }
++            }
++
++            void MovableText::setCharacterHeight(Real height)
++            {
++                if (height != mCharHeight)
++                {
++                    mCharHeight = height;
++                    mNeedUpdate = true;
++                }
++            }
++
++            void MovableText::setSpaceWidth(Real width)
++            {
++                if (width != mSpaceWidth)
++                {
++                    mSpaceWidth = width;
++                    mNeedUpdate = true;
++                }
++            }
++
++            void MovableText::setTextAlignment(const HorizontalAlignment&amp; horizontalAlignment, const VerticalAlignment&amp; verticalAlignment)
++            {
++                if(mHorizontalAlignment != horizontalAlignment)
++                {
++                    mHorizontalAlignment = horizontalAlignment;
++                    mNeedUpdate = true;
++                }
++                if(mVerticalAlignment != verticalAlignment)
++                {
++                    mVerticalAlignment = verticalAlignment;
++                    mNeedUpdate = true;
++                }
++            }
++
++            void MovableText::setGlobalTranslation( Vector3 trans )
++            {
++                mGlobalTranslation = trans;
++            }
++
++            void MovableText::setLocalTranslation( Vector3 trans )
++            {
++                mLocalTranslation = trans;
++            }
++
++            void MovableText::showOnTop(bool show)
++            {
++                if( mOnTop != show &amp;&amp; !mpMaterial.isNull() )
++                {
++                    mOnTop = show;
++                    mpMaterial-&gt;setDepthBias(1.0,1.0);
++                    mpMaterial-&gt;setDepthCheckEnabled(!mOnTop);
++                    mpMaterial-&gt;setDepthWriteEnabled(mOnTop);
++                }
++            }
++
++            void MovableText::_setupGeometry()
++            {
++                assert(mpFont);
++                assert(!mpMaterial.isNull());
++
++                unsigned int vertexCount = static_cast&lt;unsigned int&gt;(mCaption.size() * 6);
++
++                if (mRenderOp.vertexData)
++                {
++                    // Removed this test as it causes problems when replacing a caption
++                    // of the same size: replacing &quot;Hello&quot; with &quot;hello&quot;
++                    // as well as when changing the text alignment
++                    //if (mRenderOp.vertexData-&gt;vertexCount != vertexCount)
++                    {
++                        delete mRenderOp.vertexData;
++                        mRenderOp.vertexData = NULL;
++                        mUpdateColors = true;
++                    }
++                }
++
++                if (!mRenderOp.vertexData)
++                    mRenderOp.vertexData = new VertexData();
++
++                mRenderOp.indexData = 0;
++                mRenderOp.vertexData-&gt;vertexStart = 0;
++                mRenderOp.vertexData-&gt;vertexCount = vertexCount;
++                mRenderOp.operationType = RenderOperation::OT_TRIANGLE_LIST; 
++                mRenderOp.useIndexes = false; 
++
++                VertexDeclaration  *decl = mRenderOp.vertexData-&gt;vertexDeclaration;
++                VertexBufferBinding   *bind = mRenderOp.vertexData-&gt;vertexBufferBinding;
++                size_t offset = 0;
++
++                // create/bind positions/tex.ccord. buffer
++                if (!decl-&gt;findElementBySemantic(VES_POSITION))
++                    decl-&gt;addElement(POS_TEX_BINDING, offset, VET_FLOAT3, VES_POSITION);
++
++                offset += VertexElement::getTypeSize(VET_FLOAT3);
++
++                if (!decl-&gt;findElementBySemantic(VES_TEXTURE_COORDINATES))
++                    decl-&gt;addElement(POS_TEX_BINDING, offset, Ogre::VET_FLOAT2, Ogre::VES_TEXTURE_COORDINATES, 0);
++
++                HardwareVertexBufferSharedPtr ptbuf = HardwareBufferManager::getSingleton().createVertexBuffer(decl-&gt;getVertexSize(POS_TEX_BINDING),
++                        mRenderOp.vertexData-&gt;vertexCount,
++                        HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY);
++                bind-&gt;setBinding(POS_TEX_BINDING, ptbuf);
++
++                // Colours - store these in a separate buffer because they change less often
++                if (!decl-&gt;findElementBySemantic(VES_DIFFUSE))
++                    decl-&gt;addElement(COLOUR_BINDING, 0, VET_COLOUR, VES_DIFFUSE);
++
++                HardwareVertexBufferSharedPtr cbuf = HardwareBufferManager::getSingleton().createVertexBuffer(decl-&gt;getVertexSize(COLOUR_BINDING),
++                        mRenderOp.vertexData-&gt;vertexCount,
++                        HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY);
++                bind-&gt;setBinding(COLOUR_BINDING, cbuf);
++
++                size_t charlen = mCaption.size();
++                float *pPCBuff = static_cast&lt;float*&gt;(ptbuf-&gt;lock(HardwareBuffer::HBL_DISCARD));
++
++                float largestWidth = 0;
++                float left = 0 * 2.0 - 1.0;
++                float top = -((0 * 2.0) - 1.0);
++
++                Real spaceWidth = mSpaceWidth;
++                // Derive space width from a capital A
++                if (spaceWidth == 0)
++                    spaceWidth = mpFont-&gt;getGlyphAspectRatio('A') * mCharHeight * 2.0;
++
++                // for calculation of AABB
++                Ogre::Vector3 min, max, currPos;
++                Ogre::Real maxSquaredRadius;
++                bool first = true;
++
++                // Use iterator
++                String::iterator i, iend;
++                iend = mCaption.end();
++                bool newLine = true;
++                Real len = 0.0f;
++
++                Real verticalOffset = 0;
++                switch (mVerticalAlignment)
++                {
++                    case MovableText::V_ABOVE:
++                        verticalOffset = mCharHeight;
++                        break;
++                    case MovableText::V_CENTER:
++                        verticalOffset = 0.5*mCharHeight;
++                        break;
++                    case MovableText::V_BELOW:
++                        verticalOffset = 0;
++                        break;
++                }
++                // Raise the first line of the caption
++                top += verticalOffset;
++                for (i = mCaption.begin(); i != iend; ++i)
++                {
++                    if (*i == '\n')
++                        top += verticalOffset * 2.0;
++                }
++
++                for (i = mCaption.begin(); i != iend; ++i)
++                {
++                    if (newLine)
++                    {
++                        len = 0.0f;
++                        for (String::iterator j = i; j != iend &amp;&amp; *j != '\n'; j++)
++                        {
++                            if (*j == ' ')
++                                len += spaceWidth;
++                            else 
++                                len += mpFont-&gt;getGlyphAspectRatio(*j) * mCharHeight * 2.0;
++                        }
++                        newLine = false;
++                    }
++
++                    if (*i == '\n')
++                    {
++                        left = 0 * 2.0 - 1.0;
++                        top -= mCharHeight * 2.0;
++                        newLine = true;
++                        continue;
++                    }
++
++                    if (*i == ' ')
++                    {
++                        // Just leave a gap, no tris
++                        left += spaceWidth;
++                        // Also reduce tri count
++                        mRenderOp.vertexData-&gt;vertexCount -= 6;
++                        continue;
++                    }
++
++                    Real horiz_height = mpFont-&gt;getGlyphAspectRatio(*i);
++                    Real u1, u2, v1, v2; 
++                    Ogre::Font::UVRect utmp;
++                    utmp = mpFont-&gt;getGlyphTexCoords(*i);
++                    u1 = utmp.left;
++                    u2 = utmp.right;
++                    v1 = utmp.top;
++                    v2 = utmp.bottom;
++
++                    // each vert is (x, y, z, u, v)
++                    //-------------------------------------------------------------------------------------
++                    // First tri
++                    //
++                    // Upper left
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u1;
++                    *pPCBuff++ = v1;
++
++                    // Deal with bounds
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        currPos = Ogre::Vector3(left, top, -1.0);
++                    else
++                        currPos = Ogre::Vector3(left - (len / 2), top, -1.0);
++                    if (first)
++                    {
++                        min = max = currPos;
++                        maxSquaredRadius = currPos.squaredLength();
++                        first = false;
++                    }
++                    else
++                    {
++                        min.makeFloor(currPos);
++                        max.makeCeil(currPos);
++                        maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++                    }
++
++                    top -= mCharHeight * 2.0;
++
++                    // Bottom left
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u1;
++                    *pPCBuff++ = v2;
++
++                    // Deal with bounds
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        currPos = Ogre::Vector3(left, top, -1.0);
++                    else
++                        currPos = Ogre::Vector3(left - (len / 2), top, -1.0);
++                    min.makeFloor(currPos);
++                    max.makeCeil(currPos);
++                    maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++
++                    top += mCharHeight * 2.0;
++                    left += horiz_height * mCharHeight * 2.0;
++
++                    // Top right
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u2;
++                    *pPCBuff++ = v1;
++                    //-------------------------------------------------------------------------------------
++
++                    // Deal with bounds
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        currPos = Ogre::Vector3(left, top, -1.0);
++                    else
++                        currPos = Ogre::Vector3(left - (len / 2), top, -1.0);
++                    min.makeFloor(currPos);
++                    max.makeCeil(currPos);
++                    maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++
++                    //-------------------------------------------------------------------------------------
++                    // Second tri
++                    //
++                    // Top right (again)
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u2;
++                    *pPCBuff++ = v1;
++
++                    currPos = Ogre::Vector3(left, top, -1.0);
++                    min.makeFloor(currPos);
++                    max.makeCeil(currPos);
++                    maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++
++                    top -= mCharHeight * 2.0;
++                    left -= horiz_height  * mCharHeight * 2.0;
++
++                    // Bottom left (again)
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u1;
++                    *pPCBuff++ = v2;
++
++                    currPos = Ogre::Vector3(left, top, -1.0);
++                    min.makeFloor(currPos);
++                    max.makeCeil(currPos);
++                    maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++
++                    left += horiz_height  * mCharHeight * 2.0;
++
++                    // Bottom right
++                    if(mHorizontalAlignment == MovableText::H_LEFT)
++                        *pPCBuff++ = left;
++                    else
++                        *pPCBuff++ = left - (len / 2);
++                    *pPCBuff++ = top;
++                    *pPCBuff++ = -1.0;
++                    *pPCBuff++ = u2;
++                    *pPCBuff++ = v2;
++                    //-------------------------------------------------------------------------------------
++
++                    currPos = Ogre::Vector3(left, top, -1.0);
++                    min.makeFloor(currPos);
++                    max.makeCeil(currPos);
++                    maxSquaredRadius = std::max(maxSquaredRadius, currPos.squaredLength());
++
++                    // Go back up with top
++                    top += mCharHeight * 2.0;
++
++                    float currentWidth = (left + 1)/2 - 0;
++                    if (currentWidth &gt; largestWidth)
++                        largestWidth = currentWidth;
++                }
++
++                // Unlock vertex buffer
++                ptbuf-&gt;unlock();
++
++                // update AABB/Sphere radius
++                mAABB = Ogre::AxisAlignedBox(min, max);
++                mRadius = Ogre::Math::Sqrt(maxSquaredRadius);
++
++                if (mUpdateColors)
++                    this-&gt;_updateColors();
++
++                mNeedUpdate = false;
++            }
++
++            void MovableText::_updateColors(void)
++            {
++                assert(mpFont);
++                assert(!mpMaterial.isNull());
++
++                // Convert to system-specific
++                RGBA color;
++                Root::getSingleton().convertColourValue(mColor, &amp;color);
++                HardwareVertexBufferSharedPtr vbuf = mRenderOp.vertexData-&gt;vertexBufferBinding-&gt;getBuffer(COLOUR_BINDING);
++                RGBA *pDest = static_cast&lt;RGBA*&gt;(vbuf-&gt;lock(HardwareBuffer::HBL_DISCARD));
++                for (int i = 0; i &lt; (int)mRenderOp.vertexData-&gt;vertexCount; ++i)
++                    *pDest++ = color;
++                vbuf-&gt;unlock();
++                mUpdateColors = false;
++            }
++
++            const Quaternion&amp; MovableText::getWorldOrientation(void) const
++            {
++                assert(mpCam);
++                return const_cast&lt;Quaternion&amp;&gt;(mpCam-&gt;getDerivedOrientation());
++            }
++
++            const Vector3&amp; MovableText::getWorldPosition(void) const
++            {
++                assert(mParentNode);
++                return mParentNode-&gt;_getDerivedPosition();
++            }
++
++            void MovableText::getWorldTransforms(Matrix4 *xform) const 
++            {
++                if (this-&gt;isVisible() &amp;&amp; mpCam)
++                {
++                    Matrix3 rot3x3, scale3x3 = Matrix3::IDENTITY;
++
++                    // store rotation in a matrix
++                    mpCam-&gt;getDerivedOrientation().ToRotationMatrix(rot3x3);
++
++                    // parent node position
++                    Vector3 ppos = mParentNode-&gt;_getDerivedPosition() + Vector3::UNIT_Y*mGlobalTranslation;
++                    ppos += rot3x3*mLocalTranslation;
++
++                    // apply scale
++                    scale3x3[0][0] = mParentNode-&gt;_getDerivedScale().x / 2;
++                    scale3x3[1][1] = mParentNode-&gt;_getDerivedScale().y / 2;
++                    scale3x3[2][2] = mParentNode-&gt;_getDerivedScale().z / 2;
++
++                    // apply all transforms to xform       
++                    *xform = (rot3x3 * scale3x3);
++                    xform-&gt;setTrans(ppos);
++                }
++            }
++
++            void MovableText::getRenderOperation(RenderOperation &amp;op)
++            {
++                if (this-&gt;isVisible())
++                {
++                    if (mNeedUpdate)
++                        this-&gt;_setupGeometry();
++                    if (mUpdateColors)
++                        this-&gt;_updateColors();
++                    op = mRenderOp;
++                }
++            }
++
++            void MovableText::_notifyCurrentCamera(Camera *cam)
++            {
++                mpCam = cam;
++            }
++
++            void MovableText::_updateRenderQueue(RenderQueue* queue)
++            {
++                if (this-&gt;isVisible())
++                {
++                    if (mNeedUpdate)
++                        this-&gt;_setupGeometry();
++                    if (mUpdateColors)
++                        this-&gt;_updateColors();
++
++                    queue-&gt;addRenderable(this, mRenderQueueID, OGRE_RENDERABLE_DEFAULT_PRIORITY);
++                    //queue-&gt;addRenderable(this, mRenderQueueID, RENDER_QUEUE_SKIES_LATE);
++                }
++            }
++
++        }
+ }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="001595.html">[Dsa-hl-svn] r4538 - in rl/branches/newton20/engine: core/include	core/src script/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1596">[ date ]</a>
+              <a href="thread.html#1596">[ thread ]</a>
+              <a href="subject.html#1596">[ subject ]</a>
+              <a href="author.html#1596">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

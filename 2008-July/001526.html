@@ -1,0 +1,512 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4455 - in rl/trunk/engine/script: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4455%20-%20in%20rl/trunk/engine/script%3A%20.%20include%20src&In-Reply-To=%3C200807250843.m6P8h2OH018712%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001525.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4455 - in rl/trunk/engine/script: . include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4455%20-%20in%20rl/trunk/engine/script%3A%20.%20include%20src&In-Reply-To=%3C200807250843.m6P8h2OH018712%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4455 - in rl/trunk/engine/script: . include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Fri Jul 25 10:43:02 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001525.html">[Dsa-hl-svn] r4454 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1526">[ date ]</a>
+              <a href="thread.html#1526">[ thread ]</a>
+              <a href="subject.html#1526">[ subject ]</a>
+              <a href="author.html#1526">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-07-25 10:42:37 +0200 (Fri, 25 Jul 2008)
+New Revision: 4455
+
+Added:
+   rl/trunk/engine/script/include/PlaneNodeProcessor.h
+   rl/trunk/engine/script/src/PlaneNodeProcessor.cpp
+Modified:
+   rl/trunk/engine/script/RlScript2005.vcproj
+   rl/trunk/engine/script/include/AbstractMapNodeProcessor.h
+   rl/trunk/engine/script/include/Makefile.am
+   rl/trunk/engine/script/src/AbstractMapNodeProcessor.cpp
+   rl/trunk/engine/script/src/Makefile.am
+   rl/trunk/engine/script/src/MapLoader.cpp
+Log:
+Added the plane loading feature to maploader
+
+Modified: rl/trunk/engine/script/RlScript2005.vcproj
+===================================================================
+--- rl/trunk/engine/script/RlScript2005.vcproj	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/RlScript2005.vcproj	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -355,6 +355,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\src\PlaneNodeProcessor.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\src\Scene.cpp&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+@@ -462,6 +466,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\include\PlaneNodeProcessor.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\include\Scene.h&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Modified: rl/trunk/engine/script/include/AbstractMapNodeProcessor.h
+===================================================================
+--- rl/trunk/engine/script/include/AbstractMapNodeProcessor.h	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/include/AbstractMapNodeProcessor.h	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -42,6 +42,7 @@
+     
+         Ogre::String getRandomName(const Ogre::String&amp; baseName) const;
+         Ogre::Vector3 processVector3(XERCES_CPP_NAMESPACE::DOMElement* nodeElem) const;
++		Ogre::Vector2 processVector2(XERCES_CPP_NAMESPACE::DOMElement* nodeElem) const;
+         Ogre::Quaternion processQuaternion(XERCES_CPP_NAMESPACE::DOMElement* nodeElem) const;
+         Ogre::ColourValue processColour(XERCES_CPP_NAMESPACE::DOMElement* colElem) const;
+         
+
+Modified: rl/trunk/engine/script/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/script/include/Makefile.am	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/include/Makefile.am	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -1,25 +1,26 @@
+-noinst_HEADERS = \
+-	AbstractMapNodeProcessor.h \
+-	EntityNodeProcessor.h \
+-	EnvironmentProcessor.h \
+-	GameObjectNodeProcessor.h \
+-	LightNodeProcessor.h \
+-	MapLoader.h \
+-	ParticleSystemNodeProcessor.h \
+-	TriggerFactory.h \
+-	Scene.h \
+-	SceneLoader.h \
+-	SceneManager.h \
+-	ScriptObjectMarker.h \
+-	ScriptPrerequisites.h \
+-	ScriptSubsystem.h \
+-	SoundNodeProcessor.h \
+-	WaypointProcessor.h \
+-	UnifiedFactory.h \
+-	ZoneProcessor.h
+-
+-CLEANFILES = stdinc.h.gch
+-all-local: stdinc.h.gch
+-stdinc.h.gch: $(noinst_HEADERS) stdinc.h
+-	@echo Creating GCH file
+-	g++ -I. stdinc.h
++noinst_HEADERS = \
++	AbstractMapNodeProcessor.h \
++	EntityNodeProcessor.h \
++	EnvironmentProcessor.h \
++	GameObjectNodeProcessor.h \
++	LightNodeProcessor.h \
++	MapLoader.h \
++	ParticleSystemNodeProcessor.h \
++	PlaneNodeProcessor.h \
++	TriggerFactory.h \
++	Scene.h \
++	SceneLoader.h \
++	SceneManager.h \
++	ScriptObjectMarker.h \
++	ScriptPrerequisites.h \
++	ScriptSubsystem.h \
++	SoundNodeProcessor.h \
++	WaypointProcessor.h \
++	UnifiedFactory.h \
++	ZoneProcessor.h
++
++CLEANFILES = stdinc.h.gch
++all-local: stdinc.h.gch
++stdinc.h.gch: $(noinst_HEADERS) stdinc.h
++	@echo Creating GCH file
++	g++ -I. stdinc.h
+
+Added: rl/trunk/engine/script/include/PlaneNodeProcessor.h
+===================================================================
+--- rl/trunk/engine/script/include/PlaneNodeProcessor.h	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/include/PlaneNodeProcessor.h	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -0,0 +1,47 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#ifndef __PlaneNodeProcessor_H__
++#define __PlaneNodeProcessor_H__
++
++#include &lt;xercesc/dom/DOMElement.hpp&gt;
++
++#include &quot;ScriptPrerequisites.h&quot;
++
++#ifdef __APPLE__
++#   include &lt;OgreNewt/OgreNewt.h&gt;
++#else
++#   include &lt;OgreNewt.h&gt;
++#endif
++
++#include &quot;AbstractMapNodeProcessor.h&quot;
++
++namespace rl
++{
++    class PlaneNodeProcessor : public AbstractMapNodeProcessor
++    {
++    public:
++        PlaneNodeProcessor(const Ogre::String&amp; resourcegroup);
++
++        virtual bool processNode(XERCES_CPP_NAMESPACE::DOMElement* nodeElem, bool loadGameObjects);
++
++    private:
++        Ogre::String mResourceGroup;
++
++        void createCollision(Ogre::Entity* entity, XERCES_CPP_NAMESPACE::DOMElement* physicsProxyElem);
++	};
++}
++
++#endif // __PlaneNodeProcessor_H__
+
+Modified: rl/trunk/engine/script/src/AbstractMapNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/AbstractMapNodeProcessor.cpp	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/src/AbstractMapNodeProcessor.cpp	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -55,6 +55,24 @@
+         return rval;
+     }
+ 
++	Vector2 AbstractMapNodeProcessor::processVector2(DOMElement* vec2Elem) const
++    {
++        Vector2 rval(Vector2::ZERO);
++        if (vec2Elem != NULL)
++        {
++            if (hasAttribute(vec2Elem, &quot;x&quot;))
++            {
++                rval.x = getAttributeValueAsReal(vec2Elem, &quot;x&quot;);
++            }
++            if (hasAttribute(vec2Elem, &quot;y&quot;))
++            {
++                rval.y = getAttributeValueAsReal(vec2Elem, &quot;y&quot;);
++            }
++        }
++
++        return rval;
++    }
++
+     Quaternion AbstractMapNodeProcessor::processQuaternion(DOMElement* quatElem) const
+     {
+         Quaternion rval(Quaternion::IDENTITY);
+
+Modified: rl/trunk/engine/script/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/script/src/Makefile.am	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/src/Makefile.am	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -1,32 +1,33 @@
+-INCLUDES = $(CEGUI_CFLAGS) $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(OgreNewt_CFLAGS) $(OIS_CFLAGS) \
+-	$(STLPORT_CFLAGS) $(BOOST_CPPFLAGS) -I../include -I../../common/include \
+-	-I../../core/include -I../../rules/include -I../../ui/include \
+-	-I../../ai/include
+-
+-lib_LTLIBRARIES = libRlScript.la
+-libRlScript_la_LDFLAGS = \
+-    $(top_builddir)/engine/common/src/libRlCommon.la \
+-    $(top_builddir)/engine/core/src/libRlCore.la \
+-    $(top_builddir)/engine/ui/src/libRlUi.la \
+-    $(top_builddir)/engine/rules/src/libRlRules.la \
+-    $(CEGUI_LIBS) $(OGRE_LIBS) $(RUBY_LIBS) $(LIBS) \
+-    -Wl,--defsym -Wl,Init_libRlScript=Init_RlScript
+-	
+-libRlScript_la_SOURCES = \
+-	AbstractMapNodeProcessor.cpp \
+-	EntityNodeProcessor.cpp \
+-	EnvironmentProcessor.cpp \
+-	GameObjectNodeProcessor.cpp \
+-	LightNodeProcessor.cpp \
+-	MapLoader.cpp \
+-	ParticleSystemNodeProcessor.cpp \
+-	Scene.cpp \
+-	SceneLoader.cpp \
+-	SceneManager.cpp \
+-	ScriptSubsystem.cpp \
+-	ScriptObjectMarker.cpp \
+-	SoundNodeProcessor.cpp \
+-	TriggerFactory.cpp \
+-	WaypointProcessor.cpp \
+-	ZoneProcessor.cpp \
+-	../swig/RlExports.cxx 
++INCLUDES = $(CEGUI_CFLAGS) $(RUBY_CFLAGS) $(OGRE_CFLAGS) $(OgreNewt_CFLAGS) $(OIS_CFLAGS) \
++	$(STLPORT_CFLAGS) $(BOOST_CPPFLAGS) -I../include -I../../common/include \
++	-I../../core/include -I../../rules/include -I../../ui/include \
++	-I../../ai/include
++
++lib_LTLIBRARIES = libRlScript.la
++libRlScript_la_LDFLAGS = \
++    $(top_builddir)/engine/common/src/libRlCommon.la \
++    $(top_builddir)/engine/core/src/libRlCore.la \
++    $(top_builddir)/engine/ui/src/libRlUi.la \
++    $(top_builddir)/engine/rules/src/libRlRules.la \
++    $(CEGUI_LIBS) $(OGRE_LIBS) $(RUBY_LIBS) $(LIBS) \
++    -Wl,--defsym -Wl,Init_libRlScript=Init_RlScript
++	
++libRlScript_la_SOURCES = \
++	AbstractMapNodeProcessor.cpp \
++	EntityNodeProcessor.cpp \
++	EnvironmentProcessor.cpp \
++	GameObjectNodeProcessor.cpp \
++	LightNodeProcessor.cpp \
++	MapLoader.cpp \
++	ParticleSystemNodeProcessor.cpp \
++	PlaneNodeProcessor.cpp \
++	Scene.cpp \
++	SceneLoader.cpp \
++	SceneManager.cpp \
++	ScriptSubsystem.cpp \
++	ScriptObjectMarker.cpp \
++	SoundNodeProcessor.cpp \
++	TriggerFactory.cpp \
++	WaypointProcessor.cpp \
++	ZoneProcessor.cpp \
++	../swig/RlExports.cxx 
+
+Modified: rl/trunk/engine/script/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/script/src/MapLoader.cpp	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/src/MapLoader.cpp	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -37,6 +37,7 @@
+ #include &quot;ZoneProcessor.h&quot;
+ #include &quot;ContentModule.h&quot;
+ #include &quot;RubyInterpreter.h&quot;
++#include &quot;PlaneNodeProcessor.h&quot;
+ 
+ using namespace Ogre;
+ using namespace XERCES_CPP_NAMESPACE;
+@@ -83,6 +84,7 @@
+         mNodeProcessors.push_back(new SoundNodeProcessor());
+         mNodeProcessors.push_back(new LightNodeProcessor());
+ 		mNodeProcessors.push_back(new ParticleSystemNodeProcessor());
++		mNodeProcessors.push_back(new PlaneNodeProcessor(resourceGroup));
+ 
+         RequestedSceneChangeConnection = MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneChangeRequested&gt;(
+             boost::bind(&amp;MapLoader::changeScene, this, _1));
+
+Added: rl/trunk/engine/script/src/PlaneNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/PlaneNodeProcessor.cpp	2008-07-16 19:24:11 UTC (rev 4454)
++++ rl/trunk/engine/script/src/PlaneNodeProcessor.cpp	2008-07-25 08:42:37 UTC (rev 4455)
+@@ -0,0 +1,157 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;PlaneNodeProcessor.h&quot;
++
++#include &lt;xercesc/dom/DOM.hpp&gt;
++
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;PhysicsManager.h&quot;
++#include &quot;World.h&quot;
++
++using namespace Ogre;
++using namespace XERCES_CPP_NAMESPACE;
++
++namespace rl
++{
++	PlaneNodeProcessor::PlaneNodeProcessor(const Ogre::String &amp;resourcegroup)
++	{
++	}
++
++	bool PlaneNodeProcessor::processNode(xercesc_2_7::DOMElement *nodeElem, bool loadGameObjects)
++	{
++		if (!hasNodeName(nodeElem, &quot;plane&quot;))
++        {
++            return false;
++        }
++
++		Ogre::String entName = getAttributeValueAsStdString(nodeElem, &quot;name&quot;);
++
++		LOG_DEBUG(Logger::RULES,
++            &quot;Processing plane node &quot;
++                + entName);
++		if(entName==&quot;&quot;)
++		{
++			entName = getRandomName(&quot;Plane&quot;);
++		}
++
++		Quaternion orientation(Quaternion::IDENTITY);
++		Vector3 position(Vector3::ZERO);
++		Vector2 scale(1,1);
++
++		DOMElement* oriElem = getChildNamed(nodeElem, &quot;rotation&quot;);
++        if (oriElem != NULL)
++        {
++            orientation = processQuaternion(oriElem);
++        }
++        else
++        {
++            LOG_WARNING(Logger::RULES, &quot;No orientation given for plane, used Identity&quot;);
++        }
++
++		DOMElement* posElem = getChildNamed(nodeElem, &quot;position&quot;);
++        if (posElem != NULL)
++        {
++            position = processVector3(posElem);
++        }
++		else
++        {
++            LOG_WARNING(Logger::RULES, &quot;No position given for plane, used (0,0,0)&quot;);
++        }
++
++		DOMElement* scaleElem = getChildNamed(nodeElem, &quot;scale&quot;);
++        if (posElem != NULL)
++        {
++            scale = processVector2(posElem);
++        }
++		else
++        {
++            LOG_WARNING(Logger::RULES, &quot;No scale given for plane, used (0,0)&quot;);
++        }
++
++		while(!MeshManager::getSingleton().getByName(entName).isNull())
++		{
++			entName = getRandomName(&quot;Plane&quot;);
++		}
++
++		SceneNode* node = getRootSceneNode()-&gt;createChildSceneNode(entName, position, orientation);
++
++		Plane* plane = new MovablePlane(entName);
++		plane-&gt;d = 0;
++		plane-&gt;normal = Vector3::UNIT_Y;
++
++		MeshManager::getSingleton().createPlane(entName, mResourceGroup, *plane, 1, 1, 1, 1, true, 1, 1, 1, Vector3::UNIT_Z);
++
++		Entity* ent = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()-&gt;createEntity(entName, entName);
++
++		LOG_DEBUG(Logger::RULES, &quot; Loaded plane &quot;+entName);
++
++		node-&gt;attachObject(ent);
++
++		createCollision(ent, getChildNamed(nodeElem, &quot;physicsproxy&quot;));
++
++		DOMElement* materialElem = getChildNamed(nodeElem, &quot;material&quot;);
++		if(materialElem)
++		{
++			ent-&gt;setMaterialName(getAttributeValueAsStdString(materialElem, &quot;name&quot;));
++		}
++		else
++        {
++            LOG_WARNING(Logger::RULES, &quot;No material given for plane &quot;+entName);
++        }
++
++		node-&gt;scale(scale.x,1,scale.y);
++
++		return true;
++	}
++
++	void PlaneNodeProcessor::createCollision(Ogre::Entity *entity, xercesc_2_7::DOMElement *physicsProxyElem)
++	{
++		bool collisionEnabled = false;
++		if (physicsProxyElem == NULL || !hasAttribute(physicsProxyElem, &quot;type&quot;))
++			collisionEnabled = true;
++		else if(getAttributeValueAsBool(physicsProxyElem, &quot;collision&quot;))
++			collisionEnabled = true;
++		if(collisionEnabled)
++		{
++			std::vector&lt;OgreNewt::CollisionPtr&gt; collisions;
++			OgreNewt::CollisionPtr collision = OgreNewt::CollisionPtr();
++			OgreNewt::World* world = PhysicsManager::getSingleton()._getNewtonWorld();
++
++			const AxisAlignedBox &amp;aab = entity-&gt;getMesh()-&gt;getBounds();
++			Ogre::Node* parentNode = entity-&gt;getParentNode();
++			Ogre::Vector3 size = (aab.getMaximum() - aab.getMinimum()) * parentNode-&gt;getScale();
++
++			const Quaternion orientation(0,0,0,0);// = parentNode-&gt;getOrientation();
++			const Ogre::Vector3 pos = aab.getMinimum() * parentNode-&gt;getScale() + (size/2.0);
++
++			collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Box(world, size, orientation, pos));
++
++			if (!collision.isNull())
++			{
++				collisions.push_back(collision);
++			}
++
++			// Add to physics of map
++			if (collisions.size() &gt; 0)
++			{
++				PhysicsManager::getSingleton().addLevelGeometry(entity, collisions);
++				LOG_DEBUG(Logger::RULES, &quot; Plane '&quot;+entity-&gt;getName()+&quot;' in levelGeometry geladen&quot;);
++			}
++		}
++	}
++}
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001525.html">[Dsa-hl-svn] r4454 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1526">[ date ]</a>
+              <a href="thread.html#1526">[ thread ]</a>
+              <a href="subject.html#1526">[ subject ]</a>
+              <a href="author.html#1526">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

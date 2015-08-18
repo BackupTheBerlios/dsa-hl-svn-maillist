@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4643 - in rl/branches/persistence: common/include	core/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4643%20-%20in%20rl/branches/persistence%3A%20common/include%0A%09core/src%20ui/src&In-Reply-To=%3C200812061941.mB6JfJhr018102%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001699.html">
+   <LINK REL="Next"  HREF="001701.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4643 - in rl/branches/persistence: common/include	core/src ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4643%20-%20in%20rl/branches/persistence%3A%20common/include%0A%09core/src%20ui/src&In-Reply-To=%3C200812061941.mB6JfJhr018102%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4643 - in rl/branches/persistence: common/include	core/src ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sat Dec  6 20:41:19 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001699.html">[Dsa-hl-svn] r4642 - in rl/branches/persistence: ai/include	core/include core/src rules/include rules/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001701.html">[Dsa-hl-svn] r4644 - in rl/branches/persistence: common/include	common/src core core/include core/src rules/include rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1700">[ date ]</a>
+              <a href="thread.html#1700">[ thread ]</a>
+              <a href="subject.html#1700">[ subject ]</a>
+              <a href="author.html#1700">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-12-06 20:41:11 +0100 (Sat, 06 Dec 2008)
+New Revision: 4643
+
+Modified:
+   rl/branches/persistence/common/include/WriteableDataStream.h
+   rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+   rl/branches/persistence/ui/src/GameSaveLoadWindow.cpp
+Log:
+writing dummy save game into file
+
+Modified: rl/branches/persistence/common/include/WriteableDataStream.h
+===================================================================
+--- rl/branches/persistence/common/include/WriteableDataStream.h	2008-12-06 14:39:04 UTC (rev 4642)
++++ rl/branches/persistence/common/include/WriteableDataStream.h	2008-12-06 19:41:11 UTC (rev 4643)
+@@ -54,25 +54,25 @@
+ 
+         ~WriteableFileStreamDataStream();
+ 
+-		size_t read(void* buf, size_t count);
++		virtual size_t read(void* buf, size_t count);
+ 
+-        size_t readLine(char* buf, size_t maxCount, const Ogre::String&amp; delim = &quot;\n&quot;);
++        virtual size_t readLine(char* buf, size_t maxCount, const Ogre::String&amp; delim = &quot;\n&quot;);
+ 		
+-		void skip(long count);
++		virtual void skip(long count);
+ 	
+-	    void seek( size_t pos );
++	    virtual void seek( size_t pos );
+ 
+-		size_t tell(void) const;
++		virtual size_t tell(void) const;
+ 
+-	    bool eof(void) const;
++	    virtual bool eof(void) const;
+ 
+-        void close(void);
++        virtual void close(void);
+ 
+-        std::fstream* getFStream();
++        virtual std::fstream* getFStream();
+ 
+-        void write(void* buf, size_t count);
++        virtual void write(void* buf, size_t count);
+ 
+-        void flush();
++        virtual void flush();
+     };
+ 
+     typedef Ogre::SharedPtr&lt;WriteableFileStreamDataStream&gt; WriteableFileStreamDataStreamPtr;
+
+Modified: rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-12-06 14:39:04 UTC (rev 4642)
++++ rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-12-06 19:41:11 UTC (rev 4643)
+@@ -65,8 +65,7 @@
+ 	void SaveAbleSerializer::parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
+ 	{
+ 		LOG_MESSAGE(Logger::CORE, &quot;Parsing headers of save game file: &quot; + stream-&gt;getName() + &quot; Resource group: &quot; + groupName);
+-		SaveGameFile* file = new SaveGameFile(Ogre::StringConverter::parseInt(stream-&gt;getName()),
+-			WriteableDataStreamPtr(dynamic_cast&lt;WriteableDataStream*&gt;(stream.get())));
++		SaveGameFile* file = new SaveGameFile(Ogre::StringConverter::parseInt(stream-&gt;getName()),(WriteableDataStreamPtr)(WriteableDataStream*)stream.get());
+ 		mReader.parseSaveGameFileHeader(file);
+ 		mHighestSaveGameNumber = Ogre::StringConverter::parseInt(stream-&gt;getName()) &gt; mHighestSaveGameNumber ? Ogre::StringConverter::parseInt(stream-&gt;getName()) : mHighestSaveGameNumber;
+ 		mSaveGameFiles[Ogre::StringConverter::parseInt(stream-&gt;getName())] = file;
+@@ -149,6 +148,8 @@
+ 
+ 	SaveGameFile* SaveAbleSerializer::createNewSaveGame()
+ 	{
++		//SaveGameFile* file = new SaveGameFile(NULL);
++		updateFileList();
+ 		return NULL;
+ 	}
+ 
+@@ -158,22 +159,31 @@
+ 
+ 	void SaveAbleSerializer::deleteSaveGame(SaveGameFile* save)
+ 	{
++		//TODO!!!!!!111elf
+ 	}
+ 
+ 	void SaveAbleSerializer::writeSaveGame(int fileId)
+ 	{
++		if(mSaveGameFiles.find(fileId) != mSaveGameFiles.end())
++			writeSaveGame(mSaveGameFiles[fileId]);
+ 	}
+ 
+ 	void SaveAbleSerializer::writeSaveGame(SaveGameFile* save)
+ 	{
++		if(save != NULL)
++			writeToSaveGameFile(save);
+ 	}
+ 
+ 	void SaveAbleSerializer::readSaveGame(int fileId)
+ 	{
++		if(mSaveGameFiles.find(fileId) != mSaveGameFiles.end())
++			readSaveGame(mSaveGameFiles[fileId]);
+ 	}
+ 
+ 	void SaveAbleSerializer::readSaveGame(SaveGameFile* save)
+ 	{
++		if(save != NULL)
++			readFromSaveGameFile(save);
+ 	}
+ 
+ 	int SaveAbleSerializer::getHighestSaveGameNumber()
+
+Modified: rl/branches/persistence/ui/src/GameSaveLoadWindow.cpp
+===================================================================
+--- rl/branches/persistence/ui/src/GameSaveLoadWindow.cpp	2008-12-06 14:39:04 UTC (rev 4642)
++++ rl/branches/persistence/ui/src/GameSaveLoadWindow.cpp	2008-12-06 19:41:11 UTC (rev 4643)
+@@ -137,7 +137,15 @@
+ 
+         if(filename != &quot;&quot;)
+         {
+-			if(SaveAbleSerializer::getSingleton().SaveGameExists(filename, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()));
++			if(SaveAbleSerializer::getSingleton().SaveGameExists(filename, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()))
++			{
++				SaveAbleSerializer::getSingleton().writeSaveGame(SaveAbleSerializer::getSingleton().getSaveGame(filename, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()));
++			}
++			else
++			{
++			}
++			SaveAbleSerializer::getSingleton().updateFileList();
++			listSaveGames();
+         }
+         else
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001699.html">[Dsa-hl-svn] r4642 - in rl/branches/persistence: ai/include	core/include core/src rules/include rules/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001701.html">[Dsa-hl-svn] r4644 - in rl/branches/persistence: common/include	common/src core core/include core/src rules/include rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1700">[ date ]</a>
+              <a href="thread.html#1700">[ thread ]</a>
+              <a href="subject.html#1700">[ subject ]</a>
+              <a href="author.html#1700">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

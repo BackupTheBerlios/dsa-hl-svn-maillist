@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4480 - in rl/branches/newton20/engine/script: include	src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4480%20-%20in%20rl/branches/newton20/engine/script%3A%20include%0A%09src&In-Reply-To=%3C200808231251.m7NCpLfY028358%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001536.html">
+   <LINK REL="Next"  HREF="001538.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4480 - in rl/branches/newton20/engine/script: include	src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4480%20-%20in%20rl/branches/newton20/engine/script%3A%20include%0A%09src&In-Reply-To=%3C200808231251.m7NCpLfY028358%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4480 - in rl/branches/newton20/engine/script: include	src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sat Aug 23 14:51:21 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001536.html">[Dsa-hl-svn] r4479 - in modules/common/scripts: . jobs
+</A></li>
+        <LI>Next message: <A HREF="001538.html">[Dsa-hl-svn] r4481 - rl/branches/newton20/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1537">[ date ]</a>
+              <a href="thread.html#1537">[ thread ]</a>
+              <a href="subject.html#1537">[ subject ]</a>
+              <a href="author.html#1537">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-08-23 14:51:20 +0200 (Sat, 23 Aug 2008)
+New Revision: 4480
+
+Modified:
+   rl/branches/newton20/engine/script/include/PlaneNodeProcessor.h
+   rl/branches/newton20/engine/script/src/PlaneNodeProcessor.cpp
+Log:
+merged changes from trunk
+
+
+Modified: rl/branches/newton20/engine/script/include/PlaneNodeProcessor.h
+===================================================================
+--- rl/branches/newton20/engine/script/include/PlaneNodeProcessor.h	2008-08-23 12:41:05 UTC (rev 4479)
++++ rl/branches/newton20/engine/script/include/PlaneNodeProcessor.h	2008-08-23 12:51:20 UTC (rev 4480)
+@@ -43,7 +43,7 @@
+     private:
+ 
+         void createCollision(Ogre::Entity* entity, XERCES_CPP_NAMESPACE::DOMElement* physicsProxyElem);
+-		void createRenderToTextures(Ogre::Entity* entity, Ogre::Plane* plane, XERCES_CPP_NAMESPACE::DOMElement* rttElem);
++		void createRenderToTextures(Ogre::Entity* entity, Ogre::Plane* plane, Ogre::MaterialPtr mat, XERCES_CPP_NAMESPACE::DOMElement* rttElem);
+ 	};
+ 
+ 	class PlaneReflectionTextureListener : public Ogre::RenderTargetListener
+@@ -58,12 +58,13 @@
+ 		void postRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt);
+ 	};
+ 
+-	class PlaneRefactionTextureListener : public Ogre::RenderTargetListener
++	class PlaneRefractionTextureListener : public Ogre::RenderTargetListener
+ 	{
+ 	protected:
+ 		Ogre::Entity* mEntity;
++		Ogre::Camera* mCamera;
+ 	public:
+-		PlaneRefactionTextureListener(Ogre::Entity* ent);
++		PlaneRefractionTextureListener(Ogre::Entity* ent, Ogre::Camera* cam);
+ 		void preRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt);
+ 		void postRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt);
+ 	};
+
+Modified: rl/branches/newton20/engine/script/src/PlaneNodeProcessor.cpp
+===================================================================
+--- rl/branches/newton20/engine/script/src/PlaneNodeProcessor.cpp	2008-08-23 12:41:05 UTC (rev 4479)
++++ rl/branches/newton20/engine/script/src/PlaneNodeProcessor.cpp	2008-08-23 12:51:20 UTC (rev 4480)
+@@ -96,22 +96,29 @@
+ 		plane-&gt;d = 0;
+ 		plane-&gt;normal = Vector3::UNIT_Y;
+ 
+-		MeshManager::getSingleton().createPlane(entName, &quot;custom&quot;, *plane, 1, 1, 1, 1, true, 1, 1, 1, Vector3::UNIT_Z);
++		MeshManager::getSingleton().createPlane(entName, &quot;custom&quot;, *plane, scale.x, scale.y, 10, 10, true, 1, 1, 1, Vector3::UNIT_Z);
+ 
+ 		Entity* ent = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()-&gt;createEntity(entName, entName);
+ 
+ 		LOG_DEBUG(Logger::RULES, &quot; Loaded plane &quot;+entName);
+ 
+ 		node-&gt;attachObject(ent);
+-		node-&gt;scale(scale.x,1,scale.y);
++		//node-&gt;scale(scale.x,1,scale.y);
+ 
+ 		createCollision(ent, getChildNamed(nodeElem, &quot;physicsproxy&quot;));
+ 		
+ 		DOMElement* materialElem = getChildNamed(nodeElem, &quot;material&quot;);
+ 		if(materialElem)
+-		{
+-			ent-&gt;setMaterialName(getAttributeValueAsStdString(materialElem, &quot;name&quot;));
+-			createRenderToTextures(ent, plane, getChildNamed(nodeElem, &quot;renderToTexture&quot;));
++		{	
++			if(getChildNamed(nodeElem, &quot;renderToTexture&quot;))
++			{
++				Ogre::String matName = getAttributeValueAsStdString(materialElem, &quot;name&quot;);
++				MaterialPtr material = static_cast&lt;MaterialPtr&gt;(MaterialManager::getSingleton().getByName(matName))-&gt;clone(matName + entName);
++				createRenderToTextures(ent, plane, material, getChildNamed(nodeElem, &quot;renderToTexture&quot;));
++				ent-&gt;setMaterialName(matName + entName);
++			}
++			else
++				ent-&gt;setMaterialName(getAttributeValueAsStdString(materialElem, &quot;name&quot;));
+ 		}
+ 		else
+         {
+@@ -156,47 +163,57 @@
+ 		}
+ 	}
+ 
+-	void PlaneNodeProcessor::createRenderToTextures(Ogre::Entity* entity, Plane* plane, XERCES_CPP_NAMESPACE::DOMElement* rttElem)
++	void PlaneNodeProcessor::createRenderToTextures(Ogre::Entity* entity, Plane* plane, MaterialPtr material, XERCES_CPP_NAMESPACE::DOMElement* rttElem)
+ 	{
+ 		if(rttElem == NULL)
+ 			return;
+ 
+-		MeshPtr mesh = entity-&gt;getMesh();
++		Camera* cam = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()-&gt;createCamera(&quot;Cam&quot; + entity-&gt;getName());
++		cam-&gt;setFOVy(CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera()-&gt;getFOVy());
++		cam-&gt;enableCustomNearClipPlane((MovablePlane*)plane);
++		//MeshPtr mesh = entity-&gt;getMesh();
++		AliasTextureNamePairList aliases;
+ 
+ 		if(getAttributeValueAsBool(rttElem, &quot;reflection&quot;))
+-			{
++		{
+ 			TexturePtr texture = Ogre::TextureManager::getSingleton().createManual( &quot;Reflection&quot; + entity-&gt;getName(), 
+ 				ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, TEX_TYPE_2D, 
+ 				512, 512, 0, PF_R8G8B8, TU_RENDERTARGET );
+ 			RenderTexture* rttTex = texture-&gt;getBuffer()-&gt;getRenderTarget();
+-			
+-			Viewport *v = rttTex-&gt;addViewport( CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera() ); //Bleibt die Kamera immer die gleiche?
++
++			Viewport *v = rttTex-&gt;addViewport( cam ); //Bleibt die Kamera immer die gleiche?
+ 			v-&gt;setOverlaysEnabled(false);
+-			rttTex-&gt;addListener(new PlaneReflectionTextureListener(entity, CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera(), plane));
++			rttTex-&gt;addListener(new PlaneReflectionTextureListener(entity, cam, plane));
+ 			
++			aliases[&quot;reflection&quot;] = &quot;Reflection&quot; + entity-&gt;getName();
++			/*int num = mesh-&gt;getNumSubMeshes();
+ 			for(int i = 0; i &lt; mesh-&gt;getNumSubMeshes(); i++)
+ 			{
+ 				SubMesh* sub = mesh-&gt;getSubMesh(i);
+ 				sub-&gt;addTextureAlias(&quot;reflection&quot;, &quot;Reflection&quot; + entity-&gt;getName());
+ 			}
++			mesh-&gt;updateMaterialForAllSubMeshes();*/
+ 		}
+-		if(getAttributeValueAsBool(rttElem, &quot;refaction&quot;))
++		if(getAttributeValueAsBool(rttElem, &quot;refraction&quot;))
+ 		{
+-			TexturePtr texture = Ogre::TextureManager::getSingleton().createManual( &quot;Refaction&quot; + entity-&gt;getName(), 
++			TexturePtr texture = Ogre::TextureManager::getSingleton().createManual( &quot;Refraction&quot; + entity-&gt;getName(), 
+ 				ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, TEX_TYPE_2D, 
+ 				512, 512, 0, PF_R8G8B8, TU_RENDERTARGET );
+ 			RenderTexture* rttTex = texture-&gt;getBuffer()-&gt;getRenderTarget();
+ 			
+-			Viewport *v = rttTex-&gt;addViewport( CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera());
++			Viewport *v = rttTex-&gt;addViewport( cam);
+ 			v-&gt;setOverlaysEnabled(false);
+-			rttTex-&gt;addListener(new PlaneRefactionTextureListener(entity));
++			rttTex-&gt;addListener(new PlaneRefractionTextureListener(entity, cam));
+ 
+-			for(int i = 0; i &lt; mesh-&gt;getNumSubMeshes(); i++)
++			aliases[&quot;refraction&quot;] = &quot;Refraction&quot; + entity-&gt;getName();
++			/*for(int i = 0; i &lt; mesh-&gt;getNumSubMeshes(); i++)
+ 			{
+ 				SubMesh* sub = mesh-&gt;getSubMesh(i);
+-				sub-&gt;addTextureAlias(&quot;refaction&quot;, &quot;Refaction&quot; + entity-&gt;getName());
+-			}
++				sub-&gt;addTextureAlias(&quot;refraction&quot;, &quot;Refraction&quot; + entity-&gt;getName());
++			}*/
+ 		}
++		if(!material-&gt;applyTextureAliases(aliases))
++			LOG_ERROR(&quot;PLANE&quot;, &quot;Texture Aliase konnten nicht angewandt werden&quot;);
+ 	}
+ 
+ 	PlaneReflectionTextureListener::PlaneReflectionTextureListener(Ogre::Entity *ent, Ogre::Camera* cam, Plane* plane)
+@@ -208,6 +225,8 @@
+ 
+ 	void PlaneReflectionTextureListener::preRenderTargetUpdate(const RenderTargetEvent &amp;evt)
+ 	{
++		mCamera-&gt;setPosition(CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera()-&gt;getWorldPosition());
++		mCamera-&gt;setOrientation(CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera()-&gt;getWorldOrientation());
+ 		mEntity-&gt;setVisible(false);
+ 		mCamera-&gt;enableReflection(*mPlane);
+ 	}
+@@ -218,17 +237,20 @@
+ 		mCamera-&gt;disableReflection();
+ 	}
+ 
+-	PlaneRefactionTextureListener::PlaneRefactionTextureListener(Entity* ent)
++	PlaneRefractionTextureListener::PlaneRefractionTextureListener(Entity* ent, Camera* cam)
+ 	{
+ 		mEntity = ent;
++		mCamera = cam;
+ 	}
+ 
+-	void PlaneRefactionTextureListener::preRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt)
++	void PlaneRefractionTextureListener::preRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt)
+ 	{
++		mCamera-&gt;setPosition(CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera()-&gt;getWorldPosition());
++		mCamera-&gt;setOrientation(CoreSubsystem::getSingleton().getWorld()-&gt;getActiveCamera()-&gt;getWorldOrientation());
+ 		mEntity-&gt;setVisible(false);
+ 	}
+ 
+-	void PlaneRefactionTextureListener::postRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt)
++	void PlaneRefractionTextureListener::postRenderTargetUpdate(const Ogre::RenderTargetEvent&amp; evt)
+ 	{
+ 		mEntity-&gt;setVisible(true);
+ 	}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001536.html">[Dsa-hl-svn] r4479 - in modules/common/scripts: . jobs
+</A></li>
+	<LI>Next message: <A HREF="001538.html">[Dsa-hl-svn] r4481 - rl/branches/newton20/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1537">[ date ]</a>
+              <a href="thread.html#1537">[ thread ]</a>
+              <a href="subject.html#1537">[ subject ]</a>
+              <a href="author.html#1537">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

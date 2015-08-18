@@ -1,0 +1,430 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3328 - in rl/trunk/engine: core/src script/swig	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3328%20-%20in%20rl/trunk/engine%3A%20core/src%20script/swig%0A%09ui/include%20ui/src&In-Reply-To=%3C200704241906.l3OJ6B2A011963%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000398.html">
+   <LINK REL="Next"  HREF="000400.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3328 - in rl/trunk/engine: core/src script/swig	ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3328%20-%20in%20rl/trunk/engine%3A%20core/src%20script/swig%0A%09ui/include%20ui/src&In-Reply-To=%3C200704241906.l3OJ6B2A011963%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3328 - in rl/trunk/engine: core/src script/swig	ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Tue Apr 24 21:06:11 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000398.html">[Dsa-hl-svn] r3327 - modules/regressiontest/maps	modules/regressiontest/materials modules/regressiontest/scripts	modules/regressiontest/scripts/maps modules/techdemo/maps	modules/techdemo/scripts modules/techdemo/scripts/maps	rl/trunk/docs/documents rl/trunk/engine/rules/include	rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="000400.html">[Dsa-hl-svn] r3329 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#399">[ date ]</a>
+              <a href="thread.html#399">[ thread ]</a>
+              <a href="subject.html#399">[ subject ]</a>
+              <a href="author.html#399">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-24 21:05:51 +0200 (Tue, 24 Apr 2007)
+New Revision: 3328
+
+Modified:
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/script/swig/RlUi.swig
+   rl/trunk/engine/ui/include/CharacterController.h
+   rl/trunk/engine/ui/include/CombatCharacterController.h
+   rl/trunk/engine/ui/include/CutsceneCharacterController.h
+   rl/trunk/engine/ui/include/DialogCharacterController.h
+   rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+   rl/trunk/engine/ui/src/CombatCharacterController.cpp
+   rl/trunk/engine/ui/src/CommandMapper.cpp
+   rl/trunk/engine/ui/src/CutsceneCharacterController.cpp
+   rl/trunk/engine/ui/src/DialogCharacterController.cpp
+   rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+ResetCamera and ToggleViewMode aren't Actions anymore. (Was a hack). Instead they are handled by the ControlState they affect directly.
+Also fixed a bug that caused actions to get registered multiple times each.
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -100,12 +100,9 @@
+         addSetting(&quot;Action keys&quot;, &quot;toggleconsole&quot;, &quot;Tabulator&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;toggledebugwindow&quot;, &quot;F2&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;togglegamelogwindow&quot;, &quot;F3&quot;);
+-        addSetting(&quot;Action keys&quot;, &quot;toggleviewmode&quot;, &quot;F&quot;);
+-        addSetting(&quot;Action keys&quot;, &quot;resetcamera&quot;, &quot;0 (Nummernblock)&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;makescreenshot&quot;, &quot;P,Ctrl+P&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;togglecollisiondebug&quot;, &quot;L,Ctrl+L&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;toggledebugvisualisation&quot;, &quot;Ctrl+O&quot;);
+-        addSetting(&quot;Action keys&quot;, &quot;togglevanitymode&quot;, &quot;V&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;usecurrentobjectdefaultaction&quot;, &quot;R&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;toggleinventorywindow&quot;, &quot;I&quot;);
+         addSetting(&quot;Action keys&quot;, &quot;showjournalwindow&quot;, &quot;J&quot;);
+@@ -116,8 +113,11 @@
+         addSetting(&quot;Action keys&quot;, &quot;showobjectactions&quot;, &quot;U&quot;);
+ 
+         addSetting(&quot;FreeflightController keys&quot;, &quot;back_to_character_movement&quot;, &quot;M&quot;);
++        addSetting(&quot;FreeflightController keys&quot;, &quot;toggle_camera_collision&quot;, &quot;F&quot;);
+ 
+         addSetting(&quot;MovementController keys&quot;, &quot;freeflight_mode&quot;, &quot;M&quot;);
++        addSetting(&quot;MovementController keys&quot;, &quot;toggle_view_mode&quot;, &quot;F&quot;);
++        addSetting(&quot;MovementController keys&quot;, &quot;reset_camera&quot;, &quot;0 (Nummernblock)&quot;);
+ 
+         setRastullahCfgPath();
+     }
+
+Modified: rl/trunk/engine/script/swig/RlUi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlUi.swig	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/script/swig/RlUi.swig	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -24,14 +24,6 @@
+ private:
+     CharacterController(rl::Actor* camera, rl::Actor* character);
+ public:
+-
+-     /**
+-       *  @throw NullPointerException if camera or character is NULL.
+-       *  @throw InvalidArgumentException if character is not placed in the scene.
+-       */
+-    void toggleViewMode();
+-    void resetCamera();
+-
+ };
+ 
+ class CutsceneCharacterController : public CharacterController
+@@ -42,9 +34,6 @@
+ public:
+     virtual ~CutsceneCharacterController();
+ 
+-    void toggleViewMode();
+-    void resetCamera();
+-
+     void setCameraPosition(const Ogre::Vector3&amp; pos);
+     void setCameraOrientation(const Ogre::Quaternion&amp; orient);
+     void lookAt(const Ogre::Vector3&amp; point);
+
+Modified: rl/trunk/engine/ui/include/CharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CharacterController.h	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/include/CharacterController.h	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -42,9 +42,6 @@
+         CharacterController(CommandMapper* commandMapper, Actor* camera, Person* character);
+ 		virtual ~CharacterController()= 0;
+ 
+-		virtual void toggleViewMode() = 0;
+-		virtual void resetCamera() = 0;
+-
+         virtual void pause() = 0;
+         virtual void resume() = 0;
+ 
+
+Modified: rl/trunk/engine/ui/include/CombatCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -33,9 +33,6 @@
+ 
+ 		void run(Ogre::Real elapsedTime);
+ 
+-		void toggleViewMode();
+-        void resetCamera();
+-
+         virtual bool injectKeyUp(int keycode);
+     private:
+ 	};
+
+Modified: rl/trunk/engine/ui/include/CutsceneCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CutsceneCharacterController.h	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/include/CutsceneCharacterController.h	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -38,9 +38,6 @@
+ 
+ 		virtual void run(Ogre::Real elapsedTime);
+ 
+-		virtual void toggleViewMode();
+-        virtual void resetCamera();
+-
+         void setCameraPosition(const Ogre::Vector3&amp; pos);
+         void setCameraOrientation(const Ogre::Quaternion&amp; orient);
+         void lookAt(const Ogre::Vector3&amp; point);
+
+Modified: rl/trunk/engine/ui/include/DialogCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/DialogCharacterController.h	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/include/DialogCharacterController.h	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -57,11 +57,6 @@
+ 		/// @override
+ 		virtual void run(Ogre::Real elapsedTime);
+ 
+-		/// @override
+-		virtual void toggleViewMode();
+-		/// @override 
+-		virtual void resetCamera();
+-
+ 		/// Setzt den Dialogpartner (Diealogf&#252;hrenden Spieler-Actor)
+ 		void setDialogPartner(Actor* partner);
+ 
+
+Modified: rl/trunk/engine/ui/include/FreeFlightCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/include/FreeFlightCharacterController.h	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -46,12 +46,12 @@
+ 
+ 		virtual void run(Ogre::Real elapsedTime);
+ 
+-		void toggleViewMode();
+-		void resetCamera();
+-
+ 		bool injectKeyDown(int keycode);
+ 		bool injectKeyUp(int keycode);
+ 
++	    void toggleCameraCollision();
++	    void resetCamera();
++
+         /// This is the OgreNewt contact process callback for the combination
+         /// Character &lt;-&gt; Level
+         int userProcess();
+
+Modified: rl/trunk/engine/ui/src/CombatCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -33,14 +33,6 @@
+     {
+     }
+ 
+-	void CombatCharacterController::toggleViewMode()
+-    {
+-    }
+-
+-    void CombatCharacterController::resetCamera()
+-    {
+-    }
+-
+     bool CombatCharacterController::injectKeyUp(int keycode)
+     {
+         return false;
+
+Modified: rl/trunk/engine/ui/src/CommandMapper.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CommandMapper.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/CommandMapper.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -149,14 +149,14 @@
+                     + &quot;) is assigned to movement &quot; + it-&gt;first +&quot; (&quot;
+                     + StringConverter::toString(getMovement(it-&gt;first))+&quot;)&quot;);
+             }
++        }
+ 
+-            buildCommandMap(mKeyGlobalActions, cfgMgr-&gt;getSettings(&quot;Action keys&quot;));
+-            buildCommandMap(mKeyMovementControlState, cfgMgr-&gt;getSettings(&quot;MovementController keys&quot;));
+-            buildCommandMap(mKeyFreeflightControlState, cfgMgr-&gt;getSettings(&quot;FreeflightController keys&quot;));
+-            buildCommandMap(mKeyDialogControlState, cfgMgr-&gt;getSettings(&quot;DialogController keys&quot;));
+-            buildCommandMap(mKeyCombatControlState, cfgMgr-&gt;getSettings(&quot;CombatController keys&quot;));
+-            buildCommandMap(mKeyCutsceneControlState, cfgMgr-&gt;getSettings(&quot;CutsceneController keys&quot;));
+-        }
++        buildCommandMap(mKeyGlobalActions, cfgMgr-&gt;getSettings(&quot;Action keys&quot;));
++        buildCommandMap(mKeyMovementControlState, cfgMgr-&gt;getSettings(&quot;MovementController keys&quot;));
++        buildCommandMap(mKeyFreeflightControlState, cfgMgr-&gt;getSettings(&quot;FreeflightController keys&quot;));
++        buildCommandMap(mKeyDialogControlState, cfgMgr-&gt;getSettings(&quot;DialogController keys&quot;));
++        buildCommandMap(mKeyCombatControlState, cfgMgr-&gt;getSettings(&quot;CombatController keys&quot;));
++        buildCommandMap(mKeyCutsceneControlState, cfgMgr-&gt;getSettings(&quot;CutsceneController keys&quot;));
+     }
+ 
+     void CommandMapper::buildCommandMap(KeyAndMouseCommandMap&amp; cmdMap,
+
+Modified: rl/trunk/engine/ui/src/CutsceneCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CutsceneCharacterController.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/CutsceneCharacterController.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -52,14 +52,6 @@
+ 	{
+ 	}
+ 
+-	void CutsceneCharacterController::toggleViewMode()
+-	{
+-	}
+-
+-    void CutsceneCharacterController::resetCamera()
+-	{
+-	}
+-
+     void CutsceneCharacterController::setCameraPosition(const Ogre::Vector3&amp; pos)
+     {
+         mCameraActor-&gt;setPosition(pos);
+
+Modified: rl/trunk/engine/ui/src/DialogCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogCharacterController.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/DialogCharacterController.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -96,7 +96,7 @@
+         bot-&gt;setDialogCharacter(mCharacter);
+ 		mDialogPartner = bot-&gt;getDialogPartner()-&gt;getActor();
+ 
+-        resetCamera();
++        recalculateCamera( mDialogPartner, mCharacterActor );
+ 
+         mDialogWindow = WindowFactory::getSingleton().getDialogWindow();
+         mDialogWindow-&gt;initialize(this, bot);
+@@ -150,16 +150,6 @@
+                 + StringConverter::toString(mCurrFadeTextTime));
+     }
+ 
+-    void DialogCharacterController::toggleViewMode()
+-    {
+-        /// @todo Krasser Gesichtszoom? Halbtotale... usw?
+-    }
+-
+-    void DialogCharacterController::resetCamera()
+-    {
+-        recalculateCamera( mDialogPartner, mCharacterActor );
+-    }
+-
+     void DialogCharacterController::recalculateCamera( Actor* speaker, Actor* listener )
+     {
+         // Position camera at position between char and dialog partner
+
+Modified: rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/FreeFlightCharacterController.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -186,7 +186,7 @@
+         mCameraActor-&gt;pitch(pitch.valueDegrees());
+     }
+ 
+-	void FreeFlightCharacterController::toggleViewMode()
++	void FreeFlightCharacterController::toggleCameraCollision()
+ 	{
+ 		// with or without collision?
+         // be careful to enable collision if beeing in another collision
+@@ -248,8 +248,13 @@
+                 InputManager::getSingleton().popControlState();
+                 return true;
+             }
+-            else
++            if (command == &quot;toggle_camera_collision&quot;)
+             {
++                toggleCameraCollision();
++                return true;
++            }
++            else 
++            {
+                 return startAction(command);
+             }
+         }
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -314,7 +314,8 @@
+ 
+     bool InputManager::keyReleased(const OIS::KeyEvent&amp; e)
+     {
+-        LOG_MESSAGE2(Logger::UI, &quot;Key released: &quot; + mKeyboard-&gt;getAsString(e.key) , &quot;InputManager::keyReleased&quot;);
++        LOG_MESSAGE2(Logger::UI, &quot;Key released: &quot; + mKeyboard-&gt;getAsString(e.key) ,
++            &quot;InputManager::keyReleased&quot;);
+         if (sendKeyToCeGui(e))
+         {
+             CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+@@ -329,13 +330,15 @@
+             if (action != NULL)
+             {
+                 action-&gt;doAction(NULL, NULL, NULL);
+-                LOG_MESSAGE2(Logger::UI, &quot;    invoked action &quot; + action-&gt;getName(), &quot;InputManager::keyReleased&quot;);
++                LOG_MESSAGE2(Logger::UI, &quot;    invoked action &quot; + action-&gt;getName(),
++                    &quot;InputManager::keyReleased&quot;);
+             }
+ 
+             if (!mControlStates.empty())
+             {
+                 mControlStates.top()-&gt;injectKeyUp(e.key);
+-                LOG_MESSAGE2(Logger::UI, &quot;    fed to char controller&quot;, &quot;InputManager::keyReleased&quot;);
++                LOG_MESSAGE2(Logger::UI, &quot;    fed to char controller&quot;,
++                    &quot;InputManager::keyReleased&quot;);
+             }
+         }
+ 
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-20 12:42:29 UTC (rev 3327)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-24 19:05:51 UTC (rev 3328)
+@@ -1856,6 +1856,16 @@
+                 InputManager::getSingleton().pushControlState(CST_FREEFLIGHT);
+                 return true;
+             }
++            else if (command == &quot;reset_camera&quot;)
++            {
++                resetCamera();
++                return true;
++            }
++            else if (command == &quot;toggle_view_mode&quot;)
++            {
++                toggleViewMode();
++                return true;
++            }
+             else
+             {
+                 return startAction(command);
+@@ -1868,19 +1878,7 @@
+     //------------------------------------------------------------------------
+     bool MovementCharacterController::injectMouseDown(int mouseButtonMask)
+     {
+-      //  if (!im-&gt;isCeguiActive())
+-      //  {
+-            //updateSelection();
+-      //      if (im-&gt;isMouseButtonDown(1) &amp;&amp; mSelector.getSelectedObject() != NULL)
+-      //      {
+-      //          WindowFactory::getSingleton().showActionChoice(mSelector.getSelectedObject());
+-      //      }
+-      //      else if (im-&gt;isMouseButtonDown(0) &amp;&amp; mSelector.getSelectedObject() != NULL)
+-      //      {
+-      //          mSelector.getSelectedObject()-&gt;doDefaultAction(mCharacter, NULL);
+-      //      }
+-      //  }
+-      return false;
++        return false;
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000398.html">[Dsa-hl-svn] r3327 - modules/regressiontest/maps	modules/regressiontest/materials modules/regressiontest/scripts	modules/regressiontest/scripts/maps modules/techdemo/maps	modules/techdemo/scripts modules/techdemo/scripts/maps	rl/trunk/docs/documents rl/trunk/engine/rules/include	rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="000400.html">[Dsa-hl-svn] r3329 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#399">[ date ]</a>
+              <a href="thread.html#399">[ thread ]</a>
+              <a href="subject.html#399">[ subject ]</a>
+              <a href="author.html#399">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

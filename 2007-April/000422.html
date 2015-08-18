@@ -1,0 +1,2470 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3351 - in rl/trunk/engine: rules rules/include	rules/src ui ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3351%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui%20ui/include%20ui/src&In-Reply-To=%3C200704282242.l3SMg9Id013792%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000421.html">
+   <LINK REL="Next"  HREF="000423.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3351 - in rl/trunk/engine: rules rules/include	rules/src ui ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3351%20-%20in%20rl/trunk/engine%3A%20rules%20rules/include%0A%09rules/src%20ui%20ui/include%20ui/src&In-Reply-To=%3C200704282242.l3SMg9Id013792%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3351 - in rl/trunk/engine: rules rules/include	rules/src ui ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sun Apr 29 00:42:09 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000421.html">[Dsa-hl-svn] r3350 - modules/techdemo/maps modules/techdemo/scripts	rl/trunk/engine/rules/include rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="000423.html">[Dsa-hl-svn] r3352 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#422">[ date ]</a>
+              <a href="thread.html#422">[ thread ]</a>
+              <a href="subject.html#422">[ subject ]</a>
+              <a href="author.html#422">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-29 00:41:31 +0200 (Sun, 29 Apr 2007)
+New Revision: 3351
+
+Added:
+   rl/trunk/engine/rules/include/Selector.h
+   rl/trunk/engine/rules/src/Selector.cpp
+Removed:
+   rl/trunk/engine/ui/include/Selector.h
+   rl/trunk/engine/ui/src/Selector.cpp
+Modified:
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/RulesSubsystem.h
+   rl/trunk/engine/rules/src/RulesSubsystem.cpp
+   rl/trunk/engine/ui/RlUI2005.vcproj
+   rl/trunk/engine/ui/include/CombatCharacterController.h
+   rl/trunk/engine/ui/src/CombatCharacterController.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+Small refactoring regarding selectors. Selectors now work solely on GameObject basis for consistency. Selectors are moved to Rules, since they work on Objects defined in Rules.
+Externalised Line of Sight detection into helper class for better code reuse.
+
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -377,6 +377,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\SelectionHelper.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\Selector.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\Slot.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -595,6 +603,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\SelectionHelper.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\Selector.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\Slot.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/RulesSubsystem.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesSubsystem.h	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/rules/include/RulesSubsystem.h	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -25,6 +25,7 @@
+ {
+ 	class QuestBook;
+     class ActionManager;
++    class CombatManager;
+     class DsaManager;
+     class TimerManager;
+     class XdimlLoader;
+@@ -41,6 +42,7 @@
+ 	private:
+ 		QuestBook* mQuestBook;
+         ActionManager* mActionManager;
++        CombatManager* mCombatManager;
+         DsaManager* mDsaManager;
+         TimerManager* mTimerManager;
+         XdimlLoader* mXdimlLoader;
+
+Copied: rl/trunk/engine/rules/include/Selector.h (from rev 3348, rl/trunk/engine/ui/include/Selector.h)
+===================================================================
+--- rl/trunk/engine/ui/include/Selector.h	2007-04-26 21:31:13 UTC (rev 3348)
++++ rl/trunk/engine/rules/include/Selector.h	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -0,0 +1,109 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++
++#ifndef __RL_SELECTOR_H__
++#define __RL_SELECTOR_H__
++
++#include &quot;RulesPrerequisites.h&quot;
++#include &quot;SceneQuery.h&quot;
++#include &quot;GameObject.h&quot;
++#include &quot;LineSetPrimitive.h&quot;
++#include &quot;DebugVisualisable.h&quot;
++
++namespace rl {
++
++    /// Superclass for all Selectors in RL.
++    /// Selectors provide a way to query for GameObjects in a game.
++    /// Either in the scene, or inventory, or anywhere else.
++    class _RlRulesExport Selector : public DebugVisualisable
++    {
++    public:
++        typedef std::vector&lt;GameObject*&gt; GameObjectVector;
++
++        Selector(unsigned long mask = 0xffffffff);
++        virtual ~Selector();
++        virtual void updateSelection();
++
++        void setSelectionMask(unsigned long mask);
++        unsigned long getSelectionMask() const;
++
++        GameObject* getFirstSelectedObject() const;
++        const GameObjectVector&amp; getAllSelectedObjects() const;
++
++    protected:
++        GameObjectVector mSelection;
++        unsigned long mSelectionMask;
++
++        virtual const ActorVector&amp; doExecuteQuery() = 0;
++    };
++
++
++    /// A Selector that selects all unoccluded GameObject the ray hits.
++    class _RlRulesExport RaySelector : public Selector
++    {
++    public:
++        RaySelector(unsigned long mask = 0xffffffff);
++
++        void setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end);
++
++        // Overrides from DebugVisualisable
++
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
++
++    protected:
++        RaySceneQuery mQuery;
++
++        virtual const ActorVector&amp; doExecuteQuery();
++        virtual void doCreatePrimitive();
++    };
++
++    /// Selects this GameObject within a half sphere pointing to -Z,
++    /// that has the smallest angle difference to the -Z-Axis.
++    class _RlRulesExport HalfSphereSelector : public Selector
++    {
++    public:
++        HalfSphereSelector(Ogre::SceneManager* smgr, unsigned long mask = 0xffffffff);
++
++        virtual void updateSelection();
++
++        void setRadius(Ogre::Real radius);
++
++        void setPosition(const Ogre::Vector3&amp; pos);
++
++        void setOrientation(const Ogre::Quaternion&amp; ori);
++
++        /// If check is true, visibility is checked from the POV of the GameObject reference
++        /// This is currently done by casting a ray from the GameObject to the candidate GOs
++        void setCheckVisibility(bool check, GameObject* reference = NULL);
++
++        // Overrides from DebugVisualisable
++
++        virtual DebugVisualisableFlag getFlag() const;
++        virtual void updatePrimitive();
++
++    protected:
++        HalfSphereSceneQuery mQuery;
++        bool mCheckVisibility;
++        GameObject* mReferenceGo;
++
++        virtual const ActorVector&amp; doExecuteQuery();
++
++        virtual void doCreatePrimitive();
++    };
++}
++#endif
++
+
+Modified: rl/trunk/engine/rules/src/RulesSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/rules/src/RulesSubsystem.cpp	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -16,6 +16,7 @@
+ 
+ #include &quot;RulesSubsystem.h&quot;
+ #include &quot;ActionManager.h&quot;
++#include &quot;CombatManager.h&quot;
+ #include &quot;DsaManager.h&quot;
+ //#include &quot;XdimlLoader.h&quot;
+ #include &quot;DsaDataLoader.h&quot;
+@@ -31,6 +32,7 @@
+     RulesSubsystem::RulesSubsystem()
+ 		: mQuestBook(NULL),
+         mActionManager(NULL),
++        mCombatManager(NULL),
+         mDsaManager(NULL),
+         mTimerManager(NULL),
+         mXdimlLoader(NULL)
+@@ -42,6 +44,8 @@
+         //Singletons erzeugen
+         mActionManager = new ActionManager(); 
+ 		LOG_MESSAGE(Logger::RULES, &quot;ActionManager erzeugt&quot;);
++        mCombatManager = new CombatManager(); 
++		LOG_MESSAGE(Logger::RULES, &quot;CombatManager erzeugt&quot;);
+         mDsaManager = new DsaManager();
+ 		LOG_MESSAGE(Logger::RULES, &quot;DsaManager erzeugt&quot;);
+ 		mTimerManager = new TimerManager(); 
+@@ -62,6 +66,7 @@
+         delete mQuestBook;
+         delete mTimerManager;
+         delete mDsaManager;
++        delete mCombatManager;
+         delete mActionManager;
+         delete mXdimlLoader;
+         delete GameObjectManager::getSingletonPtr();
+
+Copied: rl/trunk/engine/rules/src/Selector.cpp (from rev 3348, rl/trunk/engine/ui/src/Selector.cpp)
+===================================================================
+--- rl/trunk/engine/ui/src/Selector.cpp	2007-04-26 21:31:13 UTC (rev 3348)
++++ rl/trunk/engine/rules/src/Selector.cpp	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -0,0 +1,199 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#include &quot;Selector.h&quot;
++#include &quot;SelectionHelper.h&quot;
++
++#include &quot;PhysicsManager.h&quot;
++
++using namespace Ogre;
++
++namespace rl
++{
++    Selector::Selector(unsigned long mask) : mSelectionMask(mask)
++    {
++    }
++
++    Selector::~Selector()
++    {
++    }
++
++    void Selector::setSelectionMask(unsigned long mask)
++    {
++        mSelectionMask = mask;
++    }
++
++    unsigned long Selector::getSelectionMask() const
++    {
++        return mSelectionMask;
++    }
++
++    GameObject* Selector::getFirstSelectedObject() const
++    {
++        return mSelection.empty() ? NULL : mSelection[0];
++    }
++
++    const Selector::GameObjectVector&amp; Selector::getAllSelectedObjects() const
++    {
++        return mSelection;
++    }
++
++    void Selector::updateSelection()
++    {
++        // Remove old selection
++        mSelection.clear();
++
++        // Do the query, results are in proper order
++        const ActorVector&amp; actors = doExecuteQuery();
++
++        // Set selection to first result with a GameObject attached.
++        for (ActorVector::const_iterator it = actors.begin(), end = actors.end();
++            it != end; ++it)
++        {
++            Actor* actor = *it;
++            GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
++            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
++            {
++                mSelection.push_back(go);
++            }
++        }
++    }
++
++    //------------------------------------------------------------------------
++
++    RaySelector::RaySelector(unsigned long mask)
++        : Selector(mask), mQuery(mask)
++    {
++    }
++
++    void RaySelector::setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end)
++    {
++        mQuery.setRay(start, end);
++    }
++
++    // Overrides from DebugVisualisable
++    DebugVisualisableFlag RaySelector::getFlag() const
++    {
++        return DVF_CONTROL;
++    }
++
++    void RaySelector::updatePrimitive()
++    {
++        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++        lineSet-&gt;clear();
++        lineSet-&gt;addLine(mQuery.getRayStart(), mQuery.getRayEnd(), ColourValue::Red);
++    }
++
++    const ActorVector&amp; RaySelector::doExecuteQuery()
++    {
++        return mQuery.execute();
++    }
++
++    void RaySelector::doCreatePrimitive()
++    {
++        mPrimitive = new LineSetPrimitive();
++    }
++
++    //////////////////////////////////////////////////////////////////////////
++
++    HalfSphereSelector::HalfSphereSelector(Ogre::SceneManager* smgr,
++        unsigned long mask)
++        : Selector(mask),
++          mQuery(smgr, mask),
++          mCheckVisibility(false),
++          mReferenceGo(NULL)
++    {
++    }
++
++    void HalfSphereSelector::updateSelection()
++    {
++        // Remove old selection
++        mSelection.clear();
++
++        // Do the query, results are in proper order
++        const ActorVector&amp; actors = doExecuteQuery();
++
++        // Set selection to first result with a GameObject attached.
++        for (ActorVector::const_iterator it = actors.begin(), end = actors.end();
++            it != end; ++it)
++        {
++            Actor* actor = *it;
++            GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
++            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
++            {
++                // Is this GO seen when we need it to be seen?
++                if (mCheckVisibility &amp;&amp; mReferenceGo &amp;&amp;
++                    !SelectionHelper::checkLineOfSight(mReferenceGo, go))
++                {
++                    // Nope, check next.
++                    continue;
++                }
++                // Ok, LoS either not needed or given.
++                mSelection.push_back(go);
++            }
++        }
++    }
++
++    void HalfSphereSelector::updatePrimitive()
++    {
++        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++        lineSet-&gt;clear();
++
++        Vector3 pos = mQuery.getPosition();
++        Quaternion ori = mQuery.getOrientation();
++        Real radius = mQuery.getRadius();
++
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_X), ColourValue::Red);
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_Y), ColourValue::Green);
++        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::NEGATIVE_UNIT_Z),
++            ColourValue::Blue);
++    }
++
++    void HalfSphereSelector::setRadius(Ogre::Real radius)
++    {
++        mQuery.setRadius(radius);
++    }
++
++    void HalfSphereSelector::setPosition(const Ogre::Vector3&amp; pos)
++    {
++        mQuery.setPosition(pos);
++    }
++
++    void HalfSphereSelector::setOrientation(const Ogre::Quaternion&amp; ori)
++    {
++        mQuery.setOrientation(ori);
++    }
++
++    void HalfSphereSelector::setCheckVisibility(bool check, GameObject* reference)
++    {
++        mCheckVisibility = check;
++        mReferenceGo = reference;
++    }
++
++    DebugVisualisableFlag HalfSphereSelector::getFlag() const
++    {
++        return DVF_CONTROL;
++    }
++
++    const ActorVector&amp; HalfSphereSelector::doExecuteQuery()
++    {
++        return mQuery.execute();
++    }
++
++    void HalfSphereSelector::doCreatePrimitive()
++    {
++        mPrimitive = new LineSetPrimitive();
++    }
++}
+
+Modified: rl/trunk/engine/ui/RlUI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ui/RlUI2005.vcproj	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/RlUI2005.vcproj	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -1,738 +1,730 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+-    ProjectType=&quot;Visual C++&quot;
+-    Version=&quot;8,00&quot;
+-    Name=&quot;RlUI&quot;
+-    ProjectGUID=&quot;{53FE20F3-E726-44FE-BBEC-D29CAE210D25}&quot;
+-    RootNamespace=&quot;RlUI&quot;
+-    &gt;
+-    &lt;Platforms&gt;
+-        &lt;Platform
+-            Name=&quot;Win32&quot;
+-        /&gt;
+-    &lt;/Platforms&gt;
+-    &lt;ToolFiles&gt;
+-    &lt;/ToolFiles&gt;
+-    &lt;Configurations&gt;
+-        &lt;Configuration
+-            Name=&quot;Debug|Win32&quot;
+-            OutputDirectory=&quot;./lib/$(ConfigurationName)&quot;
+-            IntermediateDirectory=&quot;./obj/$(ConfigurationName)&quot;
+-            ConfigurationType=&quot;2&quot;
+-            UseOfMFC=&quot;0&quot;
+-            ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
+-            CharacterSet=&quot;2&quot;
+-            ManagedExtensions=&quot;0&quot;
+-            &gt;
+-            &lt;Tool
+-                Name=&quot;VCPreBuildEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCustomBuildTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXMLDataGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebServiceProxyGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCMIDLTool&quot;
+-                PreprocessorDefinitions=&quot;_DEBUG&quot;
+-                MkTypLibCompatible=&quot;true&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                TargetEnvironment=&quot;1&quot;
+-                TypeLibraryName=&quot;.\lib\Debug/Rastullah.tlb&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCLCompilerTool&quot;
+-                Optimization=&quot;0&quot;
+-                AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
+-                PreprocessorDefinitions=&quot;WITH_FMOD3;_WINDOWS,_DEBUG,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+-                MinimalRebuild=&quot;true&quot;
+-                BasicRuntimeChecks=&quot;3&quot;
+-                SmallerTypeCheck=&quot;true&quot;
+-                RuntimeLibrary=&quot;3&quot;
+-                BufferSecurityCheck=&quot;false&quot;
+-                EnableFunctionLevelLinking=&quot;false&quot;
+-                RuntimeTypeInfo=&quot;true&quot;
+-                PrecompiledHeaderFile=&quot;.\obj\Debug/Rastullah.pch&quot;
+-                ExpandAttributedSource=&quot;true&quot;
+-                AssemblerOutput=&quot;4&quot;
+-                AssemblerListingLocation=&quot;.\obj\Debug/&quot;
+-                ObjectFile=&quot;.\obj\Debug/&quot;
+-                ProgramDataBaseFileName=&quot;.\obj\Debug/&quot;
+-                WarningLevel=&quot;3&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                DebugInformationFormat=&quot;4&quot;
+-                CompileAs=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManagedResourceCompilerTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCResourceCompilerTool&quot;
+-                PreprocessorDefinitions=&quot;_DEBUG&quot;
+-                Culture=&quot;2057&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPreLinkEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCLinkerTool&quot;
+-                IgnoreImportLibrary=&quot;true&quot;
+-                AdditionalOptions=&quot;/MACHINE:I386&quot;
+-                AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain_d.lib OgreGuiRenderer_d.lib CEGUIBase_d.lib xerces-c_2D.lib OgreNewt_d.lib Newton.lib OIS_d.lib&quot;
+-                ShowProgress=&quot;0&quot;
+-                OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+-                LinkIncremental=&quot;2&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+-                IgnoreDefaultLibraryNames=&quot;&quot;
+-                GenerateDebugInformation=&quot;true&quot;
+-                AssemblyDebug=&quot;1&quot;
+-                ProgramDatabaseFile=&quot;.\lib\Debug/RlUI.pdb&quot;
+-                GenerateMapFile=&quot;true&quot;
+-                MapExports=&quot;true&quot;
+-                SubSystem=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCALinkTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManifestTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXDCMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCBscMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCFxCopTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCAppVerifierTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebDeploymentTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPostBuildEventTool&quot;
+-                Description=&quot;Kopiere DLL&quot;
+-                CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
+-                ExcludedFromBuild=&quot;false&quot;
+-            /&gt;
+-        &lt;/Configuration&gt;
+-        &lt;Configuration
+-            Name=&quot;Release|Win32&quot;
+-            OutputDirectory=&quot;./lib/$(ConfigurationName)&quot;
+-            IntermediateDirectory=&quot;./obj/$(ConfigurationName)&quot;
+-            ConfigurationType=&quot;2&quot;
+-            UseOfMFC=&quot;0&quot;
+-            ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
+-            CharacterSet=&quot;2&quot;
+-            &gt;
+-            &lt;Tool
+-                Name=&quot;VCPreBuildEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCustomBuildTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXMLDataGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebServiceProxyGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCMIDLTool&quot;
+-                PreprocessorDefinitions=&quot;NDEBUG&quot;
+-                MkTypLibCompatible=&quot;true&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                TargetEnvironment=&quot;1&quot;
+-                TypeLibraryName=&quot;.\lib\Release/Rastullah.tlb&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCLCompilerTool&quot;
+-                Optimization=&quot;3&quot;
+-                EnableIntrinsicFunctions=&quot;true&quot;
+-                FavorSizeOrSpeed=&quot;1&quot;
+-                AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
+-                PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+-                StringPooling=&quot;false&quot;
+-                ExceptionHandling=&quot;1&quot;
+-                RuntimeLibrary=&quot;2&quot;
+-                BufferSecurityCheck=&quot;false&quot;
+-                RuntimeTypeInfo=&quot;true&quot;
+-                UsePrecompiledHeader=&quot;0&quot;
+-                PrecompiledHeaderFile=&quot;.\obj\Release/Rastullah.pch&quot;
+-                AssemblerListingLocation=&quot;.\obj\Release/&quot;
+-                ObjectFile=&quot;.\obj\Release/&quot;
+-                ProgramDataBaseFileName=&quot;.\obj\Release/&quot;
+-                WarningLevel=&quot;3&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                DebugInformationFormat=&quot;3&quot;
+-                CompileAs=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManagedResourceCompilerTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCResourceCompilerTool&quot;
+-                PreprocessorDefinitions=&quot;NDEBUG&quot;
+-                Culture=&quot;2057&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPreLinkEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCLinkerTool&quot;
+-                IgnoreImportLibrary=&quot;true&quot;
+-                AdditionalOptions=&quot;/MACHINE:I386&quot;
+-                AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain.lib OgreGuiRenderer.lib CEGUIBase.lib xerces-c_2.lib OgreNewt.lib Newton.lib OIS.lib&quot;
+-                OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+-                LinkIncremental=&quot;1&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+-                ProgramDatabaseFile=&quot;&quot;
+-                SubSystem=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCALinkTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManifestTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXDCMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCBscMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCFxCopTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCAppVerifierTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebDeploymentTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPostBuildEventTool&quot;
+-                Description=&quot;Kopiere DLL&quot;
+-                CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
+-                ExcludedFromBuild=&quot;false&quot;
+-            /&gt;
+-        &lt;/Configuration&gt;
+-        &lt;Configuration
+-            Name=&quot;Release with Symbols|Win32&quot;
+-            OutputDirectory=&quot;./lib/Release&quot;
+-            IntermediateDirectory=&quot;./obj/Release&quot;
+-            ConfigurationType=&quot;2&quot;
+-            UseOfMFC=&quot;0&quot;
+-            ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
+-            CharacterSet=&quot;2&quot;
+-            &gt;
+-            &lt;Tool
+-                Name=&quot;VCPreBuildEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCustomBuildTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXMLDataGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebServiceProxyGeneratorTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCMIDLTool&quot;
+-                PreprocessorDefinitions=&quot;NDEBUG&quot;
+-                MkTypLibCompatible=&quot;true&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                TargetEnvironment=&quot;1&quot;
+-                TypeLibraryName=&quot;.\lib\Release/Rastullah.tlb&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCCLCompilerTool&quot;
+-                Optimization=&quot;3&quot;
+-                EnableIntrinsicFunctions=&quot;true&quot;
+-                FavorSizeOrSpeed=&quot;1&quot;
+-                AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
+-                PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+-                StringPooling=&quot;false&quot;
+-                ExceptionHandling=&quot;1&quot;
+-                RuntimeLibrary=&quot;2&quot;
+-                BufferSecurityCheck=&quot;false&quot;
+-                RuntimeTypeInfo=&quot;true&quot;
+-                UsePrecompiledHeader=&quot;0&quot;
+-                PrecompiledHeaderFile=&quot;.\obj\Release/Rastullah.pch&quot;
+-                AssemblerListingLocation=&quot;.\obj\Release/&quot;
+-                ObjectFile=&quot;.\obj\Release/&quot;
+-                ProgramDataBaseFileName=&quot;.\obj\Release/&quot;
+-                WarningLevel=&quot;3&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                DebugInformationFormat=&quot;3&quot;
+-                CompileAs=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManagedResourceCompilerTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCResourceCompilerTool&quot;
+-                PreprocessorDefinitions=&quot;NDEBUG&quot;
+-                Culture=&quot;2057&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPreLinkEventTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCLinkerTool&quot;
+-                IgnoreImportLibrary=&quot;true&quot;
+-                AdditionalOptions=&quot;/MACHINE:I386&quot;
+-                AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain.lib OgreGuiRenderer.lib CEGUIBase.lib xerces-c_2.lib OgreNewt.lib Newton.lib OIS.lib&quot;
+-                OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+-                LinkIncremental=&quot;1&quot;
+-                SuppressStartupBanner=&quot;true&quot;
+-                AdditionalLibraryDirectories=&quot;..\core\lib\Release;..\rules\lib\Release;..\uicomponents\lib\Release;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\OgreNewt\lib\Release;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+-                GenerateDebugInformation=&quot;true&quot;
+-                ProgramDatabaseFile=&quot;$(TargetDir)$(TargetName).pdb&quot;
+-                SubSystem=&quot;2&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCALinkTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCManifestTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCXDCMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCBscMakeTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCFxCopTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCAppVerifierTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCWebDeploymentTool&quot;
+-            /&gt;
+-            &lt;Tool
+-                Name=&quot;VCPostBuildEventTool&quot;
+-                Description=&quot;Kopiere DLL&quot;
+-                CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
+-                ExcludedFromBuild=&quot;false&quot;
+-            /&gt;
+-        &lt;/Configuration&gt;
+-    &lt;/Configurations&gt;
+-    &lt;References&gt;
+-    &lt;/References&gt;
+-    &lt;Files&gt;
+-        &lt;Filter
+-            Name=&quot;Header Files&quot;
+-            Filter=&quot;h;hpp;hxx;hm;inl&quot;
+-            &gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\CeGuiHelper.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\CharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\CombatCharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\CommandMapper.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\CutsceneCharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\DialogCharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\FreeFlightCharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\GameSettings.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\InputManager.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\MovementCharacterController.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\Selector.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\UiPrerequisites.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\UiSubsystem.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\WindowFactory.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\WindowFadeJob.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\include\WindowManager.h&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;Filter
+-                Name=&quot;windows&quot;
+-                &gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\AboutWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\AbstractWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ActionChoiceWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\CharacterSheetWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\CharacterStateWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\CloseConfirmationWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ConfigComponent.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\Console.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ContainerContentWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\DataLoadingProgressWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\DebugWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\DialogWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\GameLoggerWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\GameObjectInfoWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\GameObjectPropsWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\SaveLoadWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\InfoPopup.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\InGameMenuWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\InventoryWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ItemDragContainer.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\JournalWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ListboxWrappedTextItem.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\LogWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\MainMenuEngineWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\MainMenuWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\MessageWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\ObjectDescriptionWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\PlaylistWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\RenderSystemConfigComponent.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\SoundConfig.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\SoundDriverConfigComponent.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\include\SubtitleWindow.h&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-            &lt;/Filter&gt;
+-        &lt;/Filter&gt;
+-        &lt;Filter
+-            Name=&quot;Source Files&quot;
+-            Filter=&quot;cpp;c;cxx;rc;def;r;odl;idl;hpj;bat&quot;
+-            &gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\CharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\CombatCharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\CommandMapper.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\CutsceneCharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\DialogCharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\FreeFlightCharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\GameSettings.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\InputManager.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\MovementCharacterController.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\Selector.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\UiSubsystem.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\WindowFactory.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\WindowFadeJob.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;File
+-                RelativePath=&quot;.\src\WindowManager.cpp&quot;
+-                &gt;
+-            &lt;/File&gt;
+-            &lt;Filter
+-                Name=&quot;windows&quot;
+-                &gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\AboutWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\AbstractWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ActionChoiceWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\CharacterSheetWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\CharacterStateWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\CloseConfirmationWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ConfigComponent.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\Console.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ContainerContentWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\DataLoadingProgressWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\DebugWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\DialogWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\GameLoggerWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\GameObjectInfoWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\GameObjectPropsWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\SaveLoadWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\InfoPopup.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\InGameMenuWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\InventoryWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ItemDragContainer.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\JournalWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ListboxWrappedTextItem.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\LogWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\MainMenuEngineWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\MainMenuWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\MessageWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\ObjectDescriptionWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\PlaylistWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\RenderSystemConfigComponent.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\SoundConfig.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\SoundDriverConfigComponent.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-                &lt;File
+-                    RelativePath=&quot;.\src\SubtitleWindow.cpp&quot;
+-                    &gt;
+-                &lt;/File&gt;
+-            &lt;/Filter&gt;
+-        &lt;/Filter&gt;
+-        &lt;Filter
+-            Name=&quot;Resource Files&quot;
+-            Filter=&quot;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe&quot;
+-            &gt;
+-        &lt;/Filter&gt;
+-    &lt;/Files&gt;
+-    &lt;Globals&gt;
+-    &lt;/Globals&gt;
++	ProjectType=&quot;Visual C++&quot;
++	Version=&quot;8,00&quot;
++	Name=&quot;RlUI&quot;
++	ProjectGUID=&quot;{53FE20F3-E726-44FE-BBEC-D29CAE210D25}&quot;
++	RootNamespace=&quot;RlUI&quot;
++	&gt;
++	&lt;Platforms&gt;
++		&lt;Platform
++			Name=&quot;Win32&quot;
++		/&gt;
++	&lt;/Platforms&gt;
++	&lt;ToolFiles&gt;
++	&lt;/ToolFiles&gt;
++	&lt;Configurations&gt;
++		&lt;Configuration
++			Name=&quot;Debug|Win32&quot;
++			OutputDirectory=&quot;./lib/$(ConfigurationName)&quot;
++			IntermediateDirectory=&quot;./obj/$(ConfigurationName)&quot;
++			ConfigurationType=&quot;2&quot;
++			UseOfMFC=&quot;0&quot;
++			ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
++			CharacterSet=&quot;2&quot;
++			ManagedExtensions=&quot;0&quot;
++			&gt;
++			&lt;Tool
++				Name=&quot;VCPreBuildEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCustomBuildTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXMLDataGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebServiceProxyGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCMIDLTool&quot;
++				PreprocessorDefinitions=&quot;_DEBUG&quot;
++				MkTypLibCompatible=&quot;true&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				TargetEnvironment=&quot;1&quot;
++				TypeLibraryName=&quot;.\lib\Debug/Rastullah.tlb&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCLCompilerTool&quot;
++				Optimization=&quot;0&quot;
++				AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
++				PreprocessorDefinitions=&quot;WITH_FMOD3;_WINDOWS,_DEBUG,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
++				MinimalRebuild=&quot;true&quot;
++				BasicRuntimeChecks=&quot;3&quot;
++				SmallerTypeCheck=&quot;true&quot;
++				RuntimeLibrary=&quot;3&quot;
++				BufferSecurityCheck=&quot;false&quot;
++				EnableFunctionLevelLinking=&quot;false&quot;
++				RuntimeTypeInfo=&quot;true&quot;
++				PrecompiledHeaderFile=&quot;.\obj\Debug/Rastullah.pch&quot;
++				ExpandAttributedSource=&quot;true&quot;
++				AssemblerOutput=&quot;4&quot;
++				AssemblerListingLocation=&quot;.\obj\Debug/&quot;
++				ObjectFile=&quot;.\obj\Debug/&quot;
++				ProgramDataBaseFileName=&quot;.\obj\Debug/&quot;
++				WarningLevel=&quot;3&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				DebugInformationFormat=&quot;4&quot;
++				CompileAs=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManagedResourceCompilerTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCResourceCompilerTool&quot;
++				PreprocessorDefinitions=&quot;_DEBUG&quot;
++				Culture=&quot;2057&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPreLinkEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCLinkerTool&quot;
++				IgnoreImportLibrary=&quot;true&quot;
++				AdditionalOptions=&quot;/MACHINE:I386&quot;
++				AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain_d.lib OgreGuiRenderer_d.lib CEGUIBase_d.lib xerces-c_2D.lib OgreNewt_d.lib Newton.lib OIS_d.lib&quot;
++				ShowProgress=&quot;0&quot;
++				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
++				LinkIncremental=&quot;2&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
++				IgnoreDefaultLibraryNames=&quot;&quot;
++				GenerateDebugInformation=&quot;true&quot;
++				AssemblyDebug=&quot;1&quot;
++				ProgramDatabaseFile=&quot;.\lib\Debug/RlUI.pdb&quot;
++				GenerateMapFile=&quot;true&quot;
++				MapExports=&quot;true&quot;
++				SubSystem=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCALinkTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManifestTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXDCMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCBscMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCFxCopTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCAppVerifierTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebDeploymentTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPostBuildEventTool&quot;
++				Description=&quot;Kopiere DLL&quot;
++				CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
++				ExcludedFromBuild=&quot;false&quot;
++			/&gt;
++		&lt;/Configuration&gt;
++		&lt;Configuration
++			Name=&quot;Release|Win32&quot;
++			OutputDirectory=&quot;./lib/$(ConfigurationName)&quot;
++			IntermediateDirectory=&quot;./obj/$(ConfigurationName)&quot;
++			ConfigurationType=&quot;2&quot;
++			UseOfMFC=&quot;0&quot;
++			ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
++			CharacterSet=&quot;2&quot;
++			&gt;
++			&lt;Tool
++				Name=&quot;VCPreBuildEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCustomBuildTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXMLDataGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebServiceProxyGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCMIDLTool&quot;
++				PreprocessorDefinitions=&quot;NDEBUG&quot;
++				MkTypLibCompatible=&quot;true&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				TargetEnvironment=&quot;1&quot;
++				TypeLibraryName=&quot;.\lib\Release/Rastullah.tlb&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCLCompilerTool&quot;
++				Optimization=&quot;3&quot;
++				EnableIntrinsicFunctions=&quot;true&quot;
++				FavorSizeOrSpeed=&quot;1&quot;
++				AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
++				PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
++				StringPooling=&quot;false&quot;
++				ExceptionHandling=&quot;1&quot;
++				RuntimeLibrary=&quot;2&quot;
++				BufferSecurityCheck=&quot;false&quot;
++				RuntimeTypeInfo=&quot;true&quot;
++				UsePrecompiledHeader=&quot;0&quot;
++				PrecompiledHeaderFile=&quot;.\obj\Release/Rastullah.pch&quot;
++				AssemblerListingLocation=&quot;.\obj\Release/&quot;
++				ObjectFile=&quot;.\obj\Release/&quot;
++				ProgramDataBaseFileName=&quot;.\obj\Release/&quot;
++				WarningLevel=&quot;3&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				DebugInformationFormat=&quot;3&quot;
++				CompileAs=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManagedResourceCompilerTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCResourceCompilerTool&quot;
++				PreprocessorDefinitions=&quot;NDEBUG&quot;
++				Culture=&quot;2057&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPreLinkEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCLinkerTool&quot;
++				IgnoreImportLibrary=&quot;true&quot;
++				AdditionalOptions=&quot;/MACHINE:I386&quot;
++				AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain.lib OgreGuiRenderer.lib CEGUIBase.lib xerces-c_2.lib OgreNewt.lib Newton.lib OIS.lib&quot;
++				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
++				LinkIncremental=&quot;1&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
++				ProgramDatabaseFile=&quot;&quot;
++				SubSystem=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCALinkTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManifestTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXDCMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCBscMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCFxCopTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCAppVerifierTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebDeploymentTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPostBuildEventTool&quot;
++				Description=&quot;Kopiere DLL&quot;
++				CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
++				ExcludedFromBuild=&quot;false&quot;
++			/&gt;
++		&lt;/Configuration&gt;
++		&lt;Configuration
++			Name=&quot;Release with Symbols|Win32&quot;
++			OutputDirectory=&quot;./lib/Release&quot;
++			IntermediateDirectory=&quot;./obj/Release&quot;
++			ConfigurationType=&quot;2&quot;
++			UseOfMFC=&quot;0&quot;
++			ATLMinimizesCRunTimeLibraryUsage=&quot;false&quot;
++			CharacterSet=&quot;2&quot;
++			&gt;
++			&lt;Tool
++				Name=&quot;VCPreBuildEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCustomBuildTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXMLDataGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebServiceProxyGeneratorTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCMIDLTool&quot;
++				PreprocessorDefinitions=&quot;NDEBUG&quot;
++				MkTypLibCompatible=&quot;true&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				TargetEnvironment=&quot;1&quot;
++				TypeLibraryName=&quot;.\lib\Release/Rastullah.tlb&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCCLCompilerTool&quot;
++				Optimization=&quot;3&quot;
++				EnableIntrinsicFunctions=&quot;true&quot;
++				FavorSizeOrSpeed=&quot;1&quot;
++				AdditionalIncludeDirectories=&quot;.\include;;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
++				PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
++				StringPooling=&quot;false&quot;
++				ExceptionHandling=&quot;1&quot;
++				RuntimeLibrary=&quot;2&quot;
++				BufferSecurityCheck=&quot;false&quot;
++				RuntimeTypeInfo=&quot;true&quot;
++				UsePrecompiledHeader=&quot;0&quot;
++				PrecompiledHeaderFile=&quot;.\obj\Release/Rastullah.pch&quot;
++				AssemblerListingLocation=&quot;.\obj\Release/&quot;
++				ObjectFile=&quot;.\obj\Release/&quot;
++				ProgramDataBaseFileName=&quot;.\obj\Release/&quot;
++				WarningLevel=&quot;3&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				DebugInformationFormat=&quot;3&quot;
++				CompileAs=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManagedResourceCompilerTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCResourceCompilerTool&quot;
++				PreprocessorDefinitions=&quot;NDEBUG&quot;
++				Culture=&quot;2057&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPreLinkEventTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCLinkerTool&quot;
++				IgnoreImportLibrary=&quot;true&quot;
++				AdditionalOptions=&quot;/MACHINE:I386&quot;
++				AdditionalDependencies=&quot;RlCore.lib RlRules.lib msvcrt-ruby18.lib OgreMain.lib OgreGuiRenderer.lib CEGUIBase.lib xerces-c_2.lib OgreNewt.lib Newton.lib OIS.lib&quot;
++				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
++				LinkIncremental=&quot;1&quot;
++				SuppressStartupBanner=&quot;true&quot;
++				AdditionalLibraryDirectories=&quot;..\core\lib\Release;..\rules\lib\Release;..\uicomponents\lib\Release;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\OgreNewt\lib\Release;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
++				GenerateDebugInformation=&quot;true&quot;
++				ProgramDatabaseFile=&quot;$(TargetDir)$(TargetName).pdb&quot;
++				SubSystem=&quot;2&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCALinkTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCManifestTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCXDCMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCBscMakeTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCFxCopTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCAppVerifierTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCWebDeploymentTool&quot;
++			/&gt;
++			&lt;Tool
++				Name=&quot;VCPostBuildEventTool&quot;
++				Description=&quot;Kopiere DLL&quot;
++				CommandLine=&quot;copy &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\..\rl_dist\&quot;&quot;
++				ExcludedFromBuild=&quot;false&quot;
++			/&gt;
++		&lt;/Configuration&gt;
++	&lt;/Configurations&gt;
++	&lt;References&gt;
++	&lt;/References&gt;
++	&lt;Files&gt;
++		&lt;Filter
++			Name=&quot;Header Files&quot;
++			Filter=&quot;h;hpp;hxx;hm;inl&quot;
++			&gt;
++			&lt;File
++				RelativePath=&quot;.\include\CeGuiHelper.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\CharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\CombatCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\CommandMapper.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\CutsceneCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\DialogCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\FreeFlightCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\GameSettings.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\InputManager.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\MovementCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\UiPrerequisites.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\UiSubsystem.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\WindowFactory.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\WindowFadeJob.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\WindowManager.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;Filter
++				Name=&quot;windows&quot;
++				&gt;
++				&lt;File
++					RelativePath=&quot;.\include\AboutWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\AbstractWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ActionChoiceWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\CharacterSheetWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\CharacterStateWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\CloseConfirmationWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ConfigComponent.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\Console.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ContainerContentWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\DataLoadingProgressWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\DebugWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\DialogWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\GameLoggerWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\GameObjectInfoWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\GameObjectPropsWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\InfoPopup.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\InGameMenuWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\InventoryWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ItemDragContainer.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\JournalWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ListboxWrappedTextItem.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\LogWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\MainMenuEngineWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\MainMenuWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\MessageWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\ObjectDescriptionWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\PlaylistWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\RenderSystemConfigComponent.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\SaveLoadWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\SoundConfig.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\SoundDriverConfigComponent.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\include\SubtitleWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++			&lt;/Filter&gt;
++		&lt;/Filter&gt;
++		&lt;Filter
++			Name=&quot;Source Files&quot;
++			Filter=&quot;cpp;c;cxx;rc;def;r;odl;idl;hpj;bat&quot;
++			&gt;
++			&lt;File
++				RelativePath=&quot;.\src\CharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\CombatCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\CommandMapper.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\CutsceneCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\DialogCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\FreeFlightCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\GameSettings.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\InputManager.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\MovementCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\UiSubsystem.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\WindowFactory.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\WindowFadeJob.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\WindowManager.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;Filter
++				Name=&quot;windows&quot;
++				&gt;
++				&lt;File
++					RelativePath=&quot;.\src\AboutWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\AbstractWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ActionChoiceWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\CharacterSheetWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\CharacterStateWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\CloseConfirmationWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ConfigComponent.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\Console.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ContainerContentWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\DataLoadingProgressWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\DebugWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\DialogWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\GameLoggerWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\GameObjectInfoWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\GameObjectPropsWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\InfoPopup.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\InGameMenuWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\InventoryWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ItemDragContainer.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\JournalWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ListboxWrappedTextItem.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\LogWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\MainMenuEngineWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\MainMenuWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\MessageWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\ObjectDescriptionWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\PlaylistWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\RenderSystemConfigComponent.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\SaveLoadWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\SoundConfig.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\SoundDriverConfigComponent.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
++					RelativePath=&quot;.\src\SubtitleWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++			&lt;/Filter&gt;
++		&lt;/Filter&gt;
++		&lt;Filter
++			Name=&quot;Resource Files&quot;
++			Filter=&quot;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe&quot;
++			&gt;
++		&lt;/Filter&gt;
++	&lt;/Files&gt;
++	&lt;Globals&gt;
++	&lt;/Globals&gt;
+ &lt;/VisualStudioProject&gt;
+
+Modified: rl/trunk/engine/ui/include/CombatCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -22,6 +22,9 @@
+ 
+ namespace rl {
+ 
++    class CombatManager;
++    class Combat;
++
+ 	class _RlUiExport CombatCharacterController : public CharacterController
+ 	{
+ 	public:
+@@ -31,10 +34,20 @@
+ 		CombatCharacterController(CommandMapper* cmdMapper, Actor* camera, Person* character);
+ 		virtual ~CombatCharacterController();
+ 
++        virtual void pause();
++        virtual void resume();
++
+ 		void run(Ogre::Real elapsedTime);
+ 
+-        virtual bool injectKeyUp(int keycode);
++		virtual bool injectMouseDown(int mouseButtonMask);
++		virtual bool injectMouseUp(int mouseButtonMask);
++		virtual bool injectKeyDown(int keycode);
++		virtual bool injectKeyUp(int keycode);
++
+     private:
++        CombatManager* mCombatManager;
++        // Current combat that is controlled.
++        Combat* mCombat;
+ 	};
+ }
+ #endif
+
+Deleted: rl/trunk/engine/ui/include/Selector.h
+===================================================================
+--- rl/trunk/engine/ui/include/Selector.h	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/include/Selector.h	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -1,109 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Perl Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Perl Artistic License for more details.
+- *
+- *  You should have received a copy of the Perl Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+- */
+-
+-#ifndef __RL_SELECTOR_H__
+-#define __RL_SELECTOR_H__
+-
+-#include &quot;UiPrerequisites.h&quot;
+-#include &quot;SceneQuery.h&quot;
+-#include &quot;GameObject.h&quot;
+-#include &quot;LineSetPrimitive.h&quot;
+-#include &quot;DebugVisualisable.h&quot;
+-
+-namespace rl {
+-
+-    /// Superclass for all Selectors in RL.
+-    /// Selectors provide a way to query for GameObjects in a game.
+-    /// Either in the scene, or inventory, or anywhere else.
+-    class _RlUiExport Selector : public DebugVisualisable
+-    {
+-    public:
+-        typedef std::vector&lt;GameObject*&gt; GameObjectVector;
+-
+-        Selector(unsigned long mask = 0xffffffff);
+-        virtual ~Selector();
+-        virtual void updateSelection();
+-
+-        void setSelectionMask(unsigned long mask);
+-        unsigned long getSelectionMask() const;
+-
+-        GameObject* getFirstSelectedObject() const;
+-        const GameObjectVector&amp; getAllSelectedObjects() const;
+-
+-    protected:
+-        GameObjectVector mSelection;
+-        unsigned long mSelectionMask;
+-
+-        virtual const ActorVector&amp; doExecuteQuery() = 0;
+-    };
+-
+-
+-    /// A Selector that selects all unoccluded GameObject the ray hits.
+-    class _RlUiExport RaySelector : public Selector
+-    {
+-    public:
+-        RaySelector(unsigned long mask = 0xffffffff);
+-
+-        void setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end);
+-
+-        // Overrides from DebugVisualisable
+-
+-        virtual DebugVisualisableFlag getFlag() const;
+-        virtual void updatePrimitive();
+-
+-    protected:
+-        RaySceneQuery mQuery;
+-
+-        virtual const ActorVector&amp; doExecuteQuery();
+-        virtual void doCreatePrimitive();
+-    };
+-
+-    /// Selects this GameObject within a half sphere pointing to -Z,
+-    /// that has the smallest angle difference to the -Z-Axis.
+-    class _RlUiExport HalfSphereSelector : public Selector
+-    {
+-    public:
+-        HalfSphereSelector(Ogre::SceneManager* smgr, unsigned long mask = 0xffffffff);
+-
+-        virtual void updateSelection();
+-
+-        void setRadius(Ogre::Real radius);
+-
+-        void setPosition(const Ogre::Vector3&amp; pos);
+-
+-        void setOrientation(const Ogre::Quaternion&amp; ori);
+-
+-        /// If check is true, visibility is checked from the POV of the Actor reference
+-        /// This is currently done by casting a ray from the Actor to the candidate GOs
+-        void setCheckVisibility(bool check, Actor* reference = NULL);
+-
+-        // Overrides from DebugVisualisable
+-
+-        virtual DebugVisualisableFlag getFlag() const;
+-        virtual void updatePrimitive();
+-
+-    protected:
+-        HalfSphereSceneQuery mQuery;
+-        bool mCheckVisibility;
+-        Actor* mReferenceActor;
+-
+-        virtual const ActorVector&amp; doExecuteQuery();
+-
+-        virtual void doCreatePrimitive();
+-    };
+-}
+-#endif
+-
+
+Modified: rl/trunk/engine/ui/src/CombatCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -16,12 +16,18 @@
+ 
+ #include &quot;CombatCharacterController.h&quot;
+ 
++#include &quot;Actor.h&quot;
++#include &quot;Combat.h&quot;
++#include &quot;CombatManager.h&quot;
+ #include &quot;Creature.h&quot;
+-#include &quot;Actor.h&quot;
++#include &quot;PhysicalThing.h&quot;
+ 
+ namespace rl {
+     CombatCharacterController::CombatCharacterController(CommandMapper* cmdMapper,
+-        Actor* camera, Person* character) : CharacterController(cmdMapper, camera, character)
++        Actor* camera, Person* character)
++        : CharacterController(cmdMapper, camera, character),
++          mCombatManager(CombatManager::getSingletonPtr()),
++          mCombat(NULL)
+     {
+     }
+ 
+@@ -29,10 +35,51 @@
+     {
+     }
+ 
++    void CombatCharacterController::resume()
++    {
++        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
++        mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
++
++        // Is there a combat running already?
++        if (mCombatManager-&gt;getCurrentCombat() != NULL)
++        {
++            // Yes, set this one as active.
++            mCombat = mCombatManager-&gt;getCurrentCombat();
++        }
++        else
++        {
++            // No, test, if we can start one.
++        }
++    }
++
++    void CombatCharacterController::pause()
++    {
++        mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++
++        // reset current combat, in order to avoid a potential dangling pointer
++        mCombat = NULL;
++    }
++
+ 	void CombatCharacterController::run(Ogre::Real elapsedTime)
+     {
+     }
+ 
++	bool CombatCharacterController::injectMouseDown(int mouseButtonMask)
++    {
++        return false;
++    }
++
++    bool CombatCharacterController::injectMouseUp(int mouseButtonMask)
++    {
++        return false;
++    }
++
++    bool CombatCharacterController::injectKeyDown(int keycode)
++    {
++        return false;
++    }
++
+     bool CombatCharacterController::injectKeyUp(int keycode)
+     {
+         return false;
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -135,7 +135,7 @@
+         mLookAtOffset = Vector3(0, (aabb.getMaximum() - aabb.getMinimum()).y * 0.45f, 0);
+ 
+         // We want to check for visibility from char's POV.
+-        mSelector.setCheckVisibility(true, mCharacterActor);
++        mSelector.setCheckVisibility(true, mCharacter);
+     }
+ 
+     //------------------------------------------------------------------------
+
+Deleted: rl/trunk/engine/ui/src/Selector.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/Selector.cpp	2007-04-28 07:39:48 UTC (rev 3350)
++++ rl/trunk/engine/ui/src/Selector.cpp	2007-04-28 22:41:31 UTC (rev 3351)
+@@ -1,251 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Perl Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Perl Artistic License for more details.
+- *
+- *  You should have received a copy of the Perl Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+- */
+-#include &quot;Selector.h&quot;
+-
+-#include &quot;PhysicsManager.h&quot;
+-
+-using namespace Ogre;
+-
+-namespace rl
+-{
+-    Selector::Selector(unsigned long mask) : mSelectionMask(mask)
+-    {
+-    }
+-
+-    Selector::~Selector()
+-    {
+-    }
+-
+-    void Selector::setSelectionMask(unsigned long mask)
+-    {
+-        mSelectionMask = mask;
+-    }
+-
+-    unsigned long Selector::getSelectionMask() const
+-    {
+-        return mSelectionMask;
+-    }
+-
+-    GameObject* Selector::getFirstSelectedObject() const
+-    {
+-        return mSelection.empty() ? NULL : mSelection[0];
+-    }
+-
+-    const Selector::GameObjectVector&amp; Selector::getAllSelectedObjects() const
+-    {
+-        return mSelection;
+-    }
+-
+-    void Selector::updateSelection()
+-    {
+-        // Remove old selection
+-        mSelection.clear();
+-
+-        // Do the query, results are in proper order
+-        const ActorVector&amp; actors = doExecuteQuery();
+-
+-        // Set selection to first result with a GameObject attached.
+-        for (ActorVector::const_iterator it = actors.begin(), end = actors.end();
+-            it != end; ++it)
+-        {
+-            Actor* actor = *it;
+-            GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
+-            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
+-            {
+-                mSelection.push_back(go);
+-            }
+-        }
+-    }
+-
+-    //------------------------------------------------------------------------
+-
+-    RaySelector::RaySelector(unsigned long mask)
+-        : Selector(mask), mQuery(mask)
+-    {
+-    }
+-
+-    void RaySelector::setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end)
+-    {
+-        mQuery.setRay(start, end);
+-    }
+-
+-    // Overrides from DebugVisualisable
+-    DebugVisualisableFlag RaySelector::getFlag() const
+-    {
+-        return DVF_CONTROL;
+-    }
+-
+-    void RaySelector::updatePrimitive()
+-    {
+-        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+-        lineSet-&gt;clear();
+-        lineSet-&gt;addLine(mQuery.getRayStart(), mQuery.getRayEnd(), ColourValue::Red);
+-    }
+-
+-    const ActorVector&amp; RaySelector::doExecuteQuery()
+-    {
+-        return mQuery.execute();
+-    }
+-
+-    void RaySelector::doCreatePrimitive()
+-    {
+-        mPrimitive = new LineSetPrimitive();
+-    }
+-
+-    //////////////////////////////////////////////////////////////////////////
+-
+-    HalfSphereSelector::HalfSphereSelector(Ogre::SceneManager* smgr,
+-        unsigned long mask)
+-        : Selector(mask),
+-          mQuery(smgr, mask),
+-          mCheckVisibility(false),
+-          mReferenceActor(NULL)
+-    {
+-    }
+-
+-    void HalfSphereSelector::updateSelection()
+-    {
+-        // Remove old selection
+-        mSelection.clear();
+-
+-        // Do the query, results are in proper order
+-        const ActorVector&amp; actors = doExecuteQuery();
+-
+-        // Prepare visibility check
+-        Ogre::Vector3 refPos = Ogre::Vector3::ZERO;
+-        if (mCheckVisibility &amp;&amp; mReferenceActor)
+-        {
+-            ActorControlledObject* obj = mReferenceActor-&gt;getControlledObject();
+-            PhysicalObject* physical = dynamic_cast&lt;PhysicalObject*&gt;(obj);
+-            if (physical)
+-            {
+-                // Take AABB center as reference point for physicals
+-                refPos = mReferenceActor-&gt;getWorldPosition() +
+-                    mReferenceActor-&gt;getWorldOrientation() *
+-                        physical-&gt;getDefaultSize().getCenter();
+-            }
+-            else
+-            {
+-                // Else just take the actors world position
+-                refPos = mReferenceActor-&gt;getWorldPosition();
+-            }
+-        }
+-
+-        // Set selection to first result with a GameObject attached.
+-        for (ActorVector::const_iterator it = actors.begin(), end = actors.end();
+-            it != end; ++it)
+-        {
+-            Actor* actor = *it;
+-            GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
+-            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
+-            {
+-                if (mCheckVisibility &amp;&amp; mReferenceActor)
+-                {
+-                    // Visiblity check via a raycast. Not ideal, but best option we have.
+-
+-                    // Determine target's position based on controlled object's type
+-                    Ogre::Vector3 targetPos = actor-&gt;getWorldPosition();
+-                    ActorControlledObject* obj = mReferenceActor-&gt;getControlledObject();
+-                    PhysicalObject* physical = dynamic_cast&lt;PhysicalObject*&gt;(obj);
+-                    if (physical)
+-                    {
+-                        // Take AABB center as reference point for physicals
+-                        targetPos += actor-&gt;getWorldOrientation() *
+-                            physical-&gt;getDefaultSize().getCenter();
+-                    }
+-                    
+-                    // Setup and execute raycast. Set result to be ordered by distance
+-                    OgreNewt::BasicRaycast raycast = OgreNewt::BasicRaycast(
+-                        PhysicsManager::getSingleton()._getNewtonWorld(),
+-                        refPos, targetPos, true);
+-
+-                    // inspect results
+-                    // the reference actor is filtered out
+-                    // if the first of the other hit bodies is not the actor, it is ommitted.
+-                    bool isVisible = true;
+-                    for (int i = 0, num = raycast.getHitCount(); i &lt; num; ++i)
+-                    {
+-                        OgreNewt::BasicRaycast::BasicRaycastInfo info = raycast.getInfoAt(i);
+-                        OgreNewt::Body* body = info.mBody;
+-                        if (body != NULL)
+-                        {
+-                            Actor* hitActor = static_cast&lt;Actor*&gt;(body-&gt;getUserData());
+-                            isVisible = hitActor == actor || hitActor == mReferenceActor;
+-                            if (!isVisible) break;
+-                        }
+-                    }
+-
+-                    // Actor not seen from reference actor and thus ommitted,
+-                    // check next result.
+-                    if (!isVisible) continue;
+-                }
+-
+-                mSelection.push_back(go);
+-            }
+-        }
+-    }
+-
+-    void HalfSphereSelector::updatePrimitive()
+-    {
+-        LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+-        lineSet-&gt;clear();
+-
+-        Vector3 pos = mQuery.getPosition();
+-        Quaternion ori = mQuery.getOrientation();
+-        Real radius = mQuery.getRadius();
+-
+-        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_X), ColourValue::Red);
+-        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::UNIT_Y), ColourValue::Green);
+-        lineSet-&gt;addLine(pos, pos + radius * (ori * Vector3::NEGATIVE_UNIT_Z),
+-            ColourValue::Blue);
+-    }
+-
+-    void HalfSphereSelector::setRadius(Ogre::Real radius)
+-    {
+-        mQuery.setRadius(radius);
+-    }
+-
+-    void HalfSphereSelector::setPosition(const Ogre::Vector3&amp; pos)
+-    {
+-        mQuery.setPosition(pos);
+-    }
+-
+-    void HalfSphereSelector::setOrientation(const Ogre::Quaternion&amp; ori)
+-    {
+-        mQuery.setOrientation(ori);
+-    }
+-
+-    void HalfSphereSelector::setCheckVisibility(bool check, Actor* reference)
+-    {
+-        mCheckVisibility = check;
+-        mReferenceActor = reference;
+-    }
+-
+-    DebugVisualisableFlag HalfSphereSelector::getFlag() const
+-    {
+-        return DVF_CONTROL;
+-    }
+-
+-    const ActorVector&amp; HalfSphereSelector::doExecuteQuery()
+-    {
+-        return mQuery.execute();
+-    }
+-
+-    void HalfSphereSelector::doCreatePrimitive()
+-    {
+-        mPrimitive = new LineSetPrimitive();
+-    }
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000421.html">[Dsa-hl-svn] r3350 - modules/techdemo/maps modules/techdemo/scripts	rl/trunk/engine/rules/include rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="000423.html">[Dsa-hl-svn] r3352 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#422">[ date ]</a>
+              <a href="thread.html#422">[ thread ]</a>
+              <a href="subject.html#422">[ subject ]</a>
+              <a href="author.html#422">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

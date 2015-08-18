@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4126 - in rl/trunk/engine: core/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4126%20-%20in%20rl/trunk/engine%3A%20core/src%20ui/src&In-Reply-To=%3C200803042024.m24KOcct011139%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001196.html">
+   <LINK REL="Next"  HREF="001198.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4126 - in rl/trunk/engine: core/src ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4126%20-%20in%20rl/trunk/engine%3A%20core/src%20ui/src&In-Reply-To=%3C200803042024.m24KOcct011139%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4126 - in rl/trunk/engine: core/src ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  4 21:24:38 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001196.html">[Dsa-hl-svn] r4125 - in rl/trunk/engine: ai/include ai/src core/src	ui/src
+</A></li>
+        <LI>Next message: <A HREF="001198.html">[Dsa-hl-svn] r4127 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules/include rules/src ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1197">[ date ]</a>
+              <a href="thread.html#1197">[ thread ]</a>
+              <a href="subject.html#1197">[ subject ]</a>
+              <a href="author.html#1197">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-04 21:24:36 +0100 (Tue, 04 Mar 2008)
+New Revision: 4126
+
+Modified:
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+Log:
+added missing functions to SaveGameManager
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 19:45:23 UTC (rev 4125)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 20:24:36 UTC (rev 4126)
+@@ -144,6 +144,21 @@
+         }
+     }
+ 
++    void SaveGameManager::loadSaveGameFile(int id)
++    {
++        if(mSaveGames.find(id) == mSaveGames.end())
++        {
++            MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoading&gt;();
++
++            SaveGameFile* file = getSaveGameFile(id);
++            SaveGameFileReader reader;
++            reader.parseSaveGameFile(file, mSaveGameDataOrderMap);
++            ///@todo: SaveGameReader
++
++            MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoaded&gt;();
++        }
++    }
++
+     void SaveGameManager::deleteSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+         if(SaveGameFileExists(name, moduleId))
+@@ -155,6 +170,16 @@
+         }
+     }
+ 
++    void SaveGameManager::deleteSaveGameFile(int id)
++    {
++        if(mSaveGames.find(id) == mSaveGames.end())
++        {
++            static_cast&lt;SaveGameFile*&gt;(mSaveGames[id])-&gt;deleteFileFromStorage();
++            delete mSaveGames[id];
++            mSaveGames.erase(id);
++        }
++    }
++
+     bool SaveGameManager::SaveGameFileExists(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+         bool saveGameFileExists = false;
+@@ -174,6 +199,13 @@
+         return NULL;
+     }
+ 
++    SaveGameFile* SaveGameManager::getSaveGameFile(int id)
++    {
++        if(mSaveGames.find(id) == mSaveGames.end())
++            return mSaveGames[id];
++        return NULL;
++    }
++
+     int SaveGameManager::getSaveGameId(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+         for(SaveGameEntryMap::const_iterator it = mSaveGames.begin(); it != mSaveGames.end(); ++it)
+
+Modified: rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 19:45:23 UTC (rev 4125)
++++ rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 20:24:36 UTC (rev 4126)
+@@ -127,10 +127,10 @@
+ 
+         if(mSaveGameTable-&gt;getFirstSelectedItem())
+ 		{
+-            CEGUI::uint SelectedRow = mSaveGameTable-&gt;getRowWithID(mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getID());
+-            CeGuiString moduleName = mSaveGameTable-&gt;getItemAtGridReference(CEGUI::MCLGridRef(SelectedRow,1))-&gt;getText();
+-            CeGuiString saveGameName = mSaveGameTable-&gt;getItemAtGridReference(CEGUI::MCLGridRef(SelectedRow,0))-&gt;getText();
+-            SaveGameManager::getSingleton().deleteSaveGameFile(saveGameName, moduleName);
++            mSaveGameTable-&gt;getRowWithID(mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getID());
++            
++            SaveGameManager::getSingleton().deleteSaveGameFile(
++                ((SaveGameFile*)mSaveGameTable-&gt;getFirstSelectedItem()-&gt;getUserData())-&gt;getId());
+         }
+ 
+         return true;
+@@ -149,9 +149,9 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
++            mSaveGameTable-&gt;setUserData(it-&gt;second);
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getName()), 0, saveGameNum);
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString()), 1, saveGameNum);
+-            LOG_MESSAGE(Logger::UI, &quot;Module ID: &quot; + it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString());
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME).toString()), 2, saveGameNum);
+             saveGameNum++;
+         }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001196.html">[Dsa-hl-svn] r4125 - in rl/trunk/engine: ai/include ai/src core/src	ui/src
+</A></li>
+	<LI>Next message: <A HREF="001198.html">[Dsa-hl-svn] r4127 - in rl/trunk/engine: ai/include ai/src	core/include core/src rules/include rules/src ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1197">[ date ]</a>
+              <a href="thread.html#1197">[ thread ]</a>
+              <a href="subject.html#1197">[ subject ]</a>
+              <a href="author.html#1197">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

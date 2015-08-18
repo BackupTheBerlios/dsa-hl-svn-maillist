@@ -1,0 +1,220 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4181 - in rl/trunk/engine: common/include common/src	rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4181%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09rules/src&In-Reply-To=%3C200803061217.m26CHXRX022457%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001251.html">
+   <LINK REL="Next"  HREF="001253.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4181 - in rl/trunk/engine: common/include common/src	rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4181%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09rules/src&In-Reply-To=%3C200803061217.m26CHXRX022457%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4181 - in rl/trunk/engine: common/include common/src	rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  6 13:17:33 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001251.html">[Dsa-hl-svn] r4180 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/common/include engine/core/include engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001253.html">[Dsa-hl-svn] r4182 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1252">[ date ]</a>
+              <a href="thread.html#1252">[ thread ]</a>
+              <a href="subject.html#1252">[ subject ]</a>
+              <a href="author.html#1252">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-06 13:17:29 +0100 (Thu, 06 Mar 2008)
+New Revision: 4181
+
+Modified:
+   rl/trunk/engine/common/include/Properties.h
+   rl/trunk/engine/common/src/Properties.cpp
+   rl/trunk/engine/common/src/Property.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+Log:
+moved getDifference to PropertyRecord
+
+Modified: rl/trunk/engine/common/include/Properties.h
+===================================================================
+--- rl/trunk/engine/common/include/Properties.h	2008-03-06 11:59:28 UTC (rev 4180)
++++ rl/trunk/engine/common/include/Properties.h	2008-03-06 12:17:29 UTC (rev 4181)
+@@ -58,6 +58,7 @@
+         const PropertyRecordMap::const_iterator end() const;
+         PropertyMap toPropertyMap() const;
+         
++        PropertyRecord* getDifference(PropertyRecord* differenceTo) const;
+     private:
+         PropertyRecordMap mProperties;
+ 	};
+
+Modified: rl/trunk/engine/common/src/Properties.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Properties.cpp	2008-03-06 11:59:28 UTC (rev 4180)
++++ rl/trunk/engine/common/src/Properties.cpp	2008-03-06 12:17:29 UTC (rev 4181)
+@@ -110,4 +110,23 @@
+     {
+         return convertToPropertyMap(mProperties);
+     }
++
++    PropertyRecord* PropertyRecord::getDifference(PropertyRecord* differenceTo) const
++    {
++        PropertyRecord* record = new PropertyRecord();
++        for(PropertyRecordMap::const_iterator it = begin(); it != end(); ++it)
++        {
++            if(!differenceTo-&gt;hasProperty(it-&gt;first))
++            {
++                record-&gt;setProperty(it-&gt;first,it-&gt;second);
++            }
++            else
++            {
++                Property prop = differenceTo-&gt;getProperty(it-&gt;first);
++                if(prop != it-&gt;second)
++                    record-&gt;setProperty(it-&gt;first, it-&gt;second);
++            }
++        }
++        return record;
++    }
+ }
+
+Modified: rl/trunk/engine/common/src/Property.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Property.cpp	2008-03-06 11:59:28 UTC (rev 4180)
++++ rl/trunk/engine/common/src/Property.cpp	2008-03-06 12:17:29 UTC (rev 4181)
+@@ -45,10 +45,73 @@
+         return mValue.empty();
+     }
+ 
++    bool comparePropertyArrays(PropertyArray array1, PropertyArray array2);
++
++    /// @return: will return true if the arrays are equal
++    bool comparePropertyMaps(PropertyMap map1, PropertyMap map2)
++    {
++        if(map1.size() != map2.size())
++            return false;
++        for(PropertyMap::const_iterator it = map1.begin(); it != map1.end(); ++it)
++        {
++            if(map2.find(it-&gt;first) == map2.end())
++                return false;
++            else if(it-&gt;second.getTypeName() == map2[it-&gt;first].getTypeName())
++            {
++                if(it-&gt;second.isArray())
++                {
++                    if(!comparePropertyArrays(it-&gt;second, map2[it-&gt;first]))
++                        return false;
++                }
++                else if(it-&gt;second.isMap())
++                {
++                    if(!comparePropertyMaps(it-&gt;second, map2[it-&gt;first]))
++                        return false;    
++                }
++                else if(it-&gt;second != map2[it-&gt;first])
++                    return false;
++            }
++        }
++        
++        return true;
++    }
++
++    /// @return: will return true if the arrays are equal
++    bool comparePropertyArrays(PropertyArray array1, PropertyArray array2)
++    {
++        if(array1.size() != array2.size())
++            return false;
++        for(unsigned int i = 0; i &lt; array1.size(); i++)
++        {
++            if(array1[i].getTypeName() == array2[i].getTypeName())
++            {
++                if(array1[i].isArray())
++                {
++                    if(!comparePropertyArrays(array1[i], array2[i]))
++                        return false;
++                }
++                else if(array1[i].isMap())
++                {
++                    if(!comparePropertyMaps(array1[i], array2[i]))
++                        return false;
++                }
++                else if(array1[i] != array2[i])
++                    return false;
++            }
++            else
++                return false;
++        }
++        return true;
++    }
++
+     bool Property::operator ==(const rl::Property &amp;other) const
+     {
+         if (other.getTypeName() == getTypeName())
+         {
++            if(isArray())
++                return comparePropertyArrays(*this, other);
++            else if(isMap ())
++                return comparePropertyMaps(*this, other);
+             return other.getAsString() == getAsString();
+         }
+ 
+@@ -59,6 +122,10 @@
+     {
+         if (other.getTypeName() == getTypeName())
+         {
++            if(isArray())
++                return !comparePropertyArrays(*this, other);
++            else if(isMap ())
++                return !comparePropertyMaps(*this, other);
+             return other.getAsString() != getAsString();
+         }
+ 
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-06 11:59:28 UTC (rev 4180)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-06 12:17:29 UTC (rev 4181)
+@@ -318,7 +318,8 @@
+ 
+             PropertyMap actualMap = (*it_gameobjects)-&gt;getAllProperties()-&gt;toPropertyMap();
+ 
+-            writer-&gt;writeEachPropertyToElem(gameobject, getPropertyMapDifference(actualMap, getClassProperties((*it_gameobjects)-&gt;getClassId())-&gt;toPropertyMap()));
++            writer-&gt;writeEachPropertyToElem(gameobject, (*it_gameobjects)-&gt;getAllProperties()-&gt;getDifference(getClassProperties((*it_gameobjects)-&gt;getClassId()))-&gt;toPropertyMap());
++            //writer-&gt;writeEachPropertyToElem(gameobject, getPropertyMapDifference(actualMap, getClassProperties((*it_gameobjects)-&gt;getClassId())-&gt;toPropertyMap()));
+         } 
+     }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001251.html">[Dsa-hl-svn] r4180 - in rl/trunk: Mac/Rastullah.xcodeproj	engine/common/include engine/core/include engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001253.html">[Dsa-hl-svn] r4182 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1252">[ date ]</a>
+              <a href="thread.html#1252">[ thread ]</a>
+              <a href="subject.html#1252">[ subject ]</a>
+              <a href="author.html#1252">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

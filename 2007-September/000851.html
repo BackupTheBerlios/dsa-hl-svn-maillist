@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3780 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3780%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200709010219.l812JLRB022256%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000852.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3780 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>no22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3780%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200709010219.l812JLRB022256%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3780 - in rl/trunk/engine: rules/include rules/src	script/swig">no22 at mail.berlios.de
+       </A><BR>
+    <I>Sat Sep  1 04:19:21 CEST 2007</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000852.html">[Dsa-hl-svn] r3781 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#851">[ date ]</a>
+              <a href="thread.html#851">[ thread ]</a>
+              <a href="subject.html#851">[ subject ]</a>
+              <a href="author.html#851">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: no22
+Date: 2007-09-01 04:19:01 +0200 (Sat, 01 Sep 2007)
+New Revision: 3780
+
+Modified:
+   rl/trunk/engine/rules/include/Effect.h
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/Effect.cpp
+   rl/trunk/engine/rules/src/EffectManager.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+* renamed Effect.test() to Effect.check(), which is more appropiate due to the &quot;new&quot; effect system and was renamed already in the ruby scripts, which caused crashes
+* fixed a typo in an error log message in the CreatureController
+
+Modified: rl/trunk/engine/rules/include/Effect.h
+===================================================================
+--- rl/trunk/engine/rules/include/Effect.h	2007-08-31 20:39:52 UTC (rev 3779)
++++ rl/trunk/engine/rules/include/Effect.h	2007-09-01 02:19:01 UTC (rev 3780)
+@@ -114,7 +114,7 @@
+          * @return Returns the time to the next check. If REMOVE is returned, the 
+          * effect will be removed, if PERMANENT is returned, the effect lasts permanently.
+          **/
+-		virtual RL_LONGLONG test();
++		virtual RL_LONGLONG check();
+         
+         /// Returns the status that is applied to the creature by this effect.
+         virtual Status getStatus();
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-08-31 20:39:52 UTC (rev 3779)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-09-01 02:19:01 UTC (rev 3780)
+@@ -132,8 +132,8 @@
+ 
+             if (it == mBodyControllers.end())
+             {
+-                LOG_ERROR(Logger::RULES,
+-                    &quot;Der Kollisionsk&#246;rper konnte keiner Creature zugeordner werden.&quot;);
++                //LOG_ERROR(Logger::RULES,
++                //    &quot;Der Kollisionsk&#246;rper konnte keiner Creature zugeordnet werden.&quot;);
+                 return 1;
+             }
+         }
+
+Modified: rl/trunk/engine/rules/src/Effect.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Effect.cpp	2007-08-31 20:39:52 UTC (rev 3779)
++++ rl/trunk/engine/rules/src/Effect.cpp	2007-09-01 02:19:01 UTC (rev 3780)
+@@ -87,7 +87,7 @@
+ 		}
+ 	}
+ 
+-    RL_LONGLONG Effect::test()
++    RL_LONGLONG Effect::check()
+     {
+       return PERMANENT;
+     }
+
+Modified: rl/trunk/engine/rules/src/EffectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EffectManager.cpp	2007-08-31 20:39:52 UTC (rev 3779)
++++ rl/trunk/engine/rules/src/EffectManager.cpp	2007-09-01 02:19:01 UTC (rev 3780)
+@@ -15,6 +15,8 @@
+  */
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
++#include &lt;sstream&gt;
++
+ #include &quot;EffectManager.h&quot;
+ #include &quot;DsaManager.h&quot;
+ #include &quot;Exception.h&quot;
+@@ -44,11 +46,14 @@
+         if (checkIt == mChecklist.end()) return;
+         while ( checkIt != mChecklist.end() &amp;&amp; checkIt-&gt;first &lt;= now )
+         {
+-			std::cout &lt;&lt; &quot;Effect check: &quot; &lt;&lt; checkIt-&gt;first &lt;&lt; &quot; now: &quot; &lt;&lt; now &lt;&lt; std::endl;
++				std::stringstream debugInfo;
++				debugInfo &lt;&lt; &quot;Effect check: &quot; &lt;&lt; checkIt-&gt;first &lt;&lt; &quot; now: &quot; &lt;&lt; now &lt;&lt; std::endl;
++                LOG_DEBUG(Logger::RULES,
++					debugInfo.str());
+             for (Effects::iterator effIt = checkIt-&gt;second.begin(); effIt != checkIt-&gt;second.end(); effIt++)
+             {
+                 int nextCheck;
+-                nextCheck = (*effIt)-&gt;test();
++                nextCheck = (*effIt)-&gt;check();
+                 switch (nextCheck)
+                 {
+                   case Effect::REMOVE:
+@@ -72,6 +77,10 @@
+         // Get current ingame time and add timeUntilCheck
+         RL_LONGLONG now = DsaManager::getSingleton().getTimestamp();
+         RL_LONGLONG timeForCheck = now + timeUntilCheck;
++				std::stringstream debugInfo;
++				debugInfo &lt;&lt; &quot;Adding check! now:&quot; &lt;&lt; now &lt;&lt; &quot; check: &quot; &lt;&lt; timeForCheck &lt;&lt; std::endl;
++                LOG_DEBUG(Logger::RULES,
++					debugInfo.str());
+         // Insert Sum and effect into the checklist
+         mChecklist[timeForCheck].insert(effect);
+     }
+@@ -83,12 +92,20 @@
+         if (date &lt;= now) Throw(IllegalArgumentException, &quot;date lies in the past!&quot;);
+         if (effect == NULL) Throw(IllegalArgumentException, &quot;effect pointer is NULL!&quot;);
+         // Insert date and effect into the checklist
++				std::stringstream debugInfo;
++				debugInfo &lt;&lt; &quot;Adding check! now:&quot; &lt;&lt; now &lt;&lt; &quot; check: &quot; &lt;&lt; date &lt;&lt; std::endl;
++                LOG_DEBUG(Logger::RULES,
++					debugInfo.str());
+         mChecklist[date].insert(effect);
+     }
+ 
+ 
+ 	void EffectManager::addEffect(Effect* effect)
+ 	{
++				std::stringstream debugInfo;
++				debugInfo &lt;&lt; &quot;Adding effect &quot; &lt;&lt; effect-&gt;getName() &lt;&lt; std::endl;
++                LOG_DEBUG(Logger::RULES,
++					debugInfo.str());
+ 		for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
+ 		{
+ 			if ((*it)-&gt;getName() == effect-&gt;getName())
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-08-31 20:39:52 UTC (rev 3779)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-09-01 02:19:01 UTC (rev 3780)
+@@ -590,7 +590,7 @@
+         virtual void decreaseStufe();
+         virtual void enable();
+         virtual void disable();
+-        virtual RL_LONGLONG test() = 0;
++        virtual RL_LONGLONG check() = 0;
+ 
+         virtual Status getStatus();
+         virtual int getMod(rl::CeGuiString target, ModType type, ModTag tag);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000852.html">[Dsa-hl-svn] r3781 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#851">[ date ]</a>
+              <a href="thread.html#851">[ thread ]</a>
+              <a href="subject.html#851">[ subject ]</a>
+              <a href="author.html#851">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4867 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4867%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903242106.n2OL6kf5030428%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001923.html">
+   <LINK REL="Next"  HREF="001925.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4867 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4867%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903242106.n2OL6kf5030428%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4867 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar 24 22:06:46 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001923.html">[Dsa-hl-svn] r4866 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001925.html">[Dsa-hl-svn] r4868 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1924">[ date ]</a>
+              <a href="thread.html#1924">[ thread ]</a>
+              <a href="subject.html#1924">[ subject ]</a>
+              <a href="author.html#1924">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-24 22:06:42 +0100 (Tue, 24 Mar 2009)
+New Revision: 4867
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- Most of the Zone properties are loaded and saved now
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-23 16:04:58 UTC (rev 4866)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-24 21:06:42 UTC (rev 4867)
+@@ -522,7 +522,7 @@
+             settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
+             settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
+             
+-            self.ogreRoot.shutdown()
++            #self.ogreRoot.shutdown()
+         else:
+             event.ignore()
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-23 16:04:58 UTC (rev 4866)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-24 21:06:42 UTC (rev 4867)
+@@ -490,9 +490,10 @@
+                         
+             i = i+1
+             
++        self.zoneManager.saveZonesToXml(root, self)
+         indent(root)
+         xml.ElementTree(root).write(self.pathToMapFile)
+-        
++
+ # caused a linux crash
+ #        iter = self.mapNode.getChildIterator()
+ #        while iter.hasMoreElements():
+@@ -705,7 +706,22 @@
+                 for m in s.mapFiles:
+                         if m.mapName == mapName:
+                             return m
+-                            
++
++class ProgressBarThread(QThread):
++    def __init__(self, min, max, moduleName):
++        QThread.__init__(self)
++        self.progress = QProgressDialog(&quot;Loading &quot; + moduleName, &quot;Abort Loading&quot;, min, max, None);
++        self.progress.setWindowModality(Qt.WindowModal)
++
++    def setProgress(self, progress, labelText):
++        self.progress.setLabelText(labelText)
++        self.progress.setValue(progress)
++        
++    def run(self):
++        self.progress.show()
++        self.exec_()
++
++        
+ class ModuleManager():
+     dropCount = 0
+     entityCustomOptionsDict = []
+@@ -824,41 +840,38 @@
+     def loadModule(self, moduleName):
+         t = og.Timer()
+         
++#        self.progress = ProgressBarThread(0, 8, moduleName)
++#        self.progress.start()
++        
+         for m in self.moduleList:
+             if m.name == moduleName:
+                 if m.hasDependencies: # load modules on wich the main module depends before the main module is loaded
+                     for moduleDependencie in m.moduleDependencies:
+                         for m2 in self.moduleList:
+                             if m2.name == moduleDependencie:
++#                                self.progress.setProgress(2, &quot;Loading Dependencie: &quot; + moduleDependencie)
+                                 m2.load()
+                                 self.modelSelectionDialog.scanDirForModels(m2.moduleRoot)
+                                 self.materialSelectionDialog.scanDirForMaterials(m2.moduleRoot)
+                                 self.mainModuledependencieList.append(m2)
++
++#                self.progress.setProgress(4, &quot;Loading &quot; + moduleName)
+                 m.load()
++#                self.progress.setProgress(6, &quot;Scan for models...&quot;)
+                 self.modelSelectionDialog.scanDirForModels(m.moduleRoot)
++#                self.progress.setProgress(8, &quot;Scan for materials&quot;)
+                 self.materialSelectionDialog.scanDirForMaterials(m.moduleRoot)
+                 self.mainModule = m
+                 self.moduleExplorer.setCurrentModule(m)
+-                
+-#        self.moduleExplorer.updateView()
+-#        ModuleManager.dropCount += 1
+-#        n = self.sceneManager.getRootSceneNode().createChildSceneNode()
+-#        e = self.sceneManager.createEntity(&quot;west342wt346t&quot;,  &quot;UniCube.mesh&quot;)
+-#        e.setMaterialName(&quot;DepthMap&quot;)
+-#
+-#        e2 = self.sceneManager.createEntity(&quot;west342wt34635t&quot;,  &quot;UniSphere.mesh&quot;)
+-#        e2.setMaterialName(&quot;PlainColor&quot;)
+-#        e2.getSubEntity(0).setCustomParameter(1, og.Vector4(0, 1, 0, 1))
+-#        n.attachObject(e)
+-#        n.attachObject(e2)
+-#        n.setScale(og.Vector3(10, 5, 20))
+-        
++
+         if self.selectionBuffer is None:
+             self.selectionBuffer = SelectionBuffer(self.sceneManager, self.ogreRoot.getRenderTarget(&quot;OgreMainWin&quot;))
+ 
+ #        if self.depthBuffer is None:
+ #            self.depthBuffer = DepthBuffer(self.sceneManager, self.ogreRoot.getRenderTarget(&quot;OgreMainWin&quot;))
+-        
++
++
++#        self.progress.quit()
+         print &quot;Time to load module: &quot; + str(t.getMilliseconds() / 1000.0) + &quot; seconds&quot;
+         del t
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-23 16:04:58 UTC (rev 4866)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-24 21:06:42 UTC (rev 4867)
+@@ -18,6 +18,7 @@
+  #################################################
+ 
+ import functools
++import xml.etree.cElementTree as xml
+ 
+ from PyQt4.QtCore import *
+ from PyQt4.QtGui import *
+@@ -89,7 +90,7 @@
+         self.areaNode.attachObject(self.areaEntity)
+         self.areaNode.setPosition(position)
+         if orientation is not None:
+-            self.areaNode.setOrientation(orientation.qw, orientation.qx, orientation.qy, orientation.qz)
++            self.areaNode.setOrientation(orientation.w, orientation.x, orientation.y, orientation.z)
+         if scale is not None:
+             self.areaNode.setScale(scale)
+     
+@@ -117,7 +118,7 @@
+         self.name = name
+         self.areaList = []
+         self.lightList = []
+-        self.soundListList = []
++        self.soundList = []
+         self.triggerList = []
+         self.areaCounter = 0
+         self.sceneManager = sceneManager
+@@ -217,6 +218,64 @@
+                     rot = og.Quaternion(qw, qx, qy, qz)
+                     
+                 z.addArea(type, pos, rot, scale, meshFile)
++            
++            
++            lightNodes = zone.getiterator(&quot;light&quot;)
++            for light in lightNodes:
++                name = light.attrib[&quot;name&quot;]
++                z.lightList.append(name)
++                
++            soundNodes = zone.getiterator(&quot;sound&quot;)
++            for sound in soundNodes:
++                name = sound.attrib[&quot;name&quot;]
++                z.soundList.append(name)
++            
++
++    def saveZonesToXml(self, root, map):
++        if len(map.zoneList) == 0:
++            return
++        
++        rootZonesElem = xml.SubElement(root, &quot;zones&quot;)
++        for zone in map.zoneList:
++            zoneElem = xml.SubElement(rootZonesElem, &quot;zone&quot;)
++            zoneElem.attrib[&quot;name&quot;] = zone.name
++            
++            for area in zone.areaList:
++                areaElem = xml.SubElement(zoneElem, &quot;area&quot;)
++                areaElem.attrib[&quot;type&quot;] = area.type
++                
++                if area.type == &quot;mesh&quot; and area.meshFile is not None:
++                    areaElem.attrib[&quot;meshfile&quot;] = area.meshFile
++                    
++                posElem = xml.SubElement(areaElem, &quot;position&quot;)
++                posElem.attrib[&quot;x&quot;] = str(area.areaNode.getPosition().x)
++                posElem.attrib[&quot;y&quot;] = str(area.areaNode.getPosition().y)
++                posElem.attrib[&quot;z&quot;] = str(area.areaNode.getPosition().z)
++                
++                rotElem = xml.SubElement(areaElem, &quot;rotation&quot;)
++                rotElem.attrib[&quot;qw&quot;] = str(area.areaNode.getOrientation().w)
++                rotElem.attrib[&quot;qx&quot;] = str(area.areaNode.getOrientation().x)
++                rotElem.attrib[&quot;qy&quot;] = str(area.areaNode.getOrientation().y)
++                rotElem.attrib[&quot;qz&quot;] = str(area.areaNode.getOrientation().z)
++                
++                scaleElem = None
++                if area.type == &quot;mesh&quot;:
++                    scaleElem = xml.SubElement(areaElem, &quot;scale&quot;)
++                else:
++                    scaleElem = xml.SubElement(areaElem, &quot;size&quot;)
++
++                scaleElem.attrib[&quot;x&quot;] = str(area.areaNode.getScale().x)
++                scaleElem.attrib[&quot;y&quot;] = str(area.areaNode.getScale().y)
++                scaleElem.attrib[&quot;z&quot;] = str(area.areaNode.getScale().z)
++                
++            for lightName in zone.lightList:
++                lightElem = xml.SubElement(zoneElem, &quot;light&quot;)
++                lightElem.attrib[&quot;name&quot;] = lightName
++            
++            for soundName in zone.soundList:
++                soundElem = xml.SubElement(zoneElem, &quot;sound&quot;)
++                soundElem.attrib[&quot;name&quot;] = soundName
++                
+     def deleteArea(self, area):
+         for z in self.zoneList:
+             for a in z.areaList:
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001923.html">[Dsa-hl-svn] r4866 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001925.html">[Dsa-hl-svn] r4868 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1924">[ date ]</a>
+              <a href="thread.html#1924">[ thread ]</a>
+              <a href="subject.html#1924">[ subject ]</a>
+              <a href="author.html#1924">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,2237 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3156 - in rl/trunk/engine: ai/src rules/include	rules/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3156%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/include%0A%09rules/src%20script/swig&In-Reply-To=%3C200703081020.l28AK6C0004407%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000226.html">
+   <LINK REL="Next"  HREF="000228.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3156 - in rl/trunk/engine: ai/src rules/include	rules/src script/swig</H1>
+    <B>no22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3156%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/include%0A%09rules/src%20script/swig&In-Reply-To=%3C200703081020.l28AK6C0004407%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3156 - in rl/trunk/engine: ai/src rules/include	rules/src script/swig">no22 at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  8 11:20:06 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000226.html">[Dsa-hl-svn] r3155 - in modules/aitest: dsa maps materials	materials/textures models scripts scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000228.html">[Dsa-hl-svn] r3157 - in rl/trunk: engine/core/include	engine/core/src engine/ui/include engine/ui/src	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#227">[ date ]</a>
+              <a href="thread.html#227">[ thread ]</a>
+              <a href="subject.html#227">[ subject ]</a>
+              <a href="author.html#227">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: no22
+Date: 2007-03-08 11:19:28 +0100 (Thu, 08 Mar 2007)
+New Revision: 3156
+
+Modified:
+   rl/trunk/engine/ai/src/Makefile.am
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Effect.h
+   rl/trunk/engine/rules/include/EffectManager.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/Effect.cpp
+   rl/trunk/engine/rules/src/EffectManager.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Beginning to change how the effect system works (polling instead 
+of apply/rollback mechanism). First change will be a 
+creature.getStatus() method instead of isBlind() etc.
+Interface already changed (old methods not removed yet) but 
+doesn't work yet.
+
+
+Modified: rl/trunk/engine/ai/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/ai/src/Makefile.am	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/ai/src/Makefile.am	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -18,6 +18,6 @@
+ 	PhysicalObstacle.cpp \
+ 	PlayerVehicle.cpp \
+ 	SteeringVehicle.cpp \
+-        WayPointNode.cpp \
++    WayPointNode.cpp \
+ 	WayPointGraph.cpp \
+ 	WayPointGraphManager.cpp
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/include/Creature.h	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -1,6 +1,6 @@
+ /* This source file is part of Rastullahs Lockenpracht.
+  * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- * 
++ *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the Clarified Artistic License.
+  *
+@@ -55,31 +55,31 @@
+     static const int TALENT_MIN_TAW_FOR_BERUF = 0;
+ 
+     /// Eine Doppel-1
+-	static const int RESULT_AUTOERFOLG = 100;
++    static const int RESULT_AUTOERFOLG = 100;
+     /// Eine Dreifach-1
+-	static const int RESULT_SPEKT_AUTOERFOLG = 1000;
++    static const int RESULT_SPEKT_AUTOERFOLG = 1000;
+     /// Eine Doppel-20
+-	static const int RESULT_AUTOMISSERFOLG = -100;
++    static const int RESULT_AUTOMISSERFOLG = -100;
+     /// Eine Dreifach-20
+-	static const int RESULT_SPEKT_AUTOMISSERFOLG = -1000;
+-    /** 
++    static const int RESULT_SPEKT_AUTOMISSERFOLG = -1000;
++    /**
+      *  Eine bestaetigte 1 bei einer @ref abbdea &quot;AT&quot; oder @ref abbdep &quot;PA&quot;,
+      *  eine einfache 1 bei einer Eigenschaftsprobe.
+      **/
+-	static const int RESULT_GLUECKLICH = 100;
++    static const int RESULT_GLUECKLICH = 100;
+     /**
+      *  Eine bestaetigte 20 bei einer @ref abbdea &quot;AT&quot; oder @ref abbdep &quot;PA&quot;,
+      *  eine einfache 20 bei einer Eigenschaftsprobe.
+      **/
+-	static const int RESULT_PATZER = -100;
++    static const int RESULT_PATZER = -100;
+     /// Eine normal gelungene Attacke oder Parade
+-	static const int RESULT_ERFOLG = 1;
++    static const int RESULT_ERFOLG = 1;
+     /// Eine normal misslungene Attacke oder Parade
+-	static const int RESULT_MISSERFOLG = -1;
++    static const int RESULT_MISSERFOLG = -1;
+ 
+ 
+     /// Basistalente
+-	/// @todo Passenderen Ort suchen
++    /// @todo Passenderen Ort suchen
+     static const CeGuiString TALENT_ART_BASIS = &quot;Basis&quot;;
+     /// Spezialtalente
+     static const CeGuiString TALENT_ART_SPEZIAL = &quot;Spezial&quot;;
+@@ -100,941 +100,947 @@
+     */
+     class _RlRulesExport Creature : public GameObject
+     {
+-    public:
++        public:
+ ///////////////////////////////////////////////////////////////////////////////
+ // Typedefs
+-		/**
+-		 *  Liste der Talente. Besteht aus den Namen der Talente (z.B. Athletik)
+-         *  als Schluessel und ihrem Wert.
+-		 **/
+-		typedef std::map&lt;const CeGuiString, TalentStateSet*&gt; TalentMap;
++            /**
++             *  Liste der Talente. Besteht aus den Namen der Talente (z.B. Athletik)
++                   *  als Schluessel und ihrem Wert.
++             **/
++            typedef std::map&lt;const CeGuiString, TalentStateSet*&gt; TalentMap;
+ 
+-        static const Ogre::String CLASS_NAME;
+-        static const Ogre::String PROPERTY_BEHAVIOURS; 
++            static const Ogre::String CLASS_NAME;
++            static const Ogre::String PROPERTY_BEHAVIOURS;
+ 
+-        Creature(unsigned int id);
+-		        
+-        /// Der Standarddestruktor.
+-        virtual ~Creature();
++            Creature(unsigned int id);
+ 
++            /// Der Standarddestruktor.
++            virtual ~Creature();
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // Enums
+-        /// Beschreibt die art des zugefuegten Schadens
+-        enum DamageTag
+-        {
+-            DAMAGETAG_NORMAL = 1,
+-            DAMAGETAG_PIERCING, ///&lt; Wie Pfeile, Bolzen oder gezielte Stiche, verletzen schon bei KO/2 &lt; SP
+-            DAMAGETAG_FIRE
++            /// Beschreibt die art des zugefuegten Schadens
++            enum DamageTag
++            {
++                DAMAGETAG_NORMAL = 1,
++                DAMAGETAG_PIERCING, ///&lt; Wie Pfeile, Bolzen oder gezielte Stiche, verletzen schon bei KO/2 &lt; SP
++                DAMAGETAG_FIRE
+         };
+-        /// Die verschiedenen stati in denen sich eine @ref abbdes &quot;SF&quot; befinden kann.
+-        enum SfStatus
+-        {
+-            SFSTATUS_IN_TRAINING = 1,
+-            SFSTATUS_OK,
+-            SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Wird das ueberhaupt gebraucht?
++            /// Die verschiedenen stati in denen sich eine @ref abbdes &quot;SF&quot; befinden kann.
++            enum SfStatus
++            {
++                SFSTATUS_IN_TRAINING = 1,
++                SFSTATUS_OK,
++                SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Wird das ueberhaupt gebraucht?
+         };
+-  	    /**
+-         * Identifiziert welcher Wert angesprochen werden soll.
+-         * @warning Bei WERT_MOD_* gibt getValue() Unsinn zurueck, da 
+-         * der Multiplikator dann auf 0 + modifier multipliziert wird. 
+-         * Stattdessen einzeln auf die Modifikatoren zugreifen!
+-         * @ingroup CreatureRubyExports
+-         **/
+-        enum Wert
+-        {
+-            WERT_MOD_AE = 1, ///&lt; Astralenergie
+-            WERT_MOD_LE, ///&lt; Lebensenergie
+-            WERT_MOD_AT, ///&lt; Attacke
+-            WERT_MOD_PA, ///&lt; Parade
+-            WERT_MOD_FK, ///&lt; Fernkampf
+-            WERT_MOD_AU, ///&lt; Ausdauer
+-            WERT_MOD_MR, ///&lt; Magieresistenz
+-            WERT_MOD_INI, ///&lt; Initiative
+-            WERT_MOD_REGENERATION_LE, ///&lt; Naechtliche Regeneration. modifier modifiziert den W6, ProbenModifier modifiziert die KO-Probe.
+-            WERT_MOD_REGENERATION_AE, ///&lt; Astrale Regeneration. modifier modifiziert den W6, ProbenModifier modifiziert die IN-Probe.
+-            WERT_MOD_ERSCHOEPFUNGSSCHWELLE, ///&lt; Die Modifkitoren von KO bezueglich der Erschoepfungsschwelle.
+-            WERT_MOD_ALL_EIGENSCHAFTSPROBEN, ///&lt; Modifiziert alle Proben, die mit 1W20 gewuerfelt werden.
+-            WERT_MOD_ALL_TALENTPROBEN, ///&lt; Modifiziert alle Proben, die mit 3W20 gewuerfelt werden.
+-            WERT_GS, ///&lt; Geschwindigkeit
+-            WERT_SOZIALSTATUS, ///&lt; Sozialstatus
+-            WERT_BE, ///&lt; Behinderung
+-            WERT_KAMPFUNFAEHIGKEITSSCHWELLE ///&lt; Die Schwelle zur Kampfunfaehigkeit, bei Menschen 5 LE
++            /**
++              * Identifiziert welcher Wert angesprochen werden soll.
++              * @warning Bei WERT_MOD_* gibt getValue() Unsinn zurueck, da 
++              * der Multiplikator dann auf 0 + modifier multipliziert wird. 
++              * Stattdessen einzeln auf die Modifikatoren zugreifen!
++              * @ingroup CreatureRubyExports
++              **/
++            enum Wert
++            {
++                WERT_MOD_AE = 1, ///&lt; Astralenergie
++                WERT_MOD_LE, ///&lt; Lebensenergie
++                WERT_MOD_AT, ///&lt; Attacke
++                WERT_MOD_PA, ///&lt; Parade
++                WERT_MOD_FK, ///&lt; Fernkampf
++                WERT_MOD_AU, ///&lt; Ausdauer
++                WERT_MOD_MR, ///&lt; Magieresistenz
++                WERT_MOD_INI, ///&lt; Initiative
++                WERT_MOD_REGENERATION_LE, ///&lt; Naechtliche Regeneration. modifier modifiziert den W6, ProbenModifier modifiziert die KO-Probe.
++                WERT_MOD_REGENERATION_AE, ///&lt; Astrale Regeneration. modifier modifiziert den W6, ProbenModifier modifiziert die IN-Probe.
++                WERT_MOD_ERSCHOEPFUNGSSCHWELLE, ///&lt; Die Modifkitoren von KO bezueglich der Erschoepfungsschwelle.
++                WERT_MOD_ALL_EIGENSCHAFTSPROBEN, ///&lt; Modifiziert alle Proben, die mit 1W20 gewuerfelt werden.
++                WERT_MOD_ALL_TALENTPROBEN, ///&lt; Modifiziert alle Proben, die mit 3W20 gewuerfelt werden.
++                WERT_GS, ///&lt; Geschwindigkeit
++                WERT_SOZIALSTATUS, ///&lt; Sozialstatus
++                WERT_BE, ///&lt; Behinderung
++                WERT_KAMPFUNFAEHIGKEITSSCHWELLE ///&lt; Die Schwelle zur Kampfunfaehigkeit, bei Menschen 5 LE
+         };
+-        
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // Werte
+ 
+-        /**
+-         *  Veraendert die aktuelle @ref abbdel &quot;LE&quot; der Kreatur.
+-         *  @param mod Der Wert um den die LE erhoeht (erniedrigt bei 
+-         *   negativem Wert) werden soll
+-         *  @param ignoreMax Wenn true kann die LE auch ueber das Maximum
+-         *   hinaus erhoeht werden.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-        virtual void modifyLe(int mod, bool ignoreMax = false);
+-        /**
+-         *  Gibt die aktuelle @ref abbdel &quot;LE&quot; der Kreatur zurueck.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-        virtual int getLe();
+-        /**
+-         *  Gibt die maximale Anzahl an @ref abbdel &quot;LE&quot; zurueck, die die Kreatur haben kann.
+-         **/
+-        virtual int getLeMax();
++            /**
++             *  Veraendert die aktuelle @ref abbdel &quot;LE&quot; der Kreatur.
++             *  @param mod Der Wert um den die LE erhoeht (erniedrigt bei 
++             *   negativem Wert) werden soll
++             *  @param ignoreMax Wenn true kann die LE auch ueber das Maximum
++             *   hinaus erhoeht werden.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual void modifyLe(int mod, bool ignoreMax = false);
++            /**
++             *  Gibt die aktuelle @ref abbdel &quot;LE&quot; der Kreatur zurueck.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual int getLe();
++            /**
++             *  Gibt die maximale Anzahl an @ref abbdel &quot;LE&quot; zurueck, die die Kreatur haben kann.
++             **/
++            virtual int getLeMax();
+ 
+-        /**
+-         *  Veraendert die aktuelle @ref abbdea &quot;AE&quot; der Kreatur.
+-         *  @param mod Der Wert um den die AE erhoeht (erniedrigt bei 
+-         *   negativem Wert) werden soll
+-         *  @param ignoreMax Wenn true kann die AE auch ueber das Maximum
+-         *   hinaus erhoeht werden.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual void modifyAe(int mod,  bool ignoreMax = false);
+-        /**
+-         *  Gibt die aktuelle @ref abbdea &quot;AE&quot; der Kreatur zurueck.
+-         **/
+-        virtual int getAe();
+-        /**
+-         *  Gibt die maximale Anzahl an @ref abbdea &quot;AE&quot; zurueck, die die Kreatur haben kann.
+-         **/
+-        virtual int getAeMax();
++            /**
++             *  Veraendert die aktuelle @ref abbdea &quot;AE&quot; der Kreatur.
++             *  @param mod Der Wert um den die AE erhoeht (erniedrigt bei 
++             *   negativem Wert) werden soll
++             *  @param ignoreMax Wenn true kann die AE auch ueber das Maximum
++             *   hinaus erhoeht werden.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual void modifyAe(int mod,  bool ignoreMax = false);
++            /**
++             *  Gibt die aktuelle @ref abbdea &quot;AE&quot; der Kreatur zurueck.
++             **/
++            virtual int getAe();
++            /**
++             *  Gibt die maximale Anzahl an @ref abbdea &quot;AE&quot; zurueck, die die Kreatur haben kann.
++             **/
++            virtual int getAeMax();
+ 
+-        /**
+-         *  Veraendert die aktuelle @ref abbdea &quot;AU&quot; der Kreatur.
+-         *  @param mod Der Wert um den die AU erhoeht (erniedrigt bei 
+-         *   negativem Wert) werden soll
+-         *  @param ignoreMax Wenn true kann die AU auch ueber das Maximum
+-         *   hinaus erhoeht werden.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual void modifyAu(float mod,  bool ignoreMax = false);
+-        /**
+-         *  Gibt die aktuelle @ref abbdea &quot;AU&quot; der Kreatur zurueck.
+-         **/
+-        virtual float getAu();
+-        /**
+-         *  Gibt die maximale Anzahl an @ref abbdea &quot;AE&quot; zurueck, die die Kreatur haben kann.
+-         **/
+-        virtual int getAuMax();
++            /**
++             *  Veraendert die aktuelle @ref abbdea &quot;AU&quot; der Kreatur.
++             *  @param mod Der Wert um den die AU erhoeht (erniedrigt bei 
++             *   negativem Wert) werden soll
++             *  @param ignoreMax Wenn true kann die AU auch ueber das Maximum
++             *   hinaus erhoeht werden.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual void modifyAu(float mod,  bool ignoreMax = false);
++            /**
++             *  Gibt die aktuelle @ref abbdea &quot;AU&quot; der Kreatur zurueck.
++             **/
++            virtual float getAu();
++            /**
++             *  Gibt die maximale Anzahl an @ref abbdea &quot;AE&quot; zurueck, die die Kreatur haben kann.
++             **/
++            virtual int getAuMax();
+ 
+-        /**
+-         *  Berechnet den @ref abbdea &quot;AT&quot;-Basiswert der Kreatur.
+-         **/
+-		virtual int getAttackeBasis();
+-        /**
+-         *  Berechnet den @ref abbdep &quot;PA&quot;-Basiswert der Kreatur.
+-         **/
+-	    virtual int getParadeBasis();
+-        /**
+-         *  Berechnet den @ref abbdef &quot;FK&quot;-Basiswert der Kreatur.
+-         **/
+-		virtual int getFernkampfBasis();
+-        /**
+-         *  Berechnet den @ref abbdei &quot;INI&quot;-Basiswert der Kreatur.
+-         **/
+-		virtual int getInitiativeBasis();
++            /**
++             *  Berechnet den @ref abbdea &quot;AT&quot;-Basiswert der Kreatur.
++             **/
++            virtual int getAttackeBasis();
++            /**
++             *  Berechnet den @ref abbdep &quot;PA&quot;-Basiswert der Kreatur.
++             **/
++            virtual int getParadeBasis();
++            /**
++             *  Berechnet den @ref abbdef &quot;FK&quot;-Basiswert der Kreatur.
++             **/
++            virtual int getFernkampfBasis();
++            /**
++             *  Berechnet den @ref abbdei &quot;INI&quot;-Basiswert der Kreatur.
++             **/
++            virtual int getInitiativeBasis();
+ 
+-        /**
+-         *  Setzt den Basiswert \a wertId auf \a value.
+-         *  @param wertId Bezeichnet welcher Basiswert veraendert werden soll.
+-         *  @param value Der neue wert des Basiswerts.
+-         *  @see Wert
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual void setWert(Wert wertId, int value);
+-		/** 
+-         *  Liefert den Basiswert \a wertId zurueck.
+-		 *  @param wertId Bezeichnet welcher Basiswert zurueckgeliefert werden soll.
+-         *  @param getUnmodified Wenn true wird der unmodifizierte Wert 
+-         *   zurueckgegeben.
+-		 *  @return Der Wert des Basiswerts.
+-		 *  @throws InvalidArgumentException wertId konnte in mWerte nicht
+-		 *    gefunden werden.
+-		 **/
+-		virtual int getWert(Wert wertId, bool getUnmodified = false);
+-        /**
+-         *  Gibt einen Zeiger auf das ganze Stateset des Basiswerts \a wertId zurueck.
+-         *  @param wertID Bezeichnet den Basiswert, von dem das StateSet zurueckgegeben
+-         *   werden soll.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual StateSet* getWertStateSet(Wert wertId);
+-        /**
+-         *  Gibt der Kreatur @ref abbddea &quot;AP&quot;.
+-         *  @param modifier Kann auch negativ sein (z.B. Borbarad-Moskitos).
+-         **/
+-        void modifyAp(int modifier);
+-        /**
+-         *  Liefert die Gesamtzahl der @ref abbdea &quot;AP&quot; zurueck.
+-         **/
+-        int getAp();
+-        /**
+-         *  Ver&#239;&#191;&#189;dert die verbrauchten @ref abbdea &quot;AP&quot;, wird beim Steigern
+-         *  aufgerufen.
+-         *  @param modifier Kann auch negativ sein (z.B. Borbarad-Moskitos).
+-         **/
+-        void modifyUsedAp(int modifier);
+-        /**
+-         *  Liefert die verbrauchten @refabbdea &quot;AP&quot; zurueck.
+-         **/
+-        int getUsedAp();
++            /**
++             *  Setzt den Basiswert \a wertId auf \a value.
++             *  @param wertId Bezeichnet welcher Basiswert veraendert werden soll.
++             *  @param value Der neue wert des Basiswerts.
++             *  @see Wert
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual void setWert(Wert wertId, int value);
++            /**
++                   *  Liefert den Basiswert \a wertId zurueck.
++             *  @param wertId Bezeichnet welcher Basiswert zurueckgeliefert werden soll.
++                   *  @param getUnmodified Wenn true wird der unmodifizierte Wert 
++                   *   zurueckgegeben.
++             *  @return Der Wert des Basiswerts.
++             *  @throws InvalidArgumentException wertId konnte in mWerte nicht
++             *    gefunden werden.
++             **/
++            virtual int getWert(Wert wertId, bool getUnmodified = false);
++            /**
++             *  Gibt einen Zeiger auf das ganze Stateset des Basiswerts \a wertId zurueck.
++             *  @param wertID Bezeichnet den Basiswert, von dem das StateSet zurueckgegeben
++             *   werden soll.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual StateSet* getWertStateSet(Wert wertId);
++            /**
++             *  Gibt der Kreatur @ref abbddea &quot;AP&quot;.
++             *  @param modifier Kann auch negativ sein (z.B. Borbarad-Moskitos).
++             **/
++            void modifyAp(int modifier);
++            /**
++             *  Liefert die Gesamtzahl der @ref abbdea &quot;AP&quot; zurueck.
++             **/
++            int getAp();
++            /**
++             *  Ver&#239;&#191;&#189;dert die verbrauchten @ref abbdea &quot;AP&quot;, wird beim Steigern
++             *  aufgerufen.
++             *  @param modifier Kann auch negativ sein (z.B. Borbarad-Moskitos).
++             **/
++            void modifyUsedAp(int modifier);
++            /**
++             *  Liefert die verbrauchten @refabbdea &quot;AP&quot; zurueck.
++             **/
++            int getUsedAp();
+ 
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Eigenschaften
+ 
+-		/**
+-		 *  Liefert den Wert der Eigenschaft \a eigenschaftName zurueck.
+-		 *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
+-         *   @abbdef &quot;FF&quot;, etc.).
+-		 *  @return Der Wert der Eigenschaft.
+-		 *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
+-		 *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
+-		 *   Gross/Kleinschreibung beachtet?).
+-         *  @ingroup CreatureRubyExports
+-		 **/
+-        virtual int getEigenschaft(const CeGuiString eigenschaftName);
+-		/**
+-		 *  Setzt den Wert der Eigenschaft \a eigenschaftName auf \a value.
+-		 *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
+-         *   @ref abbdef &quot;FF&quot;, etc.).
+-		 *  @param value Der Wert auf den die Eigenschaft gesetzt werden soll.
+-		 *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
+-		 *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
+-		 *   Gross/Kleinschreibung beachtet?).
+-         *  @ingroup CreatureRubyExports
+-		 **/
+-        virtual void setEigenschaft(const CeGuiString eigenschaftName, int value);
+-		/** Addiert \a mod auf den Wert der Eigenschaft \a eigenschaftName.
+-		 *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
+-         *   @ref abbdef &quot;FF&quot;, etc.).
+-		 *  @param mod Wird auf den Wert addiert (kann auch negativ sein).
+-		 *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
+-		 *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
+-		 *   Gross/Kleinschreibung beachtet?).
+-         *  @ingroup CreatureRubyExports
+-		 **/
+-        virtual void modifyEigenschaft(const CeGuiString eigenschaftName, int mod);
++            /**
++             *  Liefert den Wert der Eigenschaft \a eigenschaftName zurueck.
++             *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
++                   *   @abbdef &quot;FF&quot;, etc.).
++             *  @return Der Wert der Eigenschaft.
++             *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
++             *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
++             *   Gross/Kleinschreibung beachtet?).
++                   *  @ingroup CreatureRubyExports
++             **/
++            virtual int getEigenschaft(const CeGuiString eigenschaftName);
++            /**
++             *  Setzt den Wert der Eigenschaft \a eigenschaftName auf \a value.
++             *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
++                   *   @ref abbdef &quot;FF&quot;, etc.).
++             *  @param value Der Wert auf den die Eigenschaft gesetzt werden soll.
++             *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
++             *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
++             *   Gross/Kleinschreibung beachtet?).
++                   *  @ingroup CreatureRubyExports
++             **/
++            virtual void setEigenschaft(const CeGuiString eigenschaftName, int value);
++            /** Addiert \a mod auf den Wert der Eigenschaft \a eigenschaftName.
++             *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
++                   *   @ref abbdef &quot;FF&quot;, etc.).
++             *  @param mod Wird auf den Wert addiert (kann auch negativ sein).
++             *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
++             *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
++             *   Gross/Kleinschreibung beachtet?).
++                   *  @ingroup CreatureRubyExports
++             **/
++            virtual void modifyEigenschaft(const CeGuiString eigenschaftName, int mod);
+ 
+-        /**
+-         *  Liefert einen Zeiger auf das StateSet von \a eigenschaftName zurueck.
+-		 *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
+-         *   @ref abbdef &quot;FF&quot;, etc.).
+-		 *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
+-		 *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
+-		 *   Gross/Kleinschreibung beachtet?).
+-         *  @ingroup CreatureRubyExports
+-		 **/
+-		virtual EigenschaftenStateSet* getEigenschaftenStateSet(const CeGuiString eigenschaftName);
++            /**
++             *  Liefert einen Zeiger auf das StateSet von \a eigenschaftName zurueck.
++            *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
++             *   @ref abbdef &quot;FF&quot;, etc.).
++            *  @throws InvalidArgumentException Die Eigenschaft konnte nicht
++            *   gefunden werden (Name ausgeschrieben statt abgekuerzt? 
++            *   Gross/Kleinschreibung beachtet?).
++             *  @ingroup CreatureRubyExports
++            **/
++            virtual EigenschaftenStateSet* getEigenschaftenStateSet(const CeGuiString eigenschaftName);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Talente
+ 
+-		/** 
+-         *  Fuegt das Talent \a talentName zu \c mTalente hinzu.
+-		 *  Das neue Talent wird mit @ref abbdet &quot;TaW&quot; 0 initialisiert.
+-		 *  @param talentName Bezeichnet das Talent.
+-         *  @param value Startwert des Talents.
+-		 *  @throws InvalidArgumentException Das Talent konnte nicht
+-		 *    gefunden werden.
+-         *  @ingroup CreatureRubyExports
+-		 */
+-        void addTalent(const CeGuiString talentName, int value = 0);
+-		/** 
+-         *  Liefert den Wert des Talents \a talentName zurueck.
+-		 *  @param talentName Bezeichnet das Talent.
+-		 *  @return @ref abbdet &quot;TaW&quot;
+-         *  @ingroup CreatureRubyExports
+-		 *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
+-		 *   nicht gefunden werden.
+-		 */
+-		virtual int getTalent(const CeGuiString talentName);
+-		/** 
+-         *  Setzt den Wert des Talents \a talentName.
+-		 *  @param talentName Bezeichnet das zu veraendernde Talent.
+-		 *  @param value Der neue @ref abbdet TaW.
+-		 *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
+-		 *   nicht gefunden werden.
+-         *  @ingroup CreatureRubyExports
+-		 */
+-        virtual void setTalent(const CeGuiString talentName, int value);
+-		/** 
+-         *  Erhoeht das Talent \a talentName um \a mod.
+-		 *  @param talentName Bezeichnet das zu steigernde Talent.
+-		 *  @param mod Der Wert um den das Talent gesteigert werden soll.
+-		 *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
+-		 *   nicht gefunden werden.
+-         *  @ingroup CreatureRubyExports
+-		 */
+-        virtual void modifyTalent(const CeGuiString talentName, int mod);
+-        /**
+-         * Liefert eine Liste mit allen Talenten und @ref abbdet &quot;TaW&quot;s zurueck.
+-         * Dies wird auch der komplette Talentspiegel genannt.
+-         **/
+-		virtual const Creature::TalentMap&amp; getAllTalents() const;
+-		/** 
+-         *  Markiert ein Talent mit einer @ref abbdes &quot;SE&quot;. Siehe 
+-         *  Spezielle Erfahrungen, MFF 47.
+-		 *  @param talentName Bezeichnet das Talent in dem die SE erhalten wurde.
+-         *  @ingroup CreatureRubyExports
+-		 */
+-		virtual void addSe(const CeGuiString talentName);
+-        /**
+-         *  Liefert einen Zeiger auf das StateSet des Talents \a talentName zurueck.
+-         *  @param talentName Bezeichnet das Talent von dem das StateSet zurueckgegeben
+-         *   werden soll.
+-         *  @throws IllegalArgumentException Talent nicht gefunden.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual TalentStateSet* getTalentStateSet(const CeGuiString talentName);
++            /**
++                   *  Fuegt das Talent \a talentName zu \c mTalente hinzu.
++             *  Das neue Talent wird mit @ref abbdet &quot;TaW&quot; 0 initialisiert.
++             *  @param talentName Bezeichnet das Talent.
++                   *  @param value Startwert des Talents.
++             *  @throws InvalidArgumentException Das Talent konnte nicht
++             *    gefunden werden.
++                   *  @ingroup CreatureRubyExports
++             */
++            void addTalent(const CeGuiString talentName, int value = 0);
++            /**
++                   *  Liefert den Wert des Talents \a talentName zurueck.
++             *  @param talentName Bezeichnet das Talent.
++             *  @return @ref abbdet &quot;TaW&quot;
++                   *  @ingroup CreatureRubyExports
++             *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
++             *   nicht gefunden werden.
++             */
++            virtual int getTalent(const CeGuiString talentName);
++            /**
++                   *  Setzt den Wert des Talents \a talentName.
++             *  @param talentName Bezeichnet das zu veraendernde Talent.
++             *  @param value Der neue @ref abbdet TaW.
++             *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
++             *   nicht gefunden werden.
++                   *  @ingroup CreatureRubyExports
++             */
++            virtual void setTalent(const CeGuiString talentName, int value);
++            /**
++                   *  Erhoeht das Talent \a talentName um \a mod.
++             *  @param talentName Bezeichnet das zu steigernde Talent.
++             *  @param mod Der Wert um den das Talent gesteigert werden soll.
++             *  @throws InvalidArgumentException Das Talent konnte in \c mTalente
++             *   nicht gefunden werden.
++                   *  @ingroup CreatureRubyExports
++             */
++            virtual void modifyTalent(const CeGuiString talentName, int mod);
++            /**
++             * Liefert eine Liste mit allen Talenten und @ref abbdet &quot;TaW&quot;s zurueck.
++             * Dies wird auch der komplette Talentspiegel genannt.
++             **/
++            virtual const Creature::TalentMap&amp; getAllTalents() const;
++            /**
++                   *  Markiert ein Talent mit einer @ref abbdes &quot;SE&quot;. Siehe 
++                   *  Spezielle Erfahrungen, MFF 47.
++             *  @param talentName Bezeichnet das Talent in dem die SE erhalten wurde.
++                   *  @ingroup CreatureRubyExports
++             */
++            virtual void addSe(const CeGuiString talentName);
++            /**
++             *  Liefert einen Zeiger auf das StateSet des Talents \a talentName zurueck.
++             *  @param talentName Bezeichnet das Talent von dem das StateSet zurueckgegeben
++             *   werden soll.
++             *  @throws IllegalArgumentException Talent nicht gefunden.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual TalentStateSet* getTalentStateSet(const CeGuiString talentName);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Kampftechniken
+ 
+-		/**
+-		 *  Fuegt eine neue Kampftechnik zu \c mKampftechniken hinzu.
+-		 *  @param kampftechnikName Bezeichnet die Kampftechnik.
+-		 *  @param value Initialisiert die Kampftechnik mit value. Standard ist
+-		 *  (0,0).
+-		 *  @throws InvalidArgumentExeption Die Kampftechnik ist unbekannt.
+-         *  @ingroup CreatureRubyExports
+-		 **/
+-		void addKampftechnik(const CeGuiString kampftechnikName, const std::pair&lt;int,int&gt;&amp; value = std::make_pair(0,0));
+-		/** 
+-         *  Liefert die @ref abbdea &quot;AT&quot; und @ref abbdep &quot;PA&quot; Werte in einer 
+-         *  bestimmten Kampftechnik zurueck.
+-		 *  @param kampftechnikName Beszeichnet die Kampftechnik.
+-		 *  @return Ein std::pair&lt;AT, PA&gt;.
+-		 *  @throws InvalidArgumentException \a kampftechnikId konnte nicht in 
+-		 *   \c mKampftechniken gefunden werden.
+-		 **/
+-        virtual std::pair&lt;int, int&gt; getKampftechnik(const CeGuiString kampftechnikName) const;
+-		/** 
+-         *  Setzt die @ref abbdea &quot;AT&quot; und @ref abbdep &quot;PA&quot; Werte in einer bestimmten 
+-         *  Kampftechnik.
+-		 *  @param kampftechnikName Bestimmt die zu setzende Kampftechnik.
+-		 *  @param value Die neuen AT/PA Werte.
+-		 *  @throws InvalidArgumentException Die Kampftechnik \a kampftechnikId
+-		 *    konnte nicht in \c mKampftechniken gefunden werden.
+-		 **/
+-        virtual void setKampftechnik(const CeGuiString kampftechnikName, const std::pair&lt;int, int&gt;&amp; value);
++            /**
++             *  Fuegt eine neue Kampftechnik zu \c mKampftechniken hinzu.
++             *  @param kampftechnikName Bezeichnet die Kampftechnik.
++             *  @param value Initialisiert die Kampftechnik mit value. Standard ist
++             *  (0,0).
++             *  @throws InvalidArgumentExeption Die Kampftechnik ist unbekannt.
++                   *  @ingroup CreatureRubyExports
++             **/
++            void addKampftechnik(const CeGuiString kampftechnikName, const std::pair&lt;int, int&gt;&amp; value = std::make_pair(0, 0));
++            /**
++                   *  Liefert die @ref abbdea &quot;AT&quot; und @ref abbdep &quot;PA&quot; Werte in einer 
++                   *  bestimmten Kampftechnik zurueck.
++             *  @param kampftechnikName Beszeichnet die Kampftechnik.
++             *  @return Ein std::pair&lt;AT, PA&gt;.
++             *  @throws InvalidArgumentException \a kampftechnikId konnte nicht in 
++             *   \c mKampftechniken gefunden werden.
++             **/
++            virtual std::pair&lt;int, int&gt; getKampftechnik(const CeGuiString kampftechnikName) const;
++            /**
++                   *  Setzt die @ref abbdea &quot;AT&quot; und @ref abbdep &quot;PA&quot; Werte in einer bestimmten 
++                   *  Kampftechnik.
++             *  @param kampftechnikName Bestimmt die zu setzende Kampftechnik.
++             *  @param value Die neuen AT/PA Werte.
++             *  @throws InvalidArgumentException Die Kampftechnik \a kampftechnikId
++             *    konnte nicht in \c mKampftechniken gefunden werden.
++             **/
++            virtual void setKampftechnik(const CeGuiString kampftechnikName, const std::pair&lt;int, int&gt;&amp; value);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Vorteile
+-        /**
+-         *  Fuegt einen Vorteil hinzu.
+-         *  @param vorteilName Der Name des Vorteils.
+-         *  @param value Der Wert einer eventuellen Gabe oder die Stufe des
+-         *   Vorteils (z.B. Astrale Regeneration 3).
+-         *  @throws InvalidArgumentException Vorteil schon in \c mVorteile enthalten.
+-         **/
+-        virtual void addVorteil(const CeGuiString vorteilName, int value = 0);
+-        /**
+-         *  Ueberprueft ob die Kreatur einen bestimmten Vorteil hat.
+-         *  @param vorteilName Der Name des zu ueberpruefenden Vorteils.
+-         **/
+-        virtual bool hasVorteil(const CeGuiString vorteilName);
+-        /**
+-         *  Liefert das StateSet des Vorteils zurueck.
+-         *  Gedacht um die erforderlichen Daten von Gaben abzufragen.
+-         *  @param vorteilName Der Name der Gabe.
+-         *  @return Ein Zeiger auf das StateSet der Gabe.
+-         *  @throws InvalidArgumentException Der Vorteil \a vorteilName konnte
+-         *   nicht gefunden werden.
+-         **/
+-        virtual TalentStateSet* getVorteilStateSet(const CeGuiString vorteilName);
++            /**
++             *  Fuegt einen Vorteil hinzu.
++             *  @param vorteilName Der Name des Vorteils.
++             *  @param value Der Wert einer eventuellen Gabe oder die Stufe des
++             *   Vorteils (z.B. Astrale Regeneration 3).
++             *  @throws InvalidArgumentException Vorteil schon in \c mVorteile enthalten.
++             **/
++            virtual void addVorteil(const CeGuiString vorteilName, int value = 0);
+ 
++            /**
++             *  Ueberprueft ob die Kreatur einen bestimmten Vorteil hat.
++             *  @param vorteilName Der Name des zu ueberpruefenden Vorteils.
++             **/
++            virtual bool hasVorteil(const CeGuiString vorteilName);
++            /**
++             *  Liefert das StateSet des Vorteils zurueck.
++             *  Gedacht um die erforderlichen Daten von Gaben abzufragen.
++             *  @param vorteilName Der Name der Gabe.
++             *  @return Ein Zeiger auf das StateSet der Gabe.
++             *  @throws InvalidArgumentException Der Vorteil \a vorteilName konnte
++             *   nicht gefunden werden.
++             **/
++            virtual TalentStateSet* getVorteilStateSet(const CeGuiString vorteilName);
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // Nachteile
+-        /**
+-         *  Fuegt einen Nachteil hinzu.
+-         *  @param nachteilName Der Name des Nachteils.
+-         *  @param value Der Wert einer eventuellen Schlechten Eigenschaft oder
+-         *   die Stufe des Nachteils.
+-         *  @throws InvalidArgumentException Nachteil schon in \c mNachteile enthalten.
+-         **/
+-        virtual void addNachteil(const CeGuiString nachteilName, int value = 0);
+-        /**
+-         *  Ueberprueft ob die Kreatur einen bestimmten Nachteil hat.
+-         *  @param nachteilName Der Name des zu ueberpruefenden Nachteils.
+-         **/
+-        virtual bool hasNachteil(const CeGuiString nachteilName);
+-        /**
+-         *  Liefert das StateSet des Nachteils zurueck.
+-         *  Gedacht um die erforderlichen Daten von Schlechten Eigenschaften
+-         *  abzufragen.
+-         *  @param nachteilName Der Name der Schlechten Eigenschaft.
+-         *  @return Ein Zeiger auf das StateSet der Schlechten Eigenschaft.
+-         *  @throws InvalidArgumentException Der Nachteil \a nachteilName konnte
+-         *   nicht gefunden werden.
+-         **/
+-        virtual EigenschaftenStateSet* getNachteilStateSet(const CeGuiString nachteilName);
++            /**
++             *  Fuegt einen Nachteil hinzu.
++             *  @param nachteilName Der Name des Nachteils.
++             *  @param value Der Wert einer eventuellen Schlechten Eigenschaft oder
++             *   die Stufe des Nachteils.
++             *  @throws InvalidArgumentException Nachteil schon in \c mNachteile enthalten.
++             **/
++            virtual void addNachteil(const CeGuiString nachteilName, int value = 0);
++            /**
++             *  Ueberprueft ob die Kreatur einen bestimmten Nachteil hat.
++             *  @param nachteilName Der Name des zu ueberpruefenden Nachteils.
++             **/
++            virtual bool hasNachteil(const CeGuiString nachteilName);
++            /**
++             *  Liefert das StateSet des Nachteils zurueck.
++             *  Gedacht um die erforderlichen Daten von Schlechten Eigenschaften
++             *  abzufragen.
++             *  @param nachteilName Der Name der Schlechten Eigenschaft.
++             *  @return Ein Zeiger auf das StateSet der Schlechten Eigenschaft.
++             *  @throws InvalidArgumentException Der Nachteil \a nachteilName konnte
++             *   nicht gefunden werden.
++             **/
++            virtual EigenschaftenStateSet* getNachteilStateSet(const CeGuiString nachteilName);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Sonderfertigkeiten
+ 
+-		/** 
+-         *  Fuegt der Kreatur eine @ref abbdes &quot;SF&quot; hinzu.
+-		 *  @param sfName Bezeichnet die SF.
+-         *  @param value Der Status der SF. Standardmaessig SFSTATUS_IN_TRAINING.
+-		 *  @throws InvalidArgumentException \a sfName kann nicht gefunden
+-		 *    werden.
+-         *  @see SfStatus
+-		 */
+-		virtual void addSf(const CeGuiString sfName, SfStatus value = SFSTATUS_IN_TRAINING);
+-		/** 
+-         *  Liefert den Wert der @ref abbdes &quot;SF&quot; zurueck.
+-		 *  @param sfName Bezeichnet die SF
+-		 *  @throws InvalidArgumentException \a sfName kann nicht in 
+-		 *   \c mSonderfertigkeiten gefunden werden.
+-		 *  @see SonderfertigkeitMap
+-		 */
+-		virtual int getSf(const CeGuiString sfName);
+-		/** 
+-         *  Setzt den Wert der @ref abbdes &quot;SF&quot;.
+-		 *  @param sfName Bezeichnet die Sonderfertigkeit deren Wert gesetzt
+-		 *   werden soll.
+-		 *  @param value Der Wert auf den die Sonderfertigkeit gesetzt werden 
+-		 *   soll.
+-		 *  @throws InvalidArgumentException \a sfName kann nicht in 
+-		 *   \c mSonderfertigkeiten gefunden werden.
+-		 *  @see SonderfertigkeitMap
+-		 */
+-		virtual void setSf(const CeGuiString sfName, SfStatus value);
++            /**
++                    *  Fuegt der Kreatur eine @ref abbdes &quot;SF&quot; hinzu.
++             *  @param sfName Bezeichnet die SF.
++                    *  @param value Der Status der SF. Standardmaessig SFSTATUS_IN_TRAINING.
++             *  @throws InvalidArgumentException \a sfName kann nicht gefunden
++             *    werden.
++                    *  @see SfStatus
++             */
++            virtual void addSf(const CeGuiString sfName, SfStatus value = SFSTATUS_IN_TRAINING);
++            /**
++                   *  Liefert den Wert der @ref abbdes &quot;SF&quot; zurueck.
++             *  @param sfName Bezeichnet die SF
++             *  @throws InvalidArgumentException \a sfName kann nicht in 
++             *   \c mSonderfertigkeiten gefunden werden.
++             *  @see SonderfertigkeitMap
++             */
++            virtual int getSf(const CeGuiString sfName);
++            /**
++                   *  Setzt den Wert der @ref abbdes &quot;SF&quot;.
++             *  @param sfName Bezeichnet die Sonderfertigkeit deren Wert gesetzt
++             *   werden soll.
++             *  @param value Der Wert auf den die Sonderfertigkeit gesetzt werden 
++             *   soll.
++             *  @throws InvalidArgumentException \a sfName kann nicht in 
++             *   \c mSonderfertigkeiten gefunden werden.
++             *  @see SonderfertigkeitMap
++             */
++            virtual void setSf(const CeGuiString sfName, SfStatus value);
+ 
+-        /**
+-         *  Liefert einen Zeiger auf das StateSet der @ref abbdes &quot;SF&quot; zurueck.
+-         *  @param sfName Bezeichnet die SF deren StateSet zurueckgelifert werden soll.
+-		 *  @throws InvalidArgumentException \a sfName kann nicht in 
+-		 *   \c mSonderfertigkeiten gefunden werden.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-		virtual SonderfertigkeitenStateSet* getSonderfertigkeitenStateSet(const CeGuiString sfName);
++            /**
++             *  Liefert einen Zeiger auf das StateSet der @ref abbdes &quot;SF&quot; zurueck.
++             *  @param sfName Bezeichnet die SF deren StateSet zurueckgelifert werden soll.
++            *  @throws InvalidArgumentException \a sfName kann nicht in 
++            *   \c mSonderfertigkeiten gefunden werden.
++             *  @ingroup CreatureRubyExports
++             **/
++            virtual SonderfertigkeitenStateSet* getSonderfertigkeitenStateSet(const CeGuiString sfName);
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Status
+-        /**
+-         *  @todo Weitere denkbare Zustaende: unconcious (wie sleeping, nur 
+-         *   schwieriger zu wecken), petrified (paralyzed eigentlich = gelaehmt,
+-         *   petrified = versteinert
+-         **/
++            /**
++             * Gets the status of a creature.
++             **/
++            Effect::Status getStatus();
+ 
+-        /// Checks if the creature is currently blind.
+-        bool isBlind();
+-        /**
+-         *  Set the creature to blind / not blind. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setBlind(bool value);
+-        /// Checks if the creature is dead.
+-        bool isDead();
+-        /**
+-         *  Set the creature to dead / alive. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setDead(bool value);
+-        /// Checks if the creature is currently deaf.
+-        bool isDeaf();
+-        /**
+-         *  Set the creature to deaf / not deaf. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setDeaf(bool value);
+-        /**
+-         *  Checks if the creature is currently incapacitated.
+-         *  This happens usually if the creature's @ref abbenv &quot;VI&quot; (de: 
+-         *  @ref abbdel &quot;LE&quot;) falls below the value of 
+-         *  WERT_KAMPFUNFAEHIGKEITSSCHWELLE.
+-         *  @see Wert
+-         **/
+-        bool isIncapacitated();
+-        /**
+-         *  Set the creature to incapacitated / not incapacitated. This status 
+-         *  works with reference counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setIncapacitated(bool value);
+-        /// Checks if the creature is currently invisible.
+-        bool isInvisible();
+-        /**
+-         *  Set the creature to invisible / visible. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setInvisible(bool value);
+-        /// Checks if the creature is currently invulnerable.
+-        bool isInvulnerable();
+-        /**
+-         *  Set the creature to invulnerable / vulnerable. This status works with 
+-         *  reference counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setInvulnerable(bool value);
+-        /// Checks if the creature is currently parallyzed.
+-        bool isParalyzed();
+-        /**
+-         *  Set the creature to paralyzed / not paralyzed. This status works with 
+-         *  reference counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setParalyzed(bool value);
+-        /// Checks if the creature is currently silenced.
+-        bool isSilenced();
+-        /**
+-         *  Set the creature to silenced / not silenced. This status works with 
+-         *  reference counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setSilenced(bool value);
+-        /// Checks if the creature is currently sleeping.
+-        bool isSleeping();
+-        /**
+-         *  Set the creature to sleeping / awake. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setSleeping(bool value);
+-        /**
+-         *  Checks if the creature is unconcious. This status works with reference
+-         *  counting.
+-         **/
+-        bool isUnconscious();
+-        /**
+-         *  Set the creature to unconcious/concious. This status works with reference
+-         *  counting.
+-         *  @see setStatus for a detailed description of the reference system.
+-         **/
+-        void setUnconscious(bool value);
+-        /**
+-         *  Returns true if the creature cannot move. This function does not 
+-         *  correspond to a certain status variable but checks several other 
+-         *  stati such as isDead, isParalyzed and isSleeping.
+-         **/
+-        bool isImmovable();
+-        /**
+-         *  Checks if the creature is actively magic. This function does not 
+-         *  correspond to a certain status variable but returns true if the 
+-         *  modified AE is greater than zero.
+-         **/
+-		bool isMagic();
++            /**
++             *  @todo Weitere denkbare Zustaende: unconcious (wie sleeping, nur 
++             *   schwieriger zu wecken), petrified (paralyzed eigentlich = gelaehmt,
++             *   petrified = versteinert
++             **/
+ 
++            /// Checks if the creature is currently blind.
++            bool isBlind();
++            /**
++             *  Set the creature to blind / not blind. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setBlind(bool value);
++            /// Checks if the creature is dead.
++            bool isDead();
++            /**
++             *  Set the creature to dead / alive. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setDead(bool value);
++            /// Checks if the creature is currently deaf.
++            bool isDeaf();
++            /**
++             *  Set the creature to deaf / not deaf. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setDeaf(bool value);
++            /**
++             *  Checks if the creature is currently incapacitated.
++             *  This happens usually if the creature's @ref abbenv &quot;VI&quot; (de: 
++             *  @ref abbdel &quot;LE&quot;) falls below the value of 
++             *  WERT_KAMPFUNFAEHIGKEITSSCHWELLE.
++             *  @see Wert
++             **/
++            bool isIncapacitated();
++            /**
++             *  Set the creature to incapacitated / not incapacitated. This status 
++             *  works with reference counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setIncapacitated(bool value);
++            /// Checks if the creature is currently invisible.
++            bool isInvisible();
++            /**
++             *  Set the creature to invisible / visible. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setInvisible(bool value);
++            /// Checks if the creature is currently invulnerable.
++            bool isInvulnerable();
++            /**
++             *  Set the creature to invulnerable / vulnerable. This status works with 
++             *  reference counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setInvulnerable(bool value);
++            /// Checks if the creature is currently parallyzed.
++            bool isParalyzed();
++            /**
++             *  Set the creature to paralyzed / not paralyzed. This status works with 
++             *  reference counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setParalyzed(bool value);
++            /// Checks if the creature is currently silenced.
++            bool isSilenced();
++            /**
++             *  Set the creature to silenced / not silenced. This status works with 
++             *  reference counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setSilenced(bool value);
++            /// Checks if the creature is currently sleeping.
++            bool isSleeping();
++            /**
++             *  Set the creature to sleeping / awake. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setSleeping(bool value);
++            /**
++             *  Checks if the creature is unconcious. This status works with reference
++             *  counting.
++             **/
++            bool isUnconscious();
++            /**
++             *  Set the creature to unconcious/concious. This status works with reference
++             *  counting.
++             *  @see setStatus for a detailed description of the reference system.
++             **/
++            void setUnconscious(bool value);
++            /**
++             *  Returns true if the creature cannot move. This function does not 
++             *  correspond to a certain status variable but checks several other 
++             *  stati such as isDead, isParalyzed and isSleeping.
++             **/
++            bool isImmovable();
++            /**
++             *  Checks if the creature is actively magic. This function does not 
++             *  correspond to a certain status variable but returns true if the 
++             *  modified AE is greater than zero.
++             **/
++            bool isMagic();
+ 
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // Inventory
+ 
+ 
+-		/**
+-		 *  Gibt das Inventar der Kreatur zurueck.
+-		 *  @return Liefert einen Zeiger auf Inventar der Kreatur
+-		 **/
+-		Inventory* getInventory();
++            /**
++             *  Gibt das Inventar der Kreatur zurueck.
++             *  @return Liefert einen Zeiger auf Inventar der Kreatur
++             **/
++            Inventory* getInventory();
+ 
+ 
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Aktionen
+-        /** 
+-        *  Durchfuehren einer Talentprobe mit alternativen Eigenschaften.
+-		*  Siehe dazu auch MFF S.14. Wird nur der Korrektheit halber angeboten,
+-		*  sollte eher selten eingesetzt werden. Diese Talentprobe erlaubt auch
+-        *  die Angabe einer Spezialisierung.
+-        *  @param talentName Bezeichnet das Talent
+-		*  @param spezialisierungId Bezeichnet die Spezialisierung
+-        *  @param modifier Modifikator der Probe, dabei
+-        *     ist ein positiver Wert eine Erschwernis,
+-        *     ein negativer Wert eine Erleichterung.
+-		*  @param eigenschaft1Name Bezeichnet die erste Eigenschaft auf die 
+-		*     gewuerfelt werden soll
+-		*  @param eigenschaft2Name Bezeichnet die zweite Eigenschaft
+-		*  @param eigenschaft3Name Bezeichnet die dritte Eigenschaft
+-        *  @return uebrig gebliebene Talentpunkte, ein
+-        *     negativer Wert bedeutet die Probe ist nicht bestanden.
+-        *  @retval   RESULT_AUTOERFOLG bedeutet 2*1 gewuerfelt.
+-        *  @retval   RESULT_SPEKT_AUTOERFOLG bedeutet 3*1 gewuerfelt.
+-        *  @retval   RESULT_AUTOMISSERFOLG bedeutet 2*20 gewuerfelt.
+-        *  @retval   RESULT_SPEKT_AUTOMISSERFOLG bedeutet 3*20 gewuerfelt.
+-        */
+-        /**
+-         *  @overload doTalentprobe(const CeGuiString,int,int)
+-         *  This is the function that should be used in most cases.
+-         **/
+-        /**
+-         *  @overload doTalentprobe(const CeGuiString,int);
+-         *  This is the function you should usually use, if there is no fitting
+-         *  specialization for the task.
+-         *  @ingroup CreatureRubyExports
+-         **/
+-        /**
+-         *  @overload doAlternativeTalentprobe(const CeGuiString,int,CeGuiString,CeGuiString,CeGuiString)
+-         **/
+-        virtual int doAlternativeTalentprobe(const CeGuiString talentName, int spezialisierungId, 
+-			int modifier, CeGuiString eigenschaft1Name, CeGuiString eigenschaft2Name, 
+-			CeGuiString eigenschaft3Name);
+-        virtual int doTalentprobe(const CeGuiString talentName, int modifier);
++            /**
++            *  Durchfuehren einer Talentprobe mit alternativen Eigenschaften.
++            *  Siehe dazu auch MFF S.14. Wird nur der Korrektheit halber angeboten,
++            *  sollte eher selten eingesetzt werden. Diese Talentprobe erlaubt auch
++            *  die Angabe einer Spezialisierung.
++            *  @param talentName Bezeichnet das Talent
++            *  @param spezialisierungId Bezeichnet die Spezialisierung
++            *  @param modifier Modifikator der Probe, dabei
++            *     ist ein positiver Wert eine Erschwernis,
++            *     ein negativer Wert eine Erleichterung.
++            *  @param eigenschaft1Name Bezeichnet die erste Eigenschaft auf die 
++            *     gewuerfelt werden soll
++            *  @param eigenschaft2Name Bezeichnet die zweite Eigenschaft
++            *  @param eigenschaft3Name Bezeichnet die dritte Eigenschaft
++            *  @return uebrig gebliebene Talentpunkte, ein
++            *     negativer Wert bedeutet die Probe ist nicht bestanden.
++            *  @retval   RESULT_AUTOERFOLG bedeutet 2*1 gewuerfelt.
++            *  @retval   RESULT_SPEKT_AUTOERFOLG bedeutet 3*1 gewuerfelt.
++            *  @retval   RESULT_AUTOMISSERFOLG bedeutet 2*20 gewuerfelt.
++            *  @retval   RESULT_SPEKT_AUTOMISSERFOLG bedeutet 3*20 gewuerfelt.
++            */
++            /**
++             *  @overload doTalentprobe(const CeGuiString,int,int)
++             *  This is the function that should be used in most cases.
++             **/
++            /**
++             *  @overload doTalentprobe(const CeGuiString,int);
++             *  This is the function you should usually use, if there is no fitting
++             *  specialization for the task.
++             *  @ingroup CreatureRubyExports
++             **/
++            /**
++             *  @overload doAlternativeTalentprobe(const CeGuiString,int,CeGuiString,CeGuiString,CeGuiString)
++             **/
++            virtual int doAlternativeTalentprobe(const CeGuiString talentName, int spezialisierungId,
++                                                 int modifier, CeGuiString eigenschaft1Name, CeGuiString eigenschaft2Name,
++                                                 CeGuiString eigenschaft3Name);
++            virtual int doTalentprobe(const CeGuiString talentName, int modifier);
+ 
+-        virtual int doTalentprobe(const CeGuiString talentName, int spezialisierungId,
+-			int modifier);
+-        virtual int doAlternativeTalentprobe(const CeGuiString talentName, int modifier, 
+-			CeGuiString eigenschaft1Name, CeGuiString eigenschaft2Name, CeGuiString eigenschaft3Name);
++            virtual int doTalentprobe(const CeGuiString talentName, int spezialisierungId,
++                                      int modifier);
++            virtual int doAlternativeTalentprobe(const CeGuiString talentName, int modifier,
++                                                 CeGuiString eigenschaft1Name, CeGuiString eigenschaft2Name, CeGuiString eigenschaft3Name);
+ 
+-        /** 
+-        *  Durchfuehren einer Eigenschaftsprobe.
+-        *  @param eigenschaftName Bezeichnet die Eigenschaft
+-        *  @param modifier Modifikator der Probe, dabei
+-        *     ist ein positiver Wert eine Erschwernis,
+-        *     ein negativer Wert eine Erleichterung.
+-        *  @return Uebrig gebliebene Eigenschaftspunkte, ein
+-        *     negativer Wert bedeutet die Probe ist nicht bestanden.
+-        *  @retval RESULT_GLUECKLICH bedeutet 1 gewuerfelt.
+-        *  @retval RESULT_PATZER bedeutet 20 gewuerfelt.
+-        *  @ingroup CreatureRubyExports
+-        */
+-        virtual int doEigenschaftsprobe(const CeGuiString eigenschaftName, int modifier);
++            /**
++            *  Durchfuehren einer Eigenschaftsprobe.
++            *  @param eigenschaftName Bezeichnet die Eigenschaft
++            *  @param modifier Modifikator der Probe, dabei
++            *     ist ein positiver Wert eine Erschwernis,
++            *     ein negativer Wert eine Erleichterung.
++            *  @return Uebrig gebliebene Eigenschaftspunkte, ein
++            *     negativer Wert bedeutet die Probe ist nicht bestanden.
++            *  @retval RESULT_GLUECKLICH bedeutet 1 gewuerfelt.
++            *  @retval RESULT_PATZER bedeutet 20 gewuerfelt.
++            *  @ingroup CreatureRubyExports
++            */
++            virtual int doEigenschaftsprobe(const CeGuiString eigenschaftName, int modifier);
+ 
+-		/** 
+-		*  Fuehrt eine Attacke aus. Die Funktion wird von einem Angriffsmanoever 
+-        *  aufgerufen.
+-		*  @param kampftechnikName Bezeichnet die Kampftechnik in dem die 
+-		*   Attacke ausgefuehrt wird.
+-		*  @param modifier Erschwert oder erleichtert die Attacke.
+-		*  @retval RESULT_ERFOLG Eine erfolgreiche Attacke.
+-		*  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Attacke.
+-		*  @retval RESULT_GLUECKLICH Eine gute Attacke.
+-		*  @retval RESULT_PATZER Ein bestaetigter Attackepatzer.
+-		*  @throws InvalidArgumentException Kampftechnik nicht in 
+-		*   mKampftechniken gefunden.
+-		**/
+-		int doAttacke(const CeGuiString kampftechnikName, int modifier);
+-		/** 
+-		*  Fuehrt eine Parade aus. Die Funktion wird von einem Parademanoever 
+-        *  aufgerufen.
+-		*  @param kampftechnikName Bezeichnet die Kampftechnik in dem die 
+-		*   Parade ausgefuehrt wird.
+-		*  @param modifier Erschwert oder erleichtert die Parade.
+-		*  @param guteParade Versucht eine gute Parade (bei einem gluecklichen Treffer)
+-		*  @retval RESULT_ERFOLG Eine erfolgreiche Parade.
+-		*  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Parade.
+-		*  @retval RESULT_GLUECKLICH Eine gute Parade.
+-		*  @retval RESULT_PATZER Ein bestaetigter Paradepatzer.
+-		*  @throws InvalidArgumentException Kampftechnik nicht in 
+-		*   \c mKampftechniken gefunden.
+-		**/
+-		int doParade(const CeGuiString kampftechnikName, int modifier, bool guteParade = false);
++            /**
++            *  Fuehrt eine Attacke aus. Die Funktion wird von einem Angriffsmanoever 
++                  *  aufgerufen.
++            *  @param kampftechnikName Bezeichnet die Kampftechnik in dem die 
++            *   Attacke ausgefuehrt wird.
++            *  @param modifier Erschwert oder erleichtert die Attacke.
++            *  @retval RESULT_ERFOLG Eine erfolgreiche Attacke.
++            *  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Attacke.
++            *  @retval RESULT_GLUECKLICH Eine gute Attacke.
++            *  @retval RESULT_PATZER Ein bestaetigter Attackepatzer.
++            *  @throws InvalidArgumentException Kampftechnik nicht in 
++            *   mKampftechniken gefunden.
++            **/
++            int doAttacke(const CeGuiString kampftechnikName, int modifier);
++            /**
++            *  Fuehrt eine Parade aus. Die Funktion wird von einem Parademanoever 
++                  *  aufgerufen.
++            *  @param kampftechnikName Bezeichnet die Kampftechnik in dem die 
++            *   Parade ausgefuehrt wird.
++            *  @param modifier Erschwert oder erleichtert die Parade.
++            *  @param guteParade Versucht eine gute Parade (bei einem gluecklichen Treffer)
++            *  @retval RESULT_ERFOLG Eine erfolgreiche Parade.
++            *  @retval RESULT_MISSERFOLG Eine fehlgeschlagene Parade.
++            *  @retval RESULT_GLUECKLICH Eine gute Parade.
++            *  @retval RESULT_PATZER Ein bestaetigter Paradepatzer.
++            *  @throws InvalidArgumentException Kampftechnik nicht in 
++            *   \c mKampftechniken gefunden.
++            **/
++            int doParade(const CeGuiString kampftechnikName, int modifier, bool guteParade = false);
+ 
+-		/**
+-		 *  Fuehrt einen Initiativewurf durch.
+-		 *  @param getMaxInitiative Wenn true wird ein Wert zurueckgeliefert,
+-		 *    als ob eine 6 gewuerfelt worden waere, z.B. fuer das Manoever
+-		 *    'Orientieren'.
+-		 **/
+-		int doInitiativeWurf(bool getMaxInitiative = false);
++            /**
++             *  Fuehrt einen Initiativewurf durch.
++             *  @param getMaxInitiative Wenn true wird ein Wert zurueckgeliefert,
++             *    als ob eine 6 gewuerfelt worden waere, z.B. fuer das Manoever
++             *    'Orientieren'.
++             **/
++            int doInitiativeWurf(bool getMaxInitiative = false);
+ 
+-		/**
+-		 *  Fuegt der Kreatur \a tp @ref abbdet &quot;Trefferpunkte&quot; zu.
+-		 *  @param tp die Trefferpunkte
+-         *  @param damageType Typ des Schadens, um Immunitaeten, Verletzlichkeiten
+-         *   etc. korrekt zu beruecksichtigen.
+-		 **/
+-		void damageLe(int tp, int damageType = LEDAMAGE_NORMAL);
+-        static const int LEDAMAGE_NORMAL = 0;
+-        static const int LEDAMAGE_FIRE = 1;
+-        static const int LEDAMAGE_WATER = 2;
+-        static const int LEDAMAGE_DEMONIC = 4;
+-        static const int LEDAMAGE_TP_A = 8;
++            /**
++             *  Fuegt der Kreatur \a tp @ref abbdet &quot;Trefferpunkte&quot; zu.
++             *  @param tp die Trefferpunkte
++                   *  @param damageType Typ des Schadens, um Immunitaeten, Verletzlichkeiten
++                   *   etc. korrekt zu beruecksichtigen.
++             **/
++            void damageLe(int tp, int damageType = LEDAMAGE_NORMAL);
++            static const int LEDAMAGE_NORMAL = 0;
++            static const int LEDAMAGE_FIRE = 1;
++            static const int LEDAMAGE_WATER = 2;
++            static const int LEDAMAGE_DEMONIC = 4;
++            static const int LEDAMAGE_TP_A = 8;
+ 
+-		/**
+-		 *  Zieht der Kreatur \a asp @ref abbdea &quot;Astralpunkte&quot; ab.
+-		 *  @param aup die Trefferpunkte
+-		 **/
+-        void damageAe(int asp);
++            /**
++             *  Zieht der Kreatur \a asp @ref abbdea &quot;Astralpunkte&quot; ab.
++             *  @param aup die Trefferpunkte
++             **/
++            void damageAe(int asp);
+ 
+-        /**
+-		 *  Zieht der Kreatur \a aup @ref abbdea &quot;Ausdauerpunkte&quot; ab.
+-		 *  @param aup die Trefferpunkte
+-         *  @param damageType Typ des Schadens, um Resistenzen
+-         *   etc. korrekt zu beruecksichtigen.
+-		 **/
+-        void damageAu(float aup, int damageType = AUDAMAGE_NORMAL);
+-        static const int AUDAMAGE_NORMAL = 0;
+-        static const int AUDAMAGE_HEAT = 1;
+-        static const int AUDAMAGE_COLD = 2;
+-        static const int AUDAMAGE_CHOKE = 4;
+-        static const int AUDAMAGE_DROWN = 8;
++            /**
++            *  Zieht der Kreatur \a aup @ref abbdea &quot;Ausdauerpunkte&quot; ab.
++            *  @param aup die Trefferpunkte
++             *  @param damageType Typ des Schadens, um Resistenzen
++             *   etc. korrekt zu beruecksichtigen.
++            **/
++            void damageAu(float aup, int damageType = AUDAMAGE_NORMAL);
++            static const int AUDAMAGE_NORMAL = 0;
++            static const int AUDAMAGE_HEAT = 1;
++            static const int AUDAMAGE_COLD = 2;
++            static const int AUDAMAGE_CHOKE = 4;
++            static const int AUDAMAGE_DROWN = 8;
+ 
+-        /**
+-         *  Regeneriert die @reg appdel &quot;LE&quot; einer Kreatur, ueblicherweise nach
+-         *  einer mind. 6 stuendigen Ruhephase.
+-         *  @param modifier Ein situationsabhaengiger Modifikator, vor allem
+-         *   abhaengig von der Qualitaet der Unterbringung (1-A Hotel vs. draussen
+-         *   bei Sturm und Hagel...)
+-         **/
+-        void regenerateLe(int modifier = 0);
+-        /**
+-         *  Regeneriert die @reg appdea &quot;AE&quot; einer Kreatur, ueblicherweise nach
+-         *  einer mind. 6 stuendigen Ruhephase.
+-         *  @param modifier Ein situationsabhaengiger Modifikator, vor allem
+-         *   abhaengig von der Qualitaet der Unterbringung (1-A Hotel vs. draussen
+-         *   bei Sturm und Hagel...)
+-         **/
+-        void regenerateAe(int modifier = 0);
+-        /**
+-         *  Regeneriert die @reg appdea &quot;AU&quot; einer Kreatur, ueblicherweise nach
+-         *  einer mind. 5 minuetigen Ruhephase. Andernfalls kann die Funktion mit dem
+-         *  Parameter time aufgerufen werden.
+-         *  @param modifier Ein situationsabhaengiger Modifikator, sollte eher
+-         *   selten eingesetzt werden.
+-         *  @param time Sollte nur benutzt werden, falls es nicht m&#246;glich ist
+-         *   die Funktion wirklich nur alle 5 Minuten aufzurufen
+-         **/
+-        void regenerateAu(int modifier = 0, float factor = 1, float time = Date::ONE_SPIELRUNDE);
++            /**
++             *  Regeneriert die @reg appdel &quot;LE&quot; einer Kreatur, ueblicherweise nach
++             *  einer mind. 6 stuendigen Ruhephase.
++             *  @param modifier Ein situationsabhaengiger Modifikator, vor allem
++             *   abhaengig von der Qualitaet der Unterbringung (1-A Hotel vs. draussen
++             *   bei Sturm und Hagel...)
++             **/
++            void regenerateLe(int modifier = 0);
++            /**
++             *  Regeneriert die @reg appdea &quot;AE&quot; einer Kreatur, ueblicherweise nach
++             *  einer mind. 6 stuendigen Ruhephase.
++             *  @param modifier Ein situationsabhaengiger Modifikator, vor allem
++             *   abhaengig von der Qualitaet der Unterbringung (1-A Hotel vs. draussen
++             *   bei Sturm und Hagel...)
++             **/
++            void regenerateAe(int modifier = 0);
++            /**
++             *  Regeneriert die @reg appdea &quot;AU&quot; einer Kreatur, ueblicherweise nach
++             *  einer mind. 5 minuetigen Ruhephase. Andernfalls kann die Funktion mit dem
++             *  Parameter time aufgerufen werden.
++             *  @param modifier Ein situationsabhaengiger Modifikator, sollte eher
++             *   selten eingesetzt werden.
++             *  @param time Sollte nur benutzt werden, falls es nicht m&#239;&#191;&#189;lich ist
++             *   die Funktion wirklich nur alle 5 Minuten aufzurufen
++             **/
++            void regenerateAu(int modifier = 0, float factor = 1, float time = Date::ONE_SPIELRUNDE);
+ 
+-		/**
+-		 * Laesst einen Effekt auf der Kreatur wirken.
+-		 * @param effect Zeiger auf den Effekt.
+-         * @ingroup CreatureRubyExports
+-		 **/
+-		void addEffect(Effect* effect);
++            /**
++             * Laesst einen Effekt auf der Kreatur wirken.
++             * @param effect Zeiger auf den Effekt.
++                   * @ingroup CreatureRubyExports
++             **/
++            void addEffect(Effect* effect);
+ 
+-        virtual const Property getProperty(const Ogre::String&amp; key) const;
+-        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+-        virtual PropertySet* getAllProperties() const;
++            virtual const Property getProperty(const Ogre::String&amp; key) const;
++            virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++            virtual PropertySet* getAllProperties() const;
+ 
+-        
+-        /**
+-         * Berechnet die taktische Geschwindigkeit bei der angegebenen Bewegungsart (siehe Basisbox S.112 ff).
+-         * Eventuelle Athletikproben werden hier nicht miteinbezogen!
+-         * Die Wirkung der Modifikatoren h&#228;ngt von den Eigenschaften der Kreatur ab!
+-         * Eine gezogene Waffe (bedeutet Aufmerksamkeit) m&#252;sste hier auch miteinbezogen werden.
+-         * Eigentlich sind die Modifikatoren laut Regelwerk nur f&#252;r strategische Bewegung gedacht,
+-         * aber man k&#246;nnte sie auch gut hier einbauen zum Ausspielen von Vorteilen wie Gel&#228;ndekundig
+-         * @param movementType Flag f&#252;r die Art der Bewegung
+-         * @param modified Gibt an, ob die Behinderung und &#196;hnliches miteinbezogen werden soll, 
+-         *  bei zu geringerer Au gibt dies auch eine geringere Geschwindigkeit zur&#252;ck
+-         * @param modifikatoren Flags f&#252;r verschiedene Modifikatoren wie Gel&#228;nde und Wetter
+-         * @retval Berechnete Geschwindigkeit, kann diese Bewegung nicht ausgef&#252;hrt werden, ist der Wert 0
+-         *  Bei Spr&#252;ngen ist die Angabe die H&#246;he oder die Weite des Sprungs, bei Drehungen die Umdrehungen pro Sekunde
+-        **/
+-        float getTaktischeGeschwindigkeitsBasis(int movementType, bool modified, int modifikatoren = 0);
+-        // die Reihenfolger der Definitionen hier ist wichtig!
+-        static const int BEWEGUNG_NONE = 0;
+-        //static const int BEWEGUNG_FALLEN = -1 ?
+-        // schlie&#223;en sich gegenseitig aus
+-        static const int BEWEGUNG_GEHEN = 1; // bitte das hier nicht &#228;ndern, ohne sich der Folgen in MovementCharacterController bewusst zu sein!
+-        static const int BEWEGUNG_JOGGEN = 2;
+-        static const int BEWEGUNG_LAUFEN = 4;
+-        static const int BEWEGUNG_RENNEN = 8;
+-        //static const int BEWEGUNG_SCHWIMMEN = 6;
+-        //static const int BEWEGUNG_TAUCHEN = 7;
+-        // schlie&#223;en sich gegenseitig aus
+-        static const int BEWEGUNG_WEITSPRUNG = 16;
+-        static const int BEWEGUNG_HOCHSPRUNG = 32;
+-        //static const int BEWEGUNG_PRAEZISER_SPRUNG = 24;
+-        static const int BEWEGUNG_SCHLEICHEN = 64; //allgemein f&#252;r den Versuch leise zu sein?
+-        // k&#246;nnen miteinander kombiniert werden
+-        static const int BEWEGUNG_RUECKWAERTS = 128;
+-        static const int BEWEGUNG_SEITWAERTS = 256;
+-        // k&#246;nnen nicht miteinander kombiniert werden
+-        static const int BEWEGUNG_DREHEN = 512;
+-        static const int BEWEGUNG_UMDREHEN = 1024;
+-        //static const int BEWEGUNG_BALANCIEREN = 1024;
+-        //static const int BEWEGUNG_FLUCHT = 2048; //weiterrennen auch bei zu niedriger AU?
+-        //...
+-        // folgendes sinnvoll? siehe taktische und strategische Bewegung
+-        //static const int BEWEGUNG_MOD_NONE = 0;
+-        //static const int BEWEGUNG_MOD_REICHSSTRASSE = 1;
+-        //static const int BEWEGUNG_MOD_STADT = 2;
+-        //static const int BEWEGUNG_MOD_OFFENES_GELAENDE = 4;
+-        //static const int BEWEGUNG_MOD_STEILER_ABHANG = 8; // ? ...
+-        
+ 
+-        /**
+-         * Gibt an, ob die angegebene taktische Bewegungsart im Moment &#252;berhaupt m&#246;glich ist.
+-         * (Ausdauer und Talentwerte hoch genug?)
+-        **/
+-        bool canUseTaktischeBewegung(int movementType);
++            /**
++             * Berechnet die taktische Geschwindigkeit bei der angegebenen Bewegungsart (siehe Basisbox S.112 ff).
++             * Eventuelle Athletikproben werden hier nicht miteinbezogen!
++             * Die Wirkung der Modifikatoren h&#239;&#191;&#189;gt von den Eigenschaften der Kreatur ab!
++             * Eine gezogene Waffe (bedeutet Aufmerksamkeit) msste hier auch miteinbezogen werden.
++             * Eigentlich sind die Modifikatoren laut Regelwerk nur fr strategische Bewegung gedacht,
++             * aber man k&#239;&#191;&#189;nte sie auch gut hier einbauen zum Ausspielen von Vorteilen wie Gel&#239;&#191;&#189;dekundig
++             * @param movementType Flag fr die Art der Bewegung
++             * @param modified Gibt an, ob die Behinderung und &#239;&#191;&#189;nliches miteinbezogen werden soll, 
++             *  bei zu geringerer Au gibt dies auch eine geringere Geschwindigkeit zurck
++             * @param modifikatoren Flags fr verschiedene Modifikatoren wie Gel&#239;&#191;&#189;de und Wetter
++             * @retval Berechnete Geschwindigkeit, kann diese Bewegung nicht ausgefhrt werden, ist der Wert 0
++             *  Bei Sprngen ist die Angabe die H&#239;&#191;&#189;e oder die Weite des Sprungs, bei Drehungen die Umdrehungen pro Sekunde
++            **/
++            float getTaktischeGeschwindigkeitsBasis(int movementType, bool modified, int modifikatoren = 0);
++            // die Reihenfolger der Definitionen hier ist wichtig!
++            static const int BEWEGUNG_NONE = 0;
++            //static const int BEWEGUNG_FALLEN = -1 ?
++            // schlie&#239;&#191;&#189;n sich gegenseitig aus
++            static const int BEWEGUNG_GEHEN = 1; // bitte das hier nicht &#239;&#191;&#189;dern, ohne sich der Folgen in MovementCharacterController bewusst zu sein!
++            static const int BEWEGUNG_JOGGEN = 2;
++            static const int BEWEGUNG_LAUFEN = 4;
++            static const int BEWEGUNG_RENNEN = 8;
++            //static const int BEWEGUNG_SCHWIMMEN = 6;
++            //static const int BEWEGUNG_TAUCHEN = 7;
++            // schlie&#239;&#191;&#189;n sich gegenseitig aus
++            static const int BEWEGUNG_WEITSPRUNG = 16;
++            static const int BEWEGUNG_HOCHSPRUNG = 32;
++            //static const int BEWEGUNG_PRAEZISER_SPRUNG = 24;
++            static const int BEWEGUNG_SCHLEICHEN = 64; //allgemein fr den Versuch leise zu sein?
++            // k&#239;&#191;&#189;nen miteinander kombiniert werden
++            static const int BEWEGUNG_RUECKWAERTS = 128;
++            static const int BEWEGUNG_SEITWAERTS = 256;
++            // k&#239;&#191;&#189;nen nicht miteinander kombiniert werden
++            static const int BEWEGUNG_DREHEN = 512;
++            static const int BEWEGUNG_UMDREHEN = 1024;
++            //static const int BEWEGUNG_BALANCIEREN = 1024;
++            //static const int BEWEGUNG_FLUCHT = 2048; //weiterrennen auch bei zu niedriger AU?
++            //...
++            // folgendes sinnvoll? siehe taktische und strategische Bewegung
++            //static const int BEWEGUNG_MOD_NONE = 0;
++            //static const int BEWEGUNG_MOD_REICHSSTRASSE = 1;
++            //static const int BEWEGUNG_MOD_STADT = 2;
++            //static const int BEWEGUNG_MOD_OFFENES_GELAENDE = 4;
++            //static const int BEWEGUNG_MOD_STEILER_ABHANG = 8; // ? ...
+ 
+ 
+-        /**
+-         * F&#252;hrt eine taktische Bewegung aus, das bedeutet, es werden falls n&#246;tig Proben abgelegt
+-         * und die Ver&#228;nderungen der AU und LE berechnet; f&#252;r Richtungs&#228;nderungen (Drehung) beim Laufen/etc
+-         * muss die Funktion zweimal aufgerufen werden, einmal um die Laufgeschwindigkeit und einmal um die 
+-         * Rotationsgeschwindigkeit zu ermitteln 
+-         * (das bedeutet auch, dass sobald eine Drehung angegeben wird, nur die Auswirkungen der Drehung, 
+-         * nicht der restlichen Bewegung ermittelt werden)
+-         * @param movementType Flag f&#252;r die Art der Bewegung
+-         * @param modifikator Flags f&#252;r die Umgebung
+-         * @param time Die Dauer der Bewegung; hier sind kurze Zeiten vorgesehen (Dauer einer Frame)
+-         * @param patzer Falls eine Probe ben&#246;tigt wird, gibt dies die &#252;briggebliebenen TaW an.
+-         *  Ein negativer Wert steht f&#252;r einen Patzer; je kleiner der Wert, desto schlimmer sollten die
+-         *  Auswirkungen ausfallen!
+-         * @param probenErschwernis Um diesen Wert sind alle ben&#246;tigten Proben erschwert, dient vor allem
+-         *  dazu, erschwerte Schleichen-Proben oder &#196;hnliches zu erm&#246;glichen!
+-         * @retval Berechnete Geschwindigkeit (alle Ergebnisse von Talentproben einbezogen)
+-        **/
+-        float doTaktischeBewegung(int movementType, float time, int&amp; patzer, int probenErschwernis = 0, int modifikatoren = 0);
++            /**
++             * Gibt an, ob die angegebene taktische Bewegungsart im Moment berhaupt m&#239;&#191;&#189;lich ist.
++             * (Ausdauer und Talentwerte hoch genug?)
++            **/
++            bool canUseTaktischeBewegung(int movementType);
+ 
+-        /**
+-         * Fragt den aktuellen Bewegungstyp ab.
+-        **/
+-        int getTaktischeBewegung(void) const;
+ 
+-        /**
+-         * Setzt den aktuellen Bewegungstyp. Wird ebenfalls in doTaktischeBewegung getan!
+-        **/
+-        void setTaktischeBewegung(int type);
++            /**
++             * Fhrt eine taktische Bewegung aus, das bedeutet, es werden falls n&#239;&#191;&#189;ig Proben abgelegt
++             * und die Ver&#239;&#191;&#189;derungen der AU und LE berechnet; fr Richtungs&#239;&#191;&#189;derungen (Drehung) beim Laufen/etc
++             * muss die Funktion zweimal aufgerufen werden, einmal um die Laufgeschwindigkeit und einmal um die 
++             * Rotationsgeschwindigkeit zu ermitteln 
++             * (das bedeutet auch, dass sobald eine Drehung angegeben wird, nur die Auswirkungen der Drehung, 
++             * nicht der restlichen Bewegung ermittelt werden)
++             * @param movementType Flag fr die Art der Bewegung
++             * @param modifikator Flags fr die Umgebung
++             * @param time Die Dauer der Bewegung; hier sind kurze Zeiten vorgesehen (Dauer einer Frame)
++             * @param patzer Falls eine Probe ben&#239;&#191;&#189;igt wird, gibt dies die briggebliebenen TaW an.
++             *  Ein negativer Wert steht fr einen Patzer; je kleiner der Wert, desto schlimmer sollten die
++             *  Auswirkungen ausfallen!
++             * @param probenErschwernis Um diesen Wert sind alle ben&#239;&#191;&#189;igten Proben erschwert, dient vor allem
++             *  dazu, erschwerte Schleichen-Proben oder &#239;&#191;&#189;nliches zu erm&#239;&#191;&#189;lichen!
++             * @retval Berechnete Geschwindigkeit (alle Ergebnisse von Talentproben einbezogen)
++            **/
++            float doTaktischeBewegung(int movementType, float time, int&amp; patzer, int probenErschwernis = 0, int modifikatoren = 0);
+ 
+-    protected:
+-        /**
+-         * Liefert den Eigenschaftswert \a eigenschaftName fuer eine 
+-         * Basiswertberechnung zurueck. Manche Effekte veraendern zwar den
+-         * Eigenschaftswert, nicht jedoch die Basiswerte.
+-         **/
+-        virtual int getEigenschaftForBasiswertCalculation(const CeGuiString eigenschaftName);
+-        /**
+-         *  Berechnet den Basiswert von der @ref abbdea &quot;Astralenergie&quot;.
+-         **/
+-		virtual int getAeBasis();
+-        /**
+-         *  Berechnet den Basiswert von der @ref abbdea &quot;Ausdauer&quot;.
+-         **/
+-		virtual int getAuBasis();
+-        /**
+-         *  Berechnet den Basiswert von der @ref abbdel &quot;Lebensenergie&quot;.
+-         **/
+-        virtual int getLeBasis();
+-        /**
+-         *  Berechnet den Basiswert von der @ref abbdem &quot;Magieresistenz&quot;.
+-         **/
+-		virtual int getMrBasis();
+-		/**
+-		 *  Liefert die derzeitge @ref abbdeb &quot;BE&quot; der Kreatur zurueck.
+-		 *  Eventuelle Ruestungsgewoehnung schon beruecksichtigt
+-		 **/
+-		virtual int getCurrentBe();
++            /**
++             * Fragt den aktuellen Bewegungstyp ab.
++            **/
++            int getTaktischeBewegung(void) const;
+ 
++            /**
++             * Setzt den aktuellen Bewegungstyp. Wird ebenfalls in doTaktischeBewegung getan!
++            **/
++            void setTaktischeBewegung(int type);
+ 
+-		/**
+-		 * Ueberprueft die wirkenden Effekte auf Lebendigkeit
+-		 **/
+-		void checkEffects();
++        protected:
++            /**
++             * Liefert den Eigenschaftswert \a eigenschaftName fuer eine 
++             * Basiswertberechnung zurueck. Manche Effekte veraendern zwar den
++             * Eigenschaftswert, nicht jedoch die Basiswerte.
++             **/
++            virtual int getEigenschaftForBasiswertCalculation(const CeGuiString eigenschaftName);
++            /**
++             *  Berechnet den Basiswert von der @ref abbdea &quot;Astralenergie&quot;.
++             **/
++            virtual int getAeBasis();
++            /**
++             *  Berechnet den Basiswert von der @ref abbdea &quot;Ausdauer&quot;.
++             **/
++            virtual int getAuBasis();
++            /**
++             *  Berechnet den Basiswert von der @ref abbdel &quot;Lebensenergie&quot;.
++             **/
++            virtual int getLeBasis();
++            /**
++             *  Berechnet den Basiswert von der @ref abbdem &quot;Magieresistenz&quot;.
++             **/
++            virtual int getMrBasis();
++            /**
++             *  Liefert die derzeitge @ref abbdeb &quot;BE&quot; der Kreatur zurueck.
++             *  Eventuelle Ruestungsgewoehnung schon beruecksichtigt
++             **/
++            virtual int getCurrentBe();
+ 
+-	private:
++
++            /**
++             * Ueberprueft die wirkenden Effekte auf Lebendigkeit
++             **/
++            void checkEffects();
++
++        private:
+ ///////////////////////////////////////////////////////////////////////////////
+ // Typedefs
+-        /**
+-         *  Liste der Werte.
+-         *  @see Wert
+-         **/
+-		typedef std::map&lt;const Wert, StateSet*&gt; WertMap;
+-		/** 
+-         *  Liste der guten Eigenschaften. Besteht aus dem Abkuerzung der 
+-         *  Eigenschaft (z.B. @ref abbdem &quot;MU&quot;, @ref abbdek &quot;KL&quot;) als Schluessel 
+-         *  und einem Zeiger auf ihr StateSet.
+-		 **/
+-		typedef std::map&lt;const CeGuiString, EigenschaftenStateSet*&gt; EigenschaftMap;
+-		/**
+-		 *  Liste der Kampftechniken und ihrer @ref abbdea &quot;AT&quot;/@ref abbdep &quot;PA2 Werte.
+-		 *  Eine Kampftechnik in diesem Sinne ist so was wie Hiebwaffen
+-		 *  oder Raufen, bei Tieren sowas wie Biss oder Prankenhieb. Der erste 
+-         *  Wert ist der Name der Kampftechnik, das pair den AT und PA Werten.
+-		 *  Die Werte werden auf den AT/PA Basiswert addiert bevor sie die fertige
+-		 *  AT/PA Werte ergeben. Die Summe des pairs muss also dem TaW in dem
+-		 *  Kampftalent entsprechen.
+-		 **/
+-        typedef std::map&lt;const CeGuiString, std::pair&lt;int, int&gt; &gt; KampftechnikMap;
+-        /**
+-         *  Eine Liste der Vorteile der Kreatur. Gaben gehoeren ebenfalls zu 
+-         *  den Vorteilen, verhalten sich aber wie Talente.
+-         **/
+-        typedef std::map&lt;const CeGuiString, TalentStateSet*&gt; VorteilMap;
+-        /**
+-         *  Eine Liste der Nachteile der Kreatur. Schlechte Eigenschaften gehoeren 
+-         *  ebenfalls zu den Nachteilen, verhalten sich aber wie Eigenschaften.
+-         **/
+-        typedef std::map&lt;const CeGuiString, EigenschaftenStateSet*&gt; NachteilMap;
+-		/** 
+-         *  Die Sonderfertigkeiten der Kreatur. Besteht aus dem Namen der 
+-         *  Sonderfertigkeit als Schluessel und ihrem Status.
+-		 */
+-		typedef std::map&lt;const CeGuiString ,SonderfertigkeitenStateSet*&gt; SonderfertigkeitMap;
++            /**
++             *  Liste der Werte.
++             *  @see Wert
++             **/
++            typedef std::map&lt;const Wert, StateSet*&gt; WertMap;
++            /**
++                   *  Liste der guten Eigenschaften. Besteht aus dem Abkuerzung der 
++                   *  Eigenschaft (z.B. @ref abbdem &quot;MU&quot;, @ref abbdek &quot;KL&quot;) als Schluessel 
++                   *  und einem Zeiger auf ihr StateSet.
++             **/
++            typedef std::map&lt;const CeGuiString, EigenschaftenStateSet*&gt; EigenschaftMap;
++            /**
++             *  Liste der Kampftechniken und ihrer @ref abbdea &quot;AT&quot;/@ref abbdep &quot;PA2 Werte.
++             *  Eine Kampftechnik in diesem Sinne ist so was wie Hiebwaffen
++             *  oder Raufen, bei Tieren sowas wie Biss oder Prankenhieb. Der erste 
++                   *  Wert ist der Name der Kampftechnik, das pair den AT und PA Werten.
++             *  Die Werte werden auf den AT/PA Basiswert addiert bevor sie die fertige
++             *  AT/PA Werte ergeben. Die Summe des pairs muss also dem TaW in dem
++             *  Kampftalent entsprechen.
++             **/
++            typedef std::map&lt;const CeGuiString, std::pair&lt;int, int&gt; &gt; KampftechnikMap;
++            /**
++             *  Eine Liste der Vorteile der Kreatur. Gaben gehoeren ebenfalls zu 
++             *  den Vorteilen, verhalten sich aber wie Talente.
++             **/
++            typedef std::map&lt;const CeGuiString, TalentStateSet*&gt; VorteilMap;
++            /**
++             *  Eine Liste der Nachteile der Kreatur. Schlechte Eigenschaften gehoeren 
++             *  ebenfalls zu den Nachteilen, verhalten sich aber wie Eigenschaften.
++             **/
++            typedef std::map&lt;const CeGuiString, EigenschaftenStateSet*&gt; NachteilMap;
++            /**
++                   *  Die Sonderfertigkeiten der Kreatur. Besteht aus dem Namen der 
++                   *  Sonderfertigkeit als Schluessel und ihrem Status.
++             */
++            typedef std::map&lt;const CeGuiString , SonderfertigkeitenStateSet*&gt; SonderfertigkeitMap;
+ 
+-        struct Ap
+-        {
+-            int total;
+-            int used;
+-        };
++            struct Ap
++            {
++                int total;
++                int used;
++            };
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Membervariablen
+-        /// Die aktuelle @ref abbdel &quot;Lebensenergie&quot; der Kreatur.
+-        int mCurrentLe;
+-        /// Die aktuelle @ref abbdea &quot;Astralenergie&quot; der Kreatur.
+-		int mCurrentAe;
+-        /// Die aktuelle @ref abbdea &quot;Ausdauer&quot; der Kreatur.
+-		float mCurrentAu;
+-        /// Die aktuelle Erschoepfung der Kreatur.
+-        int mErschoepfung;
+-        /// Wenn &gt; 0 ist die Kreatur blind.
+-        int mBlind;
+-        /// Wenn &gt; 0 ist die Kreatur tot.
+-        int mDead;
+-        /// Wenn &gt; 0 ist die Kreatur taub.
+-        int mDeaf;
+-        /// Wenn &gt; 0 ist die Kreatur kampfunfaehig.
+-        int mIncapacitated;
+-        /// Wenn &gt; 0 ist die Kreatur unverwundbar.
+-        int mInvulnerable;
+-        /// Wenn &gt; 0 ist die Kreatur unsichtbar.
+-        int mInvisible;
+-        /// Wenn &gt; 0 ist die Kreatur gelaehmt.
+-        int mParalyzed;
+-        /// Wenn &gt; 0 ist liegt ein Silentium auf der Kreatur.
+-        int mSilenced;
+-        /// Wenn &gt; 0 schlaeft die Kreatur.
+-        int mSleeping;
+-        /// Wenn &gt; 0 ist die Kreatur bewusstlos.
+-        int mUnconscious;
+-        /// Zuletzt zugewiesene Bewegungsart
+-        int mMovementType;
++            /// Die aktuelle @ref abbdel &quot;Lebensenergie&quot; der Kreatur.
++            int mCurrentLe;
++            /// Die aktuelle @ref abbdea &quot;Astralenergie&quot; der Kreatur.
++            int mCurrentAe;
++            /// Die aktuelle @ref abbdea &quot;Ausdauer&quot; der Kreatur.
++            float mCurrentAu;
++            /// Die aktuelle Erschoepfung der Kreatur.
++            int mErschoepfung;
++            /// Wenn &gt; 0 ist die Kreatur blind.
++            int mBlind;
++            /// Wenn &gt; 0 ist die Kreatur tot.
++            int mDead;
++            /// Wenn &gt; 0 ist die Kreatur taub.
++            int mDeaf;
++            /// Wenn &gt; 0 ist die Kreatur kampfunfaehig.
++            int mIncapacitated;
++            /// Wenn &gt; 0 ist die Kreatur unverwundbar.
++            int mInvulnerable;
++            /// Wenn &gt; 0 ist die Kreatur unsichtbar.
++            int mInvisible;
++            /// Wenn &gt; 0 ist die Kreatur gelaehmt.
++            int mParalyzed;
++            /// Wenn &gt; 0 ist liegt ein Silentium auf der Kreatur.
++            int mSilenced;
++            /// Wenn &gt; 0 schlaeft die Kreatur.
++            int mSleeping;
++            /// Wenn &gt; 0 ist die Kreatur bewusstlos.
++            int mUnconscious;
++            /// Zuletzt zugewiesene Bewegungsart
++            int mMovementType;
+ 
+-        /// Verwaltet die Effekte die auf die Kreatur wirken.
+-		EffectManager mEffectManager;
+-        /// Zeigt auf die gerade aktive Waffe.
+-		Weapon* mActiveWeapon;
+-        EigenschaftMap mEigenschaften;
+-        TalentMap mTalente;
+-        KampftechnikMap mKampftechniken;
+-        VorteilMap mVorteile;
+-        NachteilMap mNachteile;
+-		SonderfertigkeitMap mSonderfertigkeiten;
+-		WertMap mWerte;
+-        Ap mAp;
++            /// Verwaltet die Effekte die auf die Kreatur wirken.
++            EffectManager mEffectManager;
++            /// Zeigt auf die gerade aktive Waffe.
++            Weapon* mActiveWeapon;
++            EigenschaftMap mEigenschaften;
++            TalentMap mTalente;
++            KampftechnikMap mKampftechniken;
++            VorteilMap mVorteile;
++            NachteilMap mNachteile;
++            SonderfertigkeitMap mSonderfertigkeiten;
++            WertMap mWerte;
++            Ap mAp;
+ 
+-        /// Zeigt auf das Inventar der Kreatur.
+-		Inventory* mInventory;
++            /// Zeigt auf das Inventar der Kreatur.
++            Inventory* mInventory;
+ 
+-        Property mBehaviours;
++            Property mBehaviours;
+ 
+-        /**
+-         *  Sets a the status \a statusVariable. It uses a reference counting
+-         *  System to do this, so if for example severeal effects put the creature
+-         *  to sleep, and one effect ends the creature doesn't awake until all
+-         *  the other effects end too. 
+-         *  @param statusVariable is a reference to the status to be set, such as
+-         *   \c mBlind.
+-         *  @param value If true, the reference is increased, if false it is decreased.
+-         *  @param errorMessage If \c setStatus is called with \a value = \c false more often
+-         *   than it was with \c true (i.e. the status is removed more often than
+-         *   it was applied), \c setStatus throws an exception with \a errorMessage as
+-         *   text.
+-         *  @throw InvalidArgumentException see \a errorMessage.
+-         **/
+-        void setStatus(int&amp; statusVariable, bool value, const Ogre::String&amp; errorMessage);
++            /**
++             *  Sets a the status \a statusVariable. It uses a reference counting
++             *  System to do this, so if for example severeal effects put the creature
++             *  to sleep, and one effect ends the creature doesn't awake until all
++             *  the other effects end too. 
++             *  @param statusVariable is a reference to the status to be set, such as
++             *   \c mBlind.
++             *  @param value If true, the reference is increased, if false it is decreased.
++             *  @param errorMessage If \c setStatus is called with \a value = \c false more often
++             *   than it was with \c true (i.e. the status is removed more often than
++             *   it was applied), \c setStatus throws an exception with \a errorMessage as
++             *   text.
++             *  @throw InvalidArgumentException see \a errorMessage.
++             **/
++            void setStatus(int&amp; statusVariable, bool value, const Ogre::String&amp; errorMessage);
+     };
+ }
+ #endif //__CREATURE_H__
+
+Modified: rl/trunk/engine/rules/include/Effect.h
+===================================================================
+--- rl/trunk/engine/rules/include/Effect.h	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/include/Effect.h	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -29,6 +29,20 @@
+ 	class _RlRulesExport Effect
+ 	{
+ 	public:
++        
++      typedef unsigned long Status;
++      static const Status STATUS_NONE = 0;
++      static const Status STATUS_BLIND = 1;
++      static const Status STATUS_DEAD = 2;
++      static const Status STATUS_DEAF = 4;
++      static const Status STATUS_IMMOVABLE = 8;
++      static const Status STATUS_INCAPACITATED = 16;
++      static const Status STATUS_INVISIBLE = 32;
++      static const Status STATUS_INVULNERABLE = 64;
++      static const Status STATUS_PARALYZED = 128;
++      static const Status STATUS_SILENCED = 512;
++      static const Status STATUS_SLEEPING = 1024;
++      static const Status STATUS_UNCONSCIOUS = 2048;
+ 
+         /**
+          * Spezifiziert wie oft Effekte des selben Typs gleichzeitig auf dieselbe
+@@ -108,6 +122,9 @@
+ 
+ 		/// Ueberprueft die Lebendigkeit des Effekts.
+ 		virtual void check();
++        
++        /// Returns if status is applied to the creature
++        Status getStatus();
+ 
+ 	protected:
+ 		/// Bringt die Aenderungen ein.
+
+Modified: rl/trunk/engine/rules/include/EffectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/EffectManager.h	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/include/EffectManager.h	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -29,7 +29,7 @@
+      * Verwaltet die Effekte die auf einer Kreatur wirken.
+      * Diese Klasse verwaltet alle Effekte, die auf einer Kreatur liegen.
+      * Jede Kreatur hat ihren eigenen EffectManager. Die Funktion checkeffects
+-     * sollte w&#228;hrend jeder Aktion (gemeint ist die DSA-Zeiteinheit) aufgerufen
++     * sollte w&#239;&#191;&#189;rend jeder Aktion (gemeint ist die DSA-Zeiteinheit) aufgerufen
+      * werden.
+      **/
+ 
+@@ -68,6 +68,11 @@
+          * @param effect Ein Zeiger auf den einzufuegenden Effekt.
+          **/
+ 		void addEffect(Effect* effect);
++        
++        /**
++         * Checks the effects for the given status.
++         **/
++        Effect::Status getStatus();
+ 
+ 	private:
+         /// Eine einfache Menge von Effekten
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -613,6 +613,11 @@
+ 		return it-&gt;second;
+ 	}
+ 
++    Effect::Status Creature::getStatus()
++    {
++      return mEffectManager.getStatus();
++    }
++    
+     bool Creature::isBlind()
+     {
+         if (mBlind &gt; 0) return true;
+@@ -906,7 +911,7 @@
+ 			Throw(IllegalArgumentException, &quot;kampftechnikName nicht in mKampftechniken gefunden&quot;);
+ 		}
+ 		int rval;
+-		int eBe = floor(float(DsaManager::getSingleton().getKampftechnik(kampftechnikName)-&gt;calculateEbe(getWert(WERT_BE))) / 2.0);
++		int eBe = (int)floor(float(DsaManager::getSingleton().getKampftechnik(kampftechnikName)-&gt;calculateEbe(getWert(WERT_BE))) / 2.0);
+ 
+ 		int probe = DsaManager::getSingleton().rollD20();
+ 		if (probe == 1) /// @todo Best&#195;&#164;tigen
+@@ -936,7 +941,7 @@
+ 			Throw(IllegalArgumentException, &quot;kampftechnikName nicht in mKampftechniken gefunden&quot;);
+ 		}
+ 		int rval;
+-		int eBe = ceil(float(DsaManager::getSingleton().getKampftechnik(kampftechnikName)-&gt;calculateEbe(getWert(WERT_BE))) / 2.0);
++		int eBe = (int)ceil(float(DsaManager::getSingleton().getKampftechnik(kampftechnikName)-&gt;calculateEbe(getWert(WERT_BE))) / 2.0);
+ 
+ 		int probe = DsaManager::getSingleton().rollD20();
+ 		if (probe == 1) /// @todo Best&#195;&#164;tigen
+@@ -991,7 +996,7 @@
+         if ((damageType&amp;LEDAMAGE_TP_A) == LEDAMAGE_TP_A)
+         {
+             damageAu(tp, AUDAMAGE_NORMAL);
+-            tp = floor(tp/2.);
++            tp = (int)floor(tp/2.);
+         }
+ 		modifyLe(-tp);
+ 	}
+@@ -1182,8 +1187,14 @@
+         }
+ 
+         // kann sich die Kreatur ueberhaupt bewegen?
++        /*
+         if( isImmovable() )
+             return false;
++        */
++        ///@todo What other Stati prohibit creature  movement? Paralyzed? Inacapacitated? Sleep? etc.
++        ///@todo Jumping etc. still possible, even if immobilized.
++        if (Effect::STATUS_IMMOVABLE &amp; getStatus())
++          return false;
+ 
+         if( getAu() &lt;= 1 )
+             return false;
+@@ -1212,15 +1223,15 @@
+                 return false;
+             }
+         }
+-        else if( movementType &amp; BEWEGUNG_HOCHSPRUNG || movementType &amp; BEWEGUNG_WEITSPRUNG )
++        else if( (movementType &amp; BEWEGUNG_HOCHSPRUNG) || (movementType &amp; BEWEGUNG_WEITSPRUNG) )
+         {
+             // if( getragenes Gewicht &gt; KK ) return false
+         }
+ 
+ 
+ 
+-        if( movementType &amp; BEWEGUNG_DREHEN ||
+-            movementType &amp; BEWEGUNG_UMDREHEN)
++        if( (movementType &amp; BEWEGUNG_DREHEN) ||
++            (movementType &amp; BEWEGUNG_UMDREHEN))
+         {
+         }
+         else if( movementType &amp; BEWEGUNG_RENNEN )
+@@ -1270,8 +1281,8 @@
+ 
+ 
+         // drehen ist ein sonderfall! angabe der Rotationsgeschwindigkeit in Umdrehungen pro Sekunde
+-        if( movementType &amp; BEWEGUNG_DREHEN ||
+-            movementType &amp; BEWEGUNG_UMDREHEN )
++        if( (movementType &amp; BEWEGUNG_DREHEN) ||
++            (movementType &amp; BEWEGUNG_UMDREHEN) )
+         {
+             if( movementType &amp; BEWEGUNG_UMDREHEN )
+                 velocity = 0.5;
+@@ -1294,7 +1305,7 @@
+             {
+                 return 0;
+             }
+-            if( movementType &amp; BEWEGUNG_RUECKWAERTS || movementType &amp; BEWEGUNG_SEITWAERTS )
++            if( (movementType &amp; BEWEGUNG_RUECKWAERTS) || (movementType &amp; BEWEGUNG_SEITWAERTS) )
+                 return 1;
+             if( modified &amp;&amp; getCurrentBe() &gt; 1 )
+                 return 1;
+@@ -1356,13 +1367,13 @@
+ 
+         if( movementType &amp; BEWEGUNG_RUECKWAERTS )
+         {
+-            if( movementType &amp; BEWEGUNG_RENNEN ||
+-                movementType &amp; BEWEGUNG_LAUFEN ||
+-                movementType &amp; BEWEGUNG_JOGGEN )
++            if( (movementType &amp; BEWEGUNG_RENNEN) ||
++                (movementType &amp; BEWEGUNG_LAUFEN) ||
++                (movementType &amp; BEWEGUNG_JOGGEN) )
+             {
+                 velocity = 0.6 * act_gs / factorJoggen;
+             }
+-            else if( movementType &amp; BEWEGUNG_GEHEN )
++            else if( (movementType &amp; BEWEGUNG_GEHEN) )
+             {
+                 velocity = 0.6 * act_gs / 3.6;
+             }
+@@ -1375,9 +1386,9 @@
+         }
+         else if( movementType &amp; BEWEGUNG_SEITWAERTS )
+         {
+-            if( movementType &amp; BEWEGUNG_RENNEN || 
+-                movementType &amp; BEWEGUNG_LAUFEN ||
+-                movementType &amp; BEWEGUNG_JOGGEN )
++            if( (movementType &amp; BEWEGUNG_RENNEN) || 
++                (movementType &amp; BEWEGUNG_LAUFEN) ||
++                (movementType &amp; BEWEGUNG_JOGGEN) )
+             {
+                 velocity = 0.8 * act_gs / factorJoggen;
+             }
+@@ -1546,9 +1557,9 @@
+ 
+         if( movementType &amp; BEWEGUNG_RUECKWAERTS )
+         {
+-            if( movementType &amp; BEWEGUNG_RENNEN || 
+-                movementType &amp; BEWEGUNG_LAUFEN ||
+-                movementType &amp; BEWEGUNG_JOGGEN )
++            if( (movementType &amp; BEWEGUNG_RENNEN) || 
++                (movementType &amp; BEWEGUNG_LAUFEN) ||
++                (movementType &amp; BEWEGUNG_JOGGEN) )
+             {
+             }
+             else if( movementType &amp; BEWEGUNG_GEHEN )
+@@ -1558,9 +1569,9 @@
+         }
+         else if( movementType &amp; BEWEGUNG_SEITWAERTS )
+         {
+-            if( movementType &amp; BEWEGUNG_RENNEN || 
+-                movementType &amp; BEWEGUNG_LAUFEN ||
+-                movementType &amp; BEWEGUNG_JOGGEN )
++            if( (movementType &amp; BEWEGUNG_RENNEN) || 
++                (movementType &amp; BEWEGUNG_LAUFEN) ||
++                (movementType &amp; BEWEGUNG_JOGGEN) )
+             {
+             }
+             else if( movementType &amp; BEWEGUNG_GEHEN )
+
+Modified: rl/trunk/engine/rules/src/Effect.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Effect.cpp	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/src/Effect.cpp	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -154,4 +154,10 @@
+ 	{		
+         return (DsaManager::getSingleton().getTimestamp() - mStartTime);
+ 	}
++    
++    Effect::Status Effect::getStatus()
++    {
++      // should be overlaoaded in the specific derivated effects.
++      return STATUS_NONE;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/EffectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EffectManager.cpp	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/rules/src/EffectManager.cpp	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -95,5 +95,15 @@
+ 		mEffects.insert(effect);
+ 		effect-&gt;enable();
+ 	}
++    
++    Effect::Status EffectManager::getStatus()
++    {
++      Effect::Status status;
++      for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
++      {
++        status = status | (((*it)-&gt;getStatus()));
++      }
++      return false;
++    }
+ }
+ 
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-03-08 00:20:16 UTC (rev 3155)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-03-08 10:19:28 UTC (rev 3156)
+@@ -556,7 +556,22 @@
+             EFFECTTAG_NONE,
+             EFFECTTAG_KRANKHEIT
+         };
++        
++        typedef unsigned long Status;
++        static const Status STATUS_NONE = 0;
++        static const Status STATUS_BLIND = 1;
++        static const Status STATUS_DEAD = 2;
++        static const Status STATUS_DEAF = 4;
++        static const Status STATUS_IMMOVABLE = 8;
++        static const Status STATUS_INCAPACITATED = 16;
++        static const Status STATUS_INVISIBLE = 32;
++        static const Status STATUS_INVULNERABLE = 64;
++        static const Status STATUS_PARALYZED = 128;
++        static const Status STATUS_SILENCED = 512;
++        static const Status STATUS_SLEEPING = 1024;
++        static const Status STATUS_UNCONSCIOUS = 2048;
+ 
++
+ 		Effect(int stufe = 1);
+ 		virtual ~Effect();
+ 
+@@ -580,6 +595,8 @@
+ 		virtual void disable();
+ 		virtual void check() = 0;
+ 
++        Status getStatus();
++        
+ 	protected:
+ 		virtual void apply() = 0;
+ 		virtual void remove() = 0;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000226.html">[Dsa-hl-svn] r3155 - in modules/aitest: dsa maps materials	materials/textures models scripts scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000228.html">[Dsa-hl-svn] r3157 - in rl/trunk: engine/core/include	engine/core/src engine/ui/include engine/ui/src	plugins/fmod4driver/include plugins/fmod4driver/src	plugins/openaldriver/include plugins/openaldriver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#227">[ date ]</a>
+              <a href="thread.html#227">[ thread ]</a>
+              <a href="subject.html#227">[ subject ]</a>
+              <a href="author.html#227">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

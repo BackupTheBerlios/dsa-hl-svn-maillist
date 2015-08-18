@@ -1,0 +1,846 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4197 - in rl/trunk/engine: ai/src rules/include	rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4197%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/include%0A%09rules/src%20ui/include%20ui/src&In-Reply-To=%3C200803070007.m2707UFc001108%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001267.html">
+   <LINK REL="Next"  HREF="001269.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4197 - in rl/trunk/engine: ai/src rules/include	rules/src ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4197%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/include%0A%09rules/src%20ui/include%20ui/src&In-Reply-To=%3C200803070007.m2707UFc001108%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4197 - in rl/trunk/engine: ai/src rules/include	rules/src ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar  7 01:07:30 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001267.html">[Dsa-hl-svn] r4196 - in modules: combattest/dsa common/dsa	common/models regressiontest/dsa
+</A></li>
+        <LI>Next message: <A HREF="001269.html">[Dsa-hl-svn] r4198 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1268">[ date ]</a>
+              <a href="thread.html#1268">[ thread ]</a>
+              <a href="subject.html#1268">[ subject ]</a>
+              <a href="author.html#1268">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-07 01:07:24 +0100 (Fri, 07 Mar 2008)
+New Revision: 4197
+
+Modified:
+   rl/trunk/engine/ai/src/AgentCombatState.cpp
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/include/Combatant.h
+   rl/trunk/engine/rules/include/Inventory.h
+   rl/trunk/engine/rules/include/Kampfaktion.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/rules/src/CombatManager.cpp
+   rl/trunk/engine/rules/src/Combatant.cpp
+   rl/trunk/engine/rules/src/GameEventLog.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/rules/src/Kampfaktion.cpp
+   rl/trunk/engine/ui/include/CombatControlState.h
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+Log:
+WIP on combat. Not yet usable.
+
+Modified: rl/trunk/engine/ai/src/AgentCombatState.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentCombatState.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/ai/src/AgentCombatState.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -17,6 +17,7 @@
+ 
+ #include &quot;Agent.h&quot;
+ #include &quot;AgentCombatState.h&quot;
++#include &quot;Combat.h&quot;
+ #include &quot;CombatManager.h&quot;
+ #include &quot;CreatureControllerManager.h&quot;
+ 
+@@ -44,6 +45,27 @@
+     void AgentCombatState::requestCombatantAction()
+     {
+         // Think!
++		const Combat::CombatantSet&amp; allies = mCombat-&gt;getAllAllies();
++		if (!allies.empty())
++		{
++			Combatant* target = *allies.begin();
++			// Are we in weapon range to opponent
++			AttackeAktion* attacke = dynamic_cast&lt;AttackeAktion*&gt;(
++				CombatManager::getSingleton().getKampfaktion(&quot;Attacke&quot;));
++			if (getPosition().distance(target-&gt;getPosition())
++				&lt;= attacke-&gt;getMaximumTargetDistance(this))
++			{
++				// Ok, we can attack
++				mCombat-&gt;registerCombatantAction(this, attacke, target);
++			}
++			else
++			{
++				// We can't attack from here, so go to opponent.
++				Kampfaktion* folgen = CombatManager::getSingleton().getKampfaktion(&quot;Folgen&quot;);
++				mCombat-&gt;registerCombatantAction(this, folgen, target);
++			}
++		}
++		mCombat-&gt;registerCombatantRoundDone(this);
+     }
+ 
+ 	void AgentCombatState::executeAction(Kampfaktion* action)
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/include/Combat.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -49,23 +49,34 @@
+         void stop();
+ 
+         // Called by combatants in response to a request by the Combat object.
+-        // With calling this function combatants register their actions for this round.
+-        void registerCombatantAction(Combatant*, Kampfaktion*, Kampfaktion*, Kampfaktion*);
++        // With calling one of these functions combatants register their actions for this round.
++
++        void registerCombatantAction(Combatant*, Kampfaktion* ka);
++        void registerCombatantAction(Combatant*, Kampfaktion* ka, Combatant* target);
++		void registerCombatantAction(Combatant*, Kampfaktion* ka, const Ogre::Vector3&amp; target);
++		void registerCombatantRoundDone(Combatant*);
++
+         void actionExecuted(Combatant*, Kampfaktion*);
+ 
+     private:
++		struct ActionEntry
++		{
++			Kampfaktion* kampfaktion;
++			Combatant* actor;
++			Combatant* target;
++			Ogre::Vector3 targetPos;
++		};
++		typedef std::vector&lt;ActionEntry&gt; ActionEntryVector;
++		typedef std::map&lt;Combatant*, ActionEntryVector&gt; CombatantActionsMap;
+         typedef std::vector&lt;std::pair&lt;int, Combatant*&gt; &gt; CombatantQueue;
+-        /// Stores the max three actions a combatant can do per round.
+-        /// Probably has to be replaced with a more sophisticated container later on,
+-        /// but for now it will do what it needs to.
+-        typedef boost::tuples::tuple&lt;Kampfaktion*, Kampfaktion*, Kampfaktion*&gt; ActionTuple;
+-        typedef std::map&lt;Combatant*, ActionTuple&gt; CombatantActionMap;
+ 
+         CombatantSet mOpponents;
+         CombatantSet mAllies;
+         /// Combatants in order of their initiative for the current round.
+         CombatantQueue mCombatantQueue;
+-        CombatantActionMap mCombatantActions;
++        CombatantActionsMap mCombatantActions;
++		// Combatants who have registered all their actions for this round
++		CombatantSet mFinishedCombatants;
+ 
+         unsigned short mCurrentRound;
+ 
+
+Modified: rl/trunk/engine/rules/include/Combatant.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combatant.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/include/Combatant.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -51,7 +51,11 @@
+ 
+         CreatureController* getCreatureController() const;
+ 
++		// convenience getters
++
++        Creature* getCreature() const;
+ 		CeGuiString getName() const;
++		Ogre::Vector3 getPosition() const;
+ 
+     protected:
+         Combat* mCombat;
+
+Modified: rl/trunk/engine/rules/include/Inventory.h
+===================================================================
+--- rl/trunk/engine/rules/include/Inventory.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/include/Inventory.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -27,6 +27,7 @@
+     class Creature;
+     class Item;
+     class Slot;
++	class Weapon;
+ 
+ /**
+  * @brief Verwaltet das Inventar des Charakters
+@@ -79,12 +80,15 @@
+     // Das Inventar der Kreatur wird durch das Inventarobjekt verwaltet.
+     //void addToInventory(Item* item, const CeGuiString&amp; containerName);
+     void hold(Item* item, const CeGuiString&amp; slotName);
++    void ready(Item* item, const CeGuiString&amp; slotName);
+     bool canHold(const Item* item, const CeGuiString&amp; slotName) const;
+     bool canReady(const Item* item, const CeGuiString&amp; slotName) const;
+ 	void dropItem(const CeGuiString&amp; slotName);
+-    void ready(Item* item);
+     //void removeFromInventory(Item* item);
+ 
++	/// Returns readied weapons or an empty vector if no weapon is readied.
++	std::vector&lt;Weapon*&gt; getReadiedWeapons() const;
++
+     Item* getItem(const CeGuiString&amp; slotName) const;
+     void addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemReadyMask, int itemHeldMask, SlotType type = SLOT_BONE);
+     const SlotMap&amp; getAllSlots() const;
+
+Modified: rl/trunk/engine/rules/include/Kampfaktion.h
+===================================================================
+--- rl/trunk/engine/rules/include/Kampfaktion.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/include/Kampfaktion.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -40,7 +40,7 @@
+         CeGuiString getDescription() const;
+ 
+ 		virtual bool hasTarget() const = 0;
+-		virtual Ogre::Real getMaximumTargetDistance() const = 0;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const = 0;
+ 
+         virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const = 0;
+         virtual void doKampfaktion(Combatant* actor, Combatant* target) = 0;
+@@ -51,31 +51,72 @@
+ 		CeGuiString mDescription;
+     };
+ 
+-	class _RlRulesExport Attacke : public Kampfaktion
++	class _RlRulesExport AttackeAktion : public Kampfaktion
+ 	{
+ 	public:
+-		Attacke();
+-		virtual ~Attacke();
++		AttackeAktion();
++		virtual ~AttackeAktion();
+ 
+ 		virtual bool hasTarget() const;
+-		virtual Ogre::Real getMaximumTargetDistance() const;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const;
+ 
+ 		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
+         virtual void doKampfaktion(Combatant* actor, Combatant* target);
+ 	};
+ 
+-	class _RlRulesExport Parade : public Kampfaktion
++	class _RlRulesExport ParadeAktion : public Kampfaktion
+ 	{
+ 	public:
+-		Parade();
+-		virtual ~Parade();
++		ParadeAktion();
++		virtual ~ParadeAktion();
+ 
+ 		virtual bool hasTarget() const;
+-		virtual Ogre::Real getMaximumTargetDistance() const;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const;
+ 
+ 		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
+         virtual void doKampfaktion(Combatant* actor, Combatant* target);
+ 	};
++
++	class _RlRulesExport AusweichenAktion : public Kampfaktion
++	{
++	public:
++		AusweichenAktion();
++		virtual ~AusweichenAktion();
++
++		virtual bool hasTarget() const;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const;
++
++		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
++        virtual void doKampfaktion(Combatant* actor, Combatant* target);
++	};
++
++	class _RlRulesExport BewegenAktion : public Kampfaktion
++	{
++	public:
++		BewegenAktion();
++		virtual ~BewegenAktion();
++
++		virtual bool hasTarget() const;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const;
++
++		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
++		// Do not call, will throw!
++        virtual void doKampfaktion(Combatant* actor, Combatant* target);
++		virtual void doKampfaktion(Combatant* actor, const Ogre::Vector3&amp; target);
++	};
++
++	class _RlRulesExport FolgenAktion : public Kampfaktion
++	{
++	public:
++		FolgenAktion();
++		virtual ~FolgenAktion();
++
++		virtual bool hasTarget() const;
++		virtual Ogre::Real getMaximumTargetDistance(Combatant* actor) const;
++
++		virtual bool canDoKampfaktion(Combatant* actor, Combatant* target) const;
++        virtual void doKampfaktion(Combatant* actor, Combatant* target);
++	};
+ }
+ 
+ #endif
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/include/Slot.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -35,6 +35,7 @@
+     bool isAllowed(const Item* item) const;
+     bool isEmpty() const {return mItem == NULL;}
+     bool canReady(const Item* item) const;
++	bool isReady() { return mItem != NULL &amp;&amp; canReady(mItem); }
+     CeGuiString getName() const {return mName;}
+     virtual ~Slot();
+ 
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -101,7 +101,7 @@
+             it != combatants.end(); ++it)
+         {
+             mCombatantQueue.push_back(std::make_pair(
+-                (*it)-&gt;getCreatureController()-&gt;getCreature()-&gt;getInitiativeBasis(), *it));
++                (*it)-&gt;getCreatureController()-&gt;getCreature()-&gt;doInitiativeWurf(), *it));
+         }
+         std::sort(mCombatantQueue.begin(), mCombatantQueue.end(), InitiativeComparator());
+ 
+@@ -118,14 +118,14 @@
+         mCurrentRound++;
+         mCombatantActions.clear();
+ 
+-		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + StringConverter::toString(mCurrentRound),
++		GameEventLog::getSingleton().logEvent(&quot;Runde &quot; + CeGuiString(StringConverter::toString(mCurrentRound)),
+ 			GET_COMBAT);
+ 		// Show ini for this round.
+         for (CombatantQueue::iterator it = mCombatantQueue.begin();
+ 			it != mCombatantQueue.end(); ++it)
+         {
+-			String evt = it-&gt;second-&gt;getCreatureController()-&gt;getCreature()-&gt;getName().c_str();
+-			evt += &quot; - Initiative: &quot; + StringConverter::toString(it-&gt;first);
++			CeGuiString evt = it-&gt;second-&gt;getCreatureController()-&gt;getCreature()-&gt;getName();
++			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
+ 			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
+         }
+ 
+@@ -138,16 +138,44 @@
+         }
+     }
+ 
+-    void Combat::registerCombatantAction(Combatant* combatant,
+-        Kampfaktion* action1, Kampfaktion* action2, Kampfaktion* action3)
+-    {
+-        mCombatantActions[combatant] = ActionTuple(action1, action2, action3);
++    void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka)
++	{
++		ActionEntry entry;
++		entry.kampfaktion = ka;
++		entry.actor = actor;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++    void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka, Combatant* target)
++	{
++		ActionEntry entry;
++		entry.kampfaktion = ka;
++		entry.actor = actor;
++		entry.target = target;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++	void Combat::registerCombatantAction(Combatant* actor, Kampfaktion* ka, const Ogre::Vector3&amp; targetPos)
++	{
++		ActionEntry entry;
++		entry.kampfaktion = ka;
++		entry.actor = actor;
++		entry.targetPos = targetPos;
++
++		mCombatantActions[actor].push_back(entry);
++	}
++
++	void Combat::registerCombatantRoundDone(Combatant* combatant)
++	{
++		mFinishedCombatants.insert(combatant);
+         // Are all combatants registered now?
+-        if (mCombatantActions.size() == mCombatantQueue.size())
++        if (mFinishedCombatants.size() == mCombatantQueue.size())
+         {
+             executeRound();
+         }
+-    }
++	}
+ 
+     void Combat::actionExecuted(Combatant*, Kampfaktion*)
+ 	{
+
+Modified: rl/trunk/engine/rules/src/CombatManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CombatManager.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/CombatManager.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -31,8 +31,16 @@
+ 
+     CombatManager::CombatManager() : mCurrentCombat(NULL)
+     {
+-		Kampfaktion* ka = new Attacke();
++		Kampfaktion* ka = new AttackeAktion();
+ 		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
++		ka = new ParadeAktion();
++		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
++		ka = new AusweichenAktion();
++		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
++		ka = new BewegenAktion();
++		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
++		ka = new FolgenAktion();
++		mKampfaktionen.insert(std::make_pair(ka-&gt;getName(), ka));
+     }
+ 
+     CombatManager::~CombatManager()
+
+Modified: rl/trunk/engine/rules/src/Combatant.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combatant.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/Combatant.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -35,9 +35,19 @@
+     {
+         return mController;
+     }
++    
++	Creature* Combatant::getCreature() const
++	{
++		return mController-&gt;getCreature();
++	}
+ 
+ 	CeGuiString Combatant::getName() const
+     {
+         return mController-&gt;getCreature()-&gt;getName();
+     }
++
++	Ogre::Vector3 Combatant::getPosition() const
++	{
++		return getCreature()-&gt;getPosition();
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/GameEventLog.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameEventLog.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/GameEventLog.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -40,7 +40,7 @@
+ 		return mLogSize;
+ 	}
+ 
+-	void GameEventLog::logEvent(const String&amp; eventString, GameEventType type)
++	void GameEventLog::logEvent(const CeGuiString&amp; eventString, GameEventType type)
+ 	{
+ 		mLog.push_back(std::make_pair(type, eventString));
+         MessagePump::getSingleton().sendMessage&lt;MessageType_GameEventLog_EventAdded&gt;(type, eventString);
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -231,10 +231,39 @@
+         return (*slotIter).second-&gt;getItem();
+     }
+ 
+-    void Inventory::ready(Item* item)
++    void Inventory::ready(Item* item, const CeGuiString&amp; slotName)
+     {
++        std::map&lt;CeGuiString, Slot*&gt;::iterator slotIter = mSlots.find(slotName);
++        if (slotIter == mSlots.end())
++        {
++            Throw(rl::IllegalArgumentException, Ogre::String(&quot;Slot '&quot;)+slotName.c_str()+&quot;' doesn't exist.&quot;);
++        }
++
++		if (slotIter-&gt;second-&gt;canReady(item))
++		{
++			slotIter-&gt;second-&gt;setItem(item);
++		}
++		else
++		{
++			Throw(rl::IllegalArgumentException, Ogre::String(&quot;Item '&quot;) + item-&gt;getName().c_str() +
++				&quot;' cannot be readied in slot '&quot; + slotName.c_str() + &quot;'.&quot;);
++		}
+     }
+ 
++	std::vector&lt;Weapon*&gt; Inventory::getReadiedWeapons() const
++	{
++		std::vector&lt;Weapon*&gt; rval;
++		for (SlotMap::const_iterator it = mSlots.begin(); it != mSlots.end(); ++it)
++		{
++			if (it-&gt;second-&gt;isReady() &amp;&amp; 
++				(it-&gt;second-&gt;getItem()-&gt;getItemType() &amp; Item::ITEMTYPE_WEAPON) != 0)
++			{
++				rval.push_back(dynamic_cast&lt;Weapon*&gt;(it-&gt;second-&gt;getItem()));
++			}
++		}
++		return rval;
++	}
++
+     void Inventory::addSlot(const CeGuiString&amp; name, const Ogre::String&amp; meshpartname, int itemReadyMask, int itemHeldMask, SlotType type)
+     {
+         if (mSlots.find(name) != mSlots.end())
+
+Modified: rl/trunk/engine/rules/src/Kampfaktion.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Kampfaktion.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/rules/src/Kampfaktion.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -16,8 +16,15 @@
+ #include &quot;stdinc.h&quot;
+ 
+ #include &quot;Kampfaktion.h&quot;
++
+ #include &quot;Combatant.h&quot;
++#include &quot;CreatureController.h&quot;
++#include &quot;Exception.h&quot;
++#include &quot;Inventory.h&quot;
++#include &quot;Weapon.h&quot;
+ 
++#include &lt;limits&gt;
++
+ using namespace Ogre;
+ 
+ namespace rl
+@@ -41,62 +48,165 @@
+ 		return mDescription;
+ 	}
+ 
+-	Attacke::Attacke() : Kampfaktion(AKTION, &quot;Attacke&quot;, &quot;Greife Gegner an.&quot;)
++	AttackeAktion::AttackeAktion() : Kampfaktion(AKTION, &quot;Attacke&quot;, &quot;Greife Gegner an.&quot;)
+ 	{
+ 	}
+ 
+-	Attacke::~Attacke()
++	AttackeAktion::~AttackeAktion()
+ 	{
+ 	}
+ 
+-	bool Attacke::hasTarget() const
++	bool AttackeAktion::hasTarget() const
+ 	{
+ 		return true;
+ 	}
+ 
+-	Real Attacke::getMaximumTargetDistance() const
++	Real AttackeAktion::getMaximumTargetDistance(Combatant* actor) const
+ 	{
+-		return 1.0f;
++		std::vector&lt;Weapon*&gt; weapons = actor-&gt;getCreature()-&gt;getInventory()-&gt;getReadiedWeapons();
++		Real distance = 0.0f;
++		for (size_t i = 0; i &lt; weapons.size(); ++i)
++		{
++			distance = std::max(weapons[i]-&gt;getMaximumDistance(), distance);
++		}
++		return distance;
+ 	}
+ 
+-	bool Attacke::canDoKampfaktion(Combatant* actor, Combatant* target) const
++	bool AttackeAktion::canDoKampfaktion(Combatant* actor, Combatant* target) const
+ 	{
+-		// Check whether actor has skill for weapon in hand.
+-
+-		// Check whether target &#237;s in range of our actor and his/her weapon.
++		// Does the actor have a weapon readied?
++		if (actor-&gt;getCreature()-&gt;getInventory()-&gt;getReadiedWeapons().empty())
++		{
++			return false;
++		}
++		// Is target in weapon range?
++		if (target-&gt;getPosition().distance(actor-&gt;getPosition()) &gt; getMaximumTargetDistance(actor))
++		{
++			return false;
++		}
+ 		return true;
+ 	}
+ 
+-    void Attacke::doKampfaktion(Combatant* actor, Combatant* target)
++    void AttackeAktion::doKampfaktion(Combatant* actor, Combatant* target)
+ 	{
+ 
+ 	}
+ 
+-	Parade::Parade() : Kampfaktion(REAKTION, &quot;Parade&quot;, &quot;Pariere Attacken des Gegners&quot;)
++	ParadeAktion::ParadeAktion() : Kampfaktion(REAKTION, &quot;Parade&quot;, &quot;Pariere Attacken des Gegners.&quot;)
+ 	{
+ 	}
+ 
+-	Parade::~Parade()
++	ParadeAktion::~ParadeAktion()
+ 	{
+ 	}
+ 
+-	bool Parade::hasTarget() const
++	bool ParadeAktion::hasTarget() const
+ 	{
+ 		return true;
+ 	}
+ 
+-	Real Parade::getMaximumTargetDistance() const
++	Real ParadeAktion::getMaximumTargetDistance(Combatant* actor) const
+ 	{
+-		return 1.0f;
++		return std::numeric_limits&lt;Ogre::Real&gt;::max();
+ 	}
+ 
+-    bool Parade::canDoKampfaktion(Combatant* actor, Combatant* target) const
++    bool ParadeAktion::canDoKampfaktion(Combatant* actor, Combatant* target) const
+ 	{
+ 		// Check, whether actor's weapon can be parried with our weapon/side weapon/shield.
+ 		return true;
+ 	}
+ 
+-    void Parade::doKampfaktion(Combatant* actor, Combatant* target)
++    void ParadeAktion::doKampfaktion(Combatant* actor, Combatant* target)
+ 	{
+ 	}
++
++	AusweichenAktion::AusweichenAktion()
++		: Kampfaktion(REAKTION, &quot;Ausweichen&quot;, &quot;Weiche der Attacke des Gegners aus.&quot;)
++	{
++	}
++
++	AusweichenAktion::~AusweichenAktion()
++	{
++	}
++
++	bool AusweichenAktion::hasTarget() const
++	{
++		return true;
++	}
++
++	Ogre::Real AusweichenAktion::getMaximumTargetDistance(Combatant* actor) const
++	{
++		return std::numeric_limits&lt;Ogre::Real&gt;::max();
++	}
++
++	bool AusweichenAktion::canDoKampfaktion(Combatant* actor, Combatant* target) const
++	{
++		// Always possible.
++		return true;
++	}
++
++    void AusweichenAktion::doKampfaktion(Combatant* actor, Combatant* target)
++	{
++	}
++
++	BewegenAktion::BewegenAktion()
++		: Kampfaktion(AKTION, &quot;Bewegen&quot;, &quot;Gehe zu einem Zielpunkt.&quot;)
++	{
++	}
++
++	BewegenAktion::~BewegenAktion()
++	{
++	}
++
++	bool BewegenAktion::hasTarget() const
++	{
++		return false;
++	}
++
++	Ogre::Real BewegenAktion::getMaximumTargetDistance(Combatant* actor) const
++	{
++		return std::numeric_limits&lt;Ogre::Real&gt;::max();
++	}
++
++	bool BewegenAktion::canDoKampfaktion(Combatant* actor, Combatant* target) const
++	{
++		return false;
++	}
++
++    void BewegenAktion::doKampfaktion(Combatant* actor, Combatant* target)
++	{
++        Throw(rl::OperationNotSupportedException, &quot;BewegenAktion does not support Combatant as target.&quot;);
++	}
++
++	void BewegenAktion::doKampfaktion(Combatant* actor, const Ogre::Vector3&amp; target)
++	{
++	}
++
++	FolgenAktion::FolgenAktion()
++		: Kampfaktion(AKTION, &quot;Folgen&quot;, &quot;Gehe zu einem Gegner.&quot;)
++	{
++	}
++
++	FolgenAktion::~FolgenAktion()
++	{
++	}
++
++	bool FolgenAktion::hasTarget() const
++	{
++		return true;
++	}
++
++	Ogre::Real FolgenAktion::getMaximumTargetDistance(Combatant* actor) const
++	{
++		return std::numeric_limits&lt;Ogre::Real&gt;::max();
++	}
++
++	bool FolgenAktion::canDoKampfaktion(Combatant* actor, Combatant* target) const
++	{
++		return true;
++	}
++
++    void FolgenAktion::doKampfaktion(Combatant* actor, Combatant* target)
++	{
++	}
+ }
+
+Modified: rl/trunk/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatControlState.h	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/ui/include/CombatControlState.h	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -55,10 +55,13 @@
+ 		virtual void executeAction(Kampfaktion* action);
+ 
+ 		// Event handlers
++
+ 		bool userRequestAttackOpponent(Combatant*);
+ 		bool userRequestParryOpponent(Combatant*);
+ 		bool userRequestEndTurn();
+ 
++		bool enemyLeftCombat(Combatant*);
++
+     private:
+ 		enum State {REQUEST_USER_INPUT, WAIT_FOR_OTHER_COMBATANTS, ROUND_EXECUTION};
+ 
+@@ -66,6 +69,11 @@
+ 		MessagePump::ScopedConnection mCombatIoParryOpponentConnection;
+ 		MessagePump::ScopedConnection mCombatIoEndTurnRequestedConnection;
+ 
++	    MessagePump::ScopedConnection mEnemyLeftCombatConnection;
++
++		Combatant* mAttackedOpponent;
++		Combatant* mParriedOpponent;
++
+         CombatManager* mCombatManager;
+ 		CombatGui* mCombatGui;
+         HalfSphereSelector mEnemySelector;
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-06 23:50:10 UTC (rev 4196)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2008-03-07 00:07:24 UTC (rev 4197)
+@@ -30,6 +30,7 @@
+ #include &quot;MeshObject.h&quot;
+ #include &quot;Person.h&quot;
+ #include &quot;PhysicalThing.h&quot;
++#include &quot;RulesMessages.h&quot;
+ #include &quot;Selector.h&quot;
+ #include &quot;UiMessages.h&quot;
+ #include &quot;World.h&quot;
+@@ -41,6 +42,8 @@
+         Actor* camera, Person* character, Combat* combat)
+         : ControlState(cmdMapper, camera, character, CST_COMBAT),
+           Combatant(combat, CreatureControllerManager::getSingleton().getCreatureController(character)),
++		  mAttackedOpponent(NULL),
++		  mParriedOpponent(NULL),
+           mCombatManager(CombatManager::getSingletonPtr()),
+ 		  mCombatGui(NULL),
+           mEnemySelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+@@ -65,6 +68,9 @@
+ 		mCombatIoEndTurnRequestedConnection =
+             MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatIoEndTurnRequested&gt;(
+ 			    boost::bind(&amp;CombatControlState::userRequestEndTurn, this));
++		mEnemyLeftCombatConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_CombatOpponentLeft&gt;(
++			    boost::bind(&amp;CombatControlState::enemyLeftCombat, this, _1));
+     }
+ 
+ 	CombatControlState::~CombatControlState()
+@@ -149,16 +155,60 @@
+ 
+ 	bool CombatControlState::userRequestAttackOpponent(Combatant* opponent)
+ 	{
++		mAttackedOpponent = opponent;
+ 		return true;
+ 	}
+ 
+ 	bool CombatControlState::userRequestParryOpponent(Combatant* opponent)
+ 	{
++		mParriedOpponent = opponent;
+ 		return true;
+ 	}
+ 
+ 	bool CombatControlState::userRequestEndTurn()
+ 	{
++		// Do we want to attack someone?
++		if (mAttackedOpponent)
++		{
++			// Are we in weapon range to opponent
++			AttackeAktion* attacke = dynamic_cast&lt;AttackeAktion*&gt;(
++				CombatManager::getSingleton().getKampfaktion(&quot;Attacke&quot;));
++			if (getPosition().distance(mAttackedOpponent-&gt;getPosition())
++				&lt;= attacke-&gt;getMaximumTargetDistance(this))
++			{
++				// Ok, we can attack
++				mCombat-&gt;registerCombatantAction(this, attacke, mAttackedOpponent);
++			}
++			else
++			{
++				// We can't attack from here, so go to opponent.
++				Kampfaktion* folgen = CombatManager::getSingleton().getKampfaktion(&quot;Folgen&quot;);
++				mCombat-&gt;registerCombatantAction(this, folgen, mAttackedOpponent);
++			}
++		}
++		if (mParriedOpponent)
++		{
++			Kampfaktion* parade = CombatManager::getSingleton().getKampfaktion(&quot;Parade&quot;);
++			mCombat-&gt;registerCombatantAction(this, parade, mAttackedOpponent);
++		}
++
++		mCombat-&gt;registerCombatantRoundDone(this);
++
+ 		return true;
+ 	}
++
++	bool CombatControlState::enemyLeftCombat(Combatant* opponent)
++	{
++		// Make sure we don't have any dangling pointers on invalid Combatants.
++
++		if (opponent == mAttackedOpponent)
++		{
++			mAttackedOpponent = NULL;
++		}
++		if (opponent == mParriedOpponent)
++		{
++			mParriedOpponent = NULL;
++		}
++		return true;
++	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001267.html">[Dsa-hl-svn] r4196 - in modules: combattest/dsa common/dsa	common/models regressiontest/dsa
+</A></li>
+	<LI>Next message: <A HREF="001269.html">[Dsa-hl-svn] r4198 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1268">[ date ]</a>
+              <a href="thread.html#1268">[ thread ]</a>
+              <a href="subject.html#1268">[ subject ]</a>
+              <a href="author.html#1268">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

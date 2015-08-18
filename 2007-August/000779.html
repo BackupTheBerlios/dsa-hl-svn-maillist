@@ -1,0 +1,226 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3708 - in rl/trunk/engine: ai/src dialog/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3708%20-%20in%20rl/trunk/engine%3A%20ai/src%20dialog/src&In-Reply-To=%3C200708211014.l7LAEag5025295%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000778.html">
+   <LINK REL="Next"  HREF="000780.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3708 - in rl/trunk/engine: ai/src dialog/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3708%20-%20in%20rl/trunk/engine%3A%20ai/src%20dialog/src&In-Reply-To=%3C200708211014.l7LAEag5025295%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3708 - in rl/trunk/engine: ai/src dialog/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Aug 21 12:14:36 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000778.html">[Dsa-hl-svn] r3707 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+        <LI>Next message: <A HREF="000780.html">[Dsa-hl-svn] r3709 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#779">[ date ]</a>
+              <a href="thread.html#779">[ thread ]</a>
+              <a href="subject.html#779">[ subject ]</a>
+              <a href="author.html#779">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-21 12:14:29 +0200 (Tue, 21 Aug 2007)
+New Revision: 3708
+
+Added:
+   rl/trunk/engine/ai/src/DialogCharacter.cpp
+Removed:
+   rl/trunk/engine/dialog/src/DialogCharacter.cpp
+Log:
+Merge dialog subsystem into AI
+- CAUTION: this movement will break any builds so revert to 3702 until this is fixed
+
+Copied: rl/trunk/engine/ai/src/DialogCharacter.cpp (from rev 3707, rl/trunk/engine/dialog/src/DialogCharacter.cpp)
+
+Deleted: rl/trunk/engine/dialog/src/DialogCharacter.cpp
+===================================================================
+--- rl/trunk/engine/dialog/src/DialogCharacter.cpp	2007-08-21 10:14:18 UTC (rev 3707)
++++ rl/trunk/engine/dialog/src/DialogCharacter.cpp	2007-08-21 10:14:29 UTC (rev 3708)
+@@ -1,145 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;DialogCharacter.h&quot;
+-#include &quot;DialogSubsystem.h&quot;
+-#include &quot;ContextInterpreter.h&quot;
+-#include &quot;AimlBot.h&quot;
+-#include &quot;Response.h&quot;
+-
+-#include &quot;Predicates.h&quot;
+-#include &quot;EigenschaftsProbePredicates.h&quot;
+-#include &quot;EigenschaftsWertPredicates.h&quot;
+-#include &quot;QuestKnownPredicates.h&quot;
+-#include &quot;QuestPartsPredicates.h&quot;
+-#include &quot;QuestStatePredicates.h&quot;
+-#include &quot;ScriptPredicates.h&quot;
+-#include &quot;TalentProbePredicates.h&quot;
+-#include &quot;TalentWertPredicates.h&quot;
+-#include &quot;GrundWertPredicates.h&quot;
+-
+-
+-namespace rl
+-{
+-	DialogCharacter::DialogCharacter()
+-		: mActive(false),
+-		  mBot(NULL),
+-		  mNonPlayerCharacter(NULL),
+-		  mPlayerCharacter(NULL)
+-	{
+-	}
+-
+-	DialogCharacter::~DialogCharacter(void)
+-	{
+-		if(mBot)
+-		{
+-			delete mBot;
+-		}
+-	}
+-
+-	void DialogCharacter::initialize()
+-	{
+-	//  add additional predicates
+-		if(mBot != NULL)
+-		{
+-			mBot-&gt;addPredicates(new EigenschaftsProbePredicates(mPlayerCharacter));
+-			mBot-&gt;addPredicates(new EigenschaftsWertPredicates(mPlayerCharacter));
+-			mBot-&gt;addPredicates(new QuestKnownPredicates());
+-			mBot-&gt;addPredicates(new QuestPartsPredicates());
+-			mBot-&gt;addPredicates(new QuestStatePredicates());
+-			mBot-&gt;addPredicates(new ScriptPredicates(this));
+-			mBot-&gt;addPredicates(new TalentProbePredicates(mPlayerCharacter));
+-			mBot-&gt;addPredicates(new TalentWertPredicates(mPlayerCharacter));
+-			mBot-&gt;addPredicates(new GrundWertPredicates(mPlayerCharacter));
+-		}
+-	}
+-
+-/*	void DialogCharacter::addDialogListener(DialogListener* listener)
+-	{
+-		mDialogListener.push_back(listener);
+-	}
+-
+-	void DialogCharacter::removeDialogListener(DialogListener* listener)
+-	{
+-		mDialogListener.remove(listener);
+-	}
+-	void DialogCharacter::updateDialogListeners(DialogListener::DialogEvent e)
+-	{
+-		Listeners::iterator itr = mDialogListener.begin();
+-		for(; itr != mDialogListener.end(); ++itr)
+-		{
+-			(*itr)-&gt;onDialogEvent(e);
+-		}
+-	}
+-*/
+-
+-    bool DialogCharacter::hasExitRequest() const
+-    {
+-        return mBot-&gt;hasExitRequest();
+-    }
+-
+-	const CeGuiString DialogCharacter::getName() const
+-	{
+-		return mBot-&gt;getName();
+-	}
+-
+-	Predicates&lt;CeGuiString&gt;* DialogCharacter::getPredicates(const CeGuiString&amp; pType)
+-	{
+-		return mBot-&gt;getPredicates(pType);
+-	}
+-
+-	DialogResponse* DialogCharacter::createResponse(const CeGuiString&amp; input)
+-	{
+-//		DialogListener::DialogEvent dialogEvent = DialogListener::DIALOG_RESPONSE;
+-		if(!mActive)
+-		{
+-			mActive=true;
+-//			dialogEvent = DialogListener::DIALOG_START;
+-		}
+-		input.c_str();
+-		DialogResponse* dialogResponse = NULL;
+-		LOG_MESSAGE(Logger::DIALOG, &quot;Create AIML response&quot;);
+-		Response&lt;CeGuiString&gt; response = mBot-&gt;respond(input);
+-		if(response.hasGossip())
+-		{
+-			ContextInterpreter* interpreter = DialogSubsystem::getSingleton().getContextInterpreter();
+-			if(interpreter!= NULL)
+-			{
+-				LOG_MESSAGE(Logger::DIALOG, &quot;Create DialogResponse&quot;);
+-				dialogResponse = interpreter-&gt;interpret(response.getGossip(), mBot);
+-			}
+-		}
+-		// why check for response.empty()???
+-		if(response.empty() || dialogResponse == NULL)
+-		{
+-			mActive = false;
+-//			dialogEvent = DialogListener::DIALOG_END;
+-		}
+-//		updateDialogListeners(dialogEvent);
+-		return dialogResponse;
+-	}
+-
+-	void DialogCharacter::setVoiceFile(const CeGuiString&amp; filename)
+-	{
+-		mBot-&gt;setVoice(filename);
+-	}
+-
+-	const CeGuiString&amp; DialogCharacter::getVoiceFile() const
+-	{
+-		return mBot-&gt;getVoice();
+-	}
+-}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000778.html">[Dsa-hl-svn] r3707 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+	<LI>Next message: <A HREF="000780.html">[Dsa-hl-svn] r3709 - in rl/trunk/engine: ai/src dialog/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#779">[ date ]</a>
+              <a href="thread.html#779">[ thread ]</a>
+              <a href="subject.html#779">[ subject ]</a>
+              <a href="author.html#779">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,294 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4785 - in dependencies/OgreNewt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4785%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200903031612.n23GC9UW032051%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001841.html">
+   <LINK REL="Next"  HREF="001843.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4785 - in dependencies/OgreNewt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4785%20-%20in%20dependencies/OgreNewt%3A%20inc%20src&In-Reply-To=%3C200903031612.n23GC9UW032051%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4785 - in dependencies/OgreNewt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  3 17:12:09 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001841.html">[Dsa-hl-svn] r4784 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001843.html">[Dsa-hl-svn] r4786 - in dependencies/OgreNewt: . inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1842">[ date ]</a>
+              <a href="thread.html#1842">[ thread ]</a>
+              <a href="subject.html#1842">[ subject ]</a>
+              <a href="author.html#1842">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-03-03 17:12:07 +0100 (Tue, 03 Mar 2009)
+New Revision: 4785
+
+Modified:
+   dependencies/OgreNewt/inc/OgreNewt.h
+   dependencies/OgreNewt/inc/OgreNewt_PlayerController.h
+   dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+Log:
+-some progress with the playercontroller, but it doesn't work because of a bug in newton (linux version) atm
+-added a comment about multithreading (world update not thread safe!)
+
+
+Modified: dependencies/OgreNewt/inc/OgreNewt.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt.h	2009-03-02 20:51:16 UTC (rev 4784)
++++ dependencies/OgreNewt/inc/OgreNewt.h	2009-03-03 16:12:07 UTC (rev 4785)
+@@ -56,6 +56,7 @@
+           I added a hack, it only creates one contact at the maximum at the moment!
+         - this library supports the newton functions for multithreading but there are several functions/classes in this
+           library itself, that are not thread safe (I don't need multiple threads)
++          especially the world-updates are not threadsafe in ogre (see newton forum, someone posted a solution there!)
+         - the copied MovableText class (in Tools::OgreAddons) seems to have some graphics error (it's used
+           to show the debugging information above each body)
+         - I didn't test several features:
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_PlayerController.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_PlayerController.h	2009-03-02 20:51:16 UTC (rev 4784)
++++ dependencies/OgreNewt/inc/OgreNewt_PlayerController.h	2009-03-03 16:12:07 UTC (rev 4785)
+@@ -165,10 +165,18 @@
+     class AllBodyConvexCast : public OgreNewt::BasicConvexcast
+     {
+         public:
++            AllBodyConvexCast(PlayerController *pc) : m_parent(pc) {}
+ 
++            void go(const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
++                    const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread)
++            {
++                go(m_parent-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread);
++            }
++
+             virtual bool userPreFilterCallback(OgreNewt::Body* body) {return m_parent-&gt;convexAllBodyCastPreFilter(body);}
+         private:
+             OgreNewt::PlayerController* m_parent;
++            using BasicConvexcast::go;
+     };
+ };
+ 
+
+Modified: dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-03-02 20:51:16 UTC (rev 4784)
++++ dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-03-03 16:12:07 UTC (rev 4785)
+@@ -4,6 +4,7 @@
+ #include &quot;OgreNewt_CollisionPrimitives.h&quot;
+ #include &quot;OgreNewt_World.h&quot;
+ #include &lt;vector&gt;
++#include &lt;iostream&gt;
+ 
+ namespace OgreNewt
+ {
+@@ -35,8 +36,6 @@
+     // initialize sensor-shape parameters
+     m_staticRadiusFactor = 1.125f;
+     m_dynamicRadiusFactor = 1.5f;
+-    //! TODO I think there's an error with the radius...
+-    m_dynamicRadiusFactor = 0.75f;
+     m_floorFinderRadiusFactor = 1.0f;
+     m_maxPlayerHeightPaddFactor = 0.01f;
+     m_sensorShapeSegments = 32;
+@@ -146,6 +145,10 @@
+     Ogre::Real rx = aab.getMaximum().x - aab.getMinimum().x;
+     Ogre::Real rz = aab.getMaximum().z - aab.getMinimum().z;
+     radius = std::max(rx,rz) / 2.0f;
++
++    //! TODO: the aabb seems to be too big
++// height *= 0.9f;
++// radius *= 0.5f;
+ }
+ 
+ 
+@@ -385,7 +388,7 @@
+             DynamicConvexCast dynamicConvexCast(this);
+             HitBodyVector hitBodyVec;
+             hitBodyVec.reserve(m_maxContactsCount);
+-
++/*
+             endCast = startCast + horizontalDesiredVel*timestep;
+             dynamicConvexCast.go(m_dynamicsSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
+ 
+@@ -500,13 +503,13 @@
+                     dynamicConvexCast.go(m_dynamicsSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
+                 }
+             }
++*/
+ 
+-
+             // ----------------- STATIC CONVEXCAST ---------------------
+             StaticConvexCast staticConvexCast(this);
+             startCast.y += 0.5f*m_maxStepHeight;
+             endCast = startCast + horizontalDesiredVel*timestep;
+-
++/*
+             staticConvexCast.go(m_horizontalSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
+             for(int iterations = 0; iterations &lt; m_maxCollisionsIteration; iterations++)
+             {
+@@ -559,12 +562,123 @@
+                     staticConvexCast.go(m_horizontalSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
+                 }
+             }
+-//! TODO MISSING FURTHER CASTS ETC
++*/
+ 
+ 
++            // ----------------- STEP RECOGNITION AND GROUND TRACKING ---------------------
++            // now determine the ground tracking, predict the destination position
++            if( m_isInJumpState )
++            {
++                // player of in the air look ahead for the land
++                startCast = pos + horizontalDesiredVel*timestep + Ogre::Vector3::UNIT_Y*m_maxStepHeight*0.5f;
++                endCast = startCast - Ogre::Vector3::UNIT_Y*m_maxStepHeight;
+ 
++                staticConvexCast.go(m_verticalSensorShape, startCast, yawOri, endCast, 1, threadindex);
++                
++//! TODO: remove this... bug in newton?    
++Ogre::Real distanceToFirstHit = staticConvexCast.getDistanceToFirstHit();
++if( distanceToFirstHit &gt; 0.01f )
++{
+ 
++                // found land
++                if( staticConvexCast.getContactsCount() &gt; 0 )
++                {
++                    Ogre::Real dist, correctionVel;
++                    dist = - m_maxStepHeight * (0.5f - 1.0f*staticConvexCast.getDistanceToFirstHit());
++                    correctionVel = dist/timestep - vel.y;
++                    addLinearRow(pos, pos, Ogre::Vector3::UNIT_Y);
++                    setRowAcceleration(correctionVel/timestep);
++                    m_isInJumpState = false;
++                }
++}
++            }
++            else // m_isInJumpState
++            {
++                // player is moving on the ground, look ahead for stair steps
++                startCast = pos + horizontalDesiredVel*timestep + Ogre::Vector3::UNIT_Y*m_maxStepHeight;
++                endCast = startCast - Ogre::Vector3::UNIT_Y*m_maxStepHeight*2.0f;
+ 
++                AllBodyConvexCast allBodyConvexCast(this);
++                allBodyConvexCast.go(m_verticalSensorShape, startCast, yawOri, endCast, 1, threadindex);
++
++                if( allBodyConvexCast.getContactsCount() == 0 )
++                {
++                    //m_isInJumpState = true;
++                }
++                else
++                {
++                    m_isInJumpState = false;
++
++
++                    Ogre::Real distanceToFirstHit = allBodyConvexCast.getDistanceToFirstHit();
++                    // found &quot;step&quot;
++
++                    if( distanceToFirstHit &lt; 0.01f )
++                    {
++                        // something when wrong because the vertical sensor shape is colliding
++                        // at origin of the predicted destination
++                        // this should never happens as a precaution set the vertical body velocity to zero
++                        Ogre::Vector3 vel = m_body-&gt;getVelocity();
++                        vel.y = 0.0f;
++                        m_body-&gt;setVelocity(vel);
++                    }
++                    else
++                    {
++                        Ogre::Real dist, correctionVel;
++                        // &quot;the player will hit surface, make shure it is grounded&quot; (?)
++                        dist = - m_maxStepHeight * (1.0f - 3.0f*distanceToFirstHit);
++/*
++                        // check if the contact violates the maxSlope constraint
++                        if( Ogre::Math::ASin( allBodyConvexCast.getInfoAt(0).mContactNormal.y ) &lt; m_maxSlope )
++                        {
++                            // we are hitting stiff slope
++                            // cast a ray at the hit point to verify this is a face normal and not and edge of vertex normal
++                            // that can be pointing in the wrong direction
++                            Ogre::Vector3 hitPos, localNormal, origin, retCollisionLocalNormal, p0, p1;
++                            Ogre::Real retCollisionDist;
++                            int retCollisionColId;
++                            Ogre::Quaternion hitOri, hitOriInv;
++                            const OgreNewt::Collision* collision;
++                            
++                            Body* hitBody = allBodyConvexCast.getInfoAt(0).mBody;
++                            hitBody-&gt;getPositionOrientation(hitPos, hitOri);
++                            
++                            hitOriInv = hitOri.Inverse();
++                            localNormal = hitOriInv*allBodyConvexCast.getInfoAt(0).mContactNormal;
++                            origin = hitOriInv*(allBodyConvexCast.getInfoAt(0).mContactPoint - hitPos);
++                            
++                            collision = hitBody-&gt;getCollision();
++
++                            p0 = origin + localNormal*0.1f;
++                            p1 = origin - localNormal*0.1f;
++
++                            retCollisionDist = CollisionTools::CollisionRayCast(collision, p0, p1, retCollisionLocalNormal, retCollisionColId);
++                            if( retCollisionDist &lt; 1.0f ) // this is always true
++                            {
++                                if( retCollisionLocalNormal.dotProduct(localNormal) &lt; 0.9f ) // this is really an illegal slope
++                                {
++                                    horizontalDesiredVel = Ogre::Vector3::ZERO;
++                                    dist= 0.0f; // this sets correctionVel for steps to 0
++                                }
++                            }
++                            else
++                            {
++                                dist= 0.0f; // this sets correctionVel for steps to 0
++                            }
++                        }
++*/
++
++                        // move up for step
++
++                        correctionVel = dist / timestep - vel.y;
++std::cout &lt;&lt; &quot;distToFirstHit: &quot; &lt;&lt; distanceToFirstHit &lt;&lt; &quot;    \tdist: &quot; &lt;&lt; dist &lt;&lt; &quot;    \tvel.y: &quot; &lt;&lt; vel.y &lt;&lt; &quot;    \tCorrectionVel: &quot; &lt;&lt; correctionVel &lt;&lt; std::endl;
++                        addLinearRow(pos, pos, Ogre::Vector3::UNIT_Y);
++                        setRowAcceleration( correctionVel / timestep );
++                    }
++                }
++            }
++
++
+             // calculate force needed for desired velocity
+             horizontalDesiredVel.y = 0.0f;
+             Ogre::Vector3 force = m_body-&gt;calculateInverseDynamicsForce(timestep, horizontalDesiredVel);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001841.html">[Dsa-hl-svn] r4784 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001843.html">[Dsa-hl-svn] r4786 - in dependencies/OgreNewt: . inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1842">[ date ]</a>
+              <a href="thread.html#1842">[ thread ]</a>
+              <a href="subject.html#1842">[ subject ]</a>
+              <a href="author.html#1842">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

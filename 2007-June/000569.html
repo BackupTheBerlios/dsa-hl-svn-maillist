@@ -1,0 +1,641 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3498 - in rl/trunk/engine: ai/include ai/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3498%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200706032203.l53M3iXv018200%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000568.html">
+   <LINK REL="Next"  HREF="000570.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3498 - in rl/trunk/engine: ai/include ai/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3498%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig&In-Reply-To=%3C200706032203.l53M3iXv018200%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3498 - in rl/trunk/engine: ai/include ai/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Jun  4 00:03:44 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000568.html">[Dsa-hl-svn] r3497 - modules/common/scripts
+</A></li>
+        <LI>Next message: <A HREF="000570.html">[Dsa-hl-svn] r3499 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#569">[ date ]</a>
+              <a href="thread.html#569">[ thread ]</a>
+              <a href="subject.html#569">[ subject ]</a>
+              <a href="author.html#569">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-04 00:03:29 +0200 (Mon, 04 Jun 2007)
+New Revision: 3498
+
+Modified:
+   rl/trunk/engine/ai/include/Agent.h
+   rl/trunk/engine/ai/include/PlayerVehicle.h
+   rl/trunk/engine/ai/include/SteeringVehicle.h
+   rl/trunk/engine/ai/src/Agent.cpp
+   rl/trunk/engine/ai/src/AgentManager.cpp
+   rl/trunk/engine/ai/src/PlayerVehicle.cpp
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+Implented MovingCreature in AI.
+Various Changes:
+-all update-functions are now called by the GameTask AgentManager (there were update-functions called from Physics-Callbacks before)
+-removed PhysicsCallbacks (this work is now done in MovingCreate)
+-some constructors changed
+-SteeringVehicle::update changed
+
+Modified: rl/trunk/engine/ai/include/Agent.h
+===================================================================
+--- rl/trunk/engine/ai/include/Agent.h	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/include/Agent.h	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -16,7 +16,6 @@
+ #ifndef __RlAI_Agent_H__
+ #define __RlAI_Agent_H__
+ 
+-#include &quot;PhysicsController.h&quot;
+ #include &quot;FuzzyState.h&quot;
+ #include &quot;AgentManager.h&quot;
+ 
+@@ -36,7 +35,6 @@
+ 	 * and decission making (behaviours)
+ 	 */
+ 	class _RlAiExport Agent 
+-		: public PhysicsController
+ 	{
+ 	public:
+ 		/** Constructor by Creature object.
+@@ -104,7 +102,8 @@
+ 		 * applied to the creature stored.
+ 		 * @param thing PhysicalThing that is responsible for the creature.
+ 		 */
+-		virtual void OnApplyForceAndTorque(PhysicalThing* thing);
++        // physcs handled by movingcreature
++		//virtual void OnApplyForceAndTorque(PhysicalThing* thing);
+ 
+ 	protected:
+ 		//! stores the type of the agent (Player, NPC, ...)
+
+Modified: rl/trunk/engine/ai/include/PlayerVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/PlayerVehicle.h	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/include/PlayerVehicle.h	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -21,7 +21,7 @@
+ namespace rl
+ {
+ 	class Agent;
+-	class Actor;
++	class Creature;
+ 	/** Represents the player as a vehicle.
+ 	 */
+ 	class PlayerVehicle :
+@@ -31,7 +31,7 @@
+ 		/** Constructor
+ 		 * @param Actor gives the Actor representing the Player
+ 		 */
+-		PlayerVehicle(Actor* character);
++		PlayerVehicle(Creature* character);
+ 		/** explicit destructor
+ 		 */
+ 		virtual ~PlayerVehicle(void);
+@@ -44,7 +44,11 @@
+ 		 * @param currentTime const float current time
+ 		 * @param elapsedTime const float elapsed time since last call
+ 		 */
+-		virtual void update(const float currentTime, const float elapsedTime);
++        // same as SteeringVehicle if mMovingCreature is not set
++		//virtual void update(const float currentTime, const float elapsedTime);
++    protected:
++        virtual void createMovingCreature() {}
++        virtual void destroyMovingCreature() {}
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/ai/include/SteeringVehicle.h
+===================================================================
+--- rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/include/SteeringVehicle.h	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -41,6 +41,7 @@
+ 	class Actor;
+ 	class Agent;
+ 	class PhysicalThing;
++    class MovingCreature;
+ //	class PerceptionPool;
+ 
+ 	/**
+@@ -57,7 +58,7 @@
+ 		 * @param parent Agent owning this vehicle
+ 		 * @param character Actor controlled by Agent
+ 		 */
+-		SteeringVehicle(Agent* parent, Actor* character);
++		SteeringVehicle(Agent* parent, Creature* character);
+ 		/** explicit virtual destructor.
+ 		 */
+ 		virtual ~SteeringVehicle(void);
+@@ -132,10 +133,11 @@
+ 		 * @param minTimeToCollision minimum time to next collision
+ 		 */
+ 		bool needAvoidance(const float minTimeToCollision);
+-		/** Sets the animation of the actors mesh to a new keyframe.
++		
++        /** Sets the animation of the actors mesh to a new keyframe.
+ 		 * @param name of the animation to set the mesh of the actor to.
+ 		 */
+-		void setAnimation(const CeGuiString&amp; name);
++		//void setAnimation(const CeGuiString&amp; name);
+ 	
+ 		/* TODO:
+ 		calcFollowPath
+@@ -323,6 +325,9 @@
+ 		 */
+ 		void initialize();
+ 
++        virtual void createMovingCreature(); // permit PlayerVehicle to override this functions!
++        virtual void destroyMovingCreature();
++
+ 		/** retrieves the neighbours of this SteeringVehicle
+ 		 */
+ 		OpenSteer::AVGroup getNeighbors() const;
+@@ -353,7 +358,7 @@
+         OpenSteer::Vec3 _smoothedAcceleration;
+ 	*/	
+ 		//! mass of the steering vehicle retrieved from Newton body (is this really necessary ?)
+-		Ogre::Real mMass;
++		//Ogre::Real mMass;
+ 		//! radius of for the bounding sphere (use newton to get this from)
+ 		Ogre::Real mRadius;
+ 		//! speed of the vehicle
+@@ -369,13 +374,15 @@
+ 		//! direction vector
+ 		Ogre::Vector3 mForwardVector;
+ 		//! the yaw angle in radians
+-		Ogre::Radian mYaw;
++		//Ogre::Radian mYaw;
+ 
+ 		//! Agent using this vehicle
+ 		Agent* mParent;
+-		//! Actor object steered by this vehicle (and controlled by Agent).
+-		Actor* mActor;
++        //! Creature object steered by this vehicle (and controlled by Agent).
++        Creature* mCreature;
+ 
++        MovingCreature* mMovingCreature;
++
+         // measure path curvature (1/turning-radius), maintain smoothed version
+       //  void measurePathCurvature (const float elapsedTime);
+ 	};
+
+Modified: rl/trunk/engine/ai/src/Agent.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Agent.cpp	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/src/Agent.cpp	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -58,8 +58,8 @@
+ 
+ Agent::~Agent(void)
+ {
+-    if(mType == AgentManager::AGENT_STD_NPC)
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController( NULL );
++    //if(mType == AgentManager::AGENT_STD_NPC)
++    //    mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController( NULL );
+ 
+     delete mVehicle;
+     delete mBehaviour;
+@@ -81,7 +81,7 @@
+ 	if(mVehicle == NULL)
+ 	{
+ 		mType = AgentManager::AGENT_STD_NPC;
+-		mVehicle = new SteeringVehicle(this, mCreature-&gt;getActor());
++		mVehicle = new SteeringVehicle(this, mCreature);
+ 	}
+     LOG_MESSAGE(Logger::AI, 
+         &quot;created SteeringVehicle for Agent&quot;);
+@@ -91,12 +91,15 @@
+         &quot;created SteeringMachine for Agent&quot;);
+ //  a perceptron should be the controller, and the perceptron calculates
+ //  the steering force with the help of different steering behaviours
++/*
++// physic handled by movingcreature
+ 	if(mType == AgentManager::AGENT_STD_NPC)
+ 	{
+ 		mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(this);
+         LOG_MESSAGE(Logger::AI, 
+ 			&quot;added Agent to PhysicsManager as PhysicsController&quot;);
+ 	}
++*/
+ }
+ 
+ void Agent::addSteeringBehaviour(SteeringBehaviour* behaviour)
+@@ -123,12 +126,16 @@
+     mVehicle-&gt;update(0.0f, elapsedTime);
+ }
+ 
++
++/*
++// physics handled in movingcreature
+ void Agent::OnApplyForceAndTorque(PhysicalThing* thing)
+ {
+ 	OgreNewt::World* world = PhysicsManager::getSingleton()._getNewtonWorld();
+ 	Real elapsedTime = world-&gt;getTimeStep();
+ 	update(elapsedTime);
+ }
++*/
+ 
+ bool Agent::isDialogActive()
+ {
+
+Modified: rl/trunk/engine/ai/src/AgentManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentManager.cpp	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/src/AgentManager.cpp	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -52,8 +52,9 @@
+ 	SteeringVehicle* vehicle = NULL;
+ 	if(type == AGENT_PLAYER)
+ 	{
+-		vehicle = new PlayerVehicle(character-&gt;getActor());
++		vehicle = new PlayerVehicle(character);
+ 	}
++
+     Agent* agent = new Agent(character, vehicle);
+ 	agent-&gt;setType(type);
+ 	if(type == AGENT_PLAYER)
+@@ -61,6 +62,7 @@
+ 		mPlayer = agent;
+ 	}
+ 
++
+ 	addAgent(agent);
+     return agent;
+ }
+
+Modified: rl/trunk/engine/ai/src/PlayerVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/PlayerVehicle.cpp	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/src/PlayerVehicle.cpp	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -15,6 +15,7 @@
+  */
+ #include &quot;PlayerVehicle.h&quot;
+ #include &quot;Actor.h&quot;
++#include &quot;Creature.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;PhysicalThing.h&quot;
+ 
+@@ -23,7 +24,7 @@
+ 
+ namespace rl {
+ 
+-PlayerVehicle::PlayerVehicle(Actor* character)
++PlayerVehicle::PlayerVehicle(Creature* character)
+ 	: SteeringVehicle(NULL, character)
+ {
+ }
+@@ -31,10 +32,10 @@
+ PlayerVehicle::~PlayerVehicle(void)
+ {
+ }
+-
++/*
+ void PlayerVehicle::update(const float currentTime, const float elapsedTime)
+ {
+-	PhysicalThing* pt = mActor-&gt;getPhysicalThing();
++	PhysicalThing* pt = mCreature-&gt;getActor()-&gt;getPhysicalThing();
+ 	OgreNewt::Body* body = NULL;
+ 	if(pt) pt-&gt;_getBody();
+ 	if(body)
+@@ -61,5 +62,5 @@
+ 	}
+ 	mCurrentForce = Ogre::Vector3::ZERO;
+ }
+-
++*/
+ }
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -18,7 +18,9 @@
+ #include &quot;AiWorld.h&quot; 
+ #include &quot;Agent.h&quot;
+ #include &quot;Actor.h&quot;
++#include &quot;Creature.h&quot;
+ #include &quot;MeshObject.h&quot;
++#include &quot;MovingCreature.h&quot;
+ #include &quot;PhysicalThing.h&quot;
+ 
+ using namespace Ogre;
+@@ -26,37 +28,55 @@
+ 
+ namespace rl {
+ 
+-SteeringVehicle::SteeringVehicle(Agent* parent, Actor* character)
++SteeringVehicle::SteeringVehicle(Agent* parent, Creature* character)
+ 	: _maxForce(1.0f),
+       _maxSpeed(1.0f),
+-      mMass(),
++      //mMass(),
+       mRadius(),
+       mSpeed(1.0f),
+ 	  mCurrentForce(Vector3::ZERO), 
+ 	  mCurrentVelocity(Vector3::ZERO),
+ 	  mForwardVector(Vector3::NEGATIVE_UNIT_Z),
+-      mYaw(115),
++      //mYaw(115),
+ 	  mParent(parent),
+-	  mActor(character),
++	  mCreature(character),
++      mMovingCreature(NULL),
+       mHeight(0)
+ {
+ 	initialize();
++
++    createMovingCreature();
+ }
+ 
+ SteeringVehicle::~SteeringVehicle(void)
+ {
++    destroyMovingCreature();
+ }
+ 
++void SteeringVehicle::createMovingCreature()
++{
++    if( mMovingCreature == NULL )
++    {
++        mMovingCreature = new MovingCreature(mCreature);
++    }
++}
++
++void SteeringVehicle::destroyMovingCreature()
++{
++    if( mMovingCreature != NULL )
++        delete mMovingCreature;
++}
++
+ void SteeringVehicle::resetLocalSpace()
+ {
+ 	setForward(Vec3(mForwardVector.x, mForwardVector.y, mForwardVector.z));
+ 	setSide(localRotateForwardToSide(forward()));
+ 	setUp(OpenSteer::Vec3(0, 1, 0));
+-	Vector3 pos = mActor-&gt;getPosition();
++	Vector3 pos = mCreature-&gt;getActor()-&gt;getPosition();
+ 	setPosition(Vec3(pos.x, pos.y, pos.z));
+-	Vector3 src = mActor-&gt;getOrientation()*Vector3::NEGATIVE_UNIT_Z;
+-	Quaternion orientation = mActor-&gt;getOrientation();
+-	mYaw = orientation.getYaw();
++	Vector3 src = mCreature-&gt;getActor()-&gt;getOrientation()*Vector3::NEGATIVE_UNIT_Z;
++	//Quaternion orientation = mCreature-&gt;getActor()-&gt;getOrientation();
++	//mYaw = orientation.getYaw();
+ 
+ //  regenerate local space (by default: align vehicle's forward axis with
+ //  new velocity, but this behavior may be overridden by derived classes.)
+@@ -68,9 +88,9 @@
+ //  reset LocalSpace state
+ 	resetLocalSpace();
+ 	
+-//	mActor-&gt;_getSceneNode()-&gt;setOrientation(Ogre::Quaternion::IDENTITY);
+-	Vector3 inertia;
+-	mActor-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getMassMatrix(mMass, inertia);
++//	mCreature-&gt;getActor()-&gt;_getSceneNode()-&gt;setOrientation(Ogre::Quaternion::IDENTITY);
++	//Vector3 inertia;
++	//mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getMassMatrix(mMass, inertia);
+ 
+ //	mSpeed = (float)mCreature-&gt;getWert(Creature::WERT_GS) / (float)Date::ONE_KAMPFRUNDE * 1000.0f;
+ 
+@@ -105,68 +125,78 @@
+ 
+ void SteeringVehicle::update(const float currentTime, const float elapsedTime)
+ {
+-	OgreNewt::Body* body = mActor-&gt;getPhysicalThing()-&gt;_getBody();
+-//  get the charater mass
+-	Vector3 inertia;
+-	body-&gt;getMassMatrix(mMass, inertia);
++// from PlayerVehicle
++// since physics schould by handled by movingcreature
+ 
+-//  apply gravity
+-	Vector3 force = mMass * PhysicsManager::getSingleton().getGravity();
++	OgreNewt::Body* body = mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+ 
+-//  Get the velocity vector
++    Vector3 position;
++	Quaternion orientation;
++	body-&gt;getPositionOrientation(position, orientation);
++	setPosition(Vec3(position.x, position.y, position.z));
++
++    //  Get the velocity vector
+ 	mCurrentVelocity = body-&gt;getVelocity();
+-
+-//  setSpeed(mCurrentVelocity.length());
++	//  enforce speed limit
++	//  newVelocity = newVelocity.truncateLength (maxSpeed ());
++	//  update speed
++	setSpeed(mCurrentVelocity.length());
+ 	Vec3 newVelocity(mCurrentVelocity.x, mCurrentVelocity.y, mCurrentVelocity.z);
+-//  enforce speed limit
+-//  newVelocity = newVelocity.truncateLength(maxSpeed ());
+-//  update speed 
+-    setSpeed (newVelocity.length());
+ 
+-//  Gravity is applied above, so not needed here
+-//  prevent adding a counter force against gravity
+-	if (mCurrentVelocity.y &lt; 0.0f) mCurrentVelocity.y = 0.0f;
++    //  regenerate local space (by default: align vehicle's forward axis with
++    //  new velocity, but this behavior may be overridden by derived classes.)
++	if (speed() &gt; 0) regenerateOrthonormalBasisUF (newVelocity / speed());
+ 
++// end of inserting from playervehicle
+ 
+-//	Vec3 aforce = adjustRawSteeringForce(Vec3(mCurrentForce.x, mCurrentForce.y, mCurrentForce.z)); 
+-//	aforce = aforce.truncateLength (maxForce());
+-//	aforce *=-1; // need for newton ?
+-//	mCurrentForce = Vector3(aforce.x, aforce.y, aforce.z);
+-	Vector3 temp;
+-	Quaternion orientation;
+-	body-&gt;getPositionOrientation(temp, orientation);
+-	setPosition(Vec3(temp.x, temp.y, temp.z));
+-	
+-//	if(mCurrentForce.x != 0.0f)
+-//	{
+-	// Calculate angular velocity
+-		mYaw -= Degree(mCurrentForce.x * 60.0f * elapsedTime);
+ 
+-		while (mYaw.valueDegrees() &gt; 360.0f) mYaw -= Degree(360.0f);
+-		while (mYaw.valueDegrees() &lt; -360.0f) mYaw += Degree(360.0f);
+-	//  We first need the yaw rotation from actual yaw to desired yaw
+-		Vector3 src = orientation*Vector3::NEGATIVE_UNIT_Z;
+-		src.y = 0.0f;
+-		temp = Quaternion(mYaw, Vector3::UNIT_Y)*Vector3::NEGATIVE_UNIT_Z;
+-		temp.y = 0.0f;
+-		Radian yaw = src.getRotationTo(temp).getYaw();
+ 
+-	//  Calculate omega in order to go this rotation in mMaxDelay seconds.
+-		Real newOmega = yaw.valueRadians() / (1.0f/30.0f);
+-		body-&gt;setOmega(Vector3(0.0f, newOmega, 0.0f));
++// only process if mMovingCreature not NULL
++    if( mMovingCreature == NULL )
++    {
++        mCurrentForce = Vector3::ZERO;
++        return;
++    }
++    
++// calculate the result of the force    
++    Vector3 result = mCurrentForce;// + mCurrentVelocity;
+ 
+-		mCurrentForce.x = 0.0f;
+-//	}
+-	if(elapsedTime &gt; 0.0f)
+-	{
+-		force += mMass*(orientation * mCurrentForce - mCurrentVelocity) / elapsedTime;
+-	}
+-	body-&gt;setForce(force);
++// @todo remove this
++if( mCreature-&gt;getAu() &lt;= 6 )
++    mCreature-&gt;modifyAu(20,true);
+ 
+-//  regenerate local space (by default: align vehicle's forward axis with
+-//  new velocity, but this behavior may be overridden by derived classes.)
+-	if (speed() &gt; 0) regenerateOrthonormalBasisUF ( Vec3(temp.x, temp.y, temp.z) );
+ 
++    AbstractMovement *mov_drehen = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
++    Real vel_drehen(0);
++    Radian max_drehen = Degree(0);
++    if( mov_drehen-&gt;calculateBaseVelocity(vel_drehen) )
++    {
++        max_drehen = Degree(vel_drehen * 360 * elapsedTime);
++    }
++
++    Ogre::Vector3 creatureDirection = orientation * Ogre::Vector3::NEGATIVE_UNIT_Z;
++    Radian yaw(0);
++    creatureDirection.y = result.y = 0;
++    yaw = creatureDirection.getRotationTo(result, Ogre::Vector3::UNIT_Y).getYaw();
++    if( yaw &gt; Radian(0) &amp;&amp; yaw &gt; max_drehen )
++        yaw = max_drehen;
++    if( yaw &lt; Radian(0) &amp;&amp; yaw &lt; -max_drehen )
++        yaw = -max_drehen;
++    // old version was -Degree(mCurrentForce.x * 60 * elapsedTime);
++    // should this really depend from the timestep!?!
++
++    Ogre::Vector3 direction(Ogre::Vector3::ZERO);
++    Ogre::Vector3 rotation(0,yaw.valueRadians(),0);
++    MovingCreature::MovementType movement = MovingCreature::MT_STEHEN;
++    if( result != Ogre::Vector3::ZERO )
++    {
++        direction.z = -1;
++        movement = MovingCreature::MT_GEHEN;
++    }
++
++
++    mMovingCreature-&gt;setMovement(movement, direction, rotation);
++
+ 	mCurrentForce = Ogre::Vector3::ZERO;
+ }
+ 
+@@ -182,7 +212,7 @@
+ 	Vec3 rVal = steerForSeek(Vec3(target.x, target.y, target.z)).setYtoZero();
+ 	rVal = rVal.normalize();
+ 	//rVal *= -0.1; //adjustment for newton
+-	rVal.z=0;
++	//rVal.z=0;
+ 	return Vector3(rVal.x, rVal.y, rVal.z);
+ }
+ 
+@@ -247,17 +277,20 @@
+ 	return true;
+ }
+ 
++/*
++// already in moveingcreature
+ void SteeringVehicle::setAnimation(const CeGuiString&amp; name)
+ {
+-	MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mActor-&gt;getControlledObject());
++	MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mCreature-&gt;getActor()-&gt;getControlledObject());
+ 	mesh-&gt;stopAllAnimations();
+     try
+     {
+ 	    mesh-&gt;startAnimation(name.c_str());
+-	    mActor-&gt;getPhysicalThing()-&gt;fitToPose(name.c_str());
++	    mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;fitToPose(name.c_str());
+     }
+     catch( ... ) { }
+ }
++*/
+ 
+ 
+ AVGroup SteeringVehicle::getNeighbors() const
+@@ -288,7 +321,7 @@
+ 
+ float SteeringVehicle::mass (void) const 
+ {
+-	return mMass;
++    return mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;getMass();
+ }
+ 
+ float SteeringVehicle::setMass (float m) 
+@@ -334,7 +367,7 @@
+ 
+ const Actor* SteeringVehicle::getActor(void) const  
+ { 
+-	return mActor; 
++	return mCreature-&gt;getActor(); 
+ }
+ 
+ float SteeringVehicle::maxForce (void) const 
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-06-03 21:55:43 UTC (rev 3497)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-06-03 22:03:29 UTC (rev 3498)
+@@ -29,7 +29,7 @@
+ 	class SteeringVehicle
+ 	{
+ 	public:
+-		SteeringVehicle(rl::Agent* agent, rl::Actor* character);
++		SteeringVehicle(rl::Agent* agent, rl::Creature* character);
+ 		
+ 		void addForce(const Ogre::Vector3&amp; force);
+ 
+@@ -56,8 +56,6 @@
+ 		bool isAhead(rl::Agent* agent, const float threshold);
+ 		
+ 		bool needAvoidance(const float minTimeToCollision);
+-		
+-		void setAnimation(rl::CeGuiString&amp; name);
+ 	};
+ 	
+ 	%feature(&quot;director&quot;) SteeringBehaviour;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000568.html">[Dsa-hl-svn] r3497 - modules/common/scripts
+</A></li>
+	<LI>Next message: <A HREF="000570.html">[Dsa-hl-svn] r3499 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#569">[ date ]</a>
+              <a href="thread.html#569">[ thread ]</a>
+              <a href="subject.html#569">[ subject ]</a>
+              <a href="author.html#569">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

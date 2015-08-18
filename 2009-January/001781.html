@@ -1,0 +1,348 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4724 - in dependencies/OgreNewt_ngt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4724%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200901280048.n0S0m4Tc026465%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001780.html">
+   <LINK REL="Next"  HREF="001782.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4724 - in dependencies/OgreNewt_ngt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4724%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200901280048.n0S0m4Tc026465%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4724 - in dependencies/OgreNewt_ngt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Jan 28 01:48:04 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001780.html">[Dsa-hl-svn] r4723 - in rl/branches/newton20: .	editors/Lockenwickler editors/Lockenwickler/_eric4project	editors/Lockenwickler/src editors/Lockenwickler/src/media	editors/Lockenwickler/src/plugins editors/Lockenwickler/ui	files engine/core engine/core/include engine/core/src	engine/rules/src engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001782.html">[Dsa-hl-svn] r4725 - in rl/branches/newton20/engine: core/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1781">[ date ]</a>
+              <a href="thread.html#1781">[ thread ]</a>
+              <a href="subject.html#1781">[ subject ]</a>
+              <a href="author.html#1781">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-01-28 01:48:03 +0100 (Wed, 28 Jan 2009)
+New Revision: 4724
+
+Modified:
+   dependencies/OgreNewt_ngt/inc/OgreNewt_CollisionPrimitives.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp
+Log:
+-adopted OgreNewt to latest newton beta
+.. amazingly, there's a bug in newton: spheres don't (convex)cast correctly (I just needed to mention that :-P )
+
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_CollisionPrimitives.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_CollisionPrimitives.h	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_CollisionPrimitives.h	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -256,6 +256,9 @@
+ 
+ 			//! finish the tree collision
+ 			void finish( bool optimize = true );
++
++        private:
++            static float _CDECL rayHitCallback(float interception, float *normal, int faceId, void *userData);
+ 		};
+ 
+ 		////////////////////////////////////////////////////////
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -128,8 +128,8 @@
+         public:
+             StaticConvexCast(PlayerController *pc, const OgreNewt::World* world,
+                              const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount),
++                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
++                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+                     m_parent(pc)
+                 {}
+ 
+@@ -143,8 +143,8 @@
+         public:
+             DynamicConvexCast(PlayerController *pc, const OgreNewt::World* world,
+                              const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount),
++                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
++                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+                     m_parent(pc)
+                 {}
+ 
+@@ -158,8 +158,8 @@
+         public:
+             AllBodyConvexCast(PlayerController *pc, const OgreNewt::World* world,
+                              const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount),
++                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
++                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+                     m_parent(pc)
+                 {}
+ 
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -166,7 +166,7 @@
+                 \param maxcontactscount maximum number of contacts that should be saved,
+                        set to 0 if you only need the distance to the first intersection
+ 	*/
+-	void go( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount);
++	void go( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
+ 
+ 	//! user callback pre-filter function.
+ 	/*!
+@@ -209,7 +209,7 @@
+ 	class _OgreNewtExport ConvexcastContactInfo
+ 	{
+ 	public:
+-		Ogre::Real              mDistance;      //!&lt; dist from point1 of the raycast, in range [0,1].
++		//Ogre::Real              mDistance;      //!&lt; dist from point1 of the raycast, in range [0,1].
+ 		OgreNewt::Body*         mBody;          //!&lt; pointer to body intersected with
+ 		int                     mCollisionID;   //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
+ 		Ogre::Vector3           mContactNormal; //!&lt; normal of intersection.
+@@ -235,7 +235,7 @@
+                 \param maxcontactscount maximum number of contacts that should be saved
+                 \param prefilter pointer to a prefilter function
+ 	*/
+-	BasicConvexcast( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount);
++	BasicConvexcast( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
+ 
+ 	//! destuctor.
+ 	~BasicConvexcast();
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Tools.h	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -73,7 +73,7 @@
+ 		*/
+ 		_OgreNewtExport int CollisionPointDistance( const OgreNewt::World* world, const Ogre::Vector3&amp; globalpt, 
+ 									const OgreNewt::Collision* col, const Ogre::Quaternion&amp; colorient, const Ogre::Vector3&amp; colpos, 
+-									Ogre::Vector3&amp; retpt, Ogre::Vector3&amp; retnormal );
++									Ogre::Vector3&amp; retpt, Ogre::Vector3&amp; retnormal, int threadIndex );
+ 									
+ 
+ 
+@@ -92,7 +92,7 @@
+ 		*/
+ 		_OgreNewtExport int CollisionClosestPoint( const OgreNewt::World* world, const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA,
+ 															const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB,
+-															Ogre::Vector3&amp; retPosA, Ogre::Vector3&amp; retPosB, Ogre::Vector3&amp; retNorm );
++															Ogre::Vector3&amp; retPosA, Ogre::Vector3&amp; retPosB, Ogre::Vector3&amp; retNorm, int threadIndex );
+ 
+ 
+ 		//! manual collision between collision primitives.
+@@ -114,7 +114,7 @@
+ 		_OgreNewtExport int CollisionCollide(  const OgreNewt::World* world, int maxSize, 
+ 			const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA,
+ 			const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB,
+-			Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations );
++			Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations, int threadIndex );
+ 
+ 
+ 		//! manual collision between moving primitives.
+@@ -141,7 +141,7 @@
+ 		_OgreNewtExport int CollisionCollideContinue( const OgreNewt::World* world, int maxSize, Ogre::Real timeStep,
+ 			const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA, const Ogre::Vector3&amp; colVelA, const Ogre::Vector3&amp; colOmegaA,
+ 			const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB, const Ogre::Vector3&amp; colVelB, const Ogre::Vector3&amp; colOmegaB,
+-			Ogre::Real&amp; retTimeOfImpact, Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations );
++			Ogre::Real&amp; retTimeOfImpact, Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations, int threadIndex );
+ 
+ 
+ 		//! local raycast on a collision object.
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_CollisionPrimitives.cpp	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -501,9 +501,15 @@
+ 			NewtonTreeCollisionEndBuild( m_col, optimize );
+ 
+             NewtonAddCollisionReference(m_col);
++            NewtonTreeCollisionSetUserRayCastCallback( m_col, rayHitCallback );
+ 		}
+ 
++        float TreeCollision::rayHitCallback(float interception, float *normal, int faceId, void *userData)
++        {
++            return interception;
++        }
+ 
++
+ 		int TreeCollisionSceneParser::count = 0;
+ 		
+ 		
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -162,7 +162,7 @@
+         }
+ 
+ 
+-	void Convexcast::go(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount)
++	void Convexcast::go(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex)
+ 	{
+ 
+         if( Debugger::getSingleton().isRaycastRecording() )
+@@ -186,7 +186,7 @@
+                 mReturnInfoListLength = 
+                         NewtonWorldConvexCast( world-&gt;getNewtonWorld(), &amp;matrix[0], (float*)&amp;endpt, col-&gt;getNewtonCollision(),
+                                                &amp;mFirstContactDistance, this, OgreNewt::Convexcast::newtonConvexcastPreFilter,
+-                                               mReturnInfoList, mReturnInfoListSize );
++                                               mReturnInfoList, mReturnInfoListSize, threadIndex);
+ 
+             if( Debugger::getSingleton().isRaycastRecording() &amp;&amp; Debugger::getSingleton().isRaycastRecordingHitBodies() )
+             {
+@@ -225,7 +225,6 @@
+ 	BasicConvexcast::ConvexcastContactInfo::ConvexcastContactInfo()
+ 	{
+ 		mBody = NULL;
+-		mDistance = -1.0;
+ 	}
+ 
+ 	BasicConvexcast::ConvexcastContactInfo::~ConvexcastContactInfo() {}
+@@ -234,9 +233,9 @@
+         {
+         }
+ 
+-	BasicConvexcast::BasicConvexcast(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount)
++	BasicConvexcast::BasicConvexcast(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex)
+ 	{
+-		go( world, col, startpt, colori, endpt, maxcontactscount);
++		go( world, col, startpt, colori, endpt, maxcontactscount, threadIndex);
+ 	}
+ 
+ 	BasicConvexcast::~BasicConvexcast()	{}
+@@ -272,7 +271,6 @@
+                 return info;
+ 
+ 
+-            info.mDistance = mReturnInfoList[hitnum].m_intersectionParam;
+             info.mBody = (OgreNewt::Body*) NewtonBodyGetUserData(mReturnInfoList[hitnum].m_hitBody);
+             info.mCollisionID = mReturnInfoList[hitnum].m_contactID;
+             info.mContactNormal.x = mReturnInfoList[hitnum].m_normal[0];
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp	2009-01-27 21:35:12 UTC (rev 4723)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_Tools.cpp	2009-01-28 00:48:03 UTC (rev 4724)
+@@ -101,12 +101,12 @@
+ 		
+ 		int CollisionPointDistance( const OgreNewt::World* world, const Ogre::Vector3&amp; globalpt, 
+ 									const OgreNewt::Collision* col, const Ogre::Quaternion&amp; colorient, const Ogre::Vector3&amp; colpos, 
+-									Ogre::Vector3&amp; retpt, Ogre::Vector3&amp; retnormal )
++									Ogre::Vector3&amp; retpt, Ogre::Vector3&amp; retnormal, int threadIndex )
+ 		{
+ 			float matrix[16];
+ 			Converters::QuatPosToMatrix( colorient, colpos, matrix );
+ 
+-			return NewtonCollisionPointDistance( world-&gt;getNewtonWorld(), &amp;globalpt.x, col-&gt;getNewtonCollision(), matrix, &amp;retpt.x, &amp;retnormal.x );
++			return NewtonCollisionPointDistance( world-&gt;getNewtonWorld(), &amp;globalpt.x, col-&gt;getNewtonCollision(), matrix, &amp;retpt.x, &amp;retnormal.x, threadIndex);
+ 		}
+ 		
+ 
+@@ -114,7 +114,7 @@
+ 		
+ 		int CollisionClosestPoint( const OgreNewt::World* world, const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA,
+ 															const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB,
+-															Ogre::Vector3&amp; retPosA, Ogre::Vector3&amp; retPosB, Ogre::Vector3&amp; retNorm )
++															Ogre::Vector3&amp; retPosA, Ogre::Vector3&amp; retPosB, Ogre::Vector3&amp; retNorm, int threadIndex )
+ 		{
+ 			float matrixA[16];
+ 			float matrixB[16];
+@@ -123,14 +123,14 @@
+ 			Converters::QuatPosToMatrix( colOrientB, colPosB, matrixB );
+ 
+ 			return NewtonCollisionClosestPoint( world-&gt;getNewtonWorld(), colA-&gt;getNewtonCollision(), matrixA, colB-&gt;getNewtonCollision(), matrixB,
+-												&amp;retPosA.x, &amp;retPosB.x, &amp;retNorm.x );
++												&amp;retPosA.x, &amp;retPosB.x, &amp;retNorm.x, threadIndex );
+ 		}
+ 
+ 
+ 		int CollisionCollide(  const OgreNewt::World* world, int maxSize, 
+ 			const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA,
+ 			const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB,
+-			Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations )
++			Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations, int threadIndex )
+ 		{
+ 			float matrixA[16];
+ 			float matrixB[16];
+@@ -139,14 +139,14 @@
+ 			Converters::QuatPosToMatrix( colOrientB, colPosB, matrixB );
+ 
+ 			return NewtonCollisionCollide( world-&gt;getNewtonWorld(), maxSize, colA-&gt;getNewtonCollision(), matrixA,
+-				colB-&gt;getNewtonCollision(), matrixB, &amp;retContactPts[0].x, &amp;retNormals[0].x, retPenetrations );
++				colB-&gt;getNewtonCollision(), matrixB, &amp;retContactPts[0].x, &amp;retNormals[0].x, retPenetrations, threadIndex );
+ 		}
+ 
+ 
+ 		int CollisionCollideContinue( const OgreNewt::World* world, int maxSize, Ogre::Real timeStep,
+ 			const OgreNewt::Collision* colA, const Ogre::Quaternion&amp; colOrientA, const Ogre::Vector3&amp; colPosA, const Ogre::Vector3&amp; colVelA, const Ogre::Vector3&amp; colOmegaA,
+ 			const OgreNewt::Collision* colB, const Ogre::Quaternion&amp; colOrientB, const Ogre::Vector3&amp; colPosB, const Ogre::Vector3&amp; colVelB, const Ogre::Vector3&amp; colOmegaB,
+-			Ogre::Real&amp; retTimeOfImpact, Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations )
++			Ogre::Real&amp; retTimeOfImpact, Ogre::Vector3* retContactPts, Ogre::Vector3* retNormals, Ogre::Real* retPenetrations, int threadIndex )
+ 		{
+ 			float matrixA[16];
+ 			float matrixB[16];
+@@ -157,7 +157,7 @@
+ 			return NewtonCollisionCollideContinue( world-&gt;getNewtonWorld(), maxSize, timeStep,
+ 				colA-&gt;getNewtonCollision(), matrixA, &amp;colVelA.x, &amp;colOmegaA.x, 
+ 				colB-&gt;getNewtonCollision(), matrixB, &amp;colVelB.x, &amp;colOmegaB.x,
+-				&amp;retTimeOfImpact, &amp;retContactPts[0].x, &amp;retNormals[0].x, retPenetrations );
++				&amp;retTimeOfImpact, &amp;retContactPts[0].x, &amp;retNormals[0].x, retPenetrations, threadIndex );
+ 		}
+ 
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001780.html">[Dsa-hl-svn] r4723 - in rl/branches/newton20: .	editors/Lockenwickler editors/Lockenwickler/_eric4project	editors/Lockenwickler/src editors/Lockenwickler/src/media	editors/Lockenwickler/src/plugins editors/Lockenwickler/ui	files engine/core engine/core/include engine/core/src	engine/rules/src engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001782.html">[Dsa-hl-svn] r4725 - in rl/branches/newton20/engine: core/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1781">[ date ]</a>
+              <a href="thread.html#1781">[ thread ]</a>
+              <a href="subject.html#1781">[ subject ]</a>
+              <a href="author.html#1781">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

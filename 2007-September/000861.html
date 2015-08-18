@@ -1,0 +1,393 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3790 - in rl/trunk/engine: core/include core/src	script/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3790%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/src%20script/swig&In-Reply-To=%3C200709021430.l82EUbBk024421%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000860.html">
+   <LINK REL="Next"  HREF="000862.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3790 - in rl/trunk/engine: core/include core/src	script/src script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3790%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/src%20script/swig&In-Reply-To=%3C200709021430.l82EUbBk024421%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3790 - in rl/trunk/engine: core/include core/src	script/src script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep  2 16:30:37 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000860.html">[Dsa-hl-svn] r3789 - in modules: regressiontest/maps ruchin/maps
+</A></li>
+        <LI>Next message: <A HREF="000862.html">[Dsa-hl-svn] r3791 - modules/regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#861">[ date ]</a>
+              <a href="thread.html#861">[ thread ]</a>
+              <a href="subject.html#861">[ subject ]</a>
+              <a href="author.html#861">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-02 16:30:21 +0200 (Sun, 02 Sep 2007)
+New Revision: 3790
+
+Modified:
+   rl/trunk/engine/core/include/GameAreaEventSource.h
+   rl/trunk/engine/core/include/GameEventManager.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/GameAreaEventSource.cpp
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/GameEventManager.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/src/ZoneProcessor.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+Zones/Areas:
+-not using actors any more for all areas (only moving areas need an actor)
+-doesn't place place the mesh from a zone into scene
+-the moving-actor and the entity (mesh) can be different
+
+Modified: rl/trunk/engine/core/include/GameAreaEventSource.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaEventSource.h	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/include/GameAreaEventSource.h	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -42,9 +42,9 @@
+ public:
+     /** Konstruktor
+      *  @param areaType Die Art des abzufragenden Areals 
+-     *  @param act Der Actor, an den das Zentrum des Areals gekn&#252;pft ist
++     *  @param act Der Actor, an den das Zentrum des Areals gekn&#252;pft ist, kann NULL sein f&#252;r unbewegte areas
+      */
+-    GameAreaEventSource( GameAreaType* areaType, Actor* act );
++    GameAreaEventSource( GameAreaType* areaType, Actor* act = NULL);
+     /// Dekonstruktor
+     virtual ~GameAreaEventSource();
+ 
+
+Modified: rl/trunk/engine/core/include/GameEventManager.h
+===================================================================
+--- rl/trunk/engine/core/include/GameEventManager.h	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/include/GameEventManager.h	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -71,21 +71,29 @@
+ 
+     /** F&#252;gt eine neue Mesh-Area hinzu und h&#228;ngt einen Listener an
+     *
+-    * @param meshactor der meshactor um den herum die area gelegt werden soll
++    * @param actor der actor um den herum die area gelegt werden soll, kann NULL sein
++    * @param ent die Entity mit dem Mesh, das f&#252;r die Area verwendet werden soll, falls NULL wird das mesh des actors verwendet
+     * @param geom der Geometrietype, sinnvoll w&#228;re GT_CONVEXHULL (eventuell GT_MESH)
+     * @param list Der neu hinzuzufpgende Listener
+     * @param queryMask Die Querymaske, welche Aktoren von der Area betroffen sind
+     * @param forceNew erstellt auf jeden Fall eine neue GameAreaEventSource (z.B. f&#252;r den ZoneManager)
+     * @retval Die GameAreaEventSource, der der Listener hinzugef&#252;gt wurde
+     */
+-	GameAreaEventSource* addMeshAreaListener( Actor* meshactor, GeometryType geom, GameAreaListener* list, 
++	GameAreaEventSource* addMeshAreaListener( Actor* actor,
++        Ogre::Entity* ent, GeometryType geom, GameAreaListener* list, 
+         unsigned long queryMask = 0xFFFFFFFF, 
+         Ogre::Vector3 offset = Ogre::Vector3::ZERO, Ogre::Quaternion orientation = Ogre::Quaternion::IDENTITY,
+         bool forceNew = false);
+ 
++	GameAreaEventSource* addMeshAreaListener( Actor* actor,
++        GeometryType geom, GameAreaListener* list, 
++        unsigned long queryMask = 0xFFFFFFFF, 
++        Ogre::Vector3 offset = Ogre::Vector3::ZERO, Ogre::Quaternion orientation = Ogre::Quaternion::IDENTITY,
++        bool forceNew = false);
++
+     /** F&#252;gt eine neue Area hinzu und h&#228;ngt einen Listener an
+     *
+-    * @param actor Der Actor um den herum die Area aufgespannt werden soll
++    * @param actor Der Actor um den herum die Area aufgespannt werden soll, kann NULL sein
+     * @param aabb Die Gr&#246;&#223;e der Area
+     * @param geom der Geometrietype, m&#246;glich sind GT_BOX, GT_ELLIPSOID, GT_SPHERE, GT_PYRAMID
+     * @param list Der neu hinzuzufpgende Listener
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/include/ZoneManager.h	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -66,6 +66,9 @@
+ 
+ 		void areaLeft(GameAreaEvent* gae);
+ 	    void areaEntered(GameAreaEvent* gae);
++
++        /// only needed if the lights/etc of the active zone changed
++        void update();
+ 		
+ 	private:
+ 		std::map&lt;const Ogre::String, Zone*&gt; mZones;
+
+Modified: rl/trunk/engine/core/src/GameAreaEventSource.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaEventSource.cpp	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/src/GameAreaEventSource.cpp	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -46,11 +46,13 @@
+ 			return;
+ 
+         // Position bertragen
+-        mAreaType-&gt;setQueryPosition( mActor-&gt;getWorldPosition() );
++        if( mActor )
++            mAreaType-&gt;setQueryPosition( mActor-&gt;getWorldPosition() );
+         ActorMap currInside = mAreaType-&gt;performQuery();
+         // Der Actor um den herum die Quelle ist, wird vermutlich auch gefunden :)
+         // Also rausl&#239;&#191;&#189;chen
+-        currInside.erase( mActor-&gt;getName() );
++        if( mActor )
++            currInside.erase( mActor-&gt;getName() );
+ 
+         ActorMap enteredMap, leftMap;
+         // EinfuegeIteratoren erstellen
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -225,6 +225,11 @@
+ 			Ogre::Vector3 offset,
+ 			Ogre::Quaternion orientation)
+     {
++        if(geomType == GT_MESH)
++        {
++            LOG_ERROR(Logger::CORE, &quot;Geometrie Typ 'GT_MESH' is not (yet) support by GameMeshAreaType, use GT_CONVEXHULL instead!&quot;);
++            geomType = GT_CONVEXHULL;
++        }
+         OgreNewt::CollisionPtr col =
+             PhysicsManager::getSingleton().getCollisionFactory()-&gt;createCollisionFromEntity(entity,
+             geomType, &amp;offset, &amp;orientation);
+
+Modified: rl/trunk/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameEventManager.cpp	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/src/GameEventManager.cpp	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -111,15 +111,21 @@
+     }
+ 
+     /// @todo  Doppelte Aktoren nachnutzen??
+-    GameAreaEventSource* GameEventManager::addMeshAreaListener( 
+-        Actor* actor, GeometryType geom, GameAreaListener* list, unsigned long queryMask, 
++    GameAreaEventSource* GameEventManager::addMeshAreaListener(Actor* actor,
++        Ogre::Entity* ent, GeometryType geom, GameAreaListener* list, unsigned long queryMask, 
+         Vector3 offset, Quaternion orientation, bool forceNew )
+     {
+         // neues areal ereugen
+-        MeshObject* meshObj = static_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++        if( ent == NULL )
++        {
++            if( actor == NULL )
++                Throw(IllegalArgumentException, &quot;actor and entity cannot be NULL!&quot;);
++            MeshObject* meshObj = static_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++            ent = meshObj-&gt;getEntity();
++        }
+ 
+         GameNewtonBodyAreaType* at = new GameMeshAreaType(
+-            meshObj-&gt;getEntity(), geom, offset, orientation);
++            ent, geom, offset, orientation);
+ 
+         at-&gt;setQueryMask(queryMask);
+ 
+@@ -137,6 +143,13 @@
+         return gam;
+     }
+ 
++    GameAreaEventSource* GameEventManager::addMeshAreaListener(Actor* actor,
++        GeometryType geom, GameAreaListener* list, unsigned long queryMask, 
++        Vector3 offset, Quaternion orientation, bool forceNew )
++    {
++        return addMeshAreaListener(actor, NULL, geom, list, queryMask, offset, orientation, forceNew);
++    }
++
+     /// @todo  Doppelte Aktoren nachnutzen??
+     GameAreaEventSource* GameEventManager::addAreaListener(Actor* actor,
+         Ogre::AxisAlignedBox aabb, GeometryType geom, GameAreaListener* list, 
+@@ -197,6 +210,8 @@
+ 
+     void GameEventManager::removeAllAreas( Actor* actor )
+     {
++        if( actor == NULL )
++            Throw(IllegalArgumentException, &quot;actor cannot be NULL!&quot;);
+         GameAreaEventSourceList::iterator it;
+         for( it = mAreaEventSources.begin(); it != mAreaEventSources.end();)
+         {
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -19,8 +19,10 @@
+ 
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
+ #include &quot;GameEventManager.h&quot;
+ #include &quot;Zone.h&quot;
++#include &quot;World.h&quot;
+ 
+ 
+ using namespace Ogre;
+@@ -129,12 +131,10 @@
+         if( !zone )
+             return;
+ 
+-        Actor* actor = ActorManager::getSingleton().createEmptyActor(&quot;Zone_&quot;+name);
+-        actor-&gt;placeIntoScene(position);
+ 
+         GameAreaEventSource* gam =
+-            GameEventManager::getSingleton().addAreaListener(actor, 
+-                aabb, geom, this, queryflags, offset, orientation, true);
++            GameEventManager::getSingleton().addAreaListener(NULL, 
++                aabb, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId(zone-&gt;getId());
+@@ -150,12 +150,9 @@
+         if( !zone )
+             return;
+ 
+-        Actor* actor = ActorManager::getSingleton().createEmptyActor(&quot;Zone_Area_&quot;+name);
+-        actor-&gt;placeIntoScene(position);
+-
+         GameAreaEventSource* gam =
+-            GameEventManager::getSingleton().addAreaListener(actor, 
+-                aabb, geom, this, queryflags, offset, orientation, true);
++            GameEventManager::getSingleton().addAreaListener(NULL, 
++                aabb, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId( - (zone-&gt;getId())); // a negative id indicates to subtract this area from the zone
+@@ -172,21 +169,20 @@
+         if( !zone )
+             return;
+ 
+-        Actor *actor = ActorManager::getSingleton().createMeshActor(
+-            &quot;Zone_MeshArea_&quot;+name+&quot;_&quot;+meshname, 
+-            meshname, GT_NONE); // don't create physics-proxy
+-        if(!actor)
++        Entity* entity = CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++            -&gt;getSceneManager()-&gt;createEntity(&quot;Zone_&quot;+name+&quot;_MeshArea_&quot;+meshname, meshname);
++        if( !entity )
+             return;
+ 
+-        actor-&gt;placeIntoScene(position);
+-        actor-&gt;setScale(scale.x, scale.y, scale.z);
+-
+         GameAreaEventSource* gam =
+-            GameEventManager::getSingleton().addMeshAreaListener(
+-                actor, geom, this, queryflags, offset, orientation, true);
++            GameEventManager::getSingleton().addMeshAreaListener(NULL, 
++                entity, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+-        gam-&gt;setId( zone-&gt;getId() );
++        gam-&gt;setId(zone-&gt;getId());
++
++        CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++            -&gt;getSceneManager()-&gt;destroyEntity(entity);
+     }
+ 
+     void ZoneManager::subtractMeshAreaFromZone(const Ogre::String&amp; name,
+@@ -200,21 +196,21 @@
+         if( !zone )
+             return;
+ 
+-        Actor *actor = ActorManager::getSingleton().createMeshActor(
+-            &quot;Zone_MeshArea_&quot;+name+&quot;_&quot;+meshname, 
+-            meshname, GT_NONE); // don't create physics-proxy
+-        if(!actor)
++        Entity* entity = CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++            -&gt;getSceneManager()-&gt;createEntity(&quot;Zone_&quot;+name+&quot;_MeshArea_&quot;+meshname, meshname);
++        if( !entity )
+             return;
+ 
+-        actor-&gt;placeIntoScene(position);
+-        actor-&gt;setScale(scale.x, scale.y, scale.z);
+ 
+         GameAreaEventSource* gam =
+-            GameEventManager::getSingleton().addMeshAreaListener(
+-                actor, geom, this, queryflags, offset, orientation, true);
++            GameEventManager::getSingleton().addMeshAreaListener(NULL, 
++                entity, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId( - (zone-&gt;getId()) ); // a negative id indicates to subtract this area from the zone
++
++        CoreSubsystem::getSingletonPtr()-&gt;getWorld()
++            -&gt;getSceneManager()-&gt;destroyEntity(entity);
+     }
+ 
+ 	void ZoneManager::areaLeft(GameAreaEvent* gae)
+@@ -263,6 +259,12 @@
+         }
+ 	}
+ 
++    void ZoneManager::update()
++    {
++        switchLights();
++        switchSounds();
++    }
++
+ 	void ZoneManager::switchLights()
+ 	{
+ 		Zone* currentZone = mActiveZones.front();
+
+Modified: rl/trunk/engine/script/src/ZoneProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -203,6 +203,7 @@
+ 			}
+ 		}
+ 
++        ZoneManager::getSingleton().update();
+ 		return true;
+ 	}
+ 
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-09-02 11:51:31 UTC (rev 3789)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-09-02 14:30:21 UTC (rev 3790)
+@@ -245,8 +245,10 @@
+ public:
+     void addSphereAreaListener( rl::Actor* actor, Ogre::Real radius, 
+ 		rl::GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+-	void addMeshAreaListener( rl::Actor* meshactor, rl::GeometryType geom, 
++	void addMeshAreaListener( rl::Actor* actor, Ogre::Entity* ent, rl::GeometryType geom, 
+ 	    rl::GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
++	void addMeshAreaListener( rl::Actor* actor, rl::GeometryType geom, 
++	    rl::GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+ 	
+     void removeAreaListener( rl::GameAreaListener* list );
+     void removeAllAreas( rl::Actor* actor );
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000860.html">[Dsa-hl-svn] r3789 - in modules: regressiontest/maps ruchin/maps
+</A></li>
+	<LI>Next message: <A HREF="000862.html">[Dsa-hl-svn] r3791 - modules/regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#861">[ date ]</a>
+              <a href="thread.html#861">[ thread ]</a>
+              <a href="subject.html#861">[ subject ]</a>
+              <a href="author.html#861">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

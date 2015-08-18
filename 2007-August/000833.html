@@ -1,0 +1,1050 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3762 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3762%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708271705.l7RH5d2R007177%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000832.html">
+   <LINK REL="Next"  HREF="000834.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3762 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3762%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708271705.l7RH5d2R007177%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3762 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Aug 27 19:05:39 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000832.html">[Dsa-hl-svn] r3761 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000834.html">[Dsa-hl-svn] r3763 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#833">[ date ]</a>
+              <a href="thread.html#833">[ thread ]</a>
+              <a href="subject.html#833">[ subject ]</a>
+              <a href="author.html#833">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-27 19:05:10 +0200 (Mon, 27 Aug 2007)
+New Revision: 3762
+
+Modified:
+   rl/trunk/engine/ui/include/ContainerContentWindow.h
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/include/ItemDragContainer.h
+   rl/trunk/engine/ui/include/WindowFadeJob.h
+   rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+   rl/trunk/engine/ui/src/ControlState.cpp
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/ItemDragContainer.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+   rl/trunk/engine/ui/src/WindowFadeJob.cpp
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+-ItemDragContainers are destroyed correctly (through WindowFadeJob)
+-Pressing left control in the inventorywindow shows all possible world-ItemSet
+-items can be placed at mouse position in containers (sorting possible)
+-removed bugs in ControlStates (processing key.events)
+-in the inventorywindow, world-items fade out and hide after some seconds
+-changed windowmanager (bug?) to enable abstractwindows to process both key- and mouse-events
+-WindowsFadeJob can handle different window types with different behaviour(AbstractWindow, CEGUI::Window, ItemDragContainer)
+
+Modified: rl/trunk/engine/ui/include/ContainerContentWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -20,6 +20,7 @@
+ #include &quot;UiPrerequisites.h&quot;
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;InventoryWindow.h&quot;
++#include &quot;ItemDragContainer.h&quot;
+ 
+ namespace rl {
+ 
+@@ -28,17 +29,22 @@
+ 	
+     /// this class is intended to be used with a inventorywindow
+ 	class _RlUiExport ContainerContentWindow :
+-		public AbstractWindow
++		public AbstractWindow,
++        public ItemDragContainerDestroyListener
+ 	{
+ 	public:
+ 		ContainerContentWindow(Container* container, InventoryWindow* parent);
+ 
+         void setVisible(bool visible, bool destroyAfterHide = false);
+ 
++        void notifyItemDragContainerDestroyed(ItemDragContainer* cont);
++
+ 	private:
+ 		CEGUI::Window* mContentWindow;
+ 		Container* mContainer;
+         InventoryWindow* mInventoryWindow;
++        typedef std::map&lt;Item*, ItemDragContainer*&gt; ItemDragContainerMap;
++        ItemDragContainerMap mItemDragContainerMap;
+ 
+ 		static int sItemCount;
+ 
+@@ -48,7 +54,8 @@
+         bool handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item);
+         bool handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item);
+ 		void initializeContent();
+-		CEGUI::Window* createItemWindow(Item* item);
++		ItemDragContainer* createItemWindow(Item* item);
++        ItemDragContainer* getItemWindow(Item* item);
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -22,6 +22,7 @@
+ #include &lt;OgreRectangle.h&gt;
+ 
+ #include &quot;AbstractWindow.h&quot;
++#include &quot;ItemDragContainer.h&quot;
+ 
+ namespace rl {
+ 
+@@ -30,10 +31,10 @@
+     class ContainerContentWindow;
+     class Inventory;
+ 	class Item;
+-	class ItemDragContainer;
+ 	class RaySelector;
+ 
+-	class _RlUiExport InventoryWindow : public AbstractWindow
++	class _RlUiExport InventoryWindow : public AbstractWindow,
++        public ItemDragContainerDestroyListener
+ 	{
+ 	public:
+ 		static const Ogre::String SLOTNAME;
+@@ -48,6 +49,8 @@
+ 
+         bool showPossibleSlots(const Item* item);
+ 
++        void notifyItemDragContainerDestroyed(ItemDragContainer* cont);
++
+     private:
+ 		typedef std::map&lt;CeGuiString, ItemDragContainer*&gt; DndContainerMap;
+         typedef std::map&lt;CeGuiString, CEGUI::Window*&gt; SlotWindowMap;
+@@ -58,20 +61,22 @@
+ 		DndContainerMap mWorldDragContainers;
+ 		DndContainerMap mSlotDragContainers;
+ 		RaySelector* mMouseSelector;
++        bool mShowAllWorldItems;
+ 
+ 		void createSlotWindows(Inventory* inventory);
+         void initInventoryWindow(Inventory* inventory);
+ 
+ 		ItemDragContainer* createItemDragContainer(Item* item, bool showdescription, const CeGuiString&amp; containerName = &quot;&quot;);
+-        //ItemDragContainer* getItemDragContainer(Item* item, bool description);
++        ItemDragContainer* getItemDragContainer(const Item* item, bool description);
+         CeGuiString getDragContainerNameFromItem(const Item* item, bool description);
+ 		bool handleItemDroppedOnSlot(const CEGUI::EventArgs&amp; evt);
+         bool handleItemEntersSlot(const CEGUI::EventArgs&amp; evt);
+         bool handleItemLeavesSlot(const CEGUI::EventArgs&amp; evt);
+ 		bool handleItemDroppedOnWorld(const CEGUI::EventArgs&amp; evt);
++        bool handleItemDragEnded(const Item* item, bool description);
++        bool handleItemDragStarted(const Item* item, bool description);
+ 		bool handleMouseMovedInWorld(const CEGUI::EventArgs&amp; evt);
+-		//bool handleKeys(const CEGUI::EventArgs&amp; evt, bool down);
+-		bool destroyDragContainer(ItemDragContainer* cont);
++		bool handleKeys(const CEGUI::EventArgs&amp; evt, bool down);
+ 
+ 		Ogre::Rectangle getCeGuiRectFromWorldAABB(
+ 			CameraObject* camera,
+
+Modified: rl/trunk/engine/ui/include/ItemDragContainer.h
+===================================================================
+--- rl/trunk/engine/ui/include/ItemDragContainer.h	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/include/ItemDragContainer.h	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -26,6 +26,7 @@
+ 	class Inventory;
+ 	class Item;
+ 	class Slot;
++    class ItemDragContainerDestroyListener;
+ 
+ 	class ItemDragContainer : public CEGUI::DragContainer
+ 	{
+@@ -45,6 +46,12 @@
+ 		bool _handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item);
+ 		bool _handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item);
+ 
++        bool fadeOutAndHide(Ogre::Real delay);
++        bool stopFadeOut();
++
++        void destroyWindow(); // this is internally done with a windowfadejob to prevent problems
++
++        void setDestroyListener(ItemDragContainerDestroyListener *listener) {mDestroyListener = listener;}
+ 	protected:
+ 		CEGUI::Window* mContentWindow;
+ 		
+@@ -56,8 +63,17 @@
+ 		Container* mParentContainer;
+ 		CeGuiString mParentSlot;
+ 		Inventory* mInventory;
++        unsigned long mHideAndDestroyJobTicket;
++        bool mMarkedToHideAndDestroy;
++        ItemDragContainerDestroyListener *mDestroyListener;
+ 	};
+ 
++    class ItemDragContainerDestroyListener
++    {
++    public:
++        virtual void notifyItemDragContainerDestroyed(ItemDragContainer* cont) = 0;
++    };
++
+ } // namespace rl
+ 
+ #endif //__ItemDragContainer_H__
+
+Modified: rl/trunk/engine/ui/include/WindowFadeJob.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowFadeJob.h	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/include/WindowFadeJob.h	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -22,9 +22,15 @@
+ 
+ #include &quot;Job.h&quot;
+ 
++namespace CEGUI
++{
++    class Window;
++}
++
+ namespace rl {
+ 
+     class AbstractWindow;
++    class ItemDragContainer;
+ 
+     class WindowFadeJob : public Job
+     {
+@@ -32,13 +38,19 @@
+         typedef enum {FADE_IN, FADE_OUT, FADE_OUT_AND_DESTROY} Mode;
+ 
+         WindowFadeJob(AbstractWindow* window, Mode mode,
+-            Ogre::Real targetAlpha, Ogre::Real changeRate = 4.0f);
++            Ogre::Real targetAlpha = 1.0f, Ogre::Real changeRate = 4.0f);
++        WindowFadeJob::WindowFadeJob(CEGUI::Window* window, Mode mode, 
++            Ogre::Real targetAlpha = 1.0f, Ogre::Real changeRate = 4.0f);
++        WindowFadeJob::WindowFadeJob(ItemDragContainer* window, Mode mode, 
++            Ogre::Real targetAlpha = 1.0f, Ogre::Real changeRate = 4.0f);
+ 
+         virtual bool execute(Ogre::Real time);
+         virtual void discard();
+ 
+     protected:
+-        AbstractWindow* mWindow;
++        AbstractWindow* mAbstractWindow;
++        CEGUI::Window* mCEGUIWindow;
++        ItemDragContainer* mItemDragContainer;
+         Mode mMode;
+         Ogre::Real mChangeRate;
+         Ogre::Real mCurrentAlpha;
+
+Modified: rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -152,14 +152,28 @@
+ 				evtArgs.dragDropItem);
+ 			Item* item = dragcont-&gt;getItem();
+ 
+-            if( item-&gt;getParentContainer() == mContainer )
+-                return false;
+ 
+-			if( mContainer-&gt;addItem(item) )
++            int x = evtArgs.dragDropItem-&gt;getPixelRect().d_left;
++            int y = evtArgs.dragDropItem-&gt;getPixelRect().d_top;
++            x -= mContentWindow-&gt;getPixelRect().d_left;
++            y -= mContentWindow-&gt;getPixelRect().d_top;
++
++            // &#252;bergangspixel
++            x += 14;
++            y += 14;
++
++            x = x / 30;
++            y = y / 30;
++
++			if( mContainer-&gt;addItem(item,IntPair(x,y)) )
+             {
+-			    dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
++                if( dragcont != getItemWindow(item) )
++                {
++                    dragcont-&gt;destroyWindow();
++                    dragcont = createItemWindow(item);
++                    mContentWindow-&gt;addChildWindow(dragcont);
++                }
+ 			    std::pair&lt;unsigned int, unsigned int&gt; pos = mContainer-&gt;getItemPosition(item);
+-			    mContentWindow-&gt;addChildWindow(dragcont);
+ 			    dragcont-&gt;setPosition(
+ 				    UVector2(
+ 					    cegui_absdim(pos.first*30),
+@@ -174,7 +188,7 @@
+ 		return false;
+ 	}
+ 
+-	Window* ContainerContentWindow::createItemWindow(Item* item)
++	ItemDragContainer* ContainerContentWindow::createItemWindow(Item* item)
+ 	{
+         CeGuiString icon = item-&gt;getImageName();
+ 
+@@ -183,6 +197,8 @@
+ 			icon = ItemDragContainer::ICON_UNKNOWN_ITEM;
+ 		}
+ 
++        
++
+    //     LOG_MESSAGE(&quot;IW&quot;, icon);
+    //     Window* itemWindow =
+ 	  //      CEGUI::WindowManager::getSingletonPtr()-&gt;createWindow(
+@@ -192,12 +208,22 @@
+    //     itemWindow-&gt;setProperty(&quot;Image&quot;, icon);
+    //     itemWindow-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+    //     itemWindow-&gt;setSize(UVector2(cegui_reldim(1), cegui_reldim(1)));
++
++        ItemDragContainer* itemhandler = getItemWindow(item);
++        if( itemhandler )
++            return itemhandler;
++
++
++
++
+ 		CeGuiString dragContainerName =
+ 			mWindow-&gt;getName() +  &quot;/item/&quot;
+ 			+ Ogre::StringConverter::toString(item-&gt;getId())+&quot;_DragContainer&quot;;
+ 
+-		ItemDragContainer* itemhandler = new ItemIconDragContainer(item,
++		itemhandler = new ItemIconDragContainer(item,
+ 			dragContainerName);
++        itemhandler-&gt;setDestroyListener(this);
++        mItemDragContainerMap.insert(std::make_pair(item, itemhandler));
+ 		itemhandler-&gt;setItemParent(mContainer);
+ 		itemhandler-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+         if( mInventoryWindow )
+@@ -238,4 +264,28 @@
+             return false;
+         }
+     }
++
++    ItemDragContainer* ContainerContentWindow::getItemWindow(Item* item)
++    {
++        ItemDragContainerMap::iterator iter = mItemDragContainerMap.find(item);
++        if( iter != mItemDragContainerMap.end() )
++            return iter-&gt;second;
++
++        return NULL;
++    }
++
++    void ContainerContentWindow::notifyItemDragContainerDestroyed(ItemDragContainer* cont)
++    {
++        ItemDragContainerMap::iterator iter = mItemDragContainerMap.begin();
++        for( ; iter != mItemDragContainerMap.end(); iter++ )
++        {
++            if( iter-&gt;second == cont )
++            {
++                mItemDragContainerMap.erase(iter);
++                return;
++            }
++        }
++
++        LOG_ERROR(Logger::UI, &quot;Could not find ItemDragContainer in InventoryWindow::notifyItemDragContainerDestroyed!&quot;);
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/ControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ControlState.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/ControlState.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -174,7 +174,7 @@
+         if (sendKeyToCeGui(evt))
+         {
+             CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            cegui.injectKeyUp(evt.key);
++            cegui.injectKeyDown(evt.key);
+             return true;
+         }
+         else
+@@ -190,7 +190,7 @@
+         if (sendKeyToCeGui(evt))
+         {
+             CEGUI::System&amp; cegui = CEGUI::System::getSingleton();
+-            cegui.injectKeyDown(evt.key);
++            cegui.injectKeyUp(evt.key);
+             cegui.injectChar(im-&gt;getKeyChar(evt.key, im-&gt;getModifierCode()));
+             return true;
+         }
+@@ -238,7 +238,8 @@
+             || evt.key == OIS::KC_LEFT || evt.key == OIS::KC_RIGHT
+             || evt.key == OIS::KC_BACK || evt.key == OIS::KC_DELETE
+             || evt.key == OIS::KC_UP   || evt.key == OIS::KC_DOWN
+-            || evt.key == OIS::KC_RMENU)
++            || evt.key == OIS::KC_RMENU
++            || evt.key == OIS::KC_LCONTROL)
+         {
+             return true;
+         }
+
+Modified: rl/trunk/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -219,6 +219,12 @@
+ 
+     bool FreeflightControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+ 	{
++        if( ControlState::keyPressed(evt) )
++        {
++            mCurrentMovementState = MOVE_NONE;
++            return true;
++        }
++
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 
+ 		if (movement != MOVE_NONE)
+@@ -232,6 +238,12 @@
+ 
+     bool FreeflightControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+ 	{
++        if( ControlState::keyPressed(evt) )
++        {
++            mCurrentMovementState = MOVE_NONE;
++            return true;
++        }
++
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 
+ 		if (movement != MOVE_NONE)
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -45,7 +45,7 @@
+ 	const Ogre::String InventoryWindow::SLOTNAME = &quot;slotname&quot;;
+ 
+     InventoryWindow::InventoryWindow(const Ogre::String&amp; inventoryWindow, Inventory* inventory)
+-        : AbstractWindow(inventoryWindow, AbstractWindow::WIT_MOUSE_INPUT)
++        : AbstractWindow(inventoryWindow, AbstractWindow::WIT_MOUSE_INPUT | AbstractWindow::WIT_KEYBOARD_INPUT), mShowAllWorldItems(false)
+     {
+         mInventory = inventory;
+ 
+@@ -140,7 +140,6 @@
+ 				if (itemWindow != NULL)
+ 				{
+ 					slotWindow-&gt;addChildWindow(itemWindow);
+-                    slotWindow-&gt;setTooltipText(item-&gt;getName());
+ 				}
+             }
+         }
+@@ -150,13 +149,23 @@
+ 			boost::bind(&amp;InventoryWindow::handleItemDroppedOnWorld, this, _1));
+ 		mWorldBackground-&gt;subscribeEvent(Window::EventMouseMove,
+ 			boost::bind(&amp;InventoryWindow::handleMouseMovedInWorld, this, _1));
+-		//mWorldBackground-&gt;subscribeEvent(Window::EventKeyDown,
+-		//	boost::bind(&amp;InventoryWindow::handleKeys, this, _1, true));
+-		//mWorldBackground-&gt;subscribeEvent(Window::EventKeyUp,
+-		//	boost::bind(&amp;InventoryWindow::handleKeys, this, _1, false));
++
++        // be sure we get all key-events:
++        Window* invWnd = getWindow(&quot;InventoryWindow&quot;);
++        //invWnd-&gt;setDistributesCapturedInputs(false);
++		invWnd-&gt;subscribeEvent(Window::EventKeyDown,
++			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, true));
++		invWnd-&gt;subscribeEvent(Window::EventKeyUp,
++			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, false));
++        //mWorldBackground-&gt;setDistributesCapturedInputs(false);
++		mWorldBackground-&gt;subscribeEvent(Window::EventKeyDown,
++			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, true));
++		mWorldBackground-&gt;subscribeEvent(Window::EventKeyUp,
++			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, false));
++        //invWnd-&gt;activate();
+     }
+-/*
+-    ItemDragContainer* InventoryWindow::getItemDragContainer(Item* item, bool description)
++
++    ItemDragContainer* InventoryWindow::getItemDragContainer(const Item* item, bool description)
+     {
+ 		CeGuiString dragContainerName = getDragContainerNameFromItem(item, description);
+ 		ItemDragContainer* itemhandler = NULL;
+@@ -174,7 +183,6 @@
+ 
+         return NULL;
+     }
+-*/
+ 
+     CeGuiString InventoryWindow::getDragContainerNameFromItem(const Item* item, bool description)
+     {
+@@ -195,15 +203,17 @@
+ 		DndContainerMap::iterator itS = mSlotDragContainers.find(dragContainerName);
+ 		if (itW != mWorldDragContainers.end() || itS != mSlotDragContainers.end())
+ 		{
+-			//itemhandler = it-&gt;second;
+-			return NULL; ///@todo just a test
++			return NULL;
+ 		}
+ 		else
+ 		{
+ 			if (showdescription)
+ 				itemhandler = new ItemDescriptionDragContainer(item, dragContainerName);
+ 			else
++            {
+ 				itemhandler = new ItemIconDragContainer(item, dragContainerName);
++                itemhandler-&gt;setTooltipText(item-&gt;getName());
++            }
+ 
+ 			if (slotName != &quot;&quot;)
+ 			{
+@@ -215,23 +225,49 @@
+ 				mWorldDragContainers[dragContainerName] = itemhandler;
+ 			}
+ 
+-			//Window* itemWindow = itemhandler-&gt;getContentWindow();
++            itemhandler-&gt;setDestroyListener(this);
+ 
+-			//itemWindow-&gt;subscribeEvent(
+-			//	Window::EventMouseLeaves,
+-			//	boost::bind(&amp;InventoryWindow::destroyDragContainer, this, itemhandler));
+-
+-			itemhandler-&gt;setRiseOnClickEnabled(true);
++  			itemhandler-&gt;setRiseOnClickEnabled(true);
+ 			itemhandler-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+             itemhandler-&gt;subscribeEvent(DragContainer::EventDragStarted,
+-                boost::bind(&amp;rl::InventoryWindow::showPossibleSlots, this, item));
++                boost::bind(&amp;rl::InventoryWindow::handleItemDragStarted, this, item, showdescription));
+             itemhandler-&gt;subscribeEvent(DragContainer::EventDragEnded,
+-                boost::bind(&amp;InventoryWindow::showPossibleSlots, this, (Item*)NULL));
++                boost::bind(&amp;InventoryWindow::handleItemDragEnded, this, item, showdescription));
+ 		}
+ 
+ 		return itemhandler;
+ 	}
+ 
++    bool InventoryWindow::handleItemDragEnded(const Item* item, bool showdescription)
++    {
++        showPossibleSlots(NULL);
++
++        if( showdescription &amp;&amp; !mShowAllWorldItems) // this is a world item
++        {
++            // fade out and destroy
++            ItemDragContainer* cont = getItemDragContainer(item, showdescription);
++            if( cont )
++                cont-&gt;fadeOutAndHide(2.0f);
++        }
++
++        return true;
++    }
++
++    bool InventoryWindow::handleItemDragStarted(const Item* item, bool showdescription)
++    {
++        showPossibleSlots(item);
++
++        if( showdescription &amp;&amp; !mShowAllWorldItems) // this is a world item
++        {
++            // stop fade out and destroy
++            ItemDragContainer* cont = getItemDragContainer(item, showdescription);
++            if( cont )
++                cont-&gt;stopFadeOut();
++        }
++
++        return true;
++    }
++
+ 	bool InventoryWindow::handleItemDroppedOnSlot(const EventArgs&amp; evt)
+ 	{
+ 		const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
+@@ -247,12 +283,10 @@
+ 			{
+ 				if (dragcont-&gt;getItemParentContainer() != NULL)
+ 				{
+-					//dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
+ 					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+ 				}
+ 				else if (dragcont-&gt;getItemParentSlot() != &quot;&quot;)
+ 				{
+-					//dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
+ 					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+ 				}
+ 
+@@ -260,7 +294,7 @@
+ 
+ 				if (newCont)
+ 				{
+-					destroyDragContainer(dragcont);
++                    dragcont-&gt;destroyWindow();
+ 				}
+ 				else
+ 				{
+@@ -372,8 +406,9 @@
+ 				dragcont-&gt;getPixelRect().d_top / getRoot()-&gt;getPixelSize().d_height,
+ 				-1);
+ 
+-			destroyDragContainer(dragcont);
+ 
++            dragcont-&gt;destroyWindow();
++
+ 			Ogre::Vector3 targetPosWorldSpace =
+ 				mInventory-&gt;getOwner()-&gt;getPosition()
+ 				+ mInventory-&gt;getOwner()-&gt;getOrientation()
+@@ -393,6 +428,9 @@
+ 
+ 	bool InventoryWindow::handleMouseMovedInWorld(const EventArgs&amp; evt)
+ 	{
++        if( mShowAllWorldItems )
++            return true;
++
+ 		const MouseEventArgs&amp; mevt = static_cast&lt;const MouseEventArgs&amp;&gt;(evt);
+ 
+ 		Actor* cameraActor = ActorManager::getSingleton().getActor(&quot;DefaultCamera&quot;);
+@@ -422,13 +460,15 @@
+ 				LOG_MESSAGE(Logger::UI,
+ 					&quot;Selected &quot; + (*it)-&gt;getDescription());
+ 
+-				ItemDragContainer* cont =
+-					createItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
++                ItemDragContainer* cont = getItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
++
++                if( !cont )
++                {
++					cont = createItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
++                    mWorldBackground-&gt;addChildWindow(cont);
++                }
+ 				if (cont)
+ 				{
+-					mWorldBackground-&gt;addChildWindow(cont);
+-					cont-&gt;setVisible(true);
+-
+ 					Ogre::Rectangle aabb = getCeGuiRectFromWorldAABB(camera,
+ 							(*it)-&gt;getActor()-&gt;_getSceneNode()-&gt;_getWorldAABB());
+ 					UVector2 posCont = UVector2(
+@@ -436,58 +476,72 @@
+ 							UDim((aabb.top+aabb.bottom)/2.0, 0));
+ 					posCont -= cont-&gt;getSize() / UVector2(UDim(2, 2), UDim(2, 2));
+ 					cont-&gt;setPosition(posCont);
++					cont-&gt;setVisible(true);
++
++                    cont-&gt;fadeOutAndHide(2.0f);
+ 				}
+ 			}
+ 		}
+ 
+-		//camera-&gt;getPointOnScreen(
+-
+ 		return true;
+ 	}
+-/*
++
+ 	bool InventoryWindow::handleKeys(const CEGUI::EventArgs &amp;evt, bool down)
+ 	{
+ 		const KeyEventArgs&amp; kevt = static_cast&lt;const KeyEventArgs&amp;&gt;(evt);
+-		if (kevt.scancode == CEGUI::Key::Tab)
++        if (kevt.scancode == CEGUI::Key::LeftControl)
+ 		{
+ 			if (down)
+ 			{
++                mShowAllWorldItems = true;
++
+ 				Actor* cameraActor = ActorManager::getSingleton().getActor(&quot;DefaultCamera&quot;);
+ 				CameraObject* camera = static_cast&lt;CameraObject*&gt;(cameraActor-&gt;getControlledObject());
+ 
+ 				HalfSphereSelector sel(QUERYFLAG_ITEM);
+ 				sel.setPosition(cameraActor-&gt;getWorldPosition());
+ 				sel.setOrientation(cameraActor-&gt;getWorldOrientation());
+-				sel.setRadius(2.0);
++				sel.setRadius(10.0);
+ 
+ 				sel.updateSelection();
+ 				Selector::GameObjectVector v = sel.getAllSelectedObjects();
+ 				for (Selector::GameObjectVector::iterator
+ 					it = v.begin(); it != v.end(); ++it)
+ 				{
+-					ItemDragContainer* cont =
+-						createItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
+ 
+-					if (cont)
+-					{
+-						mWorldBackground-&gt;addChildWindow(cont);
++				    LOG_MESSAGE(Logger::UI,
++					    &quot;Selected &quot; + (*it)-&gt;getDescription());
+ 
+-						Ogre::Rectangle aabb = getCeGuiRectFromWorldAABB(camera,
+-							(*it)-&gt;getActor()-&gt;_getSceneNode()-&gt;_getWorldAABB());
+-						UVector2 posCont = UVector2(
+-							UDim((aabb.left+aabb.right)/2.0, 0),
+-							UDim((aabb.top+aabb.bottom)/2.0, 0));
+-						posCont -= cont-&gt;getSize() / UVector2(UDim(2, 2), UDim(2, 2));
+-						cont-&gt;setPosition(posCont);
+-					}
++                    ItemDragContainer* cont = getItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
++
++                    if( !cont )
++                    {
++					    cont = createItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
++                        mWorldBackground-&gt;addChildWindow(cont);
++                    }
++				    if (cont)
++				    {
++					    Ogre::Rectangle aabb = getCeGuiRectFromWorldAABB(camera,
++							    (*it)-&gt;getActor()-&gt;_getSceneNode()-&gt;_getWorldAABB());
++					    UVector2 posCont = UVector2(
++							    UDim((aabb.left+aabb.right)/2.0, 0),
++							    UDim((aabb.top+aabb.bottom)/2.0, 0));
++					    posCont -= cont-&gt;getSize() / UVector2(UDim(2, 2), UDim(2, 2));
++					    cont-&gt;setPosition(posCont);
++					    cont-&gt;setVisible(true);
++                        cont-&gt;moveToFront();
++                        cont-&gt;stopFadeOut();
++				    }
+ 				}
+ 			}
+ 			else
+ 			{
+-				while (!mWorldDragContainers.empty())
+-				{
+-					destroyDragContainer(mWorldDragContainers.begin()-&gt;second);
+-				}
++                mShowAllWorldItems = false;
++                DndContainerMap::iterator iter = mWorldDragContainers.begin();
++                for( ; iter != mWorldDragContainers.end(); iter++ )
++                {
++                    iter-&gt;second-&gt;fadeOutAndHide(0.0f);
++                }
+ 			}
+ 
+ 			return true;
+@@ -495,21 +549,6 @@
+ 
+ 		return false;
+ 	}
+-*/
+-	bool InventoryWindow::destroyDragContainer(rl::ItemDragContainer* cont)
+-	{
+-		cont-&gt;hide();
+-		cont-&gt;removeAllEvents();
+-		if (cont-&gt;getParent())
+-		{
+-			cont-&gt;getParent()-&gt;removeChildWindow(cont);
+-		}
+-		mWorldDragContainers.erase(cont-&gt;getName());
+-		mSlotDragContainers.erase(cont-&gt;getName());
+-		CEGUI::WindowManager::getSingleton().destroyWindow(cont-&gt;getContentWindow());
+-		
+-		return true;
+-	}
+ 
+ 	Ogre::Rectangle InventoryWindow::getCeGuiRectFromWorldAABB(
+ 		CameraObject* camera,
+@@ -603,4 +642,29 @@
+         }
+         return true;
+     }
++
++    void InventoryWindow::notifyItemDragContainerDestroyed(ItemDragContainer* cont)
++    {
++        DndContainerMap::iterator iter = mWorldDragContainers.begin();
++        for( ; iter != mWorldDragContainers.end(); iter++)
++        {
++            if( iter-&gt;second == cont )
++            {
++                mWorldDragContainers.erase(iter);
++                return;
++            }
++        }
++
++        iter = mSlotDragContainers.begin();
++        for( ; iter != mSlotDragContainers.end(); iter++)
++        {
++            if( iter-&gt;second == cont )
++            {
++                mSlotDragContainers.erase(iter);
++                return;
++            }
++        }
++
++        LOG_ERROR(Logger::UI, &quot;Could not find ItemDragContainer in InventoryWindow::notifyItemDragContainerDestroyed!&quot;);
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/ItemDragContainer.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -18,12 +18,15 @@
+ #include &quot;ItemDragContainer.h&quot;
+ 
+ #include &lt;CEGUIWindowManager.h&gt;
++#include &lt;CEGUIEventSet.h&gt;
+ 
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
++#include &quot;JobScheduler.h&quot;
+ #include &quot;WindowFactory.h&quot;
++#include &quot;WindowFadeJob.h&quot;
+ 
+ namespace rl {
+ 	const Ogre::String ItemDragContainer::ICON_UNKNOWN_ITEM = &quot;set:ModelThumbnails image:item_unknown&quot;;
+@@ -34,18 +37,50 @@
+ 		mParentContainer(NULL),
+ 		mParentSlot(&quot;&quot;),
+ 		mContentWindow(NULL),
+-        mInventory(NULL)
++        mInventory(NULL),
++        mMarkedToHideAndDestroy(false),
++        mDestroyListener(NULL)
+ 	{
+ 	}
+ 
+ 	ItemDragContainer::~ItemDragContainer()
+ 	{
++        if(mDestroyListener)
++            mDestroyListener-&gt;notifyItemDragContainerDestroyed(this);
++        stopFadeOut();
++
++        hide();
++		if (getParent())
++		{
++			getParent()-&gt;removeChildWindow(this);
++		}
+ 		removeAllEvents();
+ 		mContentWindow-&gt;removeAllEvents();
+ 		removeChildWindow(mContentWindow);
+ 		CEGUI::WindowManager::getSingleton().destroyWindow(mContentWindow);
++        CEGUI::WindowManager::getSingleton().destroyWindow(this);
+ 	}
+ 
++    void ItemDragContainer::destroyWindow()
++    {
++        if(mDestroyListener)
++            mDestroyListener-&gt;notifyItemDragContainerDestroyed(this);
++        mDestroyListener = NULL;
++        stopFadeOut();
++
++        hide();
++		if (getParent())
++		{
++			getParent()-&gt;removeChildWindow(this);
++		}
++
++        JobScheduler::getSingleton().addJob(
++            new WindowFadeJob(this,
++            WindowFadeJob::FADE_OUT_AND_DESTROY, 1.0f, 9999999999999.9f),
++            JobScheduler::JP_NORMAL,
++            0.0f);
++    }
++
+ 	void ItemDragContainer::setItemParent(Container* container)
+ 	{
+ 		mParentContainer = container;
+@@ -119,5 +154,29 @@
+ 		}
+ 	}
+ 
++    bool ItemDragContainer::fadeOutAndHide(Ogre::Real delay)
++    {
++        stopFadeOut();
+ 
++        mHideAndDestroyJobTicket =
++                JobScheduler::getSingleton().addJob(
++                    new WindowFadeJob(this,
++                    WindowFadeJob::FADE_OUT, 1.0f, 0.5f),
++                    JobScheduler::JP_NORMAL,
++                    delay);
++        mMarkedToHideAndDestroy = true;
++        return true;
++    }
++
++    bool ItemDragContainer::stopFadeOut()
++    {
++        if( mMarkedToHideAndDestroy )
++        {
++            JobScheduler::getSingleton().removeJob(mHideAndDestroyJobTicket);
++        }
++        mMarkedToHideAndDestroy = false;
++        setAlpha(1.0f);
++
++        return true;
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -1265,7 +1265,12 @@
+     //------------------------------------------------------------------------
+     bool MovementControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+     {
+-        if (ControlState::keyPressed(evt)) return true;
++        if( ControlState::keyPressed(evt) )
++        {
++            mCharacterState.mCurrentMovementState = MOVE_NONE |
++                (mCharacterState.mCurrentMovementState &amp; MOVE_RUN_LOCK);
++            return true;
++        }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+ 
+@@ -1286,9 +1291,11 @@
+     bool MovementControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+     {
+         // CEGUI is handled by base class, so hand it down if necessary.
+-        if (sendKeyToCeGui(evt))
++        if( ControlState::keyReleased(evt) )
+         {
+-            return ControlState::keyReleased(evt);
++            mCharacterState.mCurrentMovementState = MOVE_NONE |
++                (mCharacterState.mCurrentMovementState &amp; MOVE_RUN_LOCK);
++            return true;
+         }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+
+Modified: rl/trunk/engine/ui/src/WindowFadeJob.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFadeJob.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/WindowFadeJob.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -20,6 +20,8 @@
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;CeGuiHelper.h&quot;
+ #include &quot;WindowManager.h&quot;
++#include &lt;CEGUIWindowManager.h&gt;
++#include &quot;ItemDragContainer.h&quot;
+ 
+ using namespace CEGUI;
+ using namespace Ogre;
+@@ -28,17 +30,49 @@
+ {
+     WindowFadeJob::WindowFadeJob(AbstractWindow* window, Mode mode, Real targetAlpha, Real changeRate)
+         : Job(true, true),
+-        mWindow(window),
++        mAbstractWindow(window),
++        mCEGUIWindow(window-&gt;getWindow()),
++        mItemDragContainer(NULL),
+         mMode(mode),
+         mChangeRate(changeRate),
+         mCurrentAlpha(mode == FADE_IN ? 0.0f : 1.0f),
+         mTargetAlpha(mode == FADE_IN ? targetAlpha : 0.0f)
+     {
+         // Ensure visibility. This is independant of whether we're fading in or out.
+-        mWindow-&gt;getWindow()-&gt;setVisible(true);
+-        mWindow-&gt;getWindow()-&gt;setAlpha(mCurrentAlpha);
++        mCEGUIWindow-&gt;setVisible(true);
++        mCEGUIWindow-&gt;setAlpha(mCurrentAlpha);
+     }
+ 
++    WindowFadeJob::WindowFadeJob(CEGUI::Window* window, Mode mode, Real targetAlpha, Real changeRate)
++        : Job(true, true),
++        mAbstractWindow(NULL),
++        mCEGUIWindow(window),
++        mItemDragContainer(NULL),
++        mMode(mode),
++        mChangeRate(changeRate),
++        mCurrentAlpha(mode == FADE_IN ? 0.0f : 1.0f),
++        mTargetAlpha(mode == FADE_IN ? targetAlpha : 0.0f)
++    {
++        // Ensure visibility. This is independant of whether we're fading in or out.
++        mCEGUIWindow-&gt;setVisible(true);
++        mCEGUIWindow-&gt;setAlpha(mCurrentAlpha);
++    }
++
++    WindowFadeJob::WindowFadeJob(ItemDragContainer* window, Mode mode, Real targetAlpha, Real changeRate)
++        : Job(true, true),
++        mAbstractWindow(NULL),
++        mCEGUIWindow(window),
++        mItemDragContainer(window),
++        mMode(mode),
++        mChangeRate(changeRate),
++        mCurrentAlpha(mode == FADE_IN ? 0.0f : 1.0f),
++        mTargetAlpha(mode == FADE_IN ? targetAlpha : 0.0f)
++    {
++        // Ensure visibility. This is independant of whether we're fading in or out.
++        mCEGUIWindow-&gt;setVisible(true);
++        mCEGUIWindow-&gt;setAlpha(mCurrentAlpha);
++    }
++
+     bool WindowFadeJob::execute(Real time)
+     {
+         mCurrentAlpha += time * mChangeRate * Math::Sign(mTargetAlpha - mCurrentAlpha);
+@@ -50,18 +84,23 @@
+             discard();
+             return true;
+         }
+-        mWindow-&gt;getWindow()-&gt;setAlpha(mCurrentAlpha);
++        mCEGUIWindow-&gt;setAlpha(mCurrentAlpha);
+ 
+         return false;
+     }
+ 
+     void WindowFadeJob::discard()
+     {
+-        mWindow-&gt;getWindow()-&gt;setAlpha(mTargetAlpha);
+-        mWindow-&gt;getWindow()-&gt;setVisible(mMode == FADE_IN ? true : false);
++        mCEGUIWindow-&gt;setAlpha(mTargetAlpha);
++        mCEGUIWindow-&gt;setVisible(mMode == FADE_IN ? true : false);
+         if (mMode == FADE_OUT_AND_DESTROY)
+         {
+-            WindowManager::getSingleton().destroyWindow(mWindow);
++            if( mAbstractWindow )
++                WindowManager::getSingleton().destroyWindow(mAbstractWindow);
++            else if(mItemDragContainer)
++                delete mItemDragContainer;
++            else
++                CEGUI::WindowManager::getSingleton().destroyWindow(mCEGUIWindow);
+         }
+     }
+ }
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2007-08-27 16:50:03 UTC (rev 3761)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2007-08-27 17:05:10 UTC (rev 3762)
+@@ -97,7 +97,7 @@
+         {
+             mNumActiveWindowsMouseInput += isVisible ? +1 : -1;
+         }
+-        else if (window-&gt;getWindowInputType() &amp; AbstractWindow::WIT_KEYBOARD_INPUT)
++        if (window-&gt;getWindowInputType() &amp; AbstractWindow::WIT_KEYBOARD_INPUT)
+         {
+             mNumActiveWindowsKeyboardInput += isVisible ? +1 : -1;
+         }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000832.html">[Dsa-hl-svn] r3761 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000834.html">[Dsa-hl-svn] r3763 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#833">[ date ]</a>
+              <a href="thread.html#833">[ thread ]</a>
+              <a href="subject.html#833">[ subject ]</a>
+              <a href="author.html#833">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

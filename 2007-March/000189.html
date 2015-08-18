@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3118 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3118%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200703041904.l24J4Ptb010006%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000188.html">
+   <LINK REL="Next"  HREF="000190.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3118 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3118%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200703041904.l24J4Ptb010006%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3118 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar  4 20:04:25 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000188.html">[Dsa-hl-svn] r3117 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="000190.html">[Dsa-hl-svn] r3119 - in rl/trunk/engine: ai ai/include ai/src	core/include script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-03-04 20:04:01 +0100 (Sun, 04 Mar 2007)
+New Revision: 3118
+
+Modified:
+   rl/trunk/engine/ui/include/MovementCharacterController.h
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+resetCamera does now also reset the char correctly
+
+Modified: rl/trunk/engine/ui/include/MovementCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementCharacterController.h	2007-03-04 18:52:38 UTC (rev 3117)
++++ rl/trunk/engine/ui/include/MovementCharacterController.h	2007-03-04 19:04:01 UTC (rev 3118)
+@@ -105,6 +105,12 @@
+ 
+ 			int mCurrentMovementState;
+ 			int mLastMovementState;
++            bool beginSneak;
++            bool endSneak;
++            bool beginJump;
++            bool endJump;
++            enum {HOCHSPRUNG, WEITSPRUNG /*, PRAEZISER_SPRUNG*/}
++                        jumpType;
+ 		};
+ 
+         static Ogre::String msDebugWindowPageName;
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-04 18:52:38 UTC (rev 3117)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-03-04 19:04:01 UTC (rev 3118)
+@@ -63,7 +63,11 @@
+         mJumpTimer(0.0),
+         mDesiredVel(Vector3::ZERO),
+         mCurrentMovementState(MOVE_NONE),
+-        mLastMovementState(MOVE_NONE)
++        mLastMovementState(MOVE_NONE),
++        beginSneak(false),
++        endSneak(false),
++        beginJump(false),
++        endJump(false)
+     {
+ 
+     }
+@@ -283,23 +287,20 @@
+ 
+         //  --------------------------- sneaking-behaviour ----------------------------
+         {
+-            static bool beginSneak (false);
+-            static bool endSneak (false);
+-            
+             if( (!(creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) &amp;&amp; 
+                 movement &amp; MOVE_SNEAK) || 
+-                beginSneak )
++                mCharacterState.beginSneak )
+             {
+-                beginSneak = true;
++                mCharacterState.beginSneak = true;
+             }
+             if( (!(movement &amp; MOVE_SNEAK) &amp;&amp; 
+                 creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) || 
+-                endSneak)
++                mCharacterState.endSneak)
+             {
+-                endSneak = true;
++                mCharacterState.endSneak = true;
+             }
+ 
+-            if( beginSneak )
++            if( mCharacterState.beginSneak )
+             {
+                 newAnimation = &quot;idle_zu_hocke&quot;;
+ 
+@@ -308,7 +309,7 @@
+                 {
+                     creatureMovement |= Creature::BEWEGUNG_SCHLEICHEN;
+                     mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+-                    beginSneak = false;
++                    mCharacterState.beginSneak = false;
+                 }
+                 else
+                 {
+@@ -330,7 +331,7 @@
+                 collisionPose = newAnimation;
+             }
+ 
+-            if( endSneak )
++            if( mCharacterState.endSneak )
+             {
+                 creatureMovement &amp;= ~Creature::BEWEGUNG_SCHLEICHEN;
+                 mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+@@ -341,7 +342,7 @@
+                 if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+                 {
+                     newAnimation = &quot;idle&quot;;
+-                    endSneak = false;
++                    mCharacterState.endSneak = false;
+                 }
+                 else
+                 {
+@@ -493,25 +494,18 @@
+ 
+                 // ---------- jumping-behaviour (and falling?) ---------
+                 {
+-
+-                    static bool beginJump (false);
+-                    static bool endJump (false);
+-                    static enum {HOCHSPRUNG, WEITSPRUNG /*, PRAEZISER_SPRUNG*/}
+-                        jumpType;
+-
+-
+                     if( !(creatureMovement &amp; Creature::BEWEGUNG_SCHLEICHEN) &amp;&amp; 
+-                        !blockMovement &amp;&amp; !beginJump &amp;&amp;
++                        !blockMovement &amp;&amp; !mCharacterState.beginJump &amp;&amp;
+                         !(creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG) &amp;&amp;
+                         !(creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG) &amp;&amp;
+                         movement &amp; MOVE_JUMP)
+                     {
+                         if( mCharacterState.mDesiredVel.squaredLength() &gt; 0 )
+                         {
+-                            jumpType = WEITSPRUNG;
++                            mCharacterState.jumpType = CharacterState::WEITSPRUNG;
+                             if( mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement | Creature::BEWEGUNG_WEITSPRUNG) )
+                             {
+-                                beginJump = true;
++                                mCharacterState.beginJump = true;
+                                 Real jumpWidth = 
+                                     mCharacter-&gt;doTaktischeBewegung(
+                                             newCreatureMovement | Creature::BEWEGUNG_WEITSPRUNG,
+@@ -523,10 +517,10 @@
+                         }
+                         else
+                         {
+-                            jumpType = HOCHSPRUNG;
++                            mCharacterState.jumpType = CharacterState::HOCHSPRUNG;
+                             if( mCharacter-&gt;canUseTaktischeBewegung(newCreatureMovement | Creature::BEWEGUNG_HOCHSPRUNG) )
+                             {
+-                                beginJump = true;
++                                mCharacterState.beginJump = true;
+                                 Real jumpHeight = 
+                                     mCharacter-&gt;doTaktischeBewegung(
+                                             newCreatureMovement | Creature::BEWEGUNG_HOCHSPRUNG,
+@@ -541,17 +535,17 @@
+ 
+                     if( (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG ||
+                         creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG  ) &amp;&amp;
+-                        !beginJump )
++                        !mCharacterState.beginJump )
+                     {
+                         if( !mCharacterState.mIsAirBorne )
+-                            endJump = true;
++                            mCharacterState.endJump = true;
+                     }
+ 
+ 
+ 
+                     
+                     Real timeJumpKeyPressed (0.0);
+-                    if( !beginJump )
++                    if( !mCharacterState.beginJump )
+                         timeJumpKeyPressed = 0;
+                     else if( movement &amp; MOVE_JUMP &amp;&amp; 
+                         (creatureMovement &amp; Creature::BEWEGUNG_HOCHSPRUNG ||
+@@ -560,10 +554,10 @@
+ 
+ 
+ 
+-                    if( beginJump )
++                    if( mCharacterState.beginJump )
+                     {
+                         blockMovement = true;
+-                        if( jumpType == WEITSPRUNG )
++                        if( mCharacterState.jumpType == CharacterState::WEITSPRUNG )
+                         {
+                             newAnimation = &quot;rennen_absprung&quot;;
+                             animSpeed = factor_rennen_sprung * vel;
+@@ -581,7 +575,7 @@
+                             mCharacterState.mStartJump = true;
+                             if( timeJumpKeyPressed &gt; 0.5 )
+                             mCharacterState.mJumpWidthHeight *= timeJumpKeyPressed / meshAnim-&gt;getLength();
+-                            beginJump = false;
++                            mCharacterState.beginJump = false;
+                         }
+                     }
+                     else // !beginJump
+@@ -600,7 +594,7 @@
+                         }
+                     }
+ 
+-                    if( endJump )
++                    if( mCharacterState.endJump )
+                     {
+                         blockMovement = true;
+                         if( creatureMovement &amp; Creature::BEWEGUNG_WEITSPRUNG )
+@@ -618,7 +612,7 @@
+                         MeshAnimation *meshAnim = mesh-&gt;getAnimation(newAnimation);
+                         if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+                         {
+-                            endJump = false;
++                            mCharacterState.endJump = false;
+                             creatureMovement &amp;= ~Creature::BEWEGUNG_HOCHSPRUNG &amp; ~Creature::BEWEGUNG_WEITSPRUNG;
+                             mCharacter-&gt;setTaktischeBewegung(creatureMovement);
+                         }
+@@ -1733,6 +1727,10 @@
+         mCharacterState.mStartJump = false;
+         mCharacterState.mJumpTimer = 0;
+         mCharacter-&gt;setTaktischeBewegung(Creature::BEWEGUNG_NONE);
++        mCharacterState.beginJump = false;
++        mCharacterState.endJump = false;
++        mCharacterState.beginSneak = false;
++        mCharacterState.endSneak = false;
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000188.html">[Dsa-hl-svn] r3117 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="000190.html">[Dsa-hl-svn] r3119 - in rl/trunk/engine: ai ai/include ai/src	core/include script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

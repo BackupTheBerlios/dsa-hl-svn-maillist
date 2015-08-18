@@ -1,0 +1,247 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3501 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3501%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706051837.l55Ib3KZ017721%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000571.html">
+   <LINK REL="Next"  HREF="000573.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3501 - in rl/trunk/engine/rules: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3501%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200706051837.l55Ib3KZ017721%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3501 - in rl/trunk/engine/rules: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun  5 20:37:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000571.html">[Dsa-hl-svn] r3500 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="000573.html">[Dsa-hl-svn] r3502 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#572">[ date ]</a>
+              <a href="thread.html#572">[ thread ]</a>
+              <a href="subject.html#572">[ subject ]</a>
+              <a href="author.html#572">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-05 20:36:56 +0200 (Tue, 05 Jun 2007)
+New Revision: 3501
+
+Modified:
+   rl/trunk/engine/rules/include/MovingCreature.h
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+added method getYaw in order to determine the orientation the creature is turning to
+
+Modified: rl/trunk/engine/rules/include/MovingCreature.h
+===================================================================
+--- rl/trunk/engine/rules/include/MovingCreature.h	2007-06-05 15:42:45 UTC (rev 3500)
++++ rl/trunk/engine/rules/include/MovingCreature.h	2007-06-05 18:36:56 UTC (rev 3501)
+@@ -139,6 +139,10 @@
+                           );
+ 
+ 
++        /// this method will return the yaw, the creature tries to turn to, if a rotation-movement is activated. if not, it will return the current yaw
++        Ogre::Radian getYaw();
++
++
+     protected:
+         Creature *mCreature;
+         AbstractLocation mAbstractLocation;
+@@ -169,7 +173,7 @@
+         public OgreNewt::ContactCallback
+     {
+     public:
+-        AbstractMovement(MovingCreature *movingCreature) : mMovingCreature(movingCreature) {}
++        AbstractMovement(MovingCreature *movingCreature) : mMovingCreature(movingCreature), mActive(false) {}
+ 
+         /// returns the id of this movement
+         virtual MovingCreature::MovementType getId() const = 0;
+@@ -224,13 +228,15 @@
+         /**
+          * this function is called if this movement is activated.
+          * it can be used to determine if a new &quot;Talentprobe&quot; is needed
++         * if you ovveride it, please make sure to call the base class method
+          */
+-        virtual void activate() {}
++        virtual void activate() {mActive = true;}
+ 
+         /**
+          * this function is called every time this movement is deactivated.
++         * if you ovveride it, please make sure to call the base class method
+          */
+-        virtual void deactivate() {}
++        virtual void deactivate() {mActive = false;}
+ 
+         /**
+          * this method is used to get to know if a movement can be used with a certain direction
+@@ -246,8 +252,15 @@
+          */
+         virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const = 0;
+ 
++
++        /// this can return true even though movingcreature doesn't call this movement, but another that is using this movement
++        bool isActive() const {return mActive;}
++
++        /// this method is used to return the yaw value of rotation movemenrts etc
++        virtual Ogre::Real getMovementDefinedValue() {return 0;}
+     protected:
+         MovingCreature *mMovingCreature;
++        bool mActive;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-05 15:42:45 UTC (rev 3500)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-05 18:36:56 UTC (rev 3501)
+@@ -42,10 +42,12 @@
+         virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_NONE;}
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             getRotationMovement()-&gt;activate();
+         }
+         virtual void deactivate()
+         {
++            AbstractMovement::deactivate();
+             getRotationMovement()-&gt;deactivate();
+         }
+         virtual bool calculateBaseVelocity(Real &amp;velocity)
+@@ -157,10 +159,12 @@
+         }
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             mYaw = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getWorldOrientation().getYaw();
+         }
+         virtual void deactivate()
+         {
++            AbstractMovement::deactivate();
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep) 
+         {
+@@ -209,6 +213,7 @@
+     protected:
+         Ogre::Radian mYaw;
+         Ogre::Real mRotLinearDampingK, mRotLinearSpringK;
++        virtual Real getMovementDefinedValue() {return mYaw.valueRadians();}
+     };
+ 
+ 
+@@ -311,6 +316,7 @@
+         }
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             doTalentProbeIfNecessary();
+         }
+         virtual void doTalentProbeIfNecessary()
+@@ -387,6 +393,7 @@
+         }
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             doTalentProbeIfNecessary();
+         }
+         virtual void doTalentProbeIfNecessary()
+@@ -543,6 +550,7 @@
+         virtual void setAnimation(Ogre::Real elapsedTime) {} // is not used
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             mState = UPTODOWN;
+             mMovingCreature-&gt;setAnimation(&quot;idle_zu_hocke&quot;,1,1,&quot;idle&quot;);
+             mTimer = 0;
+@@ -574,6 +582,7 @@
+         virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             mState = DOWNTOUP;
+             mMovingCreature-&gt;setAnimation(&quot;idle_absprung&quot;,1,1,&quot;idle&quot;);
+             mTimer = 0;
+@@ -605,6 +614,7 @@
+         }
+         virtual void deactivate()
+         {
++            AbstractMovement::deactivate();
+         }
+         virtual bool calculateBaseVelocity(Real &amp;velocity)
+         {
+@@ -736,6 +746,7 @@
+         virtual MovingCreature::MovementType getFallBackMovement() const {return MovingCreature::MT_STEHEN;}
+         virtual void activate()
+         {
++            AbstractMovement::activate();
+             mState = DOWNTOUP;
+             mMovingCreature-&gt;setAnimation(&quot;rennen_absprung&quot;,1,1,&quot;rennen&quot;);
+             mTimer = 0;
+@@ -767,6 +778,7 @@
+         }
+         virtual void deactivate()
+         {
++            AbstractMovement::deactivate();
+         }
+         virtual bool calculateBaseVelocity(Real &amp;velocity)
+         {
+@@ -1199,4 +1211,21 @@
+ 
+         return false;
+     }
++
++
++
++    Ogre::Radian MovingCreature::getYaw()
++    {
++        Radian yaw = mCreature-&gt;getActor()-&gt;getWorldOrientation().getYaw();
++
++        AbstractMovement *drehen = getMovementFromId(MT_DREHEN);
++        
++        if( drehen == NULL )
++            return yaw;
++
++        if( !drehen-&gt;isActive() )
++            return yaw;
++
++        return Radian(drehen-&gt;getMovementDefinedValue());
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000571.html">[Dsa-hl-svn] r3500 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="000573.html">[Dsa-hl-svn] r3502 - in rl/trunk/engine/ai: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#572">[ date ]</a>
+              <a href="thread.html#572">[ thread ]</a>
+              <a href="subject.html#572">[ subject ]</a>
+              <a href="author.html#572">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

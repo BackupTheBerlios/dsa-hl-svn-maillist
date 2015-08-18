@@ -1,0 +1,444 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4030 - in rl/trunk/engine: ai/include ai/src	script/swig ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4030%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200712182151.lBILp46w024430%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001100.html">
+   <LINK REL="Next"  HREF="001102.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4030 - in rl/trunk/engine: ai/include ai/src	script/swig ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4030%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200712182151.lBILp46w024430%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4030 - in rl/trunk/engine: ai/include ai/src	script/swig ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Dec 18 22:51:04 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001100.html">[Dsa-hl-svn] r4029 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001102.html">[Dsa-hl-svn] r4031 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1101">[ date ]</a>
+              <a href="thread.html#1101">[ thread ]</a>
+              <a href="subject.html#1101">[ subject ]</a>
+              <a href="author.html#1101">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-12-18 22:50:58 +0100 (Tue, 18 Dec 2007)
+New Revision: 4030
+
+Modified:
+   rl/trunk/engine/ai/include/Dialog.h
+   rl/trunk/engine/ai/include/DialogManager.h
+   rl/trunk/engine/ai/src/Dialog.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+   rl/trunk/engine/ui/src/DialogWindow.cpp
+Log:
+Save dialogs, introduce option for multiple pcs and npcs
+
+Modified: rl/trunk/engine/ai/include/Dialog.h
+===================================================================
+--- rl/trunk/engine/ai/include/Dialog.h	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/ai/include/Dialog.h	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -32,7 +32,7 @@
+     public:
+ 		static const Ogre::String PROP_EXIT_REQUESTED;
+ 
+-        Dialog(Creature* pc, Creature* npc);
++        Dialog(const std::vector&lt;Creature*&gt;&amp; pc, const std::vector&lt;Creature*&gt;&amp; npc);
+         ~Dialog();
+ 
+         DialogResponse* getDialogStart() const;
+
+Modified: rl/trunk/engine/ai/include/DialogManager.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogManager.h	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/ai/include/DialogManager.h	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -22,10 +22,12 @@
+ 
+ #include &lt;OgreScriptLoader.h&gt;
+ #include &quot;Properties.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ #include &quot;XmlProcessor.h&quot;
+ 
+ namespace rl
+ {
++    class Creature;
+     class Dialog;
+     class DialogCondition;
+     class DialogElement;
+@@ -34,22 +36,37 @@
+     class DialogParagraph;
+     class DialogResponse;
+     class DialogVariable;
+-    class Creature;
+ 
+     class _RlAiExport DialogManager 
+         : public Ogre::Singleton&lt;DialogManager&gt;, 
+         public Ogre::ScriptLoader, 
++        public PropertyHolder,
++        public SaveGameData,
+         private XmlProcessor
+     {
+     public:
++        static const Ogre::String PROPERTY_DIALOGS;
++        static const Ogre::String PROPERTY_DIALOG;
++        static const Ogre::String PROPERTY_DIALOG_NAME;
++        static const Ogre::String PROPERTY_NPCS;
++
+         DialogManager();
+         ~DialogManager();
+ 
+         virtual const Ogre::StringVector&amp; getScriptPatterns() const;
+         virtual void parseScript(Ogre::DataStreamPtr&amp; stream, const Ogre::String&amp; groupName);
+ 		virtual Ogre::Real getLoadingOrder() const;
+-        Dialog* createDialog(const Ogre::String&amp; name, Creature* pc, Creature* npc);
++        Dialog* createDialog(const Ogre::String&amp; name, rl::Creature* npc, rl::Creature* pc);
++        Dialog* createDialog(const Ogre::String&amp; name, const std::vector&lt;Creature*&gt;&amp; pcs, const std::vector&lt;Creature*&gt;&amp; npcs);
+ 
++        virtual const Property getProperty(const Ogre::String&amp; key) const;
++        virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++        virtual PropertyRecord* getAllProperties() const;
++        virtual void writeData(SaveGameFileWriter *writer);
++        virtual void readData(SaveGameFileReader* reader);
++        virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual int getPriority() const;
++
+     private:
+ 
+         class DialogPrototype
+@@ -61,7 +78,7 @@
+             DialogResponse* getResponse(int id) const;
+ 
+             void setStartResponse(DialogResponse* response);
+-            Dialog* createDialog(Creature* pc, Creature* npc);
++            Dialog* createDialog(const std::vector&lt;Creature*&gt;&amp; pcs, const std::vector&lt;Creature*&gt;&amp; npcs);
+             void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+ 
+         private:
+@@ -71,6 +88,21 @@
+             PropertyRecord mPropertyVariables;
+         };
+ 
++        class DialogConfiguration
++        {
++        public:
++            DialogConfiguration(const Ogre::String&amp; name, const std::vector&lt;Creature*&gt;&amp; npcs);
++
++            const Ogre::String&amp; getName() const;
++            const std::vector&lt;Creature*&gt;&amp; getNpcs() const;
++            
++            bool operator==(const DialogConfiguration&amp;) const;
++            bool operator&lt;(const DialogConfiguration&amp;) const;
++        private:
++            Ogre::String mDialogName;
++            std::vector&lt;Creature*&gt; mNpcs;
++        };
++
+         void processDialog(XERCES_CPP_NAMESPACE::DOMElement* dialogXml);
+         DialogResponse* processResponseClasses(XERCES_CPP_NAMESPACE::DOMNode *node, DialogPrototype* dialogPrototype);
+         DialogResponse* processResponse(XERCES_CPP_NAMESPACE::DOMElement* responseXml, DialogPrototype* dialogPrototype, bool subelements);
+@@ -89,6 +121,7 @@
+ 
+         Ogre::StringVector mScriptPatterns;
+         std::map&lt;Ogre::String, DialogPrototype*&gt; mDialogs;
++        std::map&lt;DialogConfiguration, Dialog*&gt; mDialogStates;
+     };
+ 
+ }
+
+Modified: rl/trunk/engine/ai/src/Dialog.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Dialog.cpp	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/ai/src/Dialog.cpp	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -22,10 +22,10 @@
+ {
+ 	const Ogre::String Dialog::PROP_EXIT_REQUESTED = &quot;exit_requested&quot;;
+ 
+-    Dialog::Dialog(Creature* npc, Creature* pc)
++    Dialog::Dialog(const std::vector&lt;Creature*&gt;&amp; npc, const std::vector&lt;Creature*&gt;&amp; pc)
+     {
+-        mNonPlayerCharacters.push_back(npc);
+-        mPlayerCharacters.push_back(pc);
++        mNonPlayerCharacters = npc;
++        mPlayerCharacters = pc;
+     }
+ 
+     Dialog::~Dialog()
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -19,6 +19,7 @@
+ 
+ #include &lt;xercesc/dom/DOM.hpp&gt;
+ 
++#include &quot;Creature.h&quot;
+ #include &quot;Dialog.h&quot;
+ #include &quot;DialogCondition.h&quot;
+ #include &quot;DialogElement.h&quot;
+@@ -27,6 +28,7 @@
+ #include &quot;DialogParagraph.h&quot;
+ #include &quot;DialogResponse.h&quot;
+ #include &quot;DialogVariable.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ #include &quot;XmlPropertyReader.h&quot;
+ 
+ using namespace Ogre;
+@@ -37,15 +39,21 @@
+ 
+ namespace rl
+ {
++    const Ogre::String DialogManager::PROPERTY_DIALOGS = &quot;dialogs&quot;;
++    const Ogre::String DialogManager::PROPERTY_DIALOG = &quot;dialog&quot;;
++    const Ogre::String DialogManager::PROPERTY_DIALOG_NAME = &quot;name&quot;;
++    const Ogre::String DialogManager::PROPERTY_NPCS = &quot;npc&quot;;
+ 
+     DialogManager::DialogManager()
+         : XmlProcessor(), ScriptLoader()
+     {
+         mScriptPatterns.push_back(&quot;*.dialog&quot;);
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
+     DialogManager::~DialogManager()
+     {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+     }
+ 
+     const StringVector&amp; DialogManager::getScriptPatterns() const
+@@ -77,6 +85,78 @@
+         shutdownXml();
+     }
+ 
++    const Property DialogManager::getProperty(const Ogre::String &amp;key) const
++    {
++        if (key == DialogManager::PROPERTY_DIALOGS)
++        {
++            PropertyVector vec;
++            for (std::map&lt;DialogConfiguration, Dialog*&gt;::const_iterator it
++                = mDialogStates.begin(); it != mDialogStates.end(); ++it)
++            {
++                PropertyMap curDialogProp;
++                PropertyRecord* dialogProps = it-&gt;second-&gt;getAllProperties();
++                curDialogProp[DialogManager::PROPERTY_DIALOG] = dialogProps-&gt;toPropertyMap();
++                curDialogProp[DialogManager::PROPERTY_DIALOG_NAME] = Property(it-&gt;first.getName());
++
++                PropertyVector npcs;
++
++                for (std::vector&lt;Creature*&gt;::const_iterator itNpc = it-&gt;first.getNpcs().begin();
++                    itNpc != it-&gt;first.getNpcs().end(); ++itNpc)
++                {
++                    npcs.push_back(GameObjectManager::getSingleton().toProperty(*itNpc));
++                }
++
++                curDialogProp[DialogManager::PROPERTY_NPCS] = Property(npcs);
++
++                delete dialogProps;
++            }
++
++            return Property(vec);
++        }
++
++        Throw(IllegalArgumentException, key + &quot; is not a property of DialogManager&quot;);
++    }
++
++    PropertyRecord* DialogManager::getAllProperties() const
++    {
++        PropertyRecord* pr = new PropertyRecord();
++        pr-&gt;setProperty(DialogManager::PROPERTY_DIALOGS, getProperty(DialogManager::PROPERTY_DIALOGS));
++        return pr;
++    }
++
++    void DialogManager::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    {
++        ///@todo implement
++    }
++
++    void DialogManager::writeData(SaveGameFileWriter *writer)
++    {
++        LOG_MESSAGE(Logger::RULES, &quot;Saving dialogs&quot;);
++
++        PropertyRecord* set = getAllProperties();
++        writer-&gt;writeEachProperty(this, set-&gt;toPropertyMap());
++        delete set;
++    }
++
++    void DialogManager::readData(SaveGameFileReader* reader)
++    {
++        LOG_MESSAGE(Logger::RULES, &quot;Loading dialogs&quot;);
++
++        PropertyRecord properties = reader-&gt;getAllPropertiesAsRecord(this);
++        setProperties(&amp;properties);
++    }
++
++    int DialogManager::getPriority() const
++    {
++        return 50;
++    }
++
++    CeGuiString DialogManager::getXmlNodeIdentifier() const
++    {
++        return &quot;dialogs&quot;;
++    }
++
++
+     void DialogManager::processDialog(DOMElement* dialogElem)
+     {
+         DialogPrototype* dialogPrototype = new DialogPrototype();
+@@ -425,16 +505,38 @@
+         return cond;
+     }
+ 
+-    Dialog* DialogManager::createDialog(const Ogre::String&amp; name, Creature* pc, Creature* npc)
++    Dialog* DialogManager::createDialog(const Ogre::String&amp; name, Creature* npc, Creature* pc)
+     {
+-        std::map&lt;Ogre::String, DialogPrototype*&gt;::iterator it = mDialogs.find(name);
+-        if (it == mDialogs.end())
++        std::vector&lt;Creature*&gt; npcs;
++        npcs.push_back(npc);
++        std::vector&lt;Creature*&gt; pcs;
++        pcs.push_back(pc);
++
++        return createDialog(name, npcs, pcs);
++    }
++
++    Dialog* DialogManager::createDialog(const Ogre::String&amp; name, const std::vector&lt;Creature*&gt;&amp; pcs, const std::vector&lt;Creature*&gt;&amp; npcs)
++    {
++        std::map&lt;DialogConfiguration, Dialog*&gt;::iterator it 
++            = mDialogStates.find(DialogConfiguration(name, npcs));
++
++        Dialog* dialog;
++        if (it != mDialogStates.end())
+         {
+-            return NULL;
++            dialog = (*it).second;
+         }
++        else 
++        {
++            std::map&lt;Ogre::String, DialogPrototype*&gt;::iterator it = mDialogs.find(name);
++            if (it == mDialogs.end())
++            {
++                return NULL;
++            }
+ 
+-        Dialog* dialog = it-&gt;second-&gt;createDialog(pc, npc); ///@todo save dialogs
+-		dialog-&gt;initialize();
++            dialog = it-&gt;second-&gt;createDialog(pcs, npcs); ///@todo save dialogs
++            dialog-&gt;initialize();
++            mDialogStates[DialogConfiguration(name, npcs)] = dialog;
++        }
+ 		return dialog;
+     }
+ 
+@@ -478,9 +580,9 @@
+         return it-&gt;second;
+     }
+ 
+-    Dialog* DialogManager::DialogPrototype::createDialog(Creature* pc, Creature* npc)
++    Dialog* DialogManager::DialogPrototype::createDialog(const std::vector&lt;Creature*&gt;&amp; pcs, const std::vector&lt;Creature*&gt;&amp; npcs)
+     {
+-        Dialog* dialog = new Dialog(pc, npc);
++        Dialog* dialog = new Dialog(pcs, npcs);
+         dialog-&gt;setStartResponse(mDialogStart);
+         
+         for (PropertyRecord::PropertyRecordMap::const_iterator it = mPropertyVariables.begin(); 
+@@ -502,6 +604,32 @@
+         mDialogStart = start;
+     }
+ 
++    DialogManager::DialogConfiguration::DialogConfiguration(const Ogre::String&amp; name, const std::vector&lt;Creature*&gt;&amp; npcs)
++        : mDialogName(name), mNpcs(npcs)
++    {
++    }
++
++    const Ogre::String&amp; DialogManager::DialogConfiguration::getName() const
++    {
++        return mDialogName;
++    }
++
++    const std::vector&lt;Creature*&gt;&amp; DialogManager::DialogConfiguration::getNpcs() const
++    {
++        return mNpcs;
++    }
++
++    bool DialogManager::DialogConfiguration::operator &lt;(const rl::DialogManager::DialogConfiguration &amp; other) const
++    {
++        return mDialogName &lt; other.mDialogName;
++    }
++
++    bool DialogManager::DialogConfiguration::operator ==(const rl::DialogManager::DialogConfiguration &amp; other) const
++    {
++        return (mDialogName == other.mDialogName) 
++            &amp;&amp; (mNpcs == other.mNpcs);
++    }
++
+     DialogCondition* DialogManager::processConditionClasses(DOMElement* conditionXml)
+     {
+         if (hasNodeName(conditionXml, &quot;equals&quot;))
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -280,6 +280,7 @@
+     public:
+         static rl::DialogManager&amp; getSingleton();
+         rl::Dialog* createDialog(const Ogre::String&amp; name, rl::Creature* npc, rl::Creature* pc);
++        rl::Dialog* createDialog(const Ogre::String&amp; name, const std::vector&lt;rl::Creature*&gt;&amp; npcs, const std::vector&lt;rl::Creature*&gt;&amp; pcs);
+     private:
+         DialogManager();
+     };
+
+Modified: rl/trunk/engine/ui/src/DialogWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogWindow.cpp	2007-12-18 21:49:27 UTC (rev 4029)
++++ rl/trunk/engine/ui/src/DialogWindow.cpp	2007-12-18 21:50:58 UTC (rev 4030)
+@@ -111,7 +111,7 @@
+                 text = cur-&gt;getLabel();
+             }
+ 
+-			if(optionCount &lt; mDialogOptions-&gt;getItemCount())
++			if (optionCount &lt; mDialogOptions-&gt;getItemCount())
+ 			{
+ 				item = static_cast&lt;ListboxWrappedTextItem*&gt;(
+ 					mDialogOptions-&gt;getListboxItemFromIndex(optionCount));
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001100.html">[Dsa-hl-svn] r4029 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001102.html">[Dsa-hl-svn] r4031 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1101">[ date ]</a>
+              <a href="thread.html#1101">[ thread ]</a>
+              <a href="subject.html#1101">[ subject ]</a>
+              <a href="author.html#1101">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

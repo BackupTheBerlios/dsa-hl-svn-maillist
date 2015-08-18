@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3325 - tools/MaterialParser
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3325%20-%20tools/MaterialParser&In-Reply-To=%3C200704201144.l3KBis3g015045%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000395.html">
+   <LINK REL="Next"  HREF="000397.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3325 - tools/MaterialParser</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3325%20-%20tools/MaterialParser&In-Reply-To=%3C200704201144.l3KBis3g015045%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3325 - tools/MaterialParser">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr 20 13:44:54 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000395.html">[Dsa-hl-svn] r3324 - tools/MaterialParser
+</A></li>
+        <LI>Next message: <A HREF="000397.html">[Dsa-hl-svn] r3326 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#396">[ date ]</a>
+              <a href="thread.html#396">[ thread ]</a>
+              <a href="subject.html#396">[ subject ]</a>
+              <a href="author.html#396">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-04-20 13:44:51 +0200 (Fri, 20 Apr 2007)
+New Revision: 3325
+
+Modified:
+   tools/MaterialParser/MaterialClasses.rb
+   tools/MaterialParser/MaterialParser.rb
+   tools/MaterialParser/Materializer.rb
+Log:
+Remember material filenames
+
+Modified: tools/MaterialParser/MaterialClasses.rb
+===================================================================
+--- tools/MaterialParser/MaterialClasses.rb	2007-04-20 10:47:56 UTC (rev 3324)
++++ tools/MaterialParser/MaterialClasses.rb	2007-04-20 11:44:51 UTC (rev 3325)
+@@ -28,14 +28,15 @@
+ end
+ 
+ class Material &lt; AttributedObject
+-    attr_reader :techniques, :name, :basename
+-    attr_writer :techniques, :name, :basename
++    attr_reader :techniques, :name, :basename, :filename
++    attr_writer :techniques, :name, :basename, :filename
+ 
+-    def initialize( )
++    def initialize( filename )
+         super()
+         @techniques = []
+         @name = nil
+         @basename = nil
++        @filename = filename
+     end
+ 
+     def addTechnique( tech )
+
+Modified: tools/MaterialParser/MaterialParser.rb
+===================================================================
+--- tools/MaterialParser/MaterialParser.rb	2007-04-20 10:47:56 UTC (rev 3324)
++++ tools/MaterialParser/MaterialParser.rb	2007-04-20 11:44:51 UTC (rev 3325)
+@@ -9,17 +9,19 @@
+         @materials = []     
+ 	end
+ 
+-	def parseFile( file )
++	def parseFile( filename )
++        parseMe = File.new( filename ).read
++        parseString( parseMe, filename )
+ 	end
+ 
+     def addMaterial( mat )
+         @materials.push( mat )
+     end
+ 
+-    def parseString( string )
++    def parseString( string, filename )
+         mp = self;
+ 
+-        mat = Material.new
++        mat = Material.new( filename )
+         tec = Technique.new
+         pa = Pass.new
+         tu = TextureUnit.new
+@@ -46,8 +48,8 @@
+             end
+ 
+             start :skript do
+-                match('material', :string, :newlines, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat);mat = Material.new }
+-                match('material', :string, ':', :string, :newlines, '{', :material, '}' ) {|_,n,_,b| mat.name = n; mat.basename = b; mp.addMaterial(mat); mat = Material.new }
++                match('material', :string, :newlines, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat);mat = Material.new( filename ) }
++                match('material', :string, ':', :string, :newlines, '{', :material, '}' ) {|_,n,_,b| mat.name = n; mat.basename = b; mp.addMaterial(mat); mat = Material.new( filename ) }
+ 
+                 match( ::NEWLINE )
+                 match(:skript, :skript ) 
+
+Modified: tools/MaterialParser/Materializer.rb
+===================================================================
+--- tools/MaterialParser/Materializer.rb	2007-04-20 10:47:56 UTC (rev 3324)
++++ tools/MaterialParser/Materializer.rb	2007-04-20 11:44:51 UTC (rev 3325)
+@@ -11,15 +11,17 @@
+ mp = MaterialParser.new( )
+ 
+ allMaterials.each { |filename|
+-    parseMe = File.new( filename ).read
+-    begin
+-        mp.parseString( parseMe )
++    begin 
++        mp.parseFile( filename )
+     rescue RuntimeError =&gt; error
+         print error.to_s
+         print &quot;\n&quot;
+         print  basePath+filename+&quot;:0:&quot;+error.to_s
+         break
+     end
++
++    pp mp
++    exit
+ }
+ 
+ #pp mp
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000395.html">[Dsa-hl-svn] r3324 - tools/MaterialParser
+</A></li>
+	<LI>Next message: <A HREF="000397.html">[Dsa-hl-svn] r3326 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#396">[ date ]</a>
+              <a href="thread.html#396">[ thread ]</a>
+              <a href="subject.html#396">[ subject ]</a>
+              <a href="author.html#396">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,465 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3383 - in rl/trunk/engine/ai: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3383%20-%20in%20rl/trunk/engine/ai%3A%20.%20include%20src&In-Reply-To=%3C200705032121.l43LLGdB024722%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000453.html">
+   <LINK REL="Next"  HREF="000455.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3383 - in rl/trunk/engine/ai: . include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3383%20-%20in%20rl/trunk/engine/ai%3A%20.%20include%20src&In-Reply-To=%3C200705032121.l43LLGdB024722%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3383 - in rl/trunk/engine/ai: . include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu May  3 23:21:16 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000453.html">[Dsa-hl-svn] r3382 - rl/trunk/engine/script/include
+</A></li>
+        <LI>Next message: <A HREF="000455.html">[Dsa-hl-svn] r3384 - in rl/trunk: docs/documents engine/script	engine/script/include engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#454">[ date ]</a>
+              <a href="thread.html#454">[ thread ]</a>
+              <a href="subject.html#454">[ subject ]</a>
+              <a href="author.html#454">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-03 23:21:02 +0200 (Thu, 03 May 2007)
+New Revision: 3383
+
+Added:
+   rl/trunk/engine/ai/include/Landmark.h
+   rl/trunk/engine/ai/include/LandmarkPath.h
+   rl/trunk/engine/ai/src/Landmark.cpp
+   rl/trunk/engine/ai/src/LandmarkPath.cpp
+Modified:
+   rl/trunk/engine/ai/RlAI2005.vcproj
+   rl/trunk/engine/ai/include/AiSubsystem.h
+   rl/trunk/engine/ai/include/WayPointNode.h
+   rl/trunk/engine/ai/src/AiSubsystem.cpp
+Log:
+Introduced Landmark (named waypoint) and LandmarkPath (path of named waypoints)
+
+Modified: rl/trunk/engine/ai/RlAI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ai/RlAI2005.vcproj	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/RlAI2005.vcproj	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -325,6 +325,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\Landmark.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\LandmarkPath.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\PhysicalObstacle.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -403,6 +411,14 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\Landmark.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\LandmarkPath.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\PhysicalObstacle.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/ai/include/AiSubsystem.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiSubsystem.h	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/include/AiSubsystem.h	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -24,9 +24,12 @@
+ {
+ 	class Agent;
+ 	class AgentManager;
++	class AiWorld;
++	class Landmark;
++	class LandmarkPath;
+ 	class WayPointGraphManager;
+-	class AiWorld;
+ 
++
+ 	/** Central core of AI
+ 	 * Handles creation of all AI related object Managers.
+ 	 */
+@@ -50,10 +53,26 @@
+ 
+ 		/** Trigger function triggered after scene load.
+ 		 */
+-		void onAfterSceneLoaded();
++		virtual void onAfterSceneLoaded();
++
+ 		/** Trigger function triggered before scene load.
+ 		 */
+-        void onBeforeClearScene();
++        virtual void onBeforeClearScene();
++
++		/** Creates an named LandmarkPath.
++		 * @param name the path's name
++		 */
++		LandmarkPath* createLandmarkPath(const Ogre::String&amp; name);
++
++		LandmarkPath* getLandmarkPath(const Ogre::String&amp; name) const;
++
++		/** Creates an named Landmark.
++		 * @param name the landmark's name
++		 */
++		Landmark* createLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
++
++		Landmark* getLandmark(const Ogre::String&amp; name) const;
++
+ 	private:
+ 		/** Initializes the AI subsystem.
+ 		 * Creates AiWorld and AgentManager, registers a scene listener,
+@@ -61,12 +80,27 @@
+ 		 */
+ 		void initialize();
+ 
++		/** Removes all registered LandmarkPaths
++		 * Clears all internal lists and deallocates the memory of the 
++		 * stored objects.
++		 */
++		void removeAllLandmarkPaths();
++
++		/** Removes all registered Landmarkss
++		 * Clears all internal lists and deallocates the memory of the 
++		 * stored objects.
++		 */
++		void removeAllLandmarks();
++
+ 		//! single AgentManager object
+ 		AgentManager* mAgentManager;
+ 		//! single WayPointGraphManager object
+ 		WayPointGraphManager *mWayPointGraphManager;
+ 		//! AiWorld representation - WIP!!! (object to changes)
+ 		AiWorld* mWorld;
++
++		std::map&lt;Ogre::String, LandmarkPath*&gt; mLandmarkPaths;
++		std::map&lt;Ogre::String, Landmark*&gt; mLandmarks;
+ 	};
+ 
+ 	inline AiWorld* AiSubsystem::getWorld()
+
+Added: rl/trunk/engine/ai/include/Landmark.h
+===================================================================
+--- rl/trunk/engine/ai/include/Landmark.h	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/include/Landmark.h	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -0,0 +1,37 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#ifndef __Landmark_H__
++#define __Landmark_H__
++
++#include &quot;AiPrerequisites.h&quot;
++
++namespace rl
++{
++	class _RlAiExport Landmark
++	{
++	public:
++		Landmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
++		
++		const Ogre::String&amp; getName() const;
++		const Ogre::Vector3&amp; getPosition() const;
++
++	private:
++		Ogre::String mName;
++		Ogre::Vector3 mPosition;
++	};
++}
++
++#endif //__Landmark_H__
+
+Added: rl/trunk/engine/ai/include/LandmarkPath.h
+===================================================================
+--- rl/trunk/engine/ai/include/LandmarkPath.h	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/include/LandmarkPath.h	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -0,0 +1,40 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2006 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#ifndef __LandmarkPath_H__
++#define __LandmarkPath_H__
++
++#include &quot;AiPrerequisites.h&quot;
++
++namespace rl
++{
++	class Landmark;
++
++	class _RlAiExport LandmarkPath
++	{
++	public:
++		LandmarkPath(const Ogre::String&amp; name);
++		~LandmarkPath();
++
++		void addPoint(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
++		void addPoint(Landmark* lm);
++
++	private:
++		std::list&lt;Landmark*&gt; mPoints;
++		Ogre::String mName;
++	};
++}
++
++#endif //__LandmarkPath_H__
+
+Modified: rl/trunk/engine/ai/include/WayPointNode.h
+===================================================================
+--- rl/trunk/engine/ai/include/WayPointNode.h	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/include/WayPointNode.h	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -17,7 +17,6 @@
+ #define __RlAI_WayPointNode_H__
+ 
+ #include &quot;AiPrerequisites.h&quot;
+-#include &quot;OgreVector3.h&quot;
+ 
+ namespace rl
+ {
+
+Modified: rl/trunk/engine/ai/src/AiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -14,12 +14,15 @@
+  *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+  */
+ #include &quot;AiSubsystem.h&quot;
++
+ #include &quot;AiWorld.h&quot;
+ #include &quot;AgentManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;GameLoop.h&quot;
++#include &quot;Landmark.h&quot;
++#include &quot;LandmarkPath.h&quot;
++#include &quot;Logger.h&quot;
+ #include &quot;WayPointGraphManager.h&quot;
+-#include &quot;Logger.h&quot;
+-#include &quot;GameLoop.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+ #include &quot;World.h&quot;
+ 
+ using namespace Ogre;
+@@ -45,6 +48,8 @@
+ 	GameLoop::getSingleton().removeTask(AgentManager::getSingletonPtr());
+     AgentManager::getSingleton().removeAllAgents();
+     mWorld-&gt;removeAllObstacles();
++	removeAllLandmarkPaths();
++	removeAllLandmarks();
+     delete mAgentManager;
+ 	delete mWayPointGraphManager;
+     delete mWorld;
+@@ -95,4 +100,63 @@
+ */
+ }
+ 
++Landmark* AiSubsystem::createLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position)
++{
++	Landmark* lm = new Landmark(name, position);
++	mLandmarks[name] = lm;
++	return lm;
+ }
++
++Landmark* AiSubsystem::getLandmark(const Ogre::String&amp; name) const
++{
++	std::map&lt;Ogre::String, Landmark*&gt;::const_iterator it = mLandmarks.find(name);
++
++	if (it == mLandmarks.end())
++	{
++		return NULL;
++	}
++	return (*it).second;
++}
++
++LandmarkPath* AiSubsystem::createLandmarkPath(const Ogre::String&amp; name)
++{
++	LandmarkPath* path = new LandmarkPath(name);
++	mLandmarkPaths[name] = path;
++	return path;
++}
++
++LandmarkPath* AiSubsystem::getLandmarkPath(const Ogre::String&amp; name) const
++{
++	std::map&lt;Ogre::String, LandmarkPath*&gt;::const_iterator it = mLandmarkPaths.find(name);
++
++	if (it == mLandmarkPaths.end())
++	{
++		return NULL;
++	}
++	return (*it).second;
++}
++
++void AiSubsystem::removeAllLandmarkPaths()
++{
++	for (std::map&lt;Ogre::String, LandmarkPath*&gt;::iterator it = mLandmarkPaths.begin(); 
++		it != mLandmarkPaths.end(); it++)
++	{
++		delete (*it).second;
++	}
++
++	mLandmarkPaths.clear();
++}
++
++void AiSubsystem::removeAllLandmarks()
++{
++	for (std::map&lt;Ogre::String, Landmark*&gt;::iterator it = mLandmarks.begin(); 
++		it != mLandmarks.end(); it++)
++	{
++		delete (*it).second;
++	}
++
++	mLandmarks.clear();
++}
++
++
++}
+
+Added: rl/trunk/engine/ai/src/Landmark.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Landmark.cpp	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/src/Landmark.cpp	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -0,0 +1,24 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#include &quot;Landmark.h&quot;
++
++namespace rl
++{
++	Landmark::Landmark(const Ogre::String &amp;name, const Ogre::Vector3 &amp;position)
++		: mName(name), mPosition(position)
++	{
++	}
++}
+
+Added: rl/trunk/engine/ai/src/LandmarkPath.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/LandmarkPath.cpp	2007-05-03 21:17:43 UTC (rev 3382)
++++ rl/trunk/engine/ai/src/LandmarkPath.cpp	2007-05-03 21:21:02 UTC (rev 3383)
+@@ -0,0 +1,41 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2006 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Perl Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Perl Artistic License for more details.
++ *
++ *  You should have received a copy of the Perl Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
++ */
++#include &quot;LandmarkPath.h&quot;
++
++#include &quot;AiSubsystem.h&quot;
++
++namespace rl
++{
++	LandmarkPath::LandmarkPath(const Ogre::String&amp; name)
++		: mName(name)
++	{
++	}
++
++	LandmarkPath::~LandmarkPath()
++	{
++		mPoints.clear();
++	}
++
++	void LandmarkPath::addPoint(const Ogre::String &amp;name, const Ogre::Vector3 &amp;position)
++	{
++		addPoint(AiSubsystem::getSingleton().createLandmark(name, position));
++	}
++
++	void LandmarkPath::addPoint(Landmark *lm)
++	{
++		mPoints.push_back(lm);
++	}
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000453.html">[Dsa-hl-svn] r3382 - rl/trunk/engine/script/include
+</A></li>
+	<LI>Next message: <A HREF="000455.html">[Dsa-hl-svn] r3384 - in rl/trunk: docs/documents engine/script	engine/script/include engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#454">[ date ]</a>
+              <a href="thread.html#454">[ thread ]</a>
+              <a href="subject.html#454">[ subject ]</a>
+              <a href="author.html#454">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

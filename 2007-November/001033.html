@@ -1,0 +1,385 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3962 - in rl/trunk/engine: ai/include ai/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3962%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20ui/src&In-Reply-To=%3C200711041927.lA4JR286030192%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001032.html">
+   <LINK REL="Next"  HREF="001034.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3962 - in rl/trunk/engine: ai/include ai/src ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3962%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20ui/src&In-Reply-To=%3C200711041927.lA4JR286030192%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3962 - in rl/trunk/engine: ai/include ai/src ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Nov  4 20:27:02 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001032.html">[Dsa-hl-svn] r3961 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	rl/trunk rl/trunk/engine/ai rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/common/include	rl/trunk/engine/common/src rl/trunk/engine/core/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001034.html">[Dsa-hl-svn] r3963 - in rl/trunk/engine: ai/include ai/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1033">[ date ]</a>
+              <a href="thread.html#1033">[ thread ]</a>
+              <a href="subject.html#1033">[ subject ]</a>
+              <a href="author.html#1033">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-11-04 20:26:55 +0100 (Sun, 04 Nov 2007)
+New Revision: 3962
+
+Modified:
+   rl/trunk/engine/ai/include/Dialog.h
+   rl/trunk/engine/ai/include/DialogCondition.h
+   rl/trunk/engine/ai/include/DialogElement.h
+   rl/trunk/engine/ai/include/DialogImplication.h
+   rl/trunk/engine/ai/include/DialogVariable.h
+   rl/trunk/engine/ai/src/Dialog.cpp
+   rl/trunk/engine/ai/src/DialogElement.cpp
+   rl/trunk/engine/ai/src/DialogImplication.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+Log:
+Bugfixes in dialog: Fixed switchoption and switchresponse, added exit DialogImplication
+
+Modified: rl/trunk/engine/ai/include/Dialog.h
+===================================================================
+--- rl/trunk/engine/ai/include/Dialog.h	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/include/Dialog.h	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -29,6 +29,8 @@
+     class _RlAiExport Dialog : public PropertyHolder
+     {
+     public:
++		static const Ogre::String PROP_EXIT_REQUESTED;
++
+         Dialog(GameObject* pc, GameObject* npc);
+         ~Dialog();
+ 
+@@ -37,6 +39,7 @@
+         void initialize();
+         GameObject* getNpc(int id) const;
+         GameObject* getPc(int id) const;
++		bool isExitRequested() const;
+ 
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+@@ -47,6 +50,7 @@
+         std::vector&lt;GameObject*&gt; mNonPlayerCharacters;
+         std::vector&lt;GameObject*&gt; mPlayerCharacters;
+         PropertyRecord mPropertyVariables;
++		bool mExitRequested;
+     };
+ 
+ }
+
+Modified: rl/trunk/engine/ai/include/DialogCondition.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogCondition.h	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/include/DialogCondition.h	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -23,7 +23,7 @@
+     class Dialog;
+     class DialogVariable;
+ 
+-    class DialogCondition
++	class _RlAiExport DialogCondition
+     {
+     public:
+         DialogCondition();
+
+Modified: rl/trunk/engine/ai/include/DialogElement.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogElement.h	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/include/DialogElement.h	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -32,6 +32,7 @@
+         int getId() const;
+         void addParagraph(DialogParagraph* paragraph);
+         virtual std::list&lt;DialogParagraph*&gt; getParagraphs(Dialog* dialog);
++		virtual bool isSelection() const;
+ 
+     protected:
+         DialogElement(int id);
+@@ -79,9 +80,14 @@
+             mElements.push_back(std::make_pair(condition, element));
+         }
+ 
+-    protected:
+         DialogElementType* getSelectedElement(Dialog* dialog) const
+         {
++			// Recalculate switch variable on start, keep for whole switch evaluation
++			if (mVariable)
++			{
++				mVariable-&gt;invalidate();
++			}
++
+             for (typename CondElemMap::const_iterator it = mElements.begin(); it != mElements.end(); ++it)
+             {
+                 DialogCondition* condition = it-&gt;first;
+@@ -95,6 +101,11 @@
+             return NULL;
+         }
+ 
++		virtual bool isSelection() const
++		{
++			return true;
++		}
++
+     private:
+         typedef std::vector&lt;std::pair&lt;DialogCondition*, DialogElementType*&gt; &gt; CondElemMap;
+         CondElemMap mElements;
+
+Modified: rl/trunk/engine/ai/include/DialogImplication.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogImplication.h	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/include/DialogImplication.h	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -44,6 +44,12 @@
+         Ogre::String mVariableName; 
+         CeGuiString mValue;
+     };
++
++	class DialogExit : public DialogImplication
++	{
++	public:
++		virtual void apply(Dialog* dialog);
++	};
+ }
+ 
+ #endif //__DialogImplication_H__
+
+Modified: rl/trunk/engine/ai/include/DialogVariable.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogVariable.h	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/include/DialogVariable.h	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -24,7 +24,7 @@
+ {
+     class Dialog;
+ 
+-    class DialogVariable
++	class _RlAiExport DialogVariable
+     {
+     public:
+         const Property&amp; getValue(Dialog* dialog);
+
+Modified: rl/trunk/engine/ai/src/Dialog.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Dialog.cpp	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/src/Dialog.cpp	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -20,6 +20,7 @@
+ 
+ namespace rl
+ {
++	const Ogre::String Dialog::PROP_EXIT_REQUESTED = &quot;exit_requested&quot;;
+ 
+     Dialog::Dialog(GameObject* npc, GameObject* pc)
+     {
+@@ -43,6 +44,7 @@
+ 
+     void Dialog::initialize() ///@todo hand over NPCs and party
+     {
++		mExitRequested = false;
+     }
+ 
+     GameObject* Dialog::getNpc(int id) const
+@@ -58,11 +60,20 @@
+     const Property Dialog::getProperty(const Ogre::String&amp; key) const
+     {
+         ///@todo dialog's state
++		if (key == Dialog::PROP_EXIT_REQUESTED)
++		{
++			return mExitRequested;
++		}
++
+         return mPropertyVariables.getProperty(key);
+     }
+ 
+     void Dialog::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+     {
++		if (key == Dialog::PROP_EXIT_REQUESTED)
++		{
++			mExitRequested = value;
++		}
+         ///@todo dialog's state
+         mPropertyVariables.setProperty(key, value);
+     }
+@@ -73,4 +84,9 @@
+         ///@todo to allow saving dialog's state
+         return ps;
+     }
++
++	bool Dialog::isExitRequested() const
++	{
++		return mExitRequested;
++	}
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogElement.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogElement.cpp	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/src/DialogElement.cpp	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -51,4 +51,9 @@
+         return mParagraphs;
+     }
+ 
++	bool DialogElement::isSelection() const
++	{
++		return false;
++	}
++
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogImplication.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogImplication.cpp	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/src/DialogImplication.cpp	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -49,5 +49,9 @@
+         dialog-&gt;setProperty(mVariableName, prop);
+     }
+ 
++	void DialogExit::apply(rl::Dialog *dialog)
++	{
++		dialog-&gt;setProperty(Dialog::PROP_EXIT_REQUESTED, true);
++	}
+ 
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -432,7 +432,9 @@
+             return NULL;
+         }
+ 
+-        return it-&gt;second-&gt;createDialog(pc, npc);
++        Dialog* dialog = it-&gt;second-&gt;createDialog(pc, npc); ///@todo save dialogs
++		dialog-&gt;initialize();
++		return dialog;
+     }
+ 
+     void DialogManager::DialogPrototype::addOption(DialogOption* option)
+@@ -531,6 +533,10 @@
+                 CeGuiString variableValue = getAttributeValueAsString(implicationElem, &quot;value&quot;);
+                 return new DialogVariableAssignment(variableName, variableValue);
+             }
++			else if (hasNodeName(implicationElem, &quot;exit&quot;))
++			{
++				return new DialogExit();
++			}
+         }
+ 
+         return NULL;
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-04 13:24:21 UTC (rev 3961)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-11-04 19:26:55 UTC (rev 3962)
+@@ -342,7 +342,7 @@
+ 
+     void DialogControlState::showResponse(DialogResponse* response)
+ 	{
+-        if (!response )
++        if (!response)
+ 		{
+ 			mDialogWindow-&gt;setDialogEnd();
+ 			mState = CLOSING_DIALOG;
+@@ -350,17 +350,26 @@
+ 			return;
+ 		}
+ 
++		if (response-&gt;isSelection())
++		{
++			DialogResponseSelection* sel = static_cast&lt;DialogResponseSelection*&gt;(response);
++			mCurrentResponse = sel-&gt;getSelectedElement(mDialog);
++		}
++		else
++		{
++			mCurrentResponse = response;
++		}
++	
+         mState = TALKING_PARTNER_CHARACTER;
+-		mCurrentResponse = response;
+         mCurrentOption = NULL;
+ 
+ 		mDialogWindow-&gt;setVisible(false);
+ 
+         mCurrentListener = mCurrentSpeaker;
+-        mCurrentSpeaker = response-&gt;getNpc(mDialog);
+-        mCurrentParagraphs = response-&gt;getParagraphs(mDialog);
++        mCurrentSpeaker = mCurrentResponse-&gt;getNpc(mDialog);
++        mCurrentParagraphs = mCurrentResponse-&gt;getParagraphs(mDialog);
+         DialogParagraph* firstParagraph = mCurrentParagraphs.front();
+-        response-&gt;applyImplications(mDialog);
++        mCurrentResponse-&gt;applyImplications(mDialog);
+         if (!firstParagraph-&gt;getResponse())
+         {
+             doTalk(firstParagraph);
+@@ -373,6 +382,12 @@
+ 
+ 	void DialogControlState::textFinished()
+ 	{
++		if (mDialog-&gt;isExitRequested())
++		{
++			handleDialogClose();
++			return;
++		}
++
+         mCurrentParagraphs.pop_front();
+         if (!mCurrentParagraphs.empty())
+         {
+@@ -411,11 +426,19 @@
+ 
+ 	bool DialogControlState::handleDialogSelectOption(DialogOption* option)
+ 	{
+-        mCurrentOption = option;
++		if (option-&gt;isSelection())
++		{
++			DialogOptionSelection* sel = static_cast&lt;DialogOptionSelection*&gt;(option);
++			mCurrentOption = sel-&gt;getSelectedElement(mDialog);
++		}
++		else
++		{
++			mCurrentOption = option;
++		}
+         mState = TALKING_PLAYER_CHARACTER;
+         mCurrentListener = mCurrentSpeaker;
+         mCurrentSpeaker = mDialog-&gt;getPc(0); ///@todo allow char switch 
+-        mCurrentParagraphs = option-&gt;getParagraphs(mDialog);
++        mCurrentParagraphs = mCurrentOption-&gt;getParagraphs(mDialog);
+         doTalk(mCurrentParagraphs.front());
+ 
+ 		return true;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001032.html">[Dsa-hl-svn] r3961 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	rl/trunk rl/trunk/engine/ai rl/trunk/engine/ai/include	rl/trunk/engine/ai/src rl/trunk/engine/common/include	rl/trunk/engine/common/src rl/trunk/engine/core/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001034.html">[Dsa-hl-svn] r3963 - in rl/trunk/engine: ai/include ai/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1033">[ date ]</a>
+              <a href="thread.html#1033">[ thread ]</a>
+              <a href="subject.html#1033">[ subject ]</a>
+              <a href="author.html#1033">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

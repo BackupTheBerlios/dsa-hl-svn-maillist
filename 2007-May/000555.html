@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3484 - in rl/trunk/engine: ai/include ai/src core/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3484%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09script/swig&In-Reply-To=%3C200705250844.l4P8igoX013553%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000554.html">
+   <LINK REL="Next"  HREF="000556.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3484 - in rl/trunk/engine: ai/include ai/src core/src	script/swig</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3484%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09script/swig&In-Reply-To=%3C200705250844.l4P8igoX013553%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3484 - in rl/trunk/engine: ai/include ai/src core/src	script/swig">timm at mail.berlios.de
+       </A><BR>
+    <I>Fri May 25 10:44:42 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000554.html">[Dsa-hl-svn] r3483 - in rl/trunk/engine: common/include common/src	core/src script/swig
+</A></li>
+        <LI>Next message: <A HREF="000556.html">[Dsa-hl-svn] r3485 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#555">[ date ]</a>
+              <a href="thread.html#555">[ thread ]</a>
+              <a href="subject.html#555">[ subject ]</a>
+              <a href="author.html#555">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-05-25 10:44:38 +0200 (Fri, 25 May 2007)
+New Revision: 3484
+
+Modified:
+   rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+   rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Just an interim report of the CreatureWalkPathJob and some clean up
+
+Modified: rl/trunk/engine/ai/include/CreatureWalkPathJob.h
+===================================================================
+--- rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2007-05-25 05:48:04 UTC (rev 3483)
++++ rl/trunk/engine/ai/include/CreatureWalkPathJob.h	2007-05-25 08:44:38 UTC (rev 3484)
+@@ -30,14 +30,30 @@
+     class _RlAiExport CreatureWalkPathJob : public Job
+     {
+     public:
++       /** Constructor
++        * @param name the name of the Job
++        * @param movingCreature the job has to know a moving creature
++        * @param startLandmark first landmark, the moving creature has to go to
++        */
+         CreatureWalkPathJob(const Ogre::String&amp; name, MovingCreature* movingCreature, Landmark* startLandmark);
++        //destructor
+         virtual ~CreatureWalkPathJob();
+ 
++        //adds an additional landmark the moving creature has to go to
+         void addLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position);
+         void addLandmark(Landmark* lm);
+ 
++       /**
++        * This function is not intented to be called directly
++        * @retval false, if the job is not done
++        */
+         virtual bool execute(Ogre::Real time);
++
++        // @retval the moving creature controlled by this object
++        MovingCreature* getMovingCreature();
+     private:
++        void updateCreature(Ogre::Real time);
++
+         LandmarkPath mLandmarkPath;
+         Ogre::String mName;
+         MovingCreature* mMovingCreature;
+
+Modified: rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2007-05-25 05:48:04 UTC (rev 3483)
++++ rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2007-05-25 08:44:38 UTC (rev 3484)
+@@ -21,6 +21,7 @@
+     CreatureWalkPathJob::CreatureWalkPathJob(const Ogre::String&amp; name, MovingCreature* movingCreature, Landmark* startLandmark) : Job(true, true), 
+         mLandmarkPath(&quot;LandmarkPath&quot; + name)
+     {
++        //the moving creature moves from the current position to the landmark
+         mMovingCreature = movingCreature;
+         //addLandmark(startLandmark);
+         mCurrentLandmark = new Landmark(name + &quot;_startup&quot;,mMovingCreature-&gt;getCreature()-&gt;getPosition());
+@@ -48,10 +49,10 @@
+             {
+ 
+             }*/
+-            mMovingCreature-&gt;setMovement(MovingCreature::MT_GEHEN,diffTrack,Ogre::Vector3(0,0,0));
+-            if(diffTrack.dotProduct(mNextLandmark-&gt;getPosition()-mMovingCreature-&gt;getCreature()-&gt;getPosition()))
+-                mMovingCreature-&gt;getCreature()-&gt;setPosition(mNextLandmark-&gt;getPosition());        
++            mMovingCreature-&gt;setMovement(MovingCreature::MT_GEHEN,diffTrack,Ogre::Vector3(0,0,0));        
+         }
++
++        updateCreature(time);
+         return false;
+     }
+ 
+@@ -64,4 +65,34 @@
+     {
+         mLandmarkPath.addPoint(lm);
+     }
++
++    MovingCreature* CreatureWalkPathJob::getMovingCreature()
++    {
++        return mMovingCreature;
++    }
++
++    void CreatureWalkPathJob::updateCreature(Ogre::Real time)
++    {
++        //executes the movements from movingCreature on the creature
++        Quaternion rotation;
++        Vector3 translation;
++
++        //@todo: calculate translation and rotation
++        AbstractMovement* _rotate = mMovingCreature-&gt;getMovementId(MovingCreature::MT_DREHEN);
++        Real baseVelRot = 0;
++        AbstractMovement* _translate = mMovingCreature-&gt;getMovementId(MovingCreature::MT_JOGGEN);
++        Real baseVelTrans = 0;
++
++        if(_rotate-&gt;calculateBaseVelocity(baseVelRot))
++        {
++            //@todo
++        }
++        if(_translate-&gt;calculateBaseVelocity(baseVelTrans))
++        {
++            //@todo
++        }
++        //make sure that the creature can't fail the landmark
++        if(diffTrack.dotProduct(mNextLandmark-&gt;getPosition()-mMovingCreature-&gt;getCreature()-&gt;getPosition()) &lt; 0)
++            mMovingCreature-&gt;getCreature()-&gt;setPosition(mNextLandmark-&gt;getPosition());
++    }
+ }
+\ No newline at end of file
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2007-05-25 05:48:04 UTC (rev 3483)
++++ rl/trunk/engine/core/src/Actor.cpp	2007-05-25 08:44:38 UTC (rev 3484)
+@@ -734,6 +734,7 @@
+     {
+         if (highlight != mHighlighted)
+         {
++            //@todo: blue ring or something signifies the highlighted object
+             //getControlledObject()-&gt;setHighlighted(highlight);
+             mHighlighted = highlight;
+         }
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-05-25 05:48:04 UTC (rev 3483)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-05-25 08:44:38 UTC (rev 3484)
+@@ -731,9 +731,6 @@
+         rl::TimerEventSource* getSource() const;
+     };
+     
+-    class AbstractMovement;
+-    class MovingCreatureManager;
+-
+     class MovingCreature : public PhysicsController, PhysicsGenericContactCallback
+     {
+     public:
+@@ -759,21 +756,11 @@
+             MT_DREHEN
+         } MovementType;
+         
+-        typedef enum { 
+-            AL_AIRBORNE,
+-            AL_FLOOR
+-        } AbstractLocation;
+-        
+         Creature *getCreature();
+-        void setAbstractLocation(AbstractLocation type);
+-        AbstractLocation getAbstractLocation() const;
+         bool setMovement(MovementType type, Ogre::Vector3 direction, Ogre::Vector3 rotation);
+         MovementType getMovementId() const;
+         Ogre::Vector3 getDirection() const;
+         Ogre::Vector3 getRotation() const;
+-        AbstractMovement *getMovement();
+-        AbstractMovement *getMovementFromId(MovementType id);
+-        int getCurrentGS() const;
+         Ogre::Vector3 getVelocity() const;
+         Ogre::Vector3 getOmega() const;
+         void setAnimation(const Ogre::String &amp;name, 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000554.html">[Dsa-hl-svn] r3483 - in rl/trunk/engine: common/include common/src	core/src script/swig
+</A></li>
+	<LI>Next message: <A HREF="000556.html">[Dsa-hl-svn] r3485 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#555">[ date ]</a>
+              <a href="thread.html#555">[ thread ]</a>
+              <a href="subject.html#555">[ subject ]</a>
+              <a href="author.html#555">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

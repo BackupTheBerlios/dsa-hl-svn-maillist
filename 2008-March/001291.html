@@ -1,0 +1,267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4220 - in rl/trunk/engine: rules/include rules/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4220%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200803071718.m27HIbpg006660%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001290.html">
+   <LINK REL="Next"  HREF="001292.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4220 - in rl/trunk/engine: rules/include rules/src	ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4220%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/src&In-Reply-To=%3C200803071718.m27HIbpg006660%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4220 - in rl/trunk/engine: rules/include rules/src	ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar  7 18:18:37 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001290.html">[Dsa-hl-svn] r4219 - in modules: common/scripts/triggers	regressiontest/scripts regressiontest/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="001292.html">[Dsa-hl-svn] r4221 - in rl/trunk/engine: ai/include ai/src	core/include core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1291">[ date ]</a>
+              <a href="thread.html#1291">[ thread ]</a>
+              <a href="subject.html#1291">[ subject ]</a>
+              <a href="author.html#1291">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-03-07 18:18:30 +0100 (Fri, 07 Mar 2008)
+New Revision: 4220
+
+Modified:
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+damage when falling
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2008-03-07 15:46:02 UTC (rev 4219)
++++ rl/trunk/engine/rules/include/CreatureController.h	2008-03-07 17:18:30 UTC (rev 4220)
+@@ -82,7 +82,8 @@
+             // these movements are only for internal purposes and should not be used directly
+             // instead use one of the movements above
+             MT_DREHEN,
+-            MT_STUFENERKENNUNG
++            MT_STUFENERKENNUNG,
++            MT_FALLEN
+         } MovementType;
+ 
+         /// The generalization of the place (in the air, on the floor, in the water...)
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-07 15:46:02 UTC (rev 4219)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-07 17:18:30 UTC (rev 4220)
+@@ -40,7 +40,105 @@
+ 
+     const Real minSquaredSpeed = 0.6;
+ 
++    // TODO: wenn Fallen nicht m&#246;glich ist (auf dem Boden und bewusstlos / Tod)
+ 
++    class Fallen : public AbstractMovement
++    {
++    public:
++        Fallen(CreatureController *creature) :
++          AbstractMovement(creature)
++          {
++              mAnim = mMovingCreature-&gt;getCreature()-&gt;getAnimation(&quot;fallen&quot;);
++              //mAnim = mMovingCreature-&gt;getCreature()-&gt;getAnimation(&quot;fallen_anfang&quot;);
++              //mAnim = mMovingCreature-&gt;getCreature()-&gt;getAnimation(&quot;fallen_landung&quot;);
++              // fallen_landung_verletzt ?
++          }
++        virtual CreatureController::MovementType getId() const {return CreatureController::MT_FALLEN;}
++        virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_NONE;}
++        virtual void activate()
++        {
++        }
++        virtual void deactivate()
++        {
++            std::ostringstream oss;
++            oss &lt;&lt; &quot;Fallen v: &quot; &lt;&lt; mVel &lt;&lt; &quot;   ermittelte Hoehe: &quot; &lt;&lt; mVel*mVel/(2* fabs(PhysicsManager::getSingleton().getGravity().y));
++            LOG_MESSAGE(Logger::RULES, oss.str());
++            int h = int(mVel*mVel/(2* fabs(PhysicsManager::getSingleton().getGravity().y)));
++
++            if( h &gt; 0 )
++            {
++
++                std::multiset&lt;int&gt; wuerfel;
++                for(int i = 0; i &lt; h; i++)
++                    wuerfel.insert( DsaManager::getSingleton().rollD6() );
++                int probenErschwernis = h;
++                if( probenErschwernis &gt; 10 )
++                    probenErschwernis = 10;
++
++                int taw = 0;
++                if( mMovingCreature-&gt;getCreature()-&gt;hasTalent(&quot;K&#246;rperbeherrschung&quot;) )
++                {
++                    taw = mMovingCreature-&gt;getCreature()-&gt;doTalentprobe(&quot;K&#246;rperbeherrschung&quot;, probenErschwernis);
++                }
++
++                for( int i = 0; i &lt; taw; i++)
++                {
++                    if( wuerfel.size() &lt;= 0 )
++                        break;
++                    wuerfel.erase(--(wuerfel.end()));
++                }
++
++                int sum = 0;
++                for( std::multiset&lt;int&gt;::iterator it = wuerfel.begin(); it != wuerfel.end(); it++)
++                    sum += *it;
++
++                mMovingCreature-&gt;getCreature()-&gt;damageLe(sum);
++
++                oss &lt;&lt; &quot;    Schaden: &quot; &lt;&lt; sum;
++            }
++            LOG_MESSAGE(Logger::RULES, oss.str());
++
++        }
++        virtual bool calculateBaseVelocity(Real &amp;velocity)
++        {
++            velocity = 0.0f;
++            return isPossible();
++        }
++        virtual bool isPossible() const
++        {
++            return
++                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE;
++        }
++        virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
++        {
++        }
++        virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
++        {
++            mVel = max(-mMovingCreature-&gt;getVelocity().y,mVel);
++            mMovingCreature-&gt;setAnimation(mAnim.first, mAnim.second, 0);
++            return true;
++        }
++        virtual void setAnimation(Ogre::Real elapsedTime)
++        {
++        }
++        virtual void applyAuChanges(Ogre::Real elapsedTime)
++        {
++        }
++        virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
++        {
++            direction = Vector3::ZERO;
++            return false;
++        }
++        virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
++        {
++            rotation = Vector3::ZERO;
++            return false;
++        }
++    protected:
++        Creature::AnimationSpeedPair mAnim;
++        Real mVel;
++    };
++
+     class Stehen : public AbstractMovement
+     {
+     public:
+@@ -55,7 +153,7 @@
+                 mAnimStehen = creature-&gt;getCreature()-&gt;getAnimation(&quot;stehen&quot;);
+             }
+         virtual CreatureController::MovementType getId() const {return CreatureController::MT_STEHEN;}
+-        virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_NONE;}
++        virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_FALLEN;}
+         virtual void activate()
+         {
+             AbstractMovement::activate();
+@@ -1482,6 +1580,9 @@
+         movementPair.first = MT_NONE;
+         movementPair.second = NULL;
+         mMovementMap.insert(movementPair);
++        movementPair.first = MT_FALLEN;
++        movementPair.second = new Fallen (this);
++        mMovementMap.insert(movementPair);
+         movementPair.first = MT_DREHEN;
+         movementPair.second = new Drehen (this);
+         mMovementMap.insert(movementPair);
+@@ -1864,21 +1965,25 @@
+         {
+             if(movement-&gt;isPossible())
+             {
+-                // runs the old movement if idle!
+-                if(mMovement == NULL)
++                if( movement != mMovement )
+                 {
+-                    mLastMovementType = MT_NONE;
++                    // runs the old movement if idle!
++                    if(mMovement == NULL)
++                    {
++                        mLastMovementType = MT_NONE;
++                    }
++                    else
++                    {
++                        mLastMovementType = mMovement-&gt;getId();
++                        mMovement-&gt;deactivate();
++                    }
++                    mMovement = movement;
++                    mMovement-&gt;activate();
++                    mLastMovementChange = 0;
+                 }
+-                else
+-                {
+-                    mLastMovementType = mMovement-&gt;getId();
+-                    mMovement-&gt;deactivate();
+-                }
+-                mMovement = movement;
+-                mMovement-&gt;activate();
+                 mDirection = direction;
+                 mRotation = rotation;
+-                mLastMovementChange = 0;
++                
+                 return true;
+             }
+ 
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2008-03-07 15:46:02 UTC (rev 4219)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2008-03-07 17:18:30 UTC (rev 4220)
+@@ -1285,6 +1285,7 @@
+         LOG_MESSAGE(Logger::UI, &quot;Camera resetted.&quot;);
+         ///@todo remove this
+         mCharacter-&gt;modifyAu(100);
++        mCharacter-&gt;modifyLe(100);
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001290.html">[Dsa-hl-svn] r4219 - in modules: common/scripts/triggers	regressiontest/scripts regressiontest/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="001292.html">[Dsa-hl-svn] r4221 - in rl/trunk/engine: ai/include ai/src	core/include core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1291">[ date ]</a>
+              <a href="thread.html#1291">[ thread ]</a>
+              <a href="subject.html#1291">[ subject ]</a>
+              <a href="author.html#1291">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

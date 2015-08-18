@@ -1,0 +1,334 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4370 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4370%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200804301559.m3UFxq9G010062%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001438.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4370 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4370%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200804301559.m3UFxq9G010062%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4370 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 30 17:59:52 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001438.html">[Dsa-hl-svn] r4369 - in rl/trunk/engine/rules: include src
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1441">[ date ]</a>
+              <a href="thread.html#1441">[ thread ]</a>
+              <a href="subject.html#1441">[ subject ]</a>
+              <a href="author.html#1441">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-04-30 17:59:51 +0200 (Wed, 30 Apr 2008)
+New Revision: 4370
+
+Modified:
+   rl/trunk/engine/ui/include/MovementControlState.h
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+- fixed camera movement (sometimes strange behaviour in kanalisation)
+- changed behaviour of &quot;MOVE_LEFT/RIGHT+MOVE_FORWARD&quot; in first-person mode
+  (because the old behaviour doesn't work with the camera-changes!)
+  so now, if you press MOVE_LEFT/RIGHT while moving around, you will only
+  look in the specified direction
+
+
+Modified: rl/trunk/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/MovementControlState.h	2008-04-29 23:43:45 UTC (rev 4369)
++++ rl/trunk/engine/ui/include/MovementControlState.h	2008-04-30 15:59:51 UTC (rev 4370)
+@@ -156,12 +156,12 @@
+         //void interpolateAnimationLookAtOffset(std::string actAnim, std::string newAnim, Ogre::Real factor);
+ 
+ 
+-        // only used in the two functions above
+         std::vector&lt;Ogre::Vector3&gt; mCharPositionsBuffer;
+         size_t mCharPositionsBufferIdx;
+         Ogre::Real mCharacterOccludedTime;
+         unsigned int mCharacterOccludedFrameCount;
+         Ogre::Real mLastDistance;
++        Ogre::Real mLastCameraCollision;
+         Ogre::Real mTimeOfLastCollision;
+         bool mIsPathfinding;
+         unsigned int mLastReachableBufPos;
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2008-04-29 23:43:45 UTC (rev 4369)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2008-04-30 15:59:51 UTC (rev 4370)
+@@ -99,7 +99,8 @@
+         mLastDistance(0.0f),
+         mTimeOfLastCollision(0.0f),
+         mIsPathfinding (false),
+-        mLastReachableBufPos(1)
++        mLastReachableBufPos(1),
++        mLastCameraCollision(0)
+     {
+         DebugWindow::getSingleton().registerPage(msDebugWindowPageName);
+ 
+@@ -112,7 +113,7 @@
+         // smaller 1.0 means spring accel is stronger and thus cam shoots over the target, resulting
+         // in a damped ozillation before reaching equilibrium.
+         // Values greater than 1.0 mean damping is stronger and thus camera takes a detour.
+-        Real relationCoefficient = 1.0f;
++        Real relationCoefficient = 0.8f;
+         mLinearDampingK = relationCoefficient * 2.0f * Math::Sqrt(mLinearSpringK);
+ 
+         // Offset for the look at point,
+@@ -215,15 +216,25 @@
+         mCameraActor-&gt;getPhysicalThing()-&gt;setUpConstraint(Vector3::ZERO);
+ 
+         // We also handle cam&lt;-&gt;level, cam&lt;-&gt;default cam&lt;-&gt;char collision from now on
+-        PhysicsManager::getSingleton().createMaterialPair(
++        OgreNewt::MaterialPair* mat_pair = NULL;
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;))-&gt;setContactCallback(this);
+-        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;default&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;))-&gt;setContactCallback(this);
+-        PhysicsManager::getSingleton().createMaterialPair(
++            PhysicsManager::getSingleton().getMaterialID(&quot;level&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
++        mat_pair = PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+-            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setContactCallback(this);
++            PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;));
++        mat_pair-&gt;setContactCallback(this);
++        mat_pair-&gt;setDefaultCollidable(1);
++        mat_pair-&gt;setDefaultFriction(0,0);
+ 
+         mCharacterState.mCurrentMovementState = MOVE_NONE;
+ 
+@@ -335,7 +346,7 @@
+                 }
+ 
+ 
+-                if( mViewMode != VM_PNYX_MODE )
++                if( mViewMode != VM_PNYX_MODE  &amp;&amp; mViewMode != VM_FIRST_PERSON )
+                 {
+                     // virtual yaw
+                     if( mCamVirtualYaw != mNewCamVirtualYaw )
+@@ -361,6 +372,39 @@
+                         rotation += mCamVirtualYaw - mNewCamVirtualYaw;
+                     }
+                 }
++
++                if( mViewMode == VM_FIRST_PERSON )
++                {
++                    if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) ||
++                        ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_RIGHT) &amp;&amp; !(movement &amp; MOVE_LEFT)) )
++                    {
++                        mCamVirtualYaw -= Degree(270)*elapsedTime;
++                        if( mCamVirtualYaw &lt;= Degree(-90) )
++                            mCamVirtualYaw = Degree(-90);
++                    }
++                    else if( ((movement &amp; MOVE_FORWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) ||
++                             ((movement &amp; MOVE_BACKWARD) &amp;&amp; (movement &amp; MOVE_LEFT) &amp;&amp; !(movement &amp; MOVE_RIGHT)) )
++                    {
++                        mCamVirtualYaw += Degree(270)*elapsedTime;
++                        if( mCamVirtualYaw &gt;= Degree(90) )
++                            mCamVirtualYaw = Degree(90);
++                    }
++                    else
++                    {
++                        if( mCamVirtualYaw &gt; Degree(0) )
++                        {
++                            mCamVirtualYaw -= Degree(270)*elapsedTime;
++                            if( mCamVirtualYaw &lt;= Degree(0) )
++                                mCamVirtualYaw = Degree(0);
++                        }
++                        else if( mCamVirtualYaw &lt; Degree(0) )
++                        {
++                            mCamVirtualYaw += Degree(270)*elapsedTime;
++                            if( mCamVirtualYaw &gt;= Degree(0) )
++                                mCamVirtualYaw = Degree(0);
++                        }
++                    }
++                }
+             }
+ 
+ 
+@@ -582,6 +626,14 @@
+         virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
+ 
+ 
++        // Kamera-Gr&#65533;e beziehen
++        CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
++                mCameraActor-&gt;getControlledObject());
++        AxisAlignedBox aabb = ogreCam-&gt;getDefaultSize();
++        // Radius berechnen
++        Real radius = (aabb.getMaximum()-aabb.getMinimum()).length() / 2.0f;
++ 
++
+         if( mViewMode == VM_FIRST_PERSON)
+         {
+             Quaternion camOri;
+@@ -594,24 +646,22 @@
+         }
+         else if( mViewMode == VM_THIRD_PERSON )
+         {
+-            // Kamera-Gr&#65533;e beziehen
+-            CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
+-                mCameraActor-&gt;getControlledObject());
+-            AxisAlignedBox aabb = ogreCam-&gt;getDefaultSize();
+-            // Radius berechnen
+-            //Real radius = (aabb.getMaximum()-aabb.getMinimum()).length() / 2.0f;
+-
+-            cameraNode-&gt;lookAt(
++           cameraNode-&gt;lookAt(
+                 charPos
+-                + charOri * virtualCamOri *  mLookAtOffset,
+-                //+ charOri * virtualCamOri * (-Vector3::UNIT_Z*radius),   // doesn't work smoothly with strafe+forward
++                + charOri * /* virtualCamOri * */  mLookAtOffset
++                + charOri * /* virtualCamOri * */ (-Vector3::UNIT_Z*radius),   // doesn't work smoothly with strafe+forward
+                 Node::TS_WORLD);
+ 
+         }
+         else if( mViewMode == VM_FREE_CAMERA || mViewMode == VM_PNYX_MODE )
+         {
++            Quaternion camOri;
++            camOri.FromAngleAxis(mCamYaw, Vector3::UNIT_Y);
++            Real dist = (mCameraActor-&gt;getPosition() - charPos).length();
+             cameraNode-&gt;lookAt(
+-                charPos + charOri * virtualCamOri * mLookAtOffset,
++                charPos
++                + camOri * virtualCamOri * mLookAtOffset
++                + camOri * (-Vector3::UNIT_Z*radius),
+                 Node::TS_WORLD);
+         }
+ 
+@@ -649,14 +699,19 @@
+     // character collision moved to CreatureController(Manager)
+     int MovementControlState::userProcess()
+     {
+-        // only camera collision
+-        return 0;
+-    
+         if( mViewMode == VM_FIRST_PERSON )
+             return 0;
+ 
+-        setContactSoftness(1.0f);
++        // test if this is cam-player-collide
++        if( ( m_body0 == mCamBody &amp;&amp; m_body1 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) ||
++            ( m_body1 == mCamBody &amp;&amp; m_body0 == mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody() ) )
++        {
++            return 0;
++        }
++
++        setContactSoftness(0.8f);
+         setContactElasticity(0.0f);
++        mLastCameraCollision = 0;
+ 
+         return 1;
+     }
+@@ -687,7 +742,7 @@
+                 mCameraActor-&gt;_getMovableObject())-&gt;getDerivedPosition() &lt;&lt; std::endl
+             &lt;&lt; &quot;camera orientation : &quot; &lt;&lt; mCameraActor-&gt;getWorldOrientation() &lt;&lt; std::endl
+             &lt;&lt; &quot;camera pos : &quot; &lt;&lt; bodpos &lt;&lt; std::endl
+-            &lt;&lt; &quot;camera distance : &quot; &lt;&lt; mDesiredDistance &lt;&lt; std::endl
++            &lt;&lt; &quot;camera distance : &quot; &lt;&lt; mLastDistance &lt;&lt; &quot; ( &quot; &lt;&lt; mDesiredDistance &lt;&lt; &quot; ) &quot; &lt;&lt; std::endl
+             &lt;&lt; &quot;is airborne: &quot; &lt;&lt; (mController-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE ? &quot;true&quot; : &quot;false&quot;) &lt;&lt; std::endl;
+ 
+         LOG_DEBUG(Logger::UI, ss.str());
+@@ -697,6 +752,7 @@
+     //------------------------------------------------------------------------
+     void MovementControlState::calculateCamera(const Ogre::Real&amp; timestep)
+     {
++        mLastCameraCollision += timestep;
+         Vector3 charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
+         Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+         Quaternion virtualCamOri;
+@@ -919,13 +975,13 @@
+     }
+ 
+     //------------------------------------------------------------------------
+-    Ogre::Vector3 MovementControlState::calculateOptimalCameraPosition(bool SlowlyMoveBackward, const Real &amp;timestep)
++    Ogre::Vector3 MovementControlState::calculateOptimalCameraPosition(bool slowlyMoveBackward, const Real &amp;timestep)
+     {
+         Vector3 targetCamPos;
+ 
+         Vector3 charPos = mCharacter-&gt;getActor()-&gt;getWorldPosition();
+         //Quaternion charOri = mCharacter-&gt;getActor()-&gt;getWorldOrientation();
+-        Quaternion charOri (mController-&gt;getYaw(), Vector3::UNIT_Y);   // is this ok, solves the problems, when strafe+move_forward...
++        Quaternion charOri (mController-&gt;getYaw(), Vector3::UNIT_Y);
+         Quaternion virtualCamOri;
+         virtualCamOri.FromAngleAxis(mCamVirtualYaw, Vector3::UNIT_Y);
+ 
+@@ -1047,7 +1103,7 @@
+             Quaternion camOri;
+             mCamBody-&gt;getPositionOrientation(camPos, camOri);
+ 
+-            if( SlowlyMoveBackward &amp;&amp;
++            if( slowlyMoveBackward &amp;&amp;
+                 desiredDistance &gt; mLastDistance )
+             {
+ 
+@@ -1056,7 +1112,11 @@
+                 Vector3 actDiff = camPos - charPos;
+                 actDiff.normalise();
+ 
+-                if( mTimeOfLastCollision &gt; mCamMoveAwayStartTime ||
++                if( mLastCameraCollision &lt;= 0.5 ) // there was a cam collision 0.5 seconds ago
++                {
++                    newDistance = mLastDistance;
++                }
++                else if( mTimeOfLastCollision &gt; mCamMoveAwayStartTime ||
+                     diff.directionEquals(actDiff, mCamMoveAwayRange*timestep) )
+                     newDistance = mLastDistance + mCamMoveAwayVelocity*timestep;
+                 else
+@@ -1282,6 +1342,7 @@
+         mCamBody-&gt;setPositionOrientation(calculateOptimalCameraPosition(false, 0.0f), camOri);
+         mCamVirtualYaw = Degree(0);
+         mNewCamVirtualYaw = Degree(0);
++        mLastCameraCollision = 0;
+         if(mViewMode == VM_FIRST_PERSON)
+             mCharacterActor-&gt;setVisible(false);
+         else
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001438.html">[Dsa-hl-svn] r4369 - in rl/trunk/engine/rules: include src
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1441">[ date ]</a>
+              <a href="thread.html#1441">[ thread ]</a>
+              <a href="subject.html#1441">[ subject ]</a>
+              <a href="author.html#1441">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

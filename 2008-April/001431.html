@@ -1,0 +1,426 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4360 - in rl/trunk/engine/rules: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4360%20-%20in%20rl/trunk/engine/rules%3A%20.%20include%20src&In-Reply-To=%3C200804211731.m3LHVHvF002692%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001430.html">
+   <LINK REL="Next"  HREF="001432.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4360 - in rl/trunk/engine/rules: . include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4360%20-%20in%20rl/trunk/engine/rules%3A%20.%20include%20src&In-Reply-To=%3C200804211731.m3LHVHvF002692%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4360 - in rl/trunk/engine/rules: . include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Apr 21 19:31:17 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001430.html">[Dsa-hl-svn] r4359 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="001432.html">[Dsa-hl-svn] r4361 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1431">[ date ]</a>
+              <a href="thread.html#1431">[ thread ]</a>
+              <a href="subject.html#1431">[ subject ]</a>
+              <a href="author.html#1431">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-04-21 19:31:13 +0200 (Mon, 21 Apr 2008)
+New Revision: 4360
+
+Added:
+   rl/trunk/engine/rules/include/ApplyDamageJob.h
+   rl/trunk/engine/rules/src/ApplyDamageJob.cpp
+Modified:
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/Combat.h
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/Combat.cpp
+   rl/trunk/engine/rules/src/Combatant.cpp
+   rl/trunk/engine/rules/src/CreatureController.cpp
+Log:
+- Apply damage after combat animations
+- Separate animation phases for each combatant
+
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+ 	ProjectType=&quot;Visual C++&quot;
+-	Version=&quot;8.00&quot;
++	Version=&quot;8,00&quot;
+ 	Name=&quot;RlRules&quot;
+ 	ProjectGUID=&quot;{1D1D45B2-A9C3-4D10-93EC-22AE4AA5C070}&quot;
+ 	RootNamespace=&quot;RlRules&quot;
+@@ -299,6 +299,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\ApplyDamageJob.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\Combat.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -537,6 +541,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\ApplyDamageJob.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\Combat.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Added: rl/trunk/engine/rules/include/ApplyDamageJob.h
+===================================================================
+--- rl/trunk/engine/rules/include/ApplyDamageJob.h	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/include/ApplyDamageJob.h	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -0,0 +1,42 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#ifndef __ApplyDamageJob__
++#define __ApplyDamageJob__
++
++#include &quot;RulesPrerequisites.h&quot;
++
++#include &quot;Job.h&quot;
++
++namespace rl
++{
++    class Creature;
++
++    class _RlRulesExport ApplyDamageJob : public Job
++    {
++    public:
++        ApplyDamageJob(Creature* target, int tp);
++        ~ApplyDamageJob();
++
++        virtual bool execute(Ogre::Real time);
++
++    private:
++        Creature* mTarget;
++        int mTp;
++    };
++
++}
++
++#endif //__ApplyDamageJob__
+
+Modified: rl/trunk/engine/rules/include/Combat.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combat.h	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/include/Combat.h	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -126,7 +126,7 @@
+         void executeRound();
+         void endRound();
+ 
+-		void doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target);
++		void doAttacke(JobSet* jobSetAnims, JobSet* jobSetDamage, Combatant* actor, Combatant* target);
+ 
+ 		Ogre::Real getMaximumAttackeDistance(Combatant* actor) const;
+ 
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/include/CreatureController.h	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -172,8 +172,8 @@
+         ~CreatureController();
+ 
+     private:
+-        bool onCreatureLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
+-                                        Effect::LifeState newstate);
++        bool onCreatureLifeStateChanged(GameObject* gameobject, Effect::LifeState oldstate,
++                                        Effect::LifeState newstate);
+ 
+         // only used in setAnimation
+         Ogre::String mLastAnimationName;
+
+Added: rl/trunk/engine/rules/src/ApplyDamageJob.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/ApplyDamageJob.cpp	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/src/ApplyDamageJob.cpp	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -0,0 +1,41 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot;
++#include &quot;ApplyDamageJob.h&quot;
++
++#include &quot;Creature.h&quot;
++
++namespace rl 
++{
++
++ApplyDamageJob::ApplyDamageJob(Creature* target, int tp)
++:   Job(false, true, TimeSource::GAMETIME, AbstractJob::PERSISTENT),
++    mTarget(target), 
++    mTp(tp)
++{
++}
++
++ApplyDamageJob::~ApplyDamageJob()
++{
++}
++
++bool ApplyDamageJob::execute(Ogre::Real time)
++{
++    mTarget-&gt;damageLe(mTp);
++    return true;
++}
++
++} // namespace rl
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -17,6 +17,7 @@
+ 
+ #include &quot;Combat.h&quot;
+ 
++#include &quot;ApplyDamageJob.h&quot;
+ #include &quot;Combatant.h&quot;
+ #include &quot;CombatManager.h&quot;
+ #include &quot;CreatureController.h&quot;
+@@ -324,13 +325,14 @@
+ 
+ 		for (size_t actionIndex = 0; actionIndex &lt; 3; ++actionIndex)
+ 		{
+-			JobSet* jobSet = new JobSet();
+-
+ 			for (CombatantQueue::iterator it = mCombatantQueue.begin();
+ 				it != mCombatantQueue.end(); ++it)
+ 			{
+-				Combatant* combatant = it-&gt;second;
++			    JobSet* jobSetAnims = new JobSet();
++                JobSet* jobSetOutcome = new JobSet(); // damage is applied after combat animations to prevent premature reactions
+ 
++                Combatant* combatant = it-&gt;second;
++
+ 			    // Is there an action registed for combatant?
+ 			    CombatantActionsMap::iterator actionsIt = mCombatantActions.find(combatant);
+ 			    if (actionsIt != mCombatantActions.end())
+@@ -352,25 +354,26 @@
+ 						    // Check whether possible
+ 						    if (canAttack(combatant, entry.target))
+ 						    {
+-							    doAttacke(jobSet, combatant, entry.target);
++							    doAttacke(jobSetAnims, jobSetOutcome, combatant, entry.target);
+ 						    }
+ 					    }
+ 					    else if (entry.aktion == BEWEGEN)
+ 					    {
+ 						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
+ 							    + CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
+-						    combatant-&gt;doBewegen(jobSet, entry.targetPos);
++						    combatant-&gt;doBewegen(jobSetAnims, entry.targetPos);
+ 					    }
+ 					    else if (entry.aktion == FOLGEN)
+ 					    {
+ 						    GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
+ 							    + entry.target-&gt;getName(), GET_COMBAT);
+-						    combatant-&gt;doFolgen(jobSet, entry.target);
++						    combatant-&gt;doFolgen(jobSetAnims, entry.target);
+ 					    }
+ 				    }
+ 				}
++                jobQueue-&gt;add(jobSetAnims);
++                jobQueue-&gt;add(jobSetOutcome);
+ 			}
+-			jobQueue-&gt;add(jobSet);
+ 		}
+ 		mAnimationSequenceTicket = JobScheduler::getSingleton().addJob(jobQueue,
+ 			JobScheduler::JP_NORMAL, 0.0f, Ogre::Math::POS_INFINITY, this);
+@@ -395,7 +398,7 @@
+         }
+     }
+ 
+-    void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
++    void Combat::doAttacke(JobSet* jobSetAnims, JobSet* jobSetDamage, Combatant* actor, Combatant* target)
+ 	{
+         enum Damage {
+             DMG_NONE,
+@@ -405,7 +408,7 @@
+         };
+         
+         GameEventLog::getSingleton().logEvent(
+-                                              actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
++            actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName(), GET_COMBAT);
+         
+         Damage rollDamage = DMG_NONE;
+ 		// Make an attack roll.
+@@ -446,11 +449,11 @@
+ 					else
+ 					{
+ 						GameEventLog::getSingleton().logEvent(&quot;Erfolg, nicht pariert, Treffer!&quot;,
+-                                                              GET_COMBAT);
+-						
++                                                              GET_COMBAT);						
+ 					}
+-					target-&gt;doParade(jobSet, actor, presult);
+-					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
++
++					target-&gt;doParade(jobSetAnims, actor, presult);
++					actor-&gt;doAttacke(jobSetAnims, target, aresult, true, presult);
+ 				}
+ 				else if (it-&gt;second == AUSWEICHEN)
+ 				{
+@@ -460,24 +463,24 @@
+ 			else
+ 			{
+ 				GameEventLog::getSingleton().logEvent(&quot;Treffer!&quot;, GET_COMBAT);
+-				actor-&gt;doAttacke(jobSet, target, aresult, false);
++				actor-&gt;doAttacke(jobSetAnims, target, aresult, false);
+ 			}
+ 		}
+ 		else
+ 		{
+ 			GameEventLog::getSingleton().logEvent(&quot;Verfehlt!&quot;, GET_COMBAT);
+-			actor-&gt;doAttacke(jobSet, target, aresult, false);
+-			target-&gt;doGetroffen(jobSet);
++			actor-&gt;doAttacke(jobSetAnims, target, aresult, false);
++			target-&gt;doGetroffen(jobSetAnims);
+ 		}
+ 		
+ 		if (rollDamage != DMG_NONE) ///@todo half/double damage
+ 		{
+ 			int tp = actor-&gt;rollTrefferpunkte();
+-			int sp = target-&gt;applyTrefferpunkte(tp);
+-			CeGuiString msg = actor-&gt;getName() + &quot; trifft f&#194;&#184;r &quot;
++            jobSetAnims-&gt;add(new ApplyDamageJob(target-&gt;getCreature(), tp));
++
++			CeGuiString msg = actor-&gt;getName() + &quot; trifft f&#252;r &quot;
+             + CeGuiString(StringConverter::toString(tp))
+-            + &quot; Trefferpunkte, &quot; + target-&gt;getName() + &quot; erleidet &quot;
+-            + CeGuiString(StringConverter::toString(sp)) + &quot; Schadenspunkte.&quot;;
++            + &quot; Trefferpunkte&quot;;
+ 			GameEventLog::getSingleton().logEvent(msg, GET_COMBAT);
+ 		}
+ 	}
+
+Modified: rl/trunk/engine/rules/src/Combatant.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combatant.cpp	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/src/Combatant.cpp	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -136,7 +136,8 @@
+ 
+ 		// Get real animation name
+ 		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(ani);
+-		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++		PlayAnimationJob* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++        job-&gt;setHoldOnEnd(false);
+         jobSet-&gt;add(job);
+ 	}
+ 
+@@ -163,7 +164,8 @@
+ 
+ 		// Get real animation name
+ 		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(ani);
+-		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++		PlayAnimationJob* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++        job-&gt;setHoldOnEnd(false);
+         jobSet-&gt;add(job);
+ 	}
+ 
+@@ -171,7 +173,8 @@
+ 	{
+ 		// Get real animation name
+ 		Creature::AnimationSpeedPair asp = getCreature()-&gt;getAnimation(&quot;kampf_getroffen&quot;);
+-		Job* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++		PlayAnimationJob* job = new PlayAnimationJob(getCreature()-&gt;getActor(), asp.first);
++        job-&gt;setHoldOnEnd(false);
+ 		jobSet-&gt;add(job);
+ 	}
+ 
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-04-21 17:30:09 UTC (rev 4359)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-04-21 17:31:13 UTC (rev 4360)
+@@ -1732,7 +1732,7 @@
+             }
+         }
+ 
+-        LOG_DEBUG(&quot;CreatureController&quot;, &quot;Set animation &quot; + name + &quot; at &quot; + mCreature-&gt;getName());
++        LOG_MESSAGE(&quot;CreatureController&quot;, &quot;Set animation &quot; + name + &quot; at &quot; + mCreature-&gt;getName());
+ 
+         return meshAnim;
+     }
+@@ -2030,6 +2030,7 @@
+                 setMovement(CreatureController::MT_NONE, Vector3::ZERO, Vector3::ZERO);
+                 Creature::AnimationSpeedPair anim = mCreature-&gt;getAnimation(&quot;sterben&quot;);
+                 setAnimation(anim.first, anim.second, 1, anim.first, 1.0f );
++                setAnimation(anim.first, anim.second, 1, anim.first, 1.0f );
+             }
+             return true;
+         }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001430.html">[Dsa-hl-svn] r4359 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="001432.html">[Dsa-hl-svn] r4361 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1431">[ date ]</a>
+              <a href="thread.html#1431">[ thread ]</a>
+              <a href="subject.html#1431">[ subject ]</a>
+              <a href="author.html#1431">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

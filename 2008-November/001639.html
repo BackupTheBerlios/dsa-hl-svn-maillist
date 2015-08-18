@@ -1,0 +1,677 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4582 - in rl/branches/persistence: ai/include ai/src	core/include core/src rules/include rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4582%20-%20in%20rl/branches/persistence%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200811081904.mA8J4Orb015452%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001638.html">
+   <LINK REL="Next"  HREF="001640.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4582 - in rl/branches/persistence: ai/include ai/src	core/include core/src rules/include rules/src ui/include ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4582%20-%20in%20rl/branches/persistence%3A%20ai/include%20ai/src%0A%09core/include%20core/src%20rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200811081904.mA8J4Orb015452%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4582 - in rl/branches/persistence: ai/include ai/src	core/include core/src rules/include rules/src ui/include ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sat Nov  8 20:04:24 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001638.html">[Dsa-hl-svn] r4581 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001640.html">[Dsa-hl-svn] r4583 - rl/branches/persistence/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1639">[ date ]</a>
+              <a href="thread.html#1639">[ thread ]</a>
+              <a href="subject.html#1639">[ subject ]</a>
+              <a href="author.html#1639">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-11-08 20:04:01 +0100 (Sat, 08 Nov 2008)
+New Revision: 4582
+
+Modified:
+   rl/branches/persistence/ai/include/AgentCombatState.h
+   rl/branches/persistence/ai/src/AgentCombatState.cpp
+   rl/branches/persistence/core/include/SaveAbleCollection.h
+   rl/branches/persistence/core/include/SaveAbleManager.h
+   rl/branches/persistence/core/src/ConfigurationManager.cpp
+   rl/branches/persistence/core/src/SaveAbleCollection.cpp
+   rl/branches/persistence/core/src/SaveAbleManager.cpp
+   rl/branches/persistence/rules/include/Combat.h
+   rl/branches/persistence/rules/include/Container.h
+   rl/branches/persistence/rules/src/Combat.cpp
+   rl/branches/persistence/rules/src/Container.cpp
+   rl/branches/persistence/rules/src/Item.cpp
+   rl/branches/persistence/ui/include/CombatGui.h
+   rl/branches/persistence/ui/src/CombatGui.cpp
+   rl/branches/persistence/ui/src/InputManager.cpp
+Log:
+- merged from trunk
+- uploaded some updates for persistence
+
+Modified: rl/branches/persistence/ai/include/AgentCombatState.h
+===================================================================
+--- rl/branches/persistence/ai/include/AgentCombatState.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/ai/include/AgentCombatState.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -18,6 +18,7 @@
+ 
+ #include &quot;AiPrerequisites.h&quot;
+ #include &quot;AgentState.h&quot;
++#include &quot;Combat.h&quot;
+ #include &quot;Combatant.h&quot;
+ 
+ namespace rl
+@@ -46,6 +47,10 @@
+     protected:
+         typedef enum {} CombatState;
+         CombatState mState;
++
++    private:
++        Combatant* findOpponent(const Combat::CombatantSet&amp; opponents) const;
++        Ogre::Vector3 getFleeTarget(const Combat::CombatantSet&amp; opponents) const;
+ 	};
+ }
+ #endif
+
+Modified: rl/branches/persistence/ai/src/AgentCombatState.cpp
+===================================================================
+--- rl/branches/persistence/ai/src/AgentCombatState.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/ai/src/AgentCombatState.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -19,6 +19,7 @@
+ #include &quot;AgentCombatState.h&quot;
+ #include &quot;Combat.h&quot;
+ #include &quot;CombatManager.h&quot;
++#include &quot;Creature.h&quot;
+ #include &quot;CreatureControllerManager.h&quot;
+ 
+ namespace rl
+@@ -45,13 +46,19 @@
+     void AgentCombatState::requestCombatantAction()
+     {
+         // Think!
+-		const Combat::CombatantSet&amp; allies = mCombat-&gt;getAllAllies();
+-		if (!allies.empty())
++        Combat::CombatantSet opponents = mCombat-&gt;getAllOpponents(this);
++		if (!opponents.empty())
+ 		{
+-			Combatant* target = *allies.begin();
+-			// Are we in weapon range to opponent
+-			if (target)
+-			{
++			Combatant* target = findOpponent(opponents);
++            
++            mCombat-&gt;registerParade(target);
++
++            if (getCreature()-&gt;getLe() &lt;= 5)
++            {
++                mCombat-&gt;registerBewegen(this, getFleeTarget(opponents));
++            }
++            else if (target)
++            {
+ 				// Are we in weapon range to opponent
+ 				if (mCombat-&gt;canAttack(this, target))
+ 				{
+@@ -72,4 +79,47 @@
+     {
+         mAgent-&gt;updateVehicle(0, elapsedTime);
+     }
++
++    class DistanceComparator
++		: std::binary_function&lt;Combatant*, Combatant*, bool&gt;
++    {
++    private:
++        const Combatant* mActingCombatant;
++
++    public:
++        DistanceComparator(const Combatant* actingCombatant)
++            : mActingCombatant(actingCombatant)
++        {
++        }
++
++        bool operator()(const Combatant* c1, const Combatant* c2) const
++        {
++            Vector3 pos = mActingCombatant-&gt;getPosition();
++            return pos.squaredDistance(c1-&gt;getPosition())
++                &lt; pos.squaredDistance(c2-&gt;getPosition());
++        }
++    };
++
++
++    Combatant* AgentCombatState::findOpponent(const Combat::CombatantSet&amp; opponents) const
++    {
++        ///@todo support different search patterns (search for most dangerous, weakest, ... opponent)
++        Combat::CombatantSet::const_iterator minIt = 
++            std::min_element(opponents.begin(), opponents.end(), DistanceComparator(this));
++        return *minIt;
++    }
++
++    Vector3 AgentCombatState::getFleeTarget(const Combat::CombatantSet&amp; opponents) const
++    {
++        Vector3 oppPosition;
++        for (Combat::CombatantSet::const_iterator it = opponents.begin(); it != opponents.end(); ++it)
++        {
++            oppPosition += (*it)-&gt;getPosition();
++        }
++        oppPosition /= opponents.size();
++
++        Vector3 pos = getPosition();
++        Vector3 oppositeDirection = (pos - oppPosition).normalisedCopy();
++        return pos + 10 * oppositeDirection;
++    }
+ }
+
+Modified: rl/branches/persistence/core/include/SaveAbleCollection.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleCollection.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/core/include/SaveAbleCollection.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -23,13 +23,15 @@
+ 	class SaveAbleCollection
+ 	{
+ 	public:
++		SaveAbleCollection(const CeGuiString &amp;id);
+ 		void attachSaveAble(SaveAblePtr saveAble);
+ 		void deattachSaveAble(SaveAblePtr saveAble);
+ 		void deattachSaveAble(int id);
+ 		void deattachAllSaveAbles();
+ 		Ogre::String getId();
+ 	protected:
+-		Ogre::String mId;
++		std::map&lt;int, SaveAblePtr&gt; mSaveAbles;
++		CeGuiString mId;
+ 	};
+ 
+ }
+\ No newline at end of file
+
+Modified: rl/branches/persistence/core/include/SaveAbleManager.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleManager.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/core/include/SaveAbleManager.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -29,10 +29,10 @@
+ 		void saveState();
+ 		void addSaveAble(SaveAblePtr save);
+ 		void removeSaveAble(SaveAblePtr save);
+-		void removeSaveAble(int id);
++		void removeSaveAble(const CeGuiString &amp;id);
+ 		void removeAllSaveAbles();
+-		void attachSaveAbleToCollection(int id);
+-		void deattachSaveAbleFromColltection(int id);
++		void attachSaveAbleToCollection(const CeGuiString &amp;id);
++		void deattachSaveAbleFromColltection(const CeGuiString &amp;id);
+ 		void restoreState();
+ 	protected:
+ 		std::map&lt;int, PropertyRecordPtr&gt; mSaveAbleStates;
+
+Modified: rl/branches/persistence/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/branches/persistence/core/src/ConfigurationManager.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/core/src/ConfigurationManager.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -388,9 +388,14 @@
+ 	
+ 	void ConfigurationManager::setExecutable(const Ogre::String&amp; path)
+ 	{
++#       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
++		return;
++		fs::path exeAbsolute(path);
++#       else
+ 		fs::path exeAbsolute(path, fs::portable_posix_name);
+-		mExecutablePath = exeAbsolute.remove_leaf().string();
+-        std::cout &lt;&lt; &quot;ConfigurationManager&quot; &lt;&lt; &quot;Executable is &quot; &lt;&lt; path &lt;&lt; &quot; &quot; &lt;&lt; mExecutablePath;
++#		endif
++		mExecutablePath = exeAbsolute.branch_path().string();
++        std::cout &lt;&lt; &quot;ConfigurationManager &quot; &lt;&lt; &quot;Executable is &quot; &lt;&lt; path &lt;&lt; &quot; &quot; &lt;&lt; mExecutablePath;
+ 	}
+ 
+ 	const Ogre::String&amp; ConfigurationManager::getExecutablePath() const
+@@ -440,17 +445,14 @@
+         try 
+         {
+ #           if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-			std::cout &lt;&lt; &quot;Checking for &quot; &lt;&lt; fs::complete(filename) &lt;&lt; std::endl;
+-            if (fs::exists(filename))
++			std::cout &lt;&lt; &quot;Checking for &quot; &lt;&lt; fs::complete(filename).string() &lt;&lt; std::endl;
++            return fs::exists(filename);
+ #           else
+ 			std::cout &lt;&lt; &quot;Checking for &quot; &lt;&lt; 
+ 				fs::complete(fs::path(filename, fs::portable_posix_name)).string()
+                  &lt;&lt; std::endl;
+-			if (fs::exists(fs::path(filename, fs::portable_posix_name)))
++			return fs::exists(fs::path(filename, fs::portable_posix_name));
+ #           endif
+-            {
+-                return true;
+-            }
+         }
+         catch (fs::filesystem_error&amp;) 
+         {
+
+Modified: rl/branches/persistence/core/src/SaveAbleCollection.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleCollection.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/core/src/SaveAbleCollection.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -16,4 +16,12 @@
+ 
+ #include &quot;stdinc.h&quot;
+ 
+-#include &quot;SaveAbleCollection.h&quot;
+\ No newline at end of file
++#include &quot;SaveAbleCollection.h&quot;
++
++namespace rl
++{
++	SaveAbleCollection::SaveAbleCollection(const CeGuiString &amp;id)
++	{
++		mId = id;
++	}
++}
+\ No newline at end of file
+
+Modified: rl/branches/persistence/core/src/SaveAbleManager.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleManager.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/core/src/SaveAbleManager.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -22,5 +22,35 @@
+ 
+ namespace rl
+ {
+-	
++	void SaveAbleManager::saveState()
++	{
++	}
++
++	void SaveAbleManager::addSaveAble(SaveAblePtr save)
++	{
++	}
++
++	void SaveAbleManager::removeSaveAble(SaveAblePtr save)
++	{
++	}
++		
++	void SaveAbleManager::removeSaveAble(const CeGuiString &amp;id)
++	{
++	}
++		
++	void SaveAbleManager::removeAllSaveAbles()
++	{
++	}
++		
++	void SaveAbleManager::attachSaveAbleToCollection(const CeGuiString &amp;id)
++	{
++	}
++		
++	void SaveAbleManager::deattachSaveAbleFromColltection(const CeGuiString &amp;id)
++	{
++	}
++		
++	void SaveAbleManager::restoreState()
++	{
++	}
+ }
+
+Modified: rl/branches/persistence/rules/include/Combat.h
+===================================================================
+--- rl/branches/persistence/rules/include/Combat.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/rules/include/Combat.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -41,7 +41,7 @@
+     public:
+         typedef std::set&lt;Combatant*&gt; CombatantSet;
+ 
+-        Combat();
++        Combat(Ogre::Real maxDistance = 10.0f);
+         ~Combat();
+ 
+         void addOpponent(Combatant*);
+@@ -54,8 +54,9 @@
+ 
+         void removeAlly(Combatant*);
+ 
+-        const CombatantSet&amp; getAllOpponents() const;
+-        const CombatantSet&amp; getAllAllies() const;
++        const CombatantSet getAllOpponents(Combatant* combatant) const;
++        const CombatantSet&amp; getAllPlayerOpponents() const;
++        const CombatantSet&amp; getAllPlayerAllies() const;
+ 
+         void start();
+         void pause();
+@@ -119,6 +120,10 @@
+ 
+         unsigned short mCurrentRound;
+ 		unsigned short mNextActionId;
++		
++		/// Maximum distance to enemies, a combatant is  this exceededing distance to its enemies
++		/// he is considered fleeing
++		Ogre::Real mMaxDistance;
+ 
+ 		MessagePump::ScopedConnection mLifeStateChangeConnection;
+ 
+@@ -138,8 +143,9 @@
+ 		/// destroy combatants owned by this combat instance.
+ 		void clearRemovedCombatantSet();
+ 
++		bool isOutOfCombatRange(Combatant* combatant, const CombatantSet&amp; enemies) const;
++
+         // Message handlers
+-
+         bool onGameObjectLifeStateChanged(GameObject*, Effect::LifeState, Effect::LifeState);
+     };
+ }
+
+Modified: rl/branches/persistence/rules/include/Container.h
+===================================================================
+--- rl/branches/persistence/rules/include/Container.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/rules/include/Container.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -71,8 +71,22 @@
+ 		 * @return &lt;code&gt;true&lt;/code&gt; if adding was successful, &lt;code&gt;false&lt;/code&gt; otherwise (e.g. not enough space)
+ 		 */
+         bool addItem(Item* item, IntPair position = IntPair(0,0));
++
++        /**
++         * Remove an item from the container
++         *
++		 * @param item the item
++         */
+         void removeItem(Item* item);
+ 
++        /**
++         * Remove an item from the container
++         * Note: This method must only be called by Item, use removeItem in all other cases
++         *
++		 * @param item the item
++         */
++        void _doRemoveItem(Item* item);
++
+         ItemSet getItems() const;
+ 
+ 		int getItemCount() const;
+
+Modified: rl/branches/persistence/rules/src/Combat.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/Combat.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/rules/src/Combat.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -59,7 +59,7 @@
+         }
+     };
+ 
+-    Combat::Combat()
++    Combat::Combat(Ogre::Real maxDistance)
+         : mOwnedCombatants(),
+ 		  mOpponents(),
+           mAllies(),
+@@ -70,7 +70,8 @@
+ 		  mRemovedCombatants(),
+           mCurrentRound(0),
+ 		  mNextActionId(0),
+-		  mAnimationSequenceTicket(0)
++		  mAnimationSequenceTicket(0),
++		  mMaxDistance(maxDistance)
+     {
+         LOG_MESSAGE(&quot;Combat&quot;, &quot;Register message handler&quot;);
+ 		mLifeStateChangeConnection =
+@@ -165,16 +166,31 @@
+ 		mRemovedCombatants.clear();
+ 	}
+ 
+-    const Combat::CombatantSet&amp; Combat::getAllOpponents() const
++    const Combat::CombatantSet&amp; Combat::getAllPlayerOpponents() const
+     {
+         return mOpponents;
+     }
+ 
+-    const Combat::CombatantSet&amp; Combat::getAllAllies() const
++    const Combat::CombatantSet&amp; Combat::getAllPlayerAllies() const
+     {
+         return mAllies;
+     }
+ 
++    const Combat::CombatantSet Combat::getAllOpponents(Combatant* combatant) const
++    {
++        if (mOpponents.find(combatant) != mOpponents.end())
++        {
++            return mAllies;
++        }
++        
++        if (mAllies.find(combatant) != mAllies.end())
++        {
++            return mOpponents;
++        }
++        
++        return Combat::CombatantSet(); // not in combat -&gt; no opponents
++    }
++
+     void Combat::start()
+     {
+ 		GameEventLog::getSingleton().logEvent(&quot;Kampf beginnt.&quot;, GET_COMBAT);
+@@ -384,6 +400,25 @@
+     void Combat::endRound()
+     {
+ 		clearRemovedCombatantSet();
++
++        // check for fleeing from combat
++        for (CombatantSet::iterator it = mAllies.begin(); it != mAllies.end(); ++it)
++        {
++            if (isOutOfCombatRange(*it, mOpponents))
++            {
++                removeAlly(*it);
++            }
++        }
++        for (CombatantSet::iterator it = mOpponents.begin(); it != mOpponents.end(); ++it)
++        {
++            if (isOutOfCombatRange(*it, mAllies))
++            {
++                removeOpponent(*it);
++            }
++        }
++
++		clearRemovedCombatantSet();
++
+         // All actions executed. Analyze outcome of this round.
+         if (mAllies.empty())
+         {
+@@ -544,4 +579,19 @@
+ 		}
+ 		return false;
+ 	}
++
++	bool Combat::isOutOfCombatRange(Combatant* combatant, const Combat::CombatantSet&amp; enemies) const
++	{
++		Vector3 pos = combatant-&gt;getPosition();
++		Ogre::Real sqD = mMaxDistance * mMaxDistance;
++		for (CombatantSet::const_iterator it = enemies.begin(); it != enemies.end(); ++it)
++		{
++			if (pos.squaredDistance((*it)-&gt;getPosition()) &lt;= sqD)
++			{
++				return false;
++			}
++		}
++
++		return true;
++	}
+ }
+
+Modified: rl/branches/persistence/rules/src/Container.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/Container.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/rules/src/Container.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -168,16 +168,25 @@
+ 		}
+     }
+ 
+-    void Container::removeItem(Item* item)
++    void Container::_doRemoveItem(Item* item)
+     {
+         ItemSet::iterator it = mItems.find(item);
+         if (it != mItems.end())
+         {
+             mItems.erase(it);
+             mItemPositions.erase(mItemPositions.find(item));
+-            
+-            // this is the case, if the item is removed automatically
+-            // don't change this without looking at Item::setState
++        }
++        else
++        {
++            Throw(IllegalArgumentException, &quot;Item not in Container.&quot;);
++        }
++    }
++
++    void Container::removeItem(Item* item)
++    {
++        ItemSet::iterator it = mItems.find(item);
++        if (it != mItems.end())
++        {
+             item-&gt;removeOldState();
+             item-&gt;setScene(&quot;&quot;);
+         }
+
+Modified: rl/branches/persistence/rules/src/Item.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/Item.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/rules/src/Item.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -95,7 +95,7 @@
+         }
+         if (mParentContainer != NULL)
+         {
+-            mParentContainer-&gt;removeItem(this);
++            mParentContainer-&gt;_doRemoveItem(this);
+             mParentContainer = NULL;
+         }
+         if (mParentSlot != NULL)
+
+Modified: rl/branches/persistence/ui/include/CombatGui.h
+===================================================================
+--- rl/branches/persistence/ui/include/CombatGui.h	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/ui/include/CombatGui.h	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -73,6 +73,8 @@
+ 		/// Needed to only close it after combat if it was not shown before.
+ 		bool mGameLoggerWindowOpened;
+ 
++        bool mVisible;
++
+         Ogre::FloatRect getScreenRectFromWorldAabb(const Ogre::AxisAlignedBox&amp; aabb) const;
+ 	};
+ }
+
+Modified: rl/branches/persistence/ui/src/CombatGui.cpp
+===================================================================
+--- rl/branches/persistence/ui/src/CombatGui.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/ui/src/CombatGui.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -37,7 +37,8 @@
+ 		  mCombat(combat),
+ 		  mCamera(camera),
+ 		  mUserInputEnabled(false),
+-		  mGameLoggerWindowOpened(false)
++		  mGameLoggerWindowOpened(false),
++          mVisible(false)
+     {
+         mCombatWindow = WindowFactory::getSingleton().getCombatWindow();
+ 		mGameLoggerWindow = WindowFactory::getSingleton().getGameLogger();
+@@ -68,7 +69,7 @@
+         sceneMgr-&gt;getRootSceneNode()-&gt;createChildSceneNode()-&gt;attachObject(mHud);
+ 
+ 		// Create an attack/parry/(goto) button set for all opponents present at the beginning.
+-        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllOpponents();
++        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllPlayerOpponents();
+         for (Combat::CombatantSet::const_iterator it = opponents.begin(), end = opponents.end();
+             it != end; ++it)
+         {
+@@ -82,6 +83,7 @@
+ 	CombatGui::~CombatGui()
+ 	{
+ 		hide();
++        mHud-&gt;getParentSceneNode()-&gt;detachObject(mHud);
+         SceneManager* sceneMgr = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager();
+ 		sceneMgr-&gt;destroyManualObject(mHud);
+ 	}
+@@ -96,7 +98,7 @@
+         mHud-&gt;clear();
+ 
+         mHud-&gt;begin(&quot;alpha_red&quot;, RenderOperation::OT_LINE_LIST);
+-        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllOpponents();
++        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllPlayerOpponents();
+         for (Combat::CombatantSet::const_iterator it = opponents.begin(), end = opponents.end();
+             it != end; ++it)
+         {
+@@ -160,16 +162,25 @@
+ 
+ 	void CombatGui::show()
+ 	{
+-		mGameLoggerWindowOpened = !mGameLoggerWindow-&gt;isVisible();
+-        mCombatWindow-&gt;setVisible(true);
+-		mGameLoggerWindow-&gt;setVisible(true);
++        if (!mVisible)
++        {
++		    mGameLoggerWindowOpened = !mGameLoggerWindow-&gt;isVisible();
++            mCombatWindow-&gt;setVisible(true);
++		    mGameLoggerWindow-&gt;setVisible(true);
++            mHud-&gt;setVisible(true);
++            mVisible = true;
++        }
+ 	}
+ 
+ 	void CombatGui::hide()
+ 	{
+-        mCombatWindow-&gt;setVisible(false);
+-		mGameLoggerWindow-&gt;setVisible(!mGameLoggerWindowOpened);
+-		mHud-&gt;clear();
++        if (mVisible)
++        {
++            mCombatWindow-&gt;setVisible(false);
++		    mGameLoggerWindow-&gt;setVisible(!mGameLoggerWindowOpened);
++            mHud-&gt;setVisible(false);
++            mVisible = false;
++        }
+ 	}
+ 
+ 	bool CombatGui::enemyButtonClicked(int handle, int buttonIndex)
+
+Modified: rl/branches/persistence/ui/src/InputManager.cpp
+===================================================================
+--- rl/branches/persistence/ui/src/InputManager.cpp	2008-11-08 12:55:50 UTC (rev 4581)
++++ rl/branches/persistence/ui/src/InputManager.cpp	2008-11-08 19:04:01 UTC (rev 4582)
+@@ -446,7 +446,10 @@
+     {
+         while (!mControlStates.empty())
+         {
+-            popControlState();
++            ControlState* controller = mControlStates.top();
++            mControlStates.pop();
++            controller-&gt;pause();
++            mFinishedControlStates.push_back(controller);
+         }
+     }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001638.html">[Dsa-hl-svn] r4581 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001640.html">[Dsa-hl-svn] r4583 - rl/branches/persistence/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1639">[ date ]</a>
+              <a href="thread.html#1639">[ thread ]</a>
+              <a href="subject.html#1639">[ subject ]</a>
+              <a href="author.html#1639">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

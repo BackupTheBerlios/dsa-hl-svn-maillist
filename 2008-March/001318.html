@@ -1,0 +1,183 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4247 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4247%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803081151.m28BpFGq025721%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001317.html">
+   <LINK REL="Next"  HREF="001319.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4247 - in rl/trunk/engine/rules: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4247%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200803081151.m28BpFGq025721%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4247 - in rl/trunk/engine/rules: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 12:51:15 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001317.html">[Dsa-hl-svn] r4246 - rl/trunk/engine/ai/src
+</A></li>
+        <LI>Next message: <A HREF="001319.html">[Dsa-hl-svn] r4248 - in modules: combattest/dsa	combattest/scripts/maps common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1318">[ date ]</a>
+              <a href="thread.html#1318">[ thread ]</a>
+              <a href="subject.html#1318">[ subject ]</a>
+              <a href="author.html#1318">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-08 12:51:10 +0100 (Sat, 08 Mar 2008)
+New Revision: 4247
+
+Modified:
+   rl/trunk/engine/rules/include/RulesConstants.h
+   rl/trunk/engine/rules/include/Slot.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+Log:
+Allow default slots without submesh or other visible effect, used for natural weapons.
+Improved logging messages in GamObjectManager/GameObject and Inventory a bit.
+
+Modified: rl/trunk/engine/rules/include/RulesConstants.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesConstants.h	2008-03-08 10:57:10 UTC (rev 4246)
++++ rl/trunk/engine/rules/include/RulesConstants.h	2008-03-08 11:51:10 UTC (rev 4247)
+@@ -47,7 +47,8 @@
+     {
+         SLOT_BONE,
+         SLOT_SUBMESH,
+-        SLOT_MATERIAL
++        SLOT_MATERIAL,
++		SLOT_DEFAULT   ///!&lt; No visual attachment, but only logical one.
+     };
+ 
+ 	/// Event type that are distinguished in the game event log
+
+Modified: rl/trunk/engine/rules/include/Slot.h
+===================================================================
+--- rl/trunk/engine/rules/include/Slot.h	2008-03-08 10:57:10 UTC (rev 4246)
++++ rl/trunk/engine/rules/include/Slot.h	2008-03-08 11:51:10 UTC (rev 4247)
+@@ -26,6 +26,9 @@
+ class _RlRulesExport Slot
+ {
+ public:
++    Slot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask);
++    virtual ~Slot();
++
+     // provides standard behaviour, sets
+     // item-state etc, returns true, if succeeded to set item, false indicates to to nothing
+     // subclasses MUST call this method when overriding
+@@ -37,12 +40,9 @@
+     bool canReady(const Item* item) const;
+ 	bool isReady() { return mItem != NULL &amp;&amp; canReady(mItem); }
+     CeGuiString getName() const {return mName;}
+-    virtual ~Slot();
+ 
+ protected:
+-    Slot(Creature* owner, const CeGuiString&amp; name, int itemReadyMask, int itemHeldMask);
+ 
+-
+     Creature* mOwner;
+     Item* mItem;
+ 
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 10:57:10 UTC (rev 4246)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-03-08 11:51:10 UTC (rev 4247)
+@@ -171,7 +171,7 @@
+         mActions.push_back(make_pair(action, option));
+         LOG_MESSAGE(Logger::RULES,
+             &quot;Bei GameObject #&quot;+Ogre::StringConverter::toString(mId)+
+-            &quot; (&quot;+getName()+&quot;) wurde Aktion &quot;+action-&gt;getName().c_str()+&quot; hinzugef&#65533;gt.&quot;);
++            &quot; (&quot;+getName()+&quot;) wurde Aktion &quot;+action-&gt;getName().c_str()+&quot; hinzugefuegt.&quot;);
+     }
+ 
+     void GameObject::addActionInGroup(Action* action, ActionGroup* group, int option)
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-08 10:57:10 UTC (rev 4246)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-03-08 11:51:10 UTC (rev 4247)
+@@ -118,7 +118,8 @@
+     GameObject* GameObjectManager::createGameObject(
+         const Ogre::String&amp; classId, unsigned int id)
+     {
+-		LOG_MESSAGE(&quot;GameObjectManager&quot;, &quot;Create/Get GameObject &quot; + Ogre::StringConverter::toString((int)id));
++		LOG_MESSAGE(&quot;GameObjectManager&quot;, &quot;Create/Get GameObject of type &quot; + classId
++			+ &quot; #&quot; + Ogre::StringConverter::toString((int)id));
+         unsigned int goId;
+ 
+         if (id != GameObject::NO_OBJECT_ID)
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2008-03-08 10:57:10 UTC (rev 4246)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2008-03-08 11:51:10 UTC (rev 4247)
+@@ -248,6 +248,8 @@
+ 			Throw(rl::IllegalArgumentException, Ogre::String(&quot;Item '&quot;) + item-&gt;getName().c_str() +
+ 				&quot;' cannot be readied in slot '&quot; + slotName.c_str() + &quot;'.&quot;);
+ 		}
++		LOG_MESSAGE(&quot;Inventory&quot;, &quot;Item &quot; + item-&gt;getName()
++			+ &quot; readied in slot &quot; + slotName + &quot;.&quot;);
+     }
+ 
+ 	std::vector&lt;Weapon*&gt; Inventory::getReadiedWeapons() const
+@@ -283,6 +285,9 @@
+                 case SLOT_MATERIAL:
+ 			        mSlots[name] = new MaterialSlot(mOwner, name, itemReadyMask, itemHeldMask, meshpartname);
+                     break;
++                case SLOT_DEFAULT:
++			        mSlots[name] = new Slot(mOwner, name, itemReadyMask, itemHeldMask);
++                    break;
+ 		    }
+         }
+     }
+@@ -356,6 +361,11 @@
+                     LOG_MESSAGE(&quot;Inventory&quot;, &quot;Add material slot &quot;+ submesh);
+                     addSlot(name, submesh.c_str(), readyItems, holdItems, SLOT_MATERIAL);
+                 }
++                else if (type == &quot;default&quot;)
++                {
++                    LOG_MESSAGE(&quot;Inventory&quot;, &quot;Add default slot &quot;+ name);
++                    addSlot(name, &quot;&quot;, readyItems, holdItems, SLOT_DEFAULT);
++                }
+                 else
+                 {
+                     LOG_ERROR(Logger::RULES, 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001317.html">[Dsa-hl-svn] r4246 - rl/trunk/engine/ai/src
+</A></li>
+	<LI>Next message: <A HREF="001319.html">[Dsa-hl-svn] r4248 - in modules: combattest/dsa	combattest/scripts/maps common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1318">[ date ]</a>
+              <a href="thread.html#1318">[ thread ]</a>
+              <a href="subject.html#1318">[ subject ]</a>
+              <a href="author.html#1318">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

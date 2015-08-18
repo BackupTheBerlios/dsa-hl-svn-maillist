@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4565 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4565%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200810261128.m9QBSwRj024800%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001621.html">
+   <LINK REL="Next"  HREF="001623.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4565 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4565%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200810261128.m9QBSwRj024800%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4565 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Oct 26 12:28:58 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001621.html">[Dsa-hl-svn] r4564 - in rl/trunk/editors/Lockenwickler: . src	src/media/icons
+</A></li>
+        <LI>Next message: <A HREF="001623.html">[Dsa-hl-svn] r4566 - in rl/branches/persistence: common/include	core/include core/src script/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1622">[ date ]</a>
+              <a href="thread.html#1622">[ thread ]</a>
+              <a href="subject.html#1622">[ subject ]</a>
+              <a href="author.html#1622">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2008-10-26 12:28:55 +0100 (Sun, 26 Oct 2008)
+New Revision: 4565
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/GameObjectClass.py
+   rl/trunk/editors/Lockenwickler/src/GameObjectClassView.py
+Log:
+- property type map is handled better now
+
+Modified: rl/trunk/editors/Lockenwickler/src/GameObjectClass.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/GameObjectClass.py	2008-10-26 09:35:34 UTC (rev 4564)
++++ rl/trunk/editors/Lockenwickler/src/GameObjectClass.py	2008-10-26 11:28:55 UTC (rev 4565)
+@@ -66,7 +66,14 @@
+     def getType(self):
+         return &quot;INTTRIPPLE&quot;
+ 
++class GOCMapProperty():
++    def __init__(self, name):
++        self.name = name
++        self.childProperties = []
+ 
++    def getType(self):
++        return &quot;MAP&quot;
++
+ class GameObjectClass():
+     def __init__(self,  parentElement):
+         self.classid = parentElement.get(&quot;classid&quot;)
+@@ -74,34 +81,53 @@
+ 
+         self.properties = []
+ 
+-        for property in parentElement.getiterator(&quot;property&quot;):
++        for property in parentElement:#.getiterator(&quot;property&quot;):
+             if property.get(&quot;type&quot;) == &quot;ARRAY&quot;:
+                 pass
+-            elif property.get(&quot;type&quot;) == &quot;STRING&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCStringProperty(name, data))
+-            elif property.get(&quot;type&quot;) == &quot;REAL&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCRealProperty(name, data))
+-            elif property.get(&quot;type&quot;) == &quot;BOOL&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCBoolProperty(name, data))
+             elif property.get(&quot;type&quot;) == &quot;MAP&quot;:
+-                pass
+-            elif property.get(&quot;type&quot;) == &quot;INT&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCIntProperty(name, data))
+-            elif property.get(&quot;type&quot;) == &quot;INTPAIR&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCIntPairProperty(name, data))
+-            elif property.get(&quot;type&quot;) == &quot;INTTRIPLE&quot;:
+-                name = property.get(&quot;name&quot;)
+-                data = property.get(&quot;data&quot;)
+-                self.properties.append(GOCIntTripleProperty(name, data))
++                self.properties.append(self.createPropertyMap(property))
+             else:
+-                print property.get(&quot;type&quot;)
++                self.properties.append(self.createProperty(property))
++
++    def createPropertyMap(self, property):
++        propMap = GOCMapProperty(property.get(&quot;name&quot;))
++        for subProperty in property:
++            if subProperty.get(&quot;type&quot;) == &quot;MAP&quot;:
++                propMap.childProperties.append(self.createPropertyMap(property))
++            else:
++                for subProperty in property:
++                    propMap.childProperties.append(self.createProperty(subProperty))
++
++        return propMap
++
++
++    def createProperty(self, property):
++        if property.get(&quot;type&quot;) == &quot;STRING&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCStringProperty(name, data)
++        elif property.get(&quot;type&quot;) == &quot;REAL&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCRealProperty(name, data)
++        elif property.get(&quot;type&quot;) == &quot;BOOL&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCBoolProperty(name, data)
++        elif property.get(&quot;type&quot;) == &quot;INT&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCIntProperty(name, data)
++        elif property.get(&quot;type&quot;) == &quot;INTPAIR&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCIntPairProperty(name, data)
++        elif property.get(&quot;type&quot;) == &quot;INTTRIPLE&quot;:
++            name = property.get(&quot;name&quot;)
++            data = property.get(&quot;data&quot;)
++            return GOCIntTripleProperty(name, data)
++        else:
++            print property.get(&quot;type&quot;)
++
++
++
+
+Modified: rl/trunk/editors/Lockenwickler/src/GameObjectClassView.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/GameObjectClassView.py	2008-10-26 09:35:34 UTC (rev 4564)
++++ rl/trunk/editors/Lockenwickler/src/GameObjectClassView.py	2008-10-26 11:28:55 UTC (rev 4565)
+@@ -75,6 +75,12 @@
+                     item1.setIcon(0, QIcon(&quot;media/icons/agt_multimedia.png&quot;))
+                     item1.setText(0, str(prop.name))
+                     item1.setText(1, prop.getType())
+-                    item1.setText(2, unicode(prop.data))
++                    if prop.getType() is &quot;MAP&quot;:
++                        pass
++                    elif prop.getType() is &quot;ARRAY&quot;:
++                        pass
++                    else:
++                        item1.setText(2, unicode(prop.data))
++
+                     changeColor = not changeColor
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001621.html">[Dsa-hl-svn] r4564 - in rl/trunk/editors/Lockenwickler: . src	src/media/icons
+</A></li>
+	<LI>Next message: <A HREF="001623.html">[Dsa-hl-svn] r4566 - in rl/branches/persistence: common/include	core/include core/src script/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1622">[ date ]</a>
+              <a href="thread.html#1622">[ thread ]</a>
+              <a href="subject.html#1622">[ subject ]</a>
+              <a href="author.html#1622">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

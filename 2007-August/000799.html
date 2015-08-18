@@ -1,0 +1,306 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3728 - in modules: common/scripts minidemo/scripts	techdemo2/scripts techdemo2/scripts/maps tutorial/scripts/maps
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3728%20-%20in%20modules%3A%20common/scripts%20minidemo/scripts%0A%09techdemo2/scripts%20techdemo2/scripts/maps%20tutorial/scripts/maps&In-Reply-To=%3C200708212220.l7LMKeu1010268%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000798.html">
+   <LINK REL="Next"  HREF="000800.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3728 - in modules: common/scripts minidemo/scripts	techdemo2/scripts techdemo2/scripts/maps tutorial/scripts/maps</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3728%20-%20in%20modules%3A%20common/scripts%20minidemo/scripts%0A%09techdemo2/scripts%20techdemo2/scripts/maps%20tutorial/scripts/maps&In-Reply-To=%3C200708212220.l7LMKeu1010268%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3728 - in modules: common/scripts minidemo/scripts	techdemo2/scripts techdemo2/scripts/maps tutorial/scripts/maps">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Aug 22 00:20:40 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000798.html">[Dsa-hl-svn] r3727 - modules/common/scripts	modules/techdemo2/scripts modules/tutorial/scripts/maps	rl/trunk rl/trunk/engine rl/trunk/engine/ai	rl/trunk/engine/ai/include	rl/trunk/engine/ai/include/predicates rl/trunk/engine/ai/src	rl/trunk/engine/script rl/trunk/engine/script/swig	rl/trunk/engine/startup/src rl/trunk/engine/ui	rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000800.html">[Dsa-hl-svn] r3729 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#799">[ date ]</a>
+              <a href="thread.html#799">[ thread ]</a>
+              <a href="subject.html#799">[ subject ]</a>
+              <a href="author.html#799">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-22 00:20:29 +0200 (Wed, 22 Aug 2007)
+New Revision: 3728
+
+Modified:
+   modules/common/scripts/globals.rb
+   modules/common/scripts/initialize_factories.rb
+   modules/common/scripts/npc.rb
+   modules/minidemo/scripts/enemy.rb
+   modules/techdemo2/scripts/forrest.rb
+   modules/techdemo2/scripts/jarn.rb
+   modules/techdemo2/scripts/maps/techdemo2map1.rb
+   modules/techdemo2/scripts/maps/techdemo2map2.rb
+   modules/techdemo2/scripts/waldwoelfe_retten.rb
+   modules/tutorial/scripts/maps/nscs.rb
+   modules/tutorial/scripts/maps/tutorial.rb
+Log:
+Finished merging dialog subsystem into the AI subsystem (fixes in ruby scripts)
+
+Modified: modules/common/scripts/globals.rb
+===================================================================
+--- modules/common/scripts/globals.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/common/scripts/globals.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -12,7 +12,8 @@
+ $UI = UiSubsystem.getSingleton();
+ $DM = DsaManager.getSingleton();
+ $WF = WindowFactory.getSingleton();
+-$AI = AgentManager.getSingleton();
++$AI = AiSubsystem.getSingleton();
++$AGM = AiSubsystem.getSingleton();
+ $WPGM = WayPointGraphManager.getSingleton();
+ $DVM = DebugVisualsManager.getSingleton();
+ $SCRIPT = ScriptSubsystem.getSingleton();
+
+Modified: modules/common/scripts/initialize_factories.rb
+===================================================================
+--- modules/common/scripts/initialize_factories.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/common/scripts/initialize_factories.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -22,6 +22,6 @@
+ 
+ factory = RubyClassFactory.new()
+ $GOM.setGameObjectFactory(factory);
+-$AI.setBehaviourFactory(factory);
++$AGM.setBehaviourFactory(factory);
+ $SCRIPT.setTriggerFactory(factory)
+ EffectFactoryManager.getSingleton().setEffectFactory(factory)
+
+Modified: modules/common/scripts/npc.rb
+===================================================================
+--- modules/common/scripts/npc.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/common/scripts/npc.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -62,7 +62,7 @@
+     #bot = $DS.loadBot(&quot;Sonja&quot;, &quot;sonja.xml&quot;);
+     #bot.setNonPlayerCharacter(sonja);
+     #
+-    #agent = $AI.createAgent(bot);
++    #agent = $AGM.createAgent(bot);
+     #agent.addSteeringBehaviour(DefaultIdleBehaviour.new);
+     #agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+     #agent.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+
+Modified: modules/minidemo/scripts/enemy.rb
+===================================================================
+--- modules/minidemo/scripts/enemy.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/minidemo/scripts/enemy.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -15,7 +15,7 @@
+ se = SimpleEnemy.new( &quot;Wolf&quot;,&quot;Lebendiger Wolf&quot;,&quot;Toter Wolf&quot;,&quot;kiste.mesh&quot;,&quot;spinne_todesschrei_01.ogg&quot;);
+ se.getActor().placeIntoScene([1.40, 2.80, 2.20]) 
+ 
+-agent = $AI.createAgent(AgentManager::AGENT_STD_NPC, se )
++agent = $AGM.createAgent(AgentManager::AGENT_STD_NPC, se )
+ agent.addSteeringBehaviour(DefaultWanderBehaviour.new);
+ agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ 
+
+Modified: modules/techdemo2/scripts/forrest.rb
+===================================================================
+--- modules/techdemo2/scripts/forrest.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/techdemo2/scripts/forrest.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -13,7 +13,7 @@
+ #bot=$AI.loadBot(&quot;Forrest&quot;, &quot;forrest.xml&quot;);
+ #bot.setNonPlayerCharacter(forrest);
+ #forrest.addAction(TalkAction.new(&quot;Forrest&quot;, &quot;forrest.xml&quot;));
+-#agent = $AI.createAgent(bot);
++#agent = $AGM.createAgent(bot);
+ #agent.addSteeringBehaviour(DefaultWanderBehaviour.new);
+ #agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ #agent.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+
+Modified: modules/techdemo2/scripts/jarn.rb
+===================================================================
+--- modules/techdemo2/scripts/jarn.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/techdemo2/scripts/jarn.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -14,7 +14,7 @@
+ #bot = $AI.loadBot(&quot;Jarn&quot;, &quot;jarn.xml&quot;);
+ #bot.setNonPlayerCharacter(jarn);
+ #jarn.addAction(TalkAction.new(&quot;Jarn&quot;, &quot;jarn.xml&quot;));
+-#agent = $AI.createAgent(bot);
++#agent = $AGM.createAgent(bot);
+ #agent.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ ##agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ #agent.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+
+Modified: modules/techdemo2/scripts/maps/techdemo2map1.rb
+===================================================================
+--- modules/techdemo2/scripts/maps/techdemo2map1.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/techdemo2/scripts/maps/techdemo2map1.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -16,7 +16,7 @@
+ $UI.setActiveCharacter($hero)
+ $SCRIPT.log(&quot;Held erstellt&quot;);
+ 
+-#$heroVehicle = $AI.createAgent(AgentManager::AGENT_PLAYER, $hero);	
++#$heroVehicle = $AGM.createAgent(AgentManager::AGENT_PLAYER, $hero);	
+ #$SCRIPT.log(&quot;SteeringVehicle f&#252;r Held erstellen...&quot;);
+ 
+ 
+
+Modified: modules/techdemo2/scripts/maps/techdemo2map2.rb
+===================================================================
+--- modules/techdemo2/scripts/maps/techdemo2map2.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/techdemo2/scripts/maps/techdemo2map2.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -13,7 +13,7 @@
+ $UI.setActiveCharacter($hero)
+ $SCRIPT.log(&quot;Held erstellt&quot;);
+ 
+-#$heroVehicle = $AI.createAgent(AgentManager::AGENT_PLAYER, $hero);	
++#$heroVehicle = $AGM.createAgent(AgentManager::AGENT_PLAYER, $hero);	
+ #$SCRIPT.log(&quot;SteeringVehicle f&#252;r Held erstellen...&quot;);
+ 
+ 
+
+Modified: modules/techdemo2/scripts/waldwoelfe_retten.rb
+===================================================================
+--- modules/techdemo2/scripts/waldwoelfe_retten.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/techdemo2/scripts/waldwoelfe_retten.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -42,7 +42,7 @@
+     se = SimpleEnemy.new( &quot;Wolf_&quot;+wolfnum.to_s,&quot;Ein gef&#228;hrlicher, ganz gef&#228;hrlicher, wirklich extrem gef&#228;hrlicher Wolf. Aber er hat ein schwaches Herz.&quot;,&quot;Ein sehr toter Wolf&quot;,&quot;tie_wolf_01.mesh&quot;,&quot;wolf_sterben_001.ogg&quot;);
+     se.getActor().placeIntoScene( pos ) 
+ 
+-    agent = $AI.createAgent(AgentManager::AGENT_STD_NPC, se )
++    agent = $AGM.createAgent(AgentManager::AGENT_STD_NPC, se )
+     agent.addSteeringBehaviour(DefaultWanderBehaviour.new);
+     agent.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ 
+
+Modified: modules/tutorial/scripts/maps/nscs.rb
+===================================================================
+--- modules/tutorial/scripts/maps/nscs.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/tutorial/scripts/maps/nscs.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -10,7 +10,7 @@
+ bot01 = $AI.loadBot(&quot;AIML01&quot;, &quot;nscs.xml&quot;);
+ bot01.setNonPlayerCharacter(nsc01);
+ nsc01.addAction(TalkAction.new(&quot;AIML01&quot;, &quot;nscs.xml&quot;));
+-agent01 = $AI.createAgent(bot01);
++agent01 = $AGM.createAgent(bot01);
+ agent01.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent01.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent01.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -25,7 +25,7 @@
+ bot02 = $AI.loadBot(&quot;AIML02&quot;, &quot;nscs.xml&quot;);
+ bot02.setNonPlayerCharacter(nsc02);
+ nsc02.addAction(TalkAction.new(&quot;AIML02&quot;, &quot;nscs.xml&quot;));
+-agent02 = $AI.createAgent(bot02);
++agent02 = $AGM.createAgent(bot02);
+ agent02.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent02.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent02.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -40,7 +40,7 @@
+ bot03 = $AI.loadBot(&quot;AIML03&quot;, &quot;nscs.xml&quot;);
+ bot03.setNonPlayerCharacter(nsc03);
+ nsc03.addAction(TalkAction.new(&quot;AIML03&quot;, &quot;nscs.xml&quot;));
+-agent03 = $AI.createAgent(bot03);
++agent03 = $AGM.createAgent(bot03);
+ agent03.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent03.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent03.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -55,7 +55,7 @@
+ bot04 = $AI.loadBot(&quot;AIML04&quot;, &quot;nscs.xml&quot;);
+ bot04.setNonPlayerCharacter(nsc04);
+ nsc04.addAction(TalkAction.new(&quot;AIML04&quot;, &quot;nscs.xml&quot;));
+-agent04 = $AI.createAgent(bot04);
++agent04 = $AGM.createAgent(bot04);
+ agent04.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent04.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent04.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -70,7 +70,7 @@
+ bot05 = $AI.loadBot(&quot;AIML05&quot;, &quot;nscs.xml&quot;);
+ bot05.setNonPlayerCharacter(nsc05);
+ nsc05.addAction(TalkAction.new(&quot;AIML05&quot;, &quot;nscs.xml&quot;));
+-agent05 = $AI.createAgent(bot05);
++agent05 = $AGM.createAgent(bot05);
+ agent05.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent05.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent05.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -86,7 +86,7 @@
+ bot06 = $AI.loadBot(&quot;AIML06&quot;, &quot;nscs.xml&quot;);
+ bot06.setNonPlayerCharacter(nsc06);
+ nsc06.addAction(TalkAction.new(&quot;AIML06&quot;, &quot;nscs.xml&quot;));
+-agent06 = $AI.createAgent(bot06);
++agent06 = $AGM.createAgent(bot06);
+ agent06.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent06.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent06.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -103,7 +103,7 @@
+ bot08 = $AI.loadBot(&quot;AIML08&quot;, &quot;nscs.xml&quot;);
+ bot08.setNonPlayerCharacter(nsc08);
+ nsc08.addAction(TalkAction.new(&quot;AIML08&quot;, &quot;nscs.xml&quot;));
+-agent08 = $AI.createAgent(bot08);
++agent08 = $AGM.createAgent(bot08);
+ agent08.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent08.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent08.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -118,7 +118,7 @@
+ bot09 = $AI.loadBot(&quot;AIML09&quot;, &quot;nscs.xml&quot;);
+ bot09.setNonPlayerCharacter(nsc09);
+ nsc09.addAction(TalkAction.new(&quot;AIML09&quot;, &quot;nscs.xml&quot;));
+-agent09 = $AI.createAgent(bot09);
++agent09 = $AGM.createAgent(bot09);
+ agent09.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent09.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent09.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+@@ -134,7 +134,7 @@
+ bot10 = $AI.loadBot(&quot;AIML10&quot;, &quot;nscs.xml&quot;);
+ bot10.setNonPlayerCharacter(nsc10);
+ nsc10.addAction(TalkAction.new(&quot;AIML10&quot;, &quot;nscs.xml&quot;));
+-agent10 = $AI.createAgent(bot10);
++agent10 = $AGM.createAgent(bot10);
+ agent10.addSteeringBehaviour(DefaultIdleBehaviour.new);
+ #agent10.addSteeringBehaviour(AvoidObstaclesBehaviour.new);
+ agent10.addSteeringBehaviour(DialogBehaviour.new($heroVehicle));
+
+Modified: modules/tutorial/scripts/maps/tutorial.rb
+===================================================================
+--- modules/tutorial/scripts/maps/tutorial.rb	2007-08-21 22:05:49 UTC (rev 3727)
++++ modules/tutorial/scripts/maps/tutorial.rb	2007-08-21 22:20:29 UTC (rev 3728)
+@@ -21,7 +21,7 @@
+ $SCRIPT.log(&quot;Held vorbereitet.&quot;);
+ $UI.setActiveCharacter($hero);
+ $SCRIPT.log(&quot;Held als aktiver Charakter gesetzt.&quot;);
+-$heroVehicle = $AI.createAgent(AgentManager::AGENT_PLAYER, $hero);	
++$heroVehicle = $AGM.createAgent(AgentManager::AGENT_PLAYER, $hero);	
+ $SCRIPT.log(&quot;SteeringVehicle f&#252;r Held erstellen...&quot;);
+ 		
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000798.html">[Dsa-hl-svn] r3727 - modules/common/scripts	modules/techdemo2/scripts modules/tutorial/scripts/maps	rl/trunk rl/trunk/engine rl/trunk/engine/ai	rl/trunk/engine/ai/include	rl/trunk/engine/ai/include/predicates rl/trunk/engine/ai/src	rl/trunk/engine/script rl/trunk/engine/script/swig	rl/trunk/engine/startup/src rl/trunk/engine/ui	rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000800.html">[Dsa-hl-svn] r3729 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#799">[ date ]</a>
+              <a href="thread.html#799">[ thread ]</a>
+              <a href="subject.html#799">[ subject ]</a>
+              <a href="author.html#799">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,318 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3280 - rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3280%20-%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704121341.l3CDfEjU015974%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000350.html">
+   <LINK REL="Next"  HREF="000352.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3280 - rl/trunk/engine/script/swig</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3280%20-%20rl/trunk/engine/script/swig&In-Reply-To=%3C200704121341.l3CDfEjU015974%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3280 - rl/trunk/engine/script/swig">tanis at mail.berlios.de
+       </A><BR>
+    <I>Thu Apr 12 15:41:14 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000350.html">[Dsa-hl-svn] r3279 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="000352.html">[Dsa-hl-svn] r3281 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#351">[ date ]</a>
+              <a href="thread.html#351">[ thread ]</a>
+              <a href="subject.html#351">[ subject ]</a>
+              <a href="author.html#351">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-12 15:41:01 +0200 (Thu, 12 Apr 2007)
+New Revision: 3280
+
+Modified:
+   rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+   rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+   rl/trunk/engine/script/swig/TypeOgreReal.swig
+   rl/trunk/engine/script/swig/TypeOgreString.swig
+Log:
+Harlequin : Started optimizing of typemaps
+
+Modified: rl/trunk/engine/script/swig/TypeOgreColourValue.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-12 12:35:59 UTC (rev 3279)
++++ rl/trunk/engine/script/swig/TypeOgreColourValue.swig	2007-04-12 13:41:01 UTC (rev 3280)
+@@ -19,35 +19,50 @@
+  * 
+  */
+ 
+-%typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) Ogre::ColourValue, const Ogre::ColourValue, Ogre::ColourValue*, Ogre::ColourValue&amp;,
++%typecheck(SWIG_TYPECHECK_DOUBLE_ARRAY) 
++   Ogre::ColourValue, const Ogre::ColourValue, 
++   Ogre::ColourValue*, Ogre::ColourValue&amp;,
+    const Ogre::ColourValue*, const Ogre::ColourValue&amp;
+-{
+-   $1 = TYPE($input) == T_ARRAY &amp;&amp; RARRAY($input)-&gt;len == 4 ? 1 : 0;
++{ 
++   bool correct = 
++       TYPE($input) == T_ARRAY   &amp;&amp; 
++       RARRAY($input)-&gt;len == 4  &amp;&amp;
++       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[0] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[1] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[2] ) &amp;&amp;
++       SWIG_FLOAT_P( RARRAY($input)-&gt;ptr[3] );
++
++   $1 = correct ? 1 : 0;
+ }
+  
+-%typemap(in) Ogre::ColourValue, const Ogre::ColourValue
++%{
++// Helper method for filling the ColourValue
++static void convertRubyToColourValue( VALUE input, Ogre::ColourValue* cv ) 
+ {
+-   Ogre::ColourValue vec(0.0, 0.0, 0.0);
+-   int length = RARRAY($input)-&gt;len;
+-   VALUE* it = RARRAY($input)-&gt;ptr;
++   int length = RARRAY(input)-&gt;len;
++   VALUE* it = RARRAY(input)-&gt;ptr;
+    if (length &gt; 0) {
+-      Check_Type(*it, T_FLOAT);
+-      vec.r = RFLOAT(*it)-&gt;value;
++      cv-&gt;r = NUM2DBL(*it);
+       it++;
+    }
+    if (length &gt; 1) {
+-      Check_Type(*it, T_FLOAT);
+-      vec.g = RFLOAT(*it)-&gt;value;
++      cv-&gt;g = NUM2DBL(*it);
+       it++;
+    }
+    if (length &gt; 2) {
+-      Check_Type(*it, T_FLOAT);
+-      vec.b = RFLOAT(*it)-&gt;value;
++      cv-&gt;b = NUM2DBL(*it);
++      it++;
+    }
+    if (length &gt; 3) {
+-      Check_Type(*it, T_FLOAT);
+-      vec.a = RFLOAT(*it)-&gt;value;
++      cv-&gt;a = NUM2DBL(*it);
+    }
++}
++%}
++
++%typemap(in) Ogre::ColourValue, const Ogre::ColourValue
++{
++   Ogre::ColourValue vec(0.0, 0.0, 0.0);
++   convertRubyToColourValue( $input, &amp; vec );
+    $1 = vec;
+ }
+ 
+@@ -55,48 +70,33 @@
+    const Ogre::ColourValue*, const Ogre::ColourValue&amp;
+ {
+    Ogre::ColourValue* vec = new Ogre::ColourValue(0.0, 0.0, 0.0);
+-   int length = RARRAY($input)-&gt;len;
+-   VALUE* it = RARRAY($input)-&gt;ptr;
+-   if (length &gt; 0) {
+-      vec-&gt;r = NUM2DBL(*it);
+-      it++;
+-   }
+-   if (length &gt; 1) {
+-      vec-&gt;g = NUM2DBL(*it);
+-      it++;
+-   }
+-   if (length &gt; 2) {
+-      vec-&gt;b = NUM2DBL(*it);
+-      it++;
+-   }
+-   if (length &gt; 3) {
+-      vec-&gt;a = NUM2DBL(*it);
+-   }
++   convertRubyToColourValue(  $input, vec );
+    $1 = vec;
+ }
+-%typemap(freearg) Ogre::ColourValue*, Ogre::ColourValue&amp;,
+-   const Ogre::ColourValue*, const Ogre::ColourValue&amp;  
+-&quot;   delete $1;&quot;
+ 
++%{
++// Helper method for creating the ruby Array
++static VALUE convertColourValueToRuby( const Ogre::ColourValue* cv ) 
++{
++   VALUE array = rb_ary_new3(4,
++	rb_float_new(cv-&gt;r), 
++	rb_float_new(cv-&gt;g), 
++	rb_float_new(cv-&gt;b), 
++	rb_float_new(cv-&gt;a) );
++	
++   return array;
++}
++%}
++
+ %typemap(out) Ogre::ColourValue, const Ogre::ColourValue {
+-   VALUE array = rb_ary_new();
+-   rb_ary_push(array, rb_float_new($1.r));
+-   rb_ary_push(array, rb_float_new($1.g));
+-   rb_ary_push(array, rb_float_new($1.b));
+-   rb_ary_push(array, rb_float_new($1.a));
+-   $result = array;
++   $result = convertColourValueToRuby( &amp; $1 );
+ }
+ 
+-%typemap(out) Ogre::ColourValue*, const Ogre::ColourValue*, const Ogre::ColourValue&amp;, Ogre::Vector&amp; {
+-   VALUE array = rb_ary_new();
+-   rb_ary_push(array, rb_float_new($1-&gt;r));
+-   rb_ary_push(array, rb_float_new($1-&gt;g));
+-   rb_ary_push(array, rb_float_new($1-&gt;b));
+-   rb_ary_push(array, rb_float_new($1-&gt;a));
+-   $result = array;
++%typemap(out) Ogre::ColourValue*, const Ogre::ColourValue*, const Ogre::ColourValue&amp;, Ogre::ColourValue&amp; {
++   $result = convertColourValueToRuby( $1 );
+ } 
+ 
++
+ %typemap(freearg) Ogre::ColourValue*, Ogre::ColourValue&amp;,
+    const Ogre::ColourValue*, const Ogre::ColourValue&amp;  
+-&quot;   delete $1;&quot;
+-
++&quot;   delete $1;&quot;
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/TypeOgreQuaternion.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-12 12:35:59 UTC (rev 3279)
++++ rl/trunk/engine/script/swig/TypeOgreQuaternion.swig	2007-04-12 13:41:01 UTC (rev 3280)
+@@ -147,45 +147,39 @@
+    }   
+    $1 = quat;
+ }
+-%typemap(freearg)  Ogre::Quaternion*, Ogre::Quaternion&amp;,
+-   const Ogre::Quaternion*, const Ogre::Quaternion&amp; 
+-&quot;   delete $1;&quot;
+ 
+ 
+-
+-
+-%typemap(out) Ogre::Quaternion, const Ogre::Quaternion {
++%{
++// Helper method for creating the ruby Array
++static VALUE convertQuaternionToRuby( const Ogre::Quaternion* q ) 
++{
+    Ogre::Degree angle;
+    Ogre::Vector3 axis;
+    
+-   $1.ToAngleAxis(angle, axis);
++   q-&gt;ToAngleAxis(angle, axis);
+    
+-   VALUE arrAxis = rb_ary_new();
+-   rb_ary_push(arrAxis, rb_float_new(axis.x));
+-   rb_ary_push(arrAxis, rb_float_new(axis.y));
+-   rb_ary_push(arrAxis, rb_float_new(axis.z));
+-   VALUE rval = rb_ary_new();
+-   rb_ary_push(rval, arrAxis);
+-   rb_ary_push(rval, rb_float_new(angle.valueDegrees()));
+-   
+-   $result = rval;
++   VALUE arrAxis = rb_ary_new3( 3, 
++       rb_float_new(axis.x), 
++       rb_float_new(axis.y), 
++       rb_float_new(axis.z) );
++
++   VALUE array = rb_ary_new3( 2, 
++       arrAxis, 
++       rb_float_new(angle.valueDegrees()) );
++
++   return array;
+ }
++%}
+ 
++%typemap(out) Ogre::Quaternion, const Ogre::Quaternion {  
++   $result = convertQuaternionToRuby( &amp; $1 );
++}
++
+ %typemap(out) Ogre::Quaternion*, const Ogre::Quaternion*, const Ogre::Quaternion&amp;, Ogre::Quaternion&amp; {
+-   Ogre::Degree angle;
+-   Ogre::Vector3 axis;
+-   
+-   $1-&gt;ToAngleAxis(angle, axis);
+-   
+-   VALUE arrAxis = rb_ary_new();
+-   rb_ary_push(arrAxis, rb_float_new(axis.x));
+-   rb_ary_push(arrAxis, rb_float_new(axis.y));
+-   rb_ary_push(arrAxis, rb_float_new(axis.z));
+-   VALUE rval = rb_ary_new();
+-   rb_ary_push(rval, arrAxis);
+-   rb_ary_push(rval, rb_float_new(angle.valueDegrees()));
+-   
+-   $result = rval;
++   $result = convertQuaternionToRuby( $1 );
+ } 
+ 
+ 
++%typemap(freearg)  Ogre::Quaternion*, Ogre::Quaternion&amp;,
++   const Ogre::Quaternion*, const Ogre::Quaternion&amp; 
++&quot;   delete $1;&quot;
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/swig/TypeOgreReal.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreReal.swig	2007-04-12 12:35:59 UTC (rev 3279)
++++ rl/trunk/engine/script/swig/TypeOgreReal.swig	2007-04-12 13:41:01 UTC (rev 3280)
+@@ -18,7 +18,7 @@
+ %apply const double { const Ogre::Real }; 
+ 
+ %apply double* { Ogre::Real* };  
+-%apply const double* { const Ogre::Real* }; 
++// Not defined yet %apply const double* { const Ogre::Real* }; 
+  
+ %apply double&amp; { Ogre::Real&amp; }; 
+ %apply const double&amp; { const Ogre::Real&amp; };
+
+Modified: rl/trunk/engine/script/swig/TypeOgreString.swig
+===================================================================
+--- rl/trunk/engine/script/swig/TypeOgreString.swig	2007-04-12 12:35:59 UTC (rev 3279)
++++ rl/trunk/engine/script/swig/TypeOgreString.swig	2007-04-12 13:41:01 UTC (rev 3280)
+@@ -18,7 +18,7 @@
+ %apply const std::string { const Ogre::String }; 
+ 
+ %apply std::string* { Ogre::String* };  
+-%apply const std::string* { const Ogre::String* }; 
++// Not defined yet %apply const std::string* { const Ogre::String* }; 
+  
+ %apply std::string&amp; { Ogre::String&amp; }; 
+ %apply const std::string&amp; { const Ogre::String&amp; };  
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000350.html">[Dsa-hl-svn] r3279 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="000352.html">[Dsa-hl-svn] r3281 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#351">[ date ]</a>
+              <a href="thread.html#351">[ thread ]</a>
+              <a href="subject.html#351">[ subject ]</a>
+              <a href="author.html#351">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

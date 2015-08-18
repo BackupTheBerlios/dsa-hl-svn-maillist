@@ -1,0 +1,1274 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4044 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4044%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/src%20ui/src&In-Reply-To=%3C200801061324.m06DO1l9027805%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001114.html">
+   <LINK REL="Next"  HREF="001116.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4044 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4044%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/src%20ui/src&In-Reply-To=%3C200801061324.m06DO1l9027805%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4044 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Jan  6 14:24:01 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001114.html">[Dsa-hl-svn] r4043 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001116.html">[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1115">[ date ]</a>
+              <a href="thread.html#1115">[ thread ]</a>
+              <a href="subject.html#1115">[ subject ]</a>
+              <a href="author.html#1115">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-01-06 14:23:36 +0100 (Sun, 06 Jan 2008)
+New Revision: 4044
+
+Modified:
+   rl/trunk/engine/core/include/Actor.h
+   rl/trunk/engine/core/include/GameAreaEventSource.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/GameAreaEventSource.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/rules/include/Container.h
+   rl/trunk/engine/rules/include/CreatureControllerManager.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/src/Container.cpp
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/rules/src/RulesSubsystem.cpp
+   rl/trunk/engine/rules/src/Slot.cpp
+   rl/trunk/engine/script/src/TriggerFactory.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+Log:
+-actors notify gameareas if they are deleted
+-zones can be saved and loaded with their areas
+-gameobjects notify all &quot;child-objects&quot; if they are deleted (gameobjects in inventory or in container)
+-fixed a problem in GameObject::setState
+-the owner of an object in a container is set correctly, when the owner of the container changes
+-creaturecontrollermanager determines a creature from a body through the userdefinedData ( -&gt; actor -&gt; creature)
+-a creature notifies the creaturecontrollermanager of its deletion
+
+Modified: rl/trunk/engine/core/include/Actor.h
+===================================================================
+--- rl/trunk/engine/core/include/Actor.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/include/Actor.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -34,6 +34,7 @@
+     class ActorControlledObject;
+     class MovableText;
+     class Actor;
++    class GameAreaEventSource;
+ 
+     typedef std::map&lt;const Ogre::String,Actor*&gt; ActorMap;
+     typedef std::vector&lt;Actor*&gt; ActorVector;
+@@ -282,6 +283,13 @@
+ 
+         bool isInScene() const;
+ 
++    protected:
++        friend class GameAreaEventSource;
++        /// this is called from the gameareaeventsource when the actor enters it
++        void addToGameArea(GameAreaEventSource *ga);
++        /// this is called from the gameareaeventsource when the actor leaves it
++        void removeFromGameArea(GameAreaEventSource *ga);
++
+     private:
+         typedef std::set&lt;Actor*&gt; ChildSet;
+ 
+@@ -308,6 +316,9 @@
+         /// Der Bone, an dem wir vielleicht h&#228;ngen.
+         Ogre::Bone *mBone;
+ 
++        /// the actor is in these areas, this is needed to notify areas of deleted actors
++        std::list&lt;GameAreaEventSource*&gt; mGameAreas;
++
+         void doPlaceIntoScene(
+             Ogre::SceneNode* parent,
+             const Ogre::Vector3&amp; position = Ogre::Vector3::ZERO,
+
+Modified: rl/trunk/engine/core/include/GameAreaEventSource.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaEventSource.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/include/GameAreaEventSource.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -25,6 +25,7 @@
+ #include &quot;GameAreaTypes.h&quot;
+ 
+ #include &quot;CorePrerequisites.h&quot;
++#include &quot;Properties.h&quot;
+ 
+ namespace rl {
+ 
+@@ -78,11 +79,15 @@
+     Actor* getActor() const { return mActor; };
+     /// gibt an ob die ga gel&#246;scht werden kann, wenn die dazugeh&#246;rige zone gel&#246;scht wird
+     virtual bool destroyIfZoneDestroyed() const {return true;}
++    /// loescht den Actor aus der liste der actoren, die sich gerade in der gamearea befinden
++    void notifyActorDeleted(Actor* actor);
+ protected:
+     /// helps the zonemanager to associate zones with areas
+     friend class ZoneManager;
+     void setId(long id) {mId = id;}
+     long getId() const {return mId;}
++    /// helps the zonemanger to get the values for saving the GameAreaEventSource
++    PropertyRecord mProperties;
+ private:
+     long mId;
+     /** Verteilt die Events an die angef&#252;gten Listener
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/include/ZoneManager.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -20,6 +20,7 @@
+ #include &quot;CoreDefines.h&quot;
+ #include &quot;GameAreaListener.h&quot;
+ #include &quot;GameTask.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ 
+ namespace rl
+ {
+@@ -29,7 +30,8 @@
+     class _RlCoreExport ZoneManager : 
+         public Ogre::Singleton&lt;ZoneManager&gt;,
+         public GameAreaListener,
+-        public GameTask // for deferred deletion of zones
++        public GameTask, // for deferred deletion of zones
++        public SaveGameData // for saving/loading zones
+ 	{
+ 	public:
+ 		ZoneManager();
+@@ -105,6 +107,14 @@
+         typedef std::map&lt;const Ogre::String, Zone*&gt; ZoneMap;
+         const ZoneMap &amp;getAllZones() const {return mZones;}
+ 
++
++        /// Override from SaveGameData
++        /// Manages saving and loading from the SaveGameFile
++
++        virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual void writeData(SaveGameFileWriter* writer);
++        virtual void readData(SaveGameFileReader* reader);
++        virtual int getPriority() const;  // zones must be loaded before triggers!
+ 	private:
+ 		ZoneMap mZones;
+         std::map&lt;long, Zone*&gt; mZonesIdMap;
+@@ -122,6 +132,7 @@
+         void zoneLeft(Zone * zone);
+         
+         void doDestroyZone(Zone *zone);
++        void parseAreaProperties(const Ogre::String&amp; zoneName, const PropertyRecord &amp;properties); // adds an area created from properties to the zone
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/src/Actor.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -23,6 +23,7 @@
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;GameEventManager.h&quot;
++#include &quot;GameAreaEventSource.h&quot;
+ #include &quot;MergeableMeshObject.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;MovableText.h&quot;
+@@ -66,6 +67,10 @@
+     {
+         // Alle m&#246;glichen Area-Verkn&#252;pfungen entfernen
+         GameEventManager::getSingleton().removeAllAreas(this);
++        // Aus allen moeglichen areas entfernen
++        std::list&lt;GameAreaEventSource*&gt;::iterator iter;
++        for( iter = mGameAreas.begin(); iter != mGameAreas.end(); iter++ )
++            (*iter)-&gt;notifyActorDeleted(this);
+         // Alle TrackAnimations entfernen
+         AnimationManager::getSingleton().removeAllTrackAnimations(this);
+ 
+@@ -900,4 +905,20 @@
+ 
+         mPhysicalThing-&gt;updatePhysicsProxy();
+     }
++
++    void Actor::addToGameArea(GameAreaEventSource *ga)
++    {
++        std::list&lt;GameAreaEventSource*&gt;::iterator iter
++            = std::find(mGameAreas.begin(), mGameAreas.end(), ga);
++        if( iter == mGameAreas.end() )
++            mGameAreas.push_back(ga);
++    }
++
++    void Actor::removeFromGameArea(GameAreaEventSource *ga)
++    {
++        std::list&lt;GameAreaEventSource*&gt;::iterator iter
++            = std::find(mGameAreas.begin(), mGameAreas.end(), ga);
++        if( iter != mGameAreas.end() )
++            mGameAreas.erase(iter);
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -111,7 +111,9 @@
+             Throw(IllegalArgumentException, &quot;Argument actor wird nicht vom ActorManager verwaltet.&quot;);
+         }
+         mActors.erase(it);
+-        actor-&gt;detachAllChildren(); //just avoiding a crash. is there a better resolution?
++        //actor-&gt;detachAllChildren(); //just avoiding a crash. is there a better resolution?
++        // should not be needed, is also done in the destructor of the actor
++
+         doDestroyActor(actor);
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/GameAreaEventSource.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaEventSource.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/src/GameAreaEventSource.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -34,6 +34,9 @@
+ 
+     GameAreaEventSource::~GameAreaEventSource()
+     {
++        ActorMap::iterator iter;
++        for( iter = mInsideAreaList.begin(); iter != mInsideAreaList.end(); iter++)
++            iter-&gt;second-&gt;removeFromGameArea(this);
+         mInsideAreaList.clear();
+         removeAllAreaListeners(  );
+     }
+@@ -84,6 +87,11 @@
+         mInsideAreaList = currInside;
+         mInsideAreaList.insert(notReallyLeftMap.begin(), notReallyLeftMap.end());
+         
++        // die aktoren davon benachrichtigen
++        for(it = enteredMap.begin(); it != enteredMap.end(); it++)
++            it-&gt;second-&gt;addToGameArea(this);
++        for(it = reallyLeftMap.begin(); it != reallyLeftMap.end(); it++)
++            it-&gt;second-&gt;removeFromGameArea(this);
+ 
+         // Die Neuen und die Rausgefallenen an die Listener dispatchen
+ 		doDispatchEvents( enteredMap, reallyLeftMap );
+@@ -155,5 +163,12 @@
+     {
+         return mAreaEventCaster.hasEventListeners();
+     }
++
++    void GameAreaEventSource::notifyActorDeleted(Actor* actor)
++    {
++        ActorMap::iterator iter = mInsideAreaList.find(actor-&gt;getName());
++        if( iter != mInsideAreaList.end() )
++            mInsideAreaList.erase(iter);
++    }
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -23,6 +23,7 @@
+ #include &quot;GameEventManager.h&quot;
+ #include &quot;Zone.h&quot;
+ #include &quot;World.h&quot;
++#include &quot;ScriptWrapper.h&quot;
+ #include &quot;Sound.h&quot;
+ #include &quot;SoundManager.h&quot;
+ #include &quot;SoundDriver.h&quot;
+@@ -44,10 +45,14 @@
+ 		mDefaultZone = new Zone(0,false);
+         mNextZoneId = 1;
+ 		mActiveZones.push_front(mDefaultZone);
++
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+ 	}
+ 
+ 	ZoneManager::~ZoneManager()
+ 	{
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
++
+         GameEventManager::getSingleton().removeAreaListener(this);
+         GameEventManager::getSingleton().removeQueuedDeletionSources();
+ 		for (ZoneMap::iterator it = mZones.begin(); it != mZones.end(); ++it)
+@@ -105,6 +110,7 @@
+         if(zone == NULL)
+             return;
+ 
++
+         // remove from active zones
+         if( isZoneActive(zone) )
+             mActiveZones.remove(zone);
+@@ -189,6 +195,15 @@
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId(zone-&gt;getId());
+         zone-&gt;addEventSource(gam);
++        gam-&gt;mProperties.setProperty(&quot;subtract&quot;, Property(false));
++        gam-&gt;mProperties.setProperty(&quot;aab_max&quot;, Property(aabb.getMaximum()));
++        gam-&gt;mProperties.setProperty(&quot;aab_min&quot;, Property(aabb.getMinimum()));
++        gam-&gt;mProperties.setProperty(&quot;type&quot;, Property(int(geom)));
++        gam-&gt;mProperties.setProperty(&quot;position&quot;, Property(position));
++        gam-&gt;mProperties.setProperty(&quot;offset&quot;, Property(offset));
++        gam-&gt;mProperties.setProperty(&quot;orientation&quot;, Property(orientation));
++        gam-&gt;mProperties.setProperty(&quot;transitionDistance&quot;, Property(transitionDistance));
++        gam-&gt;mProperties.setProperty(&quot;queryflags&quot;, Property(int(queryflags)));
+     }
+     
+     void ZoneManager::subtractAreaFromZone(const Ogre::String&amp; name, 
+@@ -208,6 +223,16 @@
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+         gam-&gt;setId( - (zone-&gt;getId())); // a negative id indicates to subtract this area from the zone
+         zone-&gt;addEventSource(gam);
++        // set the properties for saving
++        gam-&gt;mProperties.setProperty(&quot;subtract&quot;, Property(true));
++        gam-&gt;mProperties.setProperty(&quot;aab_max&quot;, Property(aabb.getMaximum()));
++        gam-&gt;mProperties.setProperty(&quot;aab_min&quot;, Property(aabb.getMinimum()));
++        gam-&gt;mProperties.setProperty(&quot;type&quot;, Property(int(geom)));
++        gam-&gt;mProperties.setProperty(&quot;position&quot;, Property(position));
++        gam-&gt;mProperties.setProperty(&quot;offset&quot;, Property(offset));
++        gam-&gt;mProperties.setProperty(&quot;orientation&quot;, Property(orientation));
++        gam-&gt;mProperties.setProperty(&quot;transitionDistance&quot;, Property(transitionDistance));
++        gam-&gt;mProperties.setProperty(&quot;queryflags&quot;, Property(int(queryflags)));
+     }
+ 
+     void ZoneManager::addMeshAreaToZone(const Ogre::String&amp; name,
+@@ -236,6 +261,16 @@
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+             -&gt;getSceneManager()-&gt;destroyEntity(entity);
+         zone-&gt;addEventSource(gam);
++        // set the properties for saving
++        gam-&gt;mProperties.setProperty(&quot;subtract&quot;, Property(false));
++        gam-&gt;mProperties.setProperty(&quot;meshname&quot;, Property(meshname));
++        gam-&gt;mProperties.setProperty(&quot;type&quot;, Property(int(geom)));
++        gam-&gt;mProperties.setProperty(&quot;position&quot;, Property(position));
++        gam-&gt;mProperties.setProperty(&quot;scale&quot;, Property(scale));
++        gam-&gt;mProperties.setProperty(&quot;offset&quot;, Property(offset));
++        gam-&gt;mProperties.setProperty(&quot;orientation&quot;, Property(orientation));
++        gam-&gt;mProperties.setProperty(&quot;transitionDistance&quot;, Property(transitionDistance));
++        gam-&gt;mProperties.setProperty(&quot;queryflags&quot;, Property(int(queryflags)));
+     }
+ 
+     void ZoneManager::subtractMeshAreaFromZone(const Ogre::String&amp; name,
+@@ -265,6 +300,16 @@
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+             -&gt;getSceneManager()-&gt;destroyEntity(entity);
+         zone-&gt;addEventSource(gam);
++        // set the properties for saving
++        gam-&gt;mProperties.setProperty(&quot;subtract&quot;, Property(true));
++        gam-&gt;mProperties.setProperty(&quot;meshname&quot;, Property(meshname));
++        gam-&gt;mProperties.setProperty(&quot;type&quot;, Property(int(geom)));
++        gam-&gt;mProperties.setProperty(&quot;position&quot;, Property(position));
++        gam-&gt;mProperties.setProperty(&quot;scale&quot;, Property(scale));
++        gam-&gt;mProperties.setProperty(&quot;offset&quot;, Property(offset));
++        gam-&gt;mProperties.setProperty(&quot;orientation&quot;, Property(orientation));
++        gam-&gt;mProperties.setProperty(&quot;transitionDistance&quot;, Property(transitionDistance));
++        gam-&gt;mProperties.setProperty(&quot;queryflags&quot;, Property(int(queryflags)));
+     }
+ 
+ 	void ZoneManager::areaLeft(GameAreaEvent* gae)
+@@ -436,4 +481,173 @@
+             SoundManager::getSingleton().getActiveDriver()-&gt;setEaxPreset(&quot;Off&quot;);
+         }
+     }
++
++
++
++// -------------- code for saving/loading  from the SaveGameFile --------------------
++
++    CeGuiString ZoneManager::getXmlNodeIdentifier() const
++    {
++        return &quot;zonemanager&quot;;
++    }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void ZoneManager::writeData(SaveGameFileWriter* writer)
++    {
++        DOMElement* zoneManagerNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++
++        // look at all zones if they need to be saved
++        for(ZoneMap::iterator zone = mZones.begin(); zone != mZones.end(); zone++)
++        {
++            // does this zone wants to be saved
++            if( zone-&gt;second-&gt;needsToBeSaved() )
++            {
++                DOMElement* zoneNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), zoneManagerNode, &quot;zone&quot;);
++                writer-&gt;setAttributeValueAsStdString(zoneNode, &quot;name&quot;, zone-&gt;first);
++                    
++                
++                // save all areas of the zone
++                GameAreaEventSourceList::iterator gam; ;
++                for( gam = zone-&gt;second-&gt;getEventSources().begin(); gam != zone-&gt;second-&gt;getEventSources().end(); gam++)
++                {
++                    DOMElement* areaNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), zoneNode, &quot;area&quot;);
++                    writer-&gt;writeEachPropertyToElem(areaNode, (*gam)-&gt;mProperties.toPropertyMap());
++                }
++
++                // save all sounds and lights
++                PropertyRecord propertyRecord;
++                std::list&lt;Actor*&gt; lightList = zone-&gt;second-&gt;getLights();
++                std::list&lt;Ogre::String&gt; soundList = zone-&gt;second-&gt;getSounds();
++                for(std::list&lt;Actor*&gt;::iterator light = lightList.begin(); light != lightList.end(); light++)
++                    propertyRecord.setProperty(&quot;light&quot;, Property((*light)-&gt;getName()));
++                for(std::list&lt;Ogre::String&gt;::iterator sound = soundList.begin(); sound != soundList.end(); sound++)
++                    propertyRecord.setProperty(&quot;sound&quot;, Property(*sound));
++                
++                writer-&gt;writeEachPropertyToElem(zoneNode, propertyRecord.toPropertyMap());
++            }
++        }
++    }
++
++    void ZoneManager::readData(SaveGameFileReader* reader)
++    {
++        // delete all zones, that say they are saveable
++        for(ZoneMap::iterator zone = mZones.begin(); zone != mZones.end(); zone++)
++        {
++            if( zone-&gt;second-&gt;needsToBeSaved() )
++            {
++                destroyZone(zone-&gt;first);
++            }
++        }
++
++
++        // load zones
++        // initialize xmlreader
++        reader-&gt;initializeXml();
++
++        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++
++        if(rootNodeList-&gt;getLength())
++        {
++            DOMNodeList* xmlZones = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;zone&quot;).data());
++            if(xmlZones-&gt;getLength())
++            {
++                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlZones-&gt;getLength(); childIdx1++)
++                {
++                    DOMNode* xmlZone = xmlZones-&gt;item(childIdx1);
++                    if(xmlZone-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++                        Ogre::String name = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlZone), &quot;name&quot;);
++                        Zone* zone = createZone(name, true);
++
++                        DOMNodeList* xmlAreas = static_cast&lt;DOMElement*&gt;(xmlZone)-&gt;getElementsByTagName(AutoXMLCh(&quot;area&quot;).data());
++                        if( xmlAreas-&gt;getLength() )
++                        {
++                            for(XMLSize_t childIdx2 = 0; childIdx2 &lt; xmlAreas-&gt;getLength(); childIdx2++)
++                            {
++                                DOMNode* xmlArea = xmlAreas-&gt;item(childIdx2);
++                                PropertyRecord properties = reader-&gt;getPropertiesAsRecord(static_cast&lt;DOMElement*&gt;(xmlArea));
++                                parseAreaProperties(name, properties);
++                            }
++                        }
++                    }
++                }
++            }
++        }
++
++
++        // close xmlreader
++        reader-&gt;shutdownXml();
++    }
++
++    void ZoneManager::parseAreaProperties(const Ogre::String&amp; name, const PropertyRecord &amp;properties)
++    {
++        Ogre::AxisAlignedBox aabb;
++        aabb.setMaximum(Vector3::ZERO);
++        aabb.setMinimum(Vector3::ZERO);
++        GeometryType geom = GT_NONE;
++        Ogre::Vector3 position = Vector3::ZERO;
++        Ogre::Vector3 offset = Vector3::ZERO;
++        Ogre::Vector3 scale = Vector3::UNIT_SCALE;
++        Ogre::Quaternion orientation = Quaternion::IDENTITY;
++        Ogre::Real transitionDistance = 0.2;
++        unsigned long queryflags = 0;
++        Ogre::String meshname = &quot;&quot;;
++        bool subtract = false;
++        bool mesh = false;
++
++        for( PropertyRecord::PropertyRecordMap::const_iterator iter = properties.begin(); iter != properties.end(); iter++)
++        {
++            if(iter-&gt;first == &quot;subtract&quot;)
++                subtract = iter-&gt;second.toBool();
++            else if(iter-&gt;first == &quot;meshname&quot;)
++            {
++                meshname = iter-&gt;second.toString().c_str();
++                mesh = true;
++            }
++            else if(iter-&gt;first == &quot;type&quot;)
++                geom = GeometryType(iter-&gt;second.toInt());
++            else if(iter-&gt;first == &quot;position&quot;)
++                position = iter-&gt;second.toVector3();
++            else if(iter-&gt;first == &quot;scale&quot;)
++                scale = iter-&gt;second.toVector3();
++            else if(iter-&gt;first == &quot;offset&quot;)
++                offset = iter-&gt;second.toVector3();
++            else if(iter-&gt;first == &quot;orientation&quot;)
++                orientation = iter-&gt;second.toQuaternion();
++            else if(iter-&gt;first == &quot;transitionDistance&quot;)
++                transitionDistance = iter-&gt;second.toReal();
++            else if(iter-&gt;first == &quot;queryflags&quot;)
++                queryflags = iter-&gt;second.toInt();
++            else if(iter-&gt;first == &quot;aab_min&quot;)
++                aabb.setMinimum(iter-&gt;second.toVector3());
++            else if(iter-&gt;first == &quot;aab_max&quot;)
++                aabb.setMaximum(iter-&gt;second.toVector3());
++            else
++            {
++                LOG_ERROR(Logger::CORE, &quot;ZoneManager: Unknown area property '&quot;+iter-&gt;first+&quot;' !&quot;);
++            }
++        }
++
++
++        if(mesh)
++        {
++            if(subtract)
++                subtractMeshAreaFromZone(name, meshname, geom, position, scale, offset, orientation, transitionDistance, queryflags);
++            else
++                addMeshAreaToZone(name, meshname, geom, position, scale, offset, orientation, transitionDistance, queryflags);
++        }
++        else
++        {
++            if(subtract)
++                subtractAreaFromZone(name, aabb, geom, position, offset, orientation, transitionDistance, queryflags);
++            else
++                addAreaToZone(name, aabb, geom, position, offset, orientation, transitionDistance, queryflags);
++        }
++    }
++
++    int ZoneManager::getPriority() const
++    {
++        return 30; // must be loaded before triggers!
++    }
+ }
+
+Modified: rl/trunk/engine/rules/include/Container.h
+===================================================================
+--- rl/trunk/engine/rules/include/Container.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/include/Container.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -90,6 +90,9 @@
+ 
+         bool canHold(Item* item);
+ 
++        // in order to set the owner of the items in this container correctly override this function
++        void setOwner(GameObject *go);
++
+     private:
+ 		static const IntPair NO_SPACE_FOR_ITEM;
+ 
+
+Modified: rl/trunk/engine/rules/include/CreatureControllerManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureControllerManager.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/include/CreatureControllerManager.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -63,9 +63,6 @@
+     protected:
+         typedef std::map&lt;Creature*, CreatureController*&gt; ControllerMap;
+         ControllerMap mControllers;
+-
+-        typedef std::map&lt;OgreNewt::Body*, CreatureController*&gt; BodyControllerMap;
+-        BodyControllerMap mBodyControllers;
+     };
+ }
+ #endif
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/include/GameObject.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -99,6 +99,11 @@
+         void addActionInGroup(Action* action, ActionGroup* group, int option = Action::ACT_NORMAL);
+         void removeAction(Action* action);
+     
++        /*
++         * sets the actor of this gameobject
++         * @warning if the GameObject is destroyed or the State of the GameObject changed or this function
++         * is called with another actor, the actor will be deleted!
++         */
+         void setActor(Actor* actor);
+         Actor* getActor();
+ 
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/include/Item.h	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -96,7 +96,7 @@
+         void setParentContainer(Container* cont);
+         Container* getParentContainer() const;
+ 
+-        void setOwner(GameObject* go);
++        virtual void setOwner(GameObject* go);
+         GameObject* getOwner() const;
+ 
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+@@ -112,7 +112,6 @@
+         Slot* mParentSlot;
+         Container* mParentContainer;
+ 
+-		void doHold();
+ 		void doLoose();
+ 	};
+ }
+
+Modified: rl/trunk/engine/rules/src/Container.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Container.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/Container.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -48,6 +48,11 @@
+ 
+     Container::~Container()
+     {
++        // set the state of all child items to GOS_LOADED
++        ItemSet::iterator it;
++        ItemSet items(mItems);
++        for( it = items.begin(); it != items.end(); it++ )
++            (*it)-&gt;removeOldState();
+     }
+ 
+     Ogre::Real Container::getCapacity() const
+@@ -142,15 +147,7 @@
+ 
+ 		if (pos != NO_SPACE_FOR_ITEM)
+ 		{
+-            if (item-&gt;getParentSlot())
+-            {
+-                item-&gt;getParentSlot()-&gt;setItem(NULL);
+-            }
+-            if (item-&gt;getParentContainer())
+-            {
+-                item-&gt;getParentContainer()-&gt;removeItem(item);
+-            }
+-            item-&gt;setOwner(NULL);
++            item-&gt;removeOldState();
+ 
+             mItemPositions[item] = pos;
+ 			mItems.insert(item);
+@@ -180,8 +177,7 @@
+             
+             // this is the case, if the item is removed automatically
+             // don't change this without looking at Item::setState
+-            if (item-&gt;getState() != GOS_LOADED)
+-                item-&gt;setState(GOS_LOADED);
++            item-&gt;removeOldState();
+         }
+         else
+         {
+@@ -410,4 +406,19 @@
+     {
+         return findPositionWithEnoughSpace(item-&gt;getSize()) != NO_SPACE_FOR_ITEM;
+     }
++
++    void Container::setOwner(GameObject *go)
++    {
++        if( mOwner == go )
++            return;
++
++        mOwner = go;
++        GameObject *newChildOwner = mOwner;
++        if( newChildOwner == NULL )
++            newChildOwner = this;
++
++        ItemSet::iterator it;
++        for( it = mItems.begin(); it != mItems.end(); it++ )
++            (*it)-&gt;setOwner(newChildOwner);
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/Creature.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;Actor.h&quot;
+ #include &quot;Container.h&quot;
++#include &quot;CreatureControllerManager.h&quot;
+ #include &quot;DsaManager.h&quot;
+ #include &quot;Eigenschaft.h&quot;
+ #include &quot;EffectManager.h&quot;
+@@ -126,6 +127,7 @@
+         for( SonderfertigkeitMap::iterator it=mSonderfertigkeiten.begin();it!=mSonderfertigkeiten.end(); it++ )
+             delete it-&gt;second;
+         mSonderfertigkeiten.clear();
++        CreatureControllerManager::getSingleton().detachController(this);
+     }
+ 
+     int Creature::getAttackeBasis()
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -1463,9 +1463,15 @@
+             delete iter-&gt;second;
+         mMovementMap.erase(mMovementMap.begin(), mMovementMap.end());
+ 
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
++        if( mCreature-&gt;getActor() != NULL )
++        {
++            if( mCreature-&gt;getActor()-&gt;getPhysicalThing() != NULL )
++            {
++                mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+ 
+-        mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(mOldMaterialId);
++                mCreature-&gt;getActor()-&gt;getPhysicalThing()-&gt;setMaterialID(mOldMaterialId);
++            }
++        }
+     }
+ 
+     CreatureController::MovementType CreatureController::getMovementId() const
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -31,9 +31,7 @@
+ 
+ namespace rl
+ {
+-    CreatureControllerManager::CreatureControllerManager() :
+-            mControllers(),
+-            mBodyControllers()
++    CreatureControllerManager::CreatureControllerManager()
+     {
+         GameLoop::getSingleton().addTask(this, GameLoop::TG_LOGIC);
+ 
+@@ -59,6 +57,7 @@
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+     {
++        // should not be needed, because all creatures should be destroyed before
+         // causes an error because PhysicalThing::setPhysicsController(NULL) is called probably after the physicalthing is destroyed
+         // delete all creaturecontrollers
+         //for( ControllerMap::iterator it = mControllers.begin(); it != mControllers.end(); it++ )
+@@ -96,8 +95,6 @@
+             // No, so create one and put it into the map.
+             rval = new CreatureController(creature);
+             mControllers.insert(std::make_pair(creature, rval));
+-            mBodyControllers.insert(std::make_pair(
+-                creature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody(), rval));
+         }
+         else
+         {
+@@ -126,23 +123,19 @@
+ 
+     void CreatureControllerManager::detachController(Creature* creature)
+     {
++        CreatureController *controller = NULL;
+         if( creature == NULL)
+         {
+             Throw(NullPointerException, &quot;Argument creature darf nicht NULL sein.&quot;);
+         }
+ 
+-        mControllers.find(creature);
+         ControllerMap::iterator it = mControllers.find(creature);
+         if (it != mControllers.end())
+         {
++            controller = it-&gt;second;
+             delete it-&gt;second;
+             mControllers.erase(it);
+         }
+-
+-        BodyControllerMap::iterator it_ = mBodyControllers.find(
+-            creature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody());
+-        if( it_ != mBodyControllers.end() )
+-            mBodyControllers.erase(it_);
+     }
+ 
+     void CreatureControllerManager::run(Real elapsedTime)
+@@ -155,26 +148,25 @@
+ 
+     int CreatureControllerManager::userProcess()
+     {
+-        BodyControllerMap::iterator it = mBodyControllers.find(m_body0);
+-        if (it == mBodyControllers.end())
++        Actor *actor = static_cast&lt;Actor*&gt;(m_body0-&gt;getUserData());
++        if( actor != NULL )
+         {
+-            it = mBodyControllers.find(m_body1);
+-
+-            if (it == mBodyControllers.end())
++            ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
++            if (it != mControllers.end())
+             {
+-                LOG_ERROR(Logger::RULES,
+-                    &quot;Der Kollisionsk&#246;rper konnte keiner Creature zugeordnet werden.&quot;);
+-                return 1;
++                // @XXX Evil code!
++                // Protected members from type OgreNewt::ContactCallback have to be overridden in order
++                // for the controllers to work. This is because these members are used by OgreNewt functions
++                // for processing this contact. Should probably be solved in OgreNewt directly.
++                OgreNewt::ContactCallback* controller = it-&gt;second;
++                *controller = (OgreNewt::ContactCallback)(*this);
++                return controller-&gt;userProcess();
+             }
+         }
+ 
+-        // @XXX Evil code!
+-        // Protected members from type OgreNewt::ContactCallback have to be overridden in order
+-        // for the controllers to work. This is because these members are used by OgreNewt functions
+-        // for processing this contact. Should probably be solved in OgreNewt directly.
+-        OgreNewt::ContactCallback* controller = it-&gt;second;
+-        *controller = (OgreNewt::ContactCallback)(*this);
+-        return controller-&gt;userProcess();
++        LOG_ERROR(Logger::RULES,
++            &quot;Der Kollisionsk&#246;rper konnte keinem CreatureController zugeordnet werden.&quot;);
++        return 1;
+     }
+ 
+     const Ogre::String&amp; CreatureControllerManager::getName() const
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -96,6 +96,7 @@
+ 
+     GameObject::~GameObject(void)
+     {
++        destroyActor();
+     	delete mEffectManager;
+     }
+ 
+@@ -667,10 +668,11 @@
+                 actor-&gt;placeIntoScene(mPosition, mOrientation);
+                 setActor(actor);
+ 
+-                GameObjectState tmpState = mState;
+-                mState = GOS_IN_SCENE;
+-                GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
+-                onStateChange(tmpState, GOS_IN_SCENE);
++                // this is done in setstate now
++                //GameObjectState tmpState = mState;
++                //mState = GOS_IN_SCENE;
++                //GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
++                //onStateChange(tmpState, GOS_IN_SCENE);
+             }
+             else {
+                 LOG_ERROR(
+@@ -693,11 +695,14 @@
+ 
+             setActor(NULL);
+             actor-&gt;removeFromScene();
+-            ActorManager::getSingleton().destroyActor(actor);
+ 
+-            GameObjectState tmpState = mState;
+-            mState = GOS_LOADED;
+-            GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
++            // give the setstate function the possibility to reuse the actor
++            //ActorManager::getSingleton().destroyActor(actor);
++
++            // this is done in setstate now
++            //GameObjectState tmpState = mState;
++            //mState = GOS_LOADED;
++            //GameObjectManager::getSingleton().gameObjectStateChanged(this, tmpState, mState);
+         }
+     }
+ 
+@@ -712,15 +717,12 @@
+ 
+         if (targetstate == GOS_LOADED &amp;&amp; mState == GOS_IN_SCENE)
+         {
+-            // Statechange event is triggered in this function
+             doRemoveFromScene();
+-            onStateChange(oldState, targetstate);
++            destroyActor();
+         }
+         else if (targetstate == GOS_IN_SCENE &amp;&amp; mState == GOS_LOADED)
+         {
+-            //Statechange event is triggered in this function
+             doPlaceIntoScene();
+-            onStateChange(oldState, targetstate);
+         }
+         else
+         {
+@@ -730,7 +732,12 @@
+                 + &quot;' could not change state from &quot;
+                 + Ogre::StringConverter::toString(mState) + &quot; to &quot;
+                 + Ogre::StringConverter::toString(targetstate));
++            return;
+         }
++
++        mState = targetstate;
++        onStateChange(oldState, targetstate);
++        GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetstate);
+     }
+ 
+     void GameObject::onStateChange(GameObjectState oldState, GameObjectState newState)
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -52,9 +52,8 @@
+     GameObjectManager::~GameObjectManager()
+     {
+         SaveGameManager::getSingleton().unregisterSaveGameData(this);
+-        //unregisterAllGameObjectStateListener();
+-        //deleteAllGameObjects();
+-        ///@todo: Delete all game objects, delete all class properties
++        unregisterAllGameObjectStateListener();
++        deleteAllGameObjects();
+     }
+ 
+     const Ogre::StringVector&amp; GameObjectManager::getScriptPatterns() const
+@@ -172,12 +171,11 @@
+ 
+     void GameObjectManager::deleteAllGameObjects()
+     {
+-        for(std::map&lt;unsigned int, GameObject*&gt;::iterator itr = mGameObjects.begin(); itr != mGameObjects.end();)
++        while(!mGameObjects.empty())
+         {
+-            GameObject* go = itr-&gt;second;
+-            mGameObjects.erase(itr++);
+-            go-&gt;setState(GOS_LOADED);  // this causes problems here, because of the relations between gofs
++            GameObject *go = mGameObjects.begin()-&gt;second;
+             delete go;
++            mGameObjects.erase(mGameObjects.begin());
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -72,6 +72,10 @@
+ 
+ 	Inventory::~Inventory()
+ 	{
++        for (SlotMap::iterator iter = mSlots.begin(); iter != mSlots.end(); ++iter)
++        {
++            delete iter-&gt;second;
++        }
+ 	}
+ 
+ 	void Inventory::markDirty()
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/Item.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -21,6 +21,7 @@
+ #include &quot;Container.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;Slot.h&quot;
++#include &quot;GameObjectManager.h&quot;
+ 
+ using namespace std;
+ 
+@@ -46,6 +47,7 @@
+ 
+     Item::~Item(void)
+     {
++        removeOldState(); // so the parent-container etc knows this item doesn't exists any more
+     }
+ 
+ 	void Item::setItemType(ItemType itemType)
+@@ -83,19 +85,23 @@
+ 		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
+ 	}
+ 
+-    void Item::doHold()
+-    {
+-        setActor(createActor());
+-        mState = GOS_HELD;
+-    }
+-
+     void Item::doLoose()
+     {
+         if (mActor != NULL)
+         {
+             mActor-&gt;detachFromParent();
+-            destroyActor();
+         }
++        if (mParentContainer != NULL)
++        {
++            mParentContainer-&gt;removeItem(this);
++            mParentContainer = NULL;
++        }
++        if (mParentSlot != NULL)
++        {
++            mParentSlot-&gt;setItem(NULL);
++            mParentSlot = NULL;
++        }
++        setOwner(NULL);
+     }
+ 
+     void Item::removeOldState()
+@@ -112,97 +118,45 @@
+         {
+             return;
+         }
+-        
+-        // This should do nothing if target or current state is not GOS_LOADED or GOS_IN_SCENE
+-        GameObject::setState(targetState); 
+ 
+-        if (targetState == GOS_IN_POSSESSION)
++        // do only things that are possible
++        if( targetState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) &amp;&amp; mState &amp; (GOS_HELD | GOS_READY | GOS_IN_POSSESSION | GOS_IN_SCENE) )
+         {
+-            if (mState == GOS_LOADED)
+-            {
+-                onStateChange(mState, targetState);
+-            }
+-            else if (mState == GOS_IN_SCENE)
+-            {
+-                destroyActor();
+-                onStateChange(mState, targetState);
+-            }
+-            else if (mState == GOS_HELD
+-                || mState == GOS_READY)
+-            {
+-                doLoose();
+-                onStateChange(mState, targetState);
+-            }
++            LOG_ERROR(Logger::RULES,
++                &quot;Item '&quot; + getName() + &quot;' could not change state from '&quot;
++                + Ogre::StringConverter::toString(mState) + &quot;' to state '&quot;
++                + Ogre::StringConverter::toString(targetState) + &quot;'!&quot;
++                + &quot;\nYou need to call 'Item::removeOldState()' first.&quot;);
++            
++            // first remove the old state (thats a recursive function call)
++            //removeOldState();
+         }
+-        else if (targetState == GOS_HELD || targetState == GOS_READY)
+-        {
+-            if (mState == GOS_LOADED)
+-            {
+-                doCreateActor();
+-                doHold();
+-                onStateChange(mState, targetState);
+-            }
+-            else if (mState == GOS_IN_SCENE)
+-            {
+-                mActor-&gt;removeFromScene();
+-                doHold();
+-                onStateChange(mState, targetState);
+-            }
+-        }
+ 
+-        mState = targetState;
+ 
++        GameObjectState oldState = mState;
+ 
+-        //if (targetstate != GOS_HELD &amp;&amp;
+-        //    targetstate != GOS_IN_POSSESSION &amp;&amp;
+-        //    targetstate != GOS_READY)
+-        //{
+-        //    if (mState == GOS_HELD ||
+-        //        mState == GOS_IN_POSSESSION ||
+-        //        mState == GOS_READY)
+-        //    {
+-        //        mState = GOS_LOADED; // &lt;- this is important to avoid endless recursion!
+-        //        
++        if( targetState == GOS_LOADED &amp;&amp; (mState == GOS_HELD || mState == GOS_READY || GOS_IN_POSSESSION) )
++        {
++            mState = targetState; // this is needed here to prevent an endless recursion
++            // &quot;remove old state&quot;
++            doLoose();
++            destroyActor();
++        }
++        else if( mState == GOS_LOADED &amp;&amp;
++                 (targetState == GOS_HELD || targetState == GOS_READY || targetState == GOS_IN_POSSESSION))
++        {
++            mState = targetState;
++            // do nothing, the user has to do what he needs himself
++        }
++        else // everything else is not handled here, so give it to the parent
++        {
++            GameObject::setState(targetState);
++            return;
++        }
+ 
+-        //        if (getParentSlot())
+-        //            getParentSlot()-&gt;setItem(NULL);
+-        //        setParentSlot(NULL);
+-        //        if (getParentContainer())
+-        //            getParentContainer()-&gt;removeItem(this);
+-        //        setParentContainer(NULL);
+-        //        doLoose();
+-        //        setOwner(NULL);
+-        //    }
+ 
+-        //    GameObject::setState(targetstate);
+-        //}
+-        //else
+-        //{
+-        //    if (mState == GOS_HELD ||
+-        //        mState == GOS_IN_POSSESSION ||
+-        //        mState == GOS_READY)
+-        //    {
+-        //        LOG_WARNING(Logger::RULES, 
+-        //            &quot;Item::removeOldState() or Item::setState(GOS_LOADED) should be called  \
+-        //            before setting one of the States GOS_HELD, GOS_IN_POSSESSION or GOS_READY!&quot;);
+-        //    }
+-        //    else
+-        //    {
+-        //        if (mState != GOS_LOADED)
+-        //        {
+-        //            GameObject::setState(GOS_LOADED);
+-        //            oldState = GOS_LOADED;
+-        //        }
+-
+-        //        if (targetstate == GOS_HELD)
+-        //        {
+-        //            doHold();
+-        //        }
+-
+-        //        mState = targetstate;
+-        //        onStateChange(oldState, mState);
+-        //    }
+-        //}
++        onStateChange(oldState, mState);
++        GameObjectManager::getSingleton().gameObjectStateChanged(this, oldState, targetState);
+     }
+ 
+     void Item::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+@@ -277,10 +231,7 @@
+ 
+     void Item::doCreateActor()
+     {
+-        if (!getActor())
+-        {
+-            setActor(createActor());
+-        }
++        setActor(createActor());
+     }
+ 
+     void Item::setParentContainer(Container* cont)
+
+Modified: rl/trunk/engine/rules/src/RulesSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/RulesSubsystem.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/RulesSubsystem.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -73,11 +73,11 @@
+     {
+         delete mQuestBook;
+         delete mDsaManager;
+-        delete mMovingCreatureManager;
+         delete mCombatManager;
+         delete mActionManager;
+         delete mXdimlLoader;
+         delete GameObjectManager::getSingletonPtr();
++        delete mMovingCreatureManager; // this manager should be deleted after the GameObjectManager
+         delete EffectFactoryManager::getSingletonPtr();
+     }
+ 
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/rules/src/Slot.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -33,6 +33,8 @@
+ 
+     Slot::~Slot()
+     {
++        if( mItem != NULL )
++            mItem-&gt;removeOldState();
+     }
+ 
+     Item* Slot::getItem() const
+@@ -58,6 +60,8 @@
+ 
+     bool Slot::setItem(Item* item)
+     {
++        if(mItem == item)
++            return false;
+         if (item)
+         {
+             if (isAllowed(item) &amp;&amp; isEmpty())
+@@ -74,7 +78,7 @@
+             }
+             else
+             {
+-                LOG_MESSAGE(Logger::RULES,
++                LOG_ERROR(Logger::RULES,
+                     &quot;Item '&quot; + item-&gt;getName() + &quot;' konnte nicht in den Slot '&quot; + mName
+                     + &quot;' gelegt werden: &quot; + (isAllowed(item) ? &quot;'falscher Typ' &quot; : &quot;&quot;)
+                     + (isEmpty() ? &quot;'Slot schon belegt&quot; : &quot;&quot;) + &quot;!&quot;);
+@@ -85,8 +89,7 @@
+         {
+             // this is the case, if the item is removed automatically
+             // don't change this without looking at Item::setState
+-            if (mItem-&gt;getState() != GOS_LOADED)
+-                mItem-&gt;setState(GOS_LOADED);
++            mItem-&gt;removeOldState();
+             mItem = NULL;
+         }
+ 
+
+Modified: rl/trunk/engine/script/src/TriggerFactory.cpp
+===================================================================
+--- rl/trunk/engine/script/src/TriggerFactory.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/script/src/TriggerFactory.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -71,7 +71,7 @@
+ 
+     void TriggerFactory::readData(SaveGameFileReader* reader)
+     {
+-        // delete all triggers, that say that they are saved.
++        // delete all triggers, that say that they should be saved.
+         const ZoneManager::ZoneMap &amp;zoneMap(ZoneManager::getSingleton().getAllZones());
+         ZoneManager::ZoneMap::const_iterator zone;
+         // look in all zones if there is a trigger
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2008-01-06 13:01:04 UTC (rev 4043)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2008-01-06 13:23:36 UTC (rev 4044)
+@@ -418,7 +418,8 @@
+ 			Ogre::Vector3 targetPosWorldSpace =
+ 				mInventory-&gt;getOwner()-&gt;getPosition()
+ 				+ mInventory-&gt;getOwner()-&gt;getOrientation()
+-				* targetPosWindow; 
++				* targetPosWindow;
++            item-&gt;removeOldState();
+ 			item-&gt;placeIntoScene();
+ 			item-&gt;setPosition(targetPosWorldSpace);
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001114.html">[Dsa-hl-svn] r4043 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001116.html">[Dsa-hl-svn] r4045 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1115">[ date ]</a>
+              <a href="thread.html#1115">[ thread ]</a>
+              <a href="subject.html#1115">[ subject ]</a>
+              <a href="author.html#1115">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

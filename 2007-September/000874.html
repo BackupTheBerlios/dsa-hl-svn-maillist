@@ -1,0 +1,225 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3803 - in rl/trunk/engine: ai/src rules/src	script/swig ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3803%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200709041429.l84ET6Fl025245%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000873.html">
+   <LINK REL="Next"  HREF="000875.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3803 - in rl/trunk/engine: ai/src rules/src	script/swig ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3803%20-%20in%20rl/trunk/engine%3A%20ai/src%20rules/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200709041429.l84ET6Fl025245%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3803 - in rl/trunk/engine: ai/src rules/src	script/swig ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Sep  4 16:29:06 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000873.html">[Dsa-hl-svn] r3802 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="000875.html">[Dsa-hl-svn] r3804 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#874">[ date ]</a>
+              <a href="thread.html#874">[ thread ]</a>
+              <a href="subject.html#874">[ subject ]</a>
+              <a href="author.html#874">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-04 16:28:54 +0200 (Tue, 04 Sep 2007)
+New Revision: 3803
+
+Modified:
+   rl/trunk/engine/ai/src/SteeringVehicle.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/script/swig/RlRules.head.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+Log:
+-fixed: strange behavior (no movement possible) after talking to someone (SteeringVehicle should not control the player)
+
+Modified: rl/trunk/engine/ai/src/SteeringVehicle.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-09-03 21:12:53 UTC (rev 3802)
++++ rl/trunk/engine/ai/src/SteeringVehicle.cpp	2007-09-04 14:28:54 UTC (rev 3803)
+@@ -115,7 +115,7 @@
+ 
+ 
+     // only process if mMovingCreature not NULL
+-    if (mController == NULL)
++    if (mController == NULL || mCreature-&gt;getQueryFlags() &amp; QUERYFLAG_PLAYER)
+     {
+         mCurrentForce = Vector3::ZERO;
+         return;
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-09-03 21:12:53 UTC (rev 3802)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-09-04 14:28:54 UTC (rev 3803)
+@@ -106,13 +106,16 @@
+ 
+         mControllers.find(creature);
+         ControllerMap::iterator it = mControllers.find(creature);
+-        if (it == mControllers.end())
++        if (it != mControllers.end())
+         {
+             delete it-&gt;second;
+             mControllers.erase(it);
+         }
+ 
+-        mBodyControllers.erase(creature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody());
++        BodyControllerMap::iterator it_ = mBodyControllers.find(
++            creature-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody());
++        if( it_ != mBodyControllers.end() )
++            mBodyControllers.erase(it_);
+     }
+ 
+     void CreatureControllerManager::run(Real elapsedTime)
+
+Modified: rl/trunk/engine/script/swig/RlRules.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.head.swig	2007-09-03 21:12:53 UTC (rev 3802)
++++ rl/trunk/engine/script/swig/RlRules.head.swig	2007-09-04 14:28:54 UTC (rev 3803)
+@@ -24,6 +24,8 @@
+ #include &quot;Armor.h&quot;
+ #include &quot;Container.h&quot;
+ #include &quot;Creature.h&quot;
++#include &quot;CreatureController.h&quot;
++#include &quot;CreatureControllerManager.h&quot;
+ #include &quot;Date.h&quot;
+ #include &quot;DsaManager.h&quot;
+ #include &quot;Effect.h&quot;
+@@ -50,5 +52,4 @@
+ #include &quot;TalentStateSet.h&quot;
+ #include &quot;Tripel.h&quot;
+ #include &quot;Weapon.h&quot;
+-#include &quot;CreatureController.h&quot;
+ %}
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-09-03 21:12:53 UTC (rev 3802)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-09-04 14:28:54 UTC (rev 3803)
+@@ -731,7 +731,7 @@
+         virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+         
+-    %feature(&quot;director&quot;) ActionMananger;
++    %feature(&quot;director&quot;) ActionManager;
+     class ActionManager
+     {
+     public:
+@@ -747,7 +747,6 @@
+     class CreatureController
+     {
+     public:
+-        CreatureController(Creature *character); 
+         
+         typedef enum
+         {
+@@ -770,7 +769,7 @@
+         } MovementType;
+         
+         Creature *getCreature();
+-        bool setMovement(MovementType type, Ogre::Vector3 direction, Ogre::Vector3 rotation);
++        //bool setMovement(MovementType type, Ogre::Vector3 direction, Ogre::Vector3 rotation);
+         MovementType getMovementId() const;
+         Ogre::Vector3 getDirection() const;
+         Ogre::Vector3 getRotation() const;
+@@ -780,8 +779,25 @@
+                           Ogre::Real speed = 1, 
+                           unsigned int timesToPlay = 0, 
+                           const Ogre::String &amp;collisionName = &quot;&quot;);
++    protected:
++        CreatureController(Creature *character);
++        ~CreatureController();
+     };
++    
++    class CreatureControllerManager
++    {
++    public:
++        /// Returns a CreatureController that can be used to control given Creature.
++        /// There is only one controller per Creature at a given time.
++        /// If no such controller exists yet, it is created.
++        rl::CreatureController* getCreatureController(rl::Creature* creature);
+ 
++        /// This function detaches a controller attached to the given Creature, if any.
++        void detachController(rl::Creature* creature);
++
++        static rl::CreatureControllerManager&amp; getSingleton();
++    };
++
+ 	// Before first use of Selector or subclasses!
+     %apply SWIGTYPE *DYNAMIC { rl::Selector* };
+ 
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-09-03 21:12:53 UTC (rev 3802)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-09-04 14:28:54 UTC (rev 3803)
+@@ -86,6 +86,7 @@
+ 
+     void DialogControlState::pause()
+     {
++        /*
+         if (mDialogPartner)
+         {
+             MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mDialogPartner-&gt;getControlledObject());
+@@ -98,8 +99,9 @@
+                 }
+             }
+         }
+-        mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        */
++        //mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
++        //mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
+         mDialogWindow-&gt;setVisible(false, false);
+         mSubtitleWindow-&gt;setVisible(false, false);
+     }
+@@ -108,8 +110,8 @@
+     {
+         mCharacterActor-&gt;setVisible(true);
+ 
+-        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
++        //mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
++        //mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+         Camera* ogreCam = static_cast&lt;Camera*&gt;(mCameraActor-&gt;_getMovableObject());
+         ogreCam-&gt;setFixedYawAxis(true);
+         ogreCam-&gt;setPosition(Vector3::ZERO);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000873.html">[Dsa-hl-svn] r3802 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="000875.html">[Dsa-hl-svn] r3804 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#874">[ date ]</a>
+              <a href="thread.html#874">[ thread ]</a>
+              <a href="subject.html#874">[ subject ]</a>
+              <a href="author.html#874">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

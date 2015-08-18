@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3558 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3558%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200707021748.l62HmYf2027373%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000628.html">
+   <LINK REL="Next"  HREF="000630.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3558 - in rl/trunk/engine/ui: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3558%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200707021748.l62HmYf2027373%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3558 - in rl/trunk/engine/ui: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Jul  2 19:48:34 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000628.html">[Dsa-hl-svn] r3557 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000630.html">[Dsa-hl-svn] r3559 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#629">[ date ]</a>
+              <a href="thread.html#629">[ thread ]</a>
+              <a href="subject.html#629">[ subject ]</a>
+              <a href="author.html#629">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-07-02 19:48:24 +0200 (Mon, 02 Jul 2007)
+New Revision: 3558
+
+Modified:
+   rl/trunk/engine/ui/include/WindowManager.h
+   rl/trunk/engine/ui/src/AbstractWindow.cpp
+   rl/trunk/engine/ui/src/WindowManager.cpp
+Log:
+Move window deletion operations (hide and destroy CEGUI window) into destructor of AbstractWindow since creation operation are in its c'tor
+
+
+Modified: rl/trunk/engine/ui/include/WindowManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowManager.h	2007-07-02 14:34:13 UTC (rev 3557)
++++ rl/trunk/engine/ui/include/WindowManager.h	2007-07-02 17:48:24 UTC (rev 3558)
+@@ -40,6 +40,7 @@
+ 		~WindowManager();
+ 
+ 		void registerWindow(AbstractWindow* window);
++		void unregisterWindow(AbstractWindow* window);
+ 		void destroyWindow(AbstractWindow* window);
+ 		void closeTopWindow();
+ 		bool handleMovedToFront(AbstractWindow* window);
+
+Modified: rl/trunk/engine/ui/src/AbstractWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/AbstractWindow.cpp	2007-07-02 14:34:13 UTC (rev 3557)
++++ rl/trunk/engine/ui/src/AbstractWindow.cpp	2007-07-02 17:48:24 UTC (rev 3558)
+@@ -76,6 +76,11 @@
+ 
+ 	AbstractWindow::~AbstractWindow()
+ 	{
++		mWindow-&gt;hide();
++		mWindow-&gt;removeAllEvents();
++		WindowManager::getSingleton().unregisterWindow(this);
++		getRoot()-&gt;removeChildWindow(mWindow);
++		CEGUI::WindowManager::getSingleton().destroyWindow(mWindow);
+ 	}
+ 
+ 	CEGUI::Window* AbstractWindow::loadWindow(const CeGuiString&amp; xmlfile)
+
+Modified: rl/trunk/engine/ui/src/WindowManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowManager.cpp	2007-07-02 14:34:13 UTC (rev 3557)
++++ rl/trunk/engine/ui/src/WindowManager.cpp	2007-07-02 17:48:24 UTC (rev 3558)
+@@ -37,6 +37,14 @@
+ 
+ 	WindowManager::~WindowManager()
+ 	{
++		for(std::list&lt;AbstractWindow*&gt;::iterator it = mWindowList.begin(); it != mWindowList.end(); it++)
++		{
++			AbstractWindow* window = *it;
++			LOG_MESSAGE(Logger::UI, &quot;Delete window &quot;+window-&gt;getName());
++			//AbstractWindow::getRoot()-&gt;removeChildWindow(window-&gt;getWindow());
++			//CEGUI::WindowManager::getSingleton().destroyWindow(window-&gt;getWindow());
++		}
++		mWindowList.clear();
+ 	}
+ 	
+ 	void WindowManager::registerWindow(AbstractWindow* window)
+@@ -44,15 +52,14 @@
+ 		mWindowList.push_back(window);
+ 	}
+ 
+-	void WindowManager::destroyWindow(AbstractWindow* window)
++	void WindowManager::unregisterWindow(AbstractWindow* window)
+ 	{
+ 		mWindowList.remove(window);
+-		window-&gt;getWindow()-&gt;hide();
+-		AbstractWindow::getRoot()-&gt;removeChildWindow(window-&gt;getWindow());
+-		CEGUI::WindowManager::getSingleton().destroyWindow(window-&gt;getWindow());
++	}
+ 
+-		///@todo memory leak, aber destroyWindow macht sonst Probleme (heap corruption)
+-		//delete window;		
++	void WindowManager::destroyWindow(AbstractWindow* window)
++	{
++		delete window;
+ 	}
+ 
+ 	void WindowManager::closeTopWindow()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000628.html">[Dsa-hl-svn] r3557 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000630.html">[Dsa-hl-svn] r3559 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#629">[ date ]</a>
+              <a href="thread.html#629">[ thread ]</a>
+              <a href="subject.html#629">[ subject ]</a>
+              <a href="author.html#629">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

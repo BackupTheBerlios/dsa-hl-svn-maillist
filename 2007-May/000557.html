@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3486 - rl/trunk/engine/ai/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3486%20-%20rl/trunk/engine/ai/src&In-Reply-To=%3C200705281742.l4SHg6qQ021870%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000556.html">
+   <LINK REL="Next"  HREF="000558.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3486 - rl/trunk/engine/ai/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3486%20-%20rl/trunk/engine/ai/src&In-Reply-To=%3C200705281742.l4SHg6qQ021870%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3486 - rl/trunk/engine/ai/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Mon May 28 19:42:06 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000556.html">[Dsa-hl-svn] r3485 - rl/trunk/engine/ai/src
+</A></li>
+        <LI>Next message: <A HREF="000558.html">[Dsa-hl-svn] r3487 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#557">[ date ]</a>
+              <a href="thread.html#557">[ thread ]</a>
+              <a href="subject.html#557">[ subject ]</a>
+              <a href="author.html#557">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-05-28 19:42:03 +0200 (Mon, 28 May 2007)
+New Revision: 3486
+
+Modified:
+   rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+Log:
+updated CreatureWalkPathJob
+
+Modified: rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2007-05-25 08:51:49 UTC (rev 3485)
++++ rl/trunk/engine/ai/src/CreatureWalkPathJob.cpp	2007-05-28 17:42:03 UTC (rev 3486)
+@@ -23,10 +23,8 @@
+     {
+         //the moving creature moves from the current position to the landmark
+         mMovingCreature = movingCreature;
+-        //addLandmark(startLandmark);
+         mCurrentLandmark = new Landmark(name + &quot;_startup&quot;,mMovingCreature-&gt;getCreature()-&gt;getPosition());
+         mNextLandmark = startLandmark;
+-        //mMovingCreature-&gt;getCreature()-&gt;setPosition(startLandmark-&gt;getPosition());
+     }
+ 
+     CreatureWalkPathJob::~CreatureWalkPathJob()
+@@ -35,24 +33,26 @@
+ 
+     bool CreatureWalkPathJob::execute(Ogre::Real time)
+     {
+-        if (mLandmarkPath.getPoints().size() &gt; 0 &amp;&amp; mMovingCreature-&gt;getCreature()-&gt;getPosition() == mNextLandmark-&gt;getPosition())
++        if (mMovingCreature-&gt;getCreature()-&gt;getPosition() == mNextLandmark-&gt;getPosition())
+         {
+-            mCurrentLandmark = mNextLandmark;
+-            mNextLandmark = mLandmarkPath.getPoints().front();
+-            mLandmarkPath.getPoints().pop_front();
++            if (mLandmarkPath.getPoints().size())
++            {
++                mCurrentLandmark = mNextLandmark;
++                mNextLandmark = mLandmarkPath.getPoints().front();
++                mLandmarkPath.getPoints().pop_front();
++            }
++            else
++            {
++                mCurrentLandmark = mNextLandmark;
++                //@todo
++            }
++            
+         }
+-        else if (mMovingCreature-&gt;getCreature()-&gt;getPosition() != mNextLandmark-&gt;getPosition())
++        else if (mCurrentLandmark != mNextLandmark)
+         {
+-            Ogre::Vector3 creatureViewVector = mMovingCreature-&gt;getCreature()-&gt;getOrientation() * Ogre::Vector3::NEGATIVE_UNIT_Z;
+-            Ogre::Vector3 diffTrack = mNextLandmark-&gt;getPosition() - mCurrentLandmark-&gt;getPosition();
+-            /*if (diffTrack.dotProduct(creatureViewVector) &lt; 0.5)
+-            {
+-
+-            }*/
+-            mMovingCreature-&gt;setMovement(MovingCreature::MT_GEHEN,diffTrack,Ogre::Vector3(0,0,0));        
++            updateCreature(time);
+         }
+ 
+-        updateCreature(time);
+         return false;
+     }
+ 
+@@ -73,27 +73,35 @@
+ 
+     void CreatureWalkPathJob::updateCreature(Ogre::Real time)
+     {
+-        //executes the movements from movingCreature on the creature
+-        Ogre::Quaternion rotation;
+-        Ogre::Vector3 translation;
+-
++        LOG_MESSAGE(&quot;JOB&quot;,&quot;CreatureWalkPathJob::updateCreature&quot;);
+         //@todo: calculate translation and rotation
+-        AbstractMovement* _rotate = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
++        AbstractMovement* rotate = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_DREHEN);
+         Ogre::Real baseVelRot = 0;
+-        AbstractMovement* _translate = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_JOGGEN);
++        AbstractMovement* translate = mMovingCreature-&gt;getMovementFromId(MovingCreature::MT_RENNEN);
+         Ogre::Real baseVelTrans = 0;
++        Ogre::Radian rotation(time) ;
++        Ogre::Vector3 direction = Ogre::Vector3(0,0,0);
+ 
+-        if(_rotate-&gt;calculateBaseVelocity(baseVelRot))
++        if(rotate-&gt;calculateBaseVelocity(baseVelRot))
+         {
++            Ogre::Vector3 creatureViewVector = mMovingCreature-&gt;getCreature()-&gt;getOrientation() * Ogre::Vector3::NEGATIVE_UNIT_Z;
++            Ogre::Radian baseVelRotRad(baseVelRot * 2 * Ogre::Math::PI);
+             //@todo
+         }
+-        if(_translate-&gt;calculateBaseVelocity(baseVelTrans))
+-        {
++        //if(translate-&gt;calculateBaseVelocity(baseVelTrans))
++        //{
++        direction = mNextLandmark-&gt;getPosition() - mCurrentLandmark-&gt;getPosition();
+             //@todo
+-        }
++        //}
++
++        LOG_MESSAGE(&quot;Movement&quot;, &quot;Vec3 &quot; + Ogre::StringConverter::toString(direction) 
++            + &quot; Set Movement &quot; + Ogre::StringConverter::toString(
++            mMovingCreature-&gt;setMovement(MovingCreature::MT_GEHEN, direction, Ogre::Vector3(0,rotation.valueRadians(),0))));
++        //mMovingCreature-&gt;setAnimation(&quot;rennen&quot;);
++
+         //make sure that the creature can't fail the landmark
+-        Ogre::Vector3 diffTrack = mNextLandmark-&gt;getPosition() - mCurrentLandmark-&gt;getPosition();
+-        if(diffTrack.dotProduct(mNextLandmark-&gt;getPosition()-mMovingCreature-&gt;getCreature()-&gt;getPosition()) &lt; 0)
++        //Ogre::Vector3 diffTrack = mNextLandmark-&gt;getPosition() - mCurrentLandmark-&gt;getPosition();
++        if(direction.dotProduct(mNextLandmark-&gt;getPosition()-mMovingCreature-&gt;getCreature()-&gt;getPosition()) &lt; 0)
+             mMovingCreature-&gt;getCreature()-&gt;setPosition(mNextLandmark-&gt;getPosition());
+     }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000556.html">[Dsa-hl-svn] r3485 - rl/trunk/engine/ai/src
+</A></li>
+	<LI>Next message: <A HREF="000558.html">[Dsa-hl-svn] r3487 - rl/trunk/engine/ai/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#557">[ date ]</a>
+              <a href="thread.html#557">[ thread ]</a>
+              <a href="subject.html#557">[ subject ]</a>
+              <a href="author.html#557">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

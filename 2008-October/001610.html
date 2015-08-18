@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4553 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4553%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200810181937.m9IJbpV5011550%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001609.html">
+   <LINK REL="Next"  HREF="001611.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4553 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4553%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200810181937.m9IJbpV5011550%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4553 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sat Oct 18 21:37:51 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001609.html">[Dsa-hl-svn] r4552 - rl/branches/persistence/script/swig
+</A></li>
+        <LI>Next message: <A HREF="001611.html">[Dsa-hl-svn] r4554 - in rl/branches/persistence: core/include	core/src rules/src script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1610">[ date ]</a>
+              <a href="thread.html#1610">[ thread ]</a>
+              <a href="subject.html#1610">[ subject ]</a>
+              <a href="author.html#1610">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2008-10-18 21:37:47 +0200 (Sat, 18 Oct 2008)
+New Revision: 4553
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/MovePivot.py
+Log:
+- cut and paste works
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2008-10-17 16:28:50 UTC (rev 4552)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2008-10-18 19:37:47 UTC (rev 4553)
+@@ -276,7 +276,7 @@
+         self.moduleManager.cutObjects()
+ 
+     def actionPasteSlot(self):
+-        self.moduleManager.pasteObjects()
++        self.moduleManager.pasteObjects(self.ogreRenderWindow.getCameraToViewportRay())
+ 
+     def actionMoveSlot(self):
+         self.moduleManager.pivot.setMoveMode()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-10-17 16:28:50 UTC (rev 4552)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2008-10-18 19:37:47 UTC (rev 4553)
+@@ -312,6 +312,8 @@
+         self.raySceneQuery = self.sceneManager.createRayQuery(og.Ray())
+ 
+         self.userSelectionList = []
++        self.cutList = [] # selection objects that has been cut out and wait to be pasted again
++        self.cutListPreviousNodes = [] # contains the nodes they where copnnected to before the cut
+ 
+         self.listenerDings = MyRaySceneQueryListener()
+ 
+@@ -512,11 +514,36 @@
+     def cutObjects(self):
+         if len(self.userSelectionList) &lt; 1:
+             return
+-        print &quot;dbg: cut&quot;
+ 
+-    def pasteObjects(self):
+-        print &quot;dbg: paste&quot;
++        self.cutList = []
++        for so in self.userSelectionList:
++            self.cutListPreviousNodes.append(so.entity.getParentNode().getParent())
++            so.entity.getParentNode().getParent().removeChild(so.entity.getParentNode())
++            # set the &quot;point of gravity&quot; of all the cutted nodes to world origin at 0,0,0
++            # so we only have to translate them to their new destination when they get pasted
++            # the position of the pivot point is considered as the center of gravity
++            so.entity.getParentNode().setPosition(so.entity.getParentNode().getPosition() - self.pivot.getPosition())
++            self.cutList.append(so)
++        self.resetSelection()
++    def pasteObjects(self,  ray):
++        if len(self.cutList) &lt; 1:
++            return
+ 
++        result = og.Math.intersects(ray, self.dropCollisionPlane)
++        if result.first == True:
++            i=0
++            while i &lt; len(self.cutList):
++                self.cutListPreviousNodes[i].addChild(self.cutList[i].entity.getParentNode())
++                self.cutList[i].entity.getParentNode().translate(ray.getPoint(result.second))
++                i = i+1
++        else:
++            i=0
++            while i &lt; len(self.cutList):
++                self.cutListPreviousNodes[i].addChild(self.cutList[i].entity.getParentNode())
++                self.cutList[i].entity.getParentNode().translate(ray.getPoint(100.0))
++                i = i+1
++        self.cutList = []
++
+     def leftMouseUp(self):
+         if self.pivot is not None and self.pivot.isTransforming:
+             self.pivot.stopTransforming()
+
+Modified: rl/trunk/editors/Lockenwickler/src/MovePivot.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/MovePivot.py	2008-10-17 16:28:50 UTC (rev 4552)
++++ rl/trunk/editors/Lockenwickler/src/MovePivot.py	2008-10-18 19:37:47 UTC (rev 4553)
+@@ -124,6 +124,9 @@
+     def setPosition(self,  pos):
+         self.pivotNode.setPosition(pos)
+ 
++    def getPosition(self):
++        return self.pivotNode.getPosition()
++
+     def startTransforming(self, dirEntity, soList):
+         print &quot;dbg: transforming.....&quot;
+         self.moveDirection = dirEntity.getName()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001609.html">[Dsa-hl-svn] r4552 - rl/branches/persistence/script/swig
+</A></li>
+	<LI>Next message: <A HREF="001611.html">[Dsa-hl-svn] r4554 - in rl/branches/persistence: core/include	core/src rules/src script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1610">[ date ]</a>
+              <a href="thread.html#1610">[ thread ]</a>
+              <a href="subject.html#1610">[ subject ]</a>
+              <a href="author.html#1610">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3797 - in rl/trunk/engine: common/src rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3797%20-%20in%20rl/trunk/engine%3A%20common/src%20rules/src&In-Reply-To=%3C200709022152.l82LqKnO030100%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000867.html">
+   <LINK REL="Next"  HREF="000869.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3797 - in rl/trunk/engine: common/src rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3797%20-%20in%20rl/trunk/engine%3A%20common/src%20rules/src&In-Reply-To=%3C200709022152.l82LqKnO030100%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3797 - in rl/trunk/engine: common/src rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Sep  2 23:52:20 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000867.html">[Dsa-hl-svn] r3796 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+        <LI>Next message: <A HREF="000869.html">[Dsa-hl-svn] r3798 - rl/trunk/engine/rules/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#868">[ date ]</a>
+              <a href="thread.html#868">[ thread ]</a>
+              <a href="subject.html#868">[ subject ]</a>
+              <a href="author.html#868">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-02 23:52:14 +0200 (Sun, 02 Sep 2007)
+New Revision: 3797
+
+Added:
+   rl/trunk/engine/common/src/PropertyWriter.cpp
+Modified:
+   rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+Log:
+added the last file and fixed a damn typo
+
+Added: rl/trunk/engine/common/src/PropertyWriter.cpp
+===================================================================
+--- rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-02 21:03:07 UTC (rev 3796)
++++ rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-02 21:52:14 UTC (rev 3797)
+@@ -0,0 +1,123 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;XmlHelper.h&quot;
++
++#include &quot;Properties.h&quot;
++#include &quot;PropertyWriter.h&quot;
++
++#include &lt;OgreResourceManager.h&gt;
++#include &lt;CEGUIPropertyHelper.h&gt;
++
++
++using namespace XERCES_CPP_NAMESPACE;
++using namespace Ogre;
++
++namespace rl {
++
++    XmlPropertyWriter::XmlPropertyWriter()
++    {
++    }
++
++    void XmlPropertyWriter::setPropertySets(std::vector&lt;PropertySet*&gt; sets)
++    {
++        mPropertySets = sets;
++    }
++
++    void XmlPropertyWriter::addPropertySet(PropertySet* set)
++    {
++        mPropertySets.push_back(set);
++    }
++
++    DOMElement* XmlPropertyWriter::processProperty(DOMElement* parent, PropertyEntry entry)
++    {
++        DOMElement* element;
++        if(entry.second.isArray())
++        {
++            element = this-&gt;processPropertyArray(parent, entry.first.c_str(), entry.second.toArray());
++        }
++        else if(entry.second.isMap())
++        {
++            element = this-&gt;processPropertyMap(parent, entry.first.c_str(), entry.second.toMap());
++        }
++        else
++        {
++            element = XmlHelper::appendChildElement(mDocument, parent, &quot;property&quot;);
++            if(entry.first != &quot;&quot;)
++                XmlHelper::setAttribute(element, &quot;name&quot;, entry.first.c_str());
++
++            //Ogre::String typeName = entry.second.getTypeName();
++            Ogre::String name = entry.second.getName();
++            Ogre::StringUtil::toUpperCase(name);
++            XmlHelper::setAttributeValueAsString(element, &quot;type&quot;, name);
++
++            if(entry.second.isBool())
++                XmlHelper::setAttributeValueAsBool(element, &quot;data&quot;, entry.second.toBool());
++            else if(entry.second.isInt())
++                XmlHelper::setAttributeValueAsInteger(element, &quot;data&quot;, entry.second.toInt());
++            else if(entry.second.isIntPair())
++                XmlHelper::setAttributeValueAsIntegerPair(element, &quot;data&quot;, entry.second.toIntPair());
++            else if(entry.second.isIntPair())
++                XmlHelper::setAttributeValueAsIntegerTriple(element, &quot;data&quot;, entry.second.toIntTriple());
++            else if(entry.second.isQuaternion())
++                XmlHelper::setValueAsQuaternion(element, entry.second.toQuaternion());
++            else if(entry.second.isReal())
++                XmlHelper::setAttributeValueAsReal(element, &quot;data&quot;, entry.second.toReal());
++            else if(entry.second.isString())
++                XmlHelper::setAttributeValueAsString(element, &quot;data&quot;, entry.second.toString());
++            else if(entry.second.isVector3())
++                XmlHelper::setValueAsVector3(element, entry.second.toVector3());
++        }
++        return element;
++    }
++
++    DOMElement* XmlPropertyWriter::processPropertySet(DOMElement* parent, const char* const name, PropertySet set)
++    {
++        PropertyMap map = set.toPropertyMap();
++
++        return processPropertyMap(parent, name, map);
++    }
++
++    DOMElement* XmlPropertyWriter::processPropertyArray(DOMElement *parent, const char *const name, PropertyVector vector)
++    {
++        DOMElement* element = XmlHelper::appendChildElement(mDocument, parent, &quot;property&quot;);
++        XmlHelper::setAttribute(element, &quot;name&quot;, name);
++        XmlHelper::setAttribute(element, &quot;type&quot;, &quot;MAP&quot;);
++
++        PropertyVector::iterator iter;
++        for(iter = vector.begin(); iter != vector.end(); iter++)
++        {
++            processProperty(element, PropertyEntry(&quot;&quot;,*iter));
++        }
++        return element;
++    }
++
++    DOMElement* XmlPropertyWriter::processPropertyMap(DOMElement *parent, const char *const name, PropertyMap map)
++    {
++        DOMElement* element = XmlHelper::appendChildElement(mDocument, parent, &quot;property&quot;);
++        XmlHelper::setAttribute(element, &quot;name&quot;, name);
++        XmlHelper::setAttribute(element, &quot;type&quot;, &quot;MAP&quot;);
++
++        PropertyMap::iterator iter;
++        for(iter = map.begin(); iter != map.end(); iter++)
++        {
++            processProperty(element, PropertyEntry(iter-&gt;first.c_str(), iter-&gt;second));
++        }
++        return element;
++    }
++}
+
+Modified: rl/trunk/engine/rules/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-02 21:03:07 UTC (rev 3796)
++++ rl/trunk/engine/rules/src/SaveGameFileWriter.cpp	2007-09-02 21:52:14 UTC (rev 3797)
+@@ -70,12 +70,14 @@
+ 
+             PropertyMap map = (*it)-&gt;getAllProperties()-&gt;toPropertyMap();
+             PropertyMap::iterator it2;
+-            for(it2 = map.begin(); it2 != map.end(); it2)
++            for(it2 = map.begin(); it2 != map.end(); it2++)
+             {
+                 this-&gt;processProperty(gameobject, PropertyEntry(it2-&gt;first.c_str(), it2-&gt;second));
+             }
+         }        
+ 
++        //Write Zones?
++
+         //Write scripts
+         DOMElement* scripts = XmlHelper::appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;scripts&quot;);
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000867.html">[Dsa-hl-svn] r3796 - in rl/trunk/engine: rules/include rules/src	ui/src
+</A></li>
+	<LI>Next message: <A HREF="000869.html">[Dsa-hl-svn] r3798 - rl/trunk/engine/rules/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#868">[ date ]</a>
+              <a href="thread.html#868">[ thread ]</a>
+              <a href="subject.html#868">[ subject ]</a>
+              <a href="author.html#868">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

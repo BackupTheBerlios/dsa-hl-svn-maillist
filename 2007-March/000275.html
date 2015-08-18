@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3204 - in rl/trunk/engine/core: . include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3204%20-%20in%20rl/trunk/engine/core%3A%20.%20include%20src&In-Reply-To=%3C200703282119.l2SLJF5B002529%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000274.html">
+   <LINK REL="Next"  HREF="000276.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3204 - in rl/trunk/engine/core: . include src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3204%20-%20in%20rl/trunk/engine/core%3A%20.%20include%20src&In-Reply-To=%3C200703282119.l2SLJF5B002529%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3204 - in rl/trunk/engine/core: . include src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar 28 23:19:15 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000274.html">[Dsa-hl-svn] r3203 - rl/trunk/engine/core/include
+</A></li>
+        <LI>Next message: <A HREF="000276.html">[Dsa-hl-svn] r3205 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#275">[ date ]</a>
+              <a href="thread.html#275">[ thread ]</a>
+              <a href="subject.html#275">[ subject ]</a>
+              <a href="author.html#275">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-28 23:19:09 +0200 (Wed, 28 Mar 2007)
+New Revision: 3204
+
+Modified:
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+Log:
+deactivated old way of handling levelobjects, added new quadtree style handling
+
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-03-28 15:47:03 UTC (rev 3203)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-03-28 21:19:09 UTC (rev 3204)
+@@ -1,7 +1,7 @@
+ &lt;?xml version=&quot;1.0&quot; encoding=&quot;Windows-1252&quot;?&gt;
+ &lt;VisualStudioProject
+ 	ProjectType=&quot;Visual C++&quot;
+-	Version=&quot;8,00&quot;
++	Version=&quot;8.00&quot;
+ 	Name=&quot;RlCore&quot;
+ 	ProjectGUID=&quot;{0935F495-4540-40E3-AC8F-AA54C85DC5B2}&quot;
+ 	RootNamespace=&quot;RlCore&quot;
+@@ -525,6 +525,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\QuadTree.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\RubyInterpreter.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2007-03-28 15:47:03 UTC (rev 3203)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2007-03-28 21:19:09 UTC (rev 3204)
+@@ -35,6 +35,8 @@
+ #include &quot;GameTask.h&quot;
+ #include &quot;CorePrerequisites.h&quot;
+ 
++#include &quot;QuadTree.h&quot;
++
+ namespace rl {
+ 
+     class Actor;
+@@ -43,10 +45,20 @@
+     class PhysicsController;
+     class PhysicsGenericContactCallback;
+     class World;
+-
+     class PhysicsCollisionFactory;
+ 
++	class LQTBodies : public TLooseQuadTreeNode&lt;OgreNewt::Body*, LQTBodies&gt;
++	{
++	public:
++		typedef std::vector&lt;OgreNewt::Body*&gt; BodyList;
++		LQTBodies(int maxData, int maxDepth, float looseness, const Ogre::Vector2&amp; tlc,
++			const Ogre::Vector2&amp; brc, float mWidth);
++        LQTBodies(const LQTBodies&amp; LQT);
++		~LQTBodies();
+ 
++		static const Ogre::AxisAlignedBox getAABB(OgreNewt::Body* body);
++	};
++
+     /** Management class for the physical properties of game world objects.
+      * This class utilizes OgreNewt (and therefore indirectly Newton) for handling
+      * the physics of RL. It sets up OgreNewt and realizes the timestepping for Newton.
+@@ -304,7 +316,9 @@
+         //! a list of objects of the physical world
+         std::vector&lt;PhysicalThing*&gt; mPhysicalThings;
+         //! a list of bodies for the static level parts
+-        std::vector&lt;OgreNewt::Body*&gt; mLevelBodies;
++        //std::vector&lt;OgreNewt::Body*&gt; mLevelBodies;
++		//! a quadtree storing a spatial partioning of static level parts
++        TLooseQuadTree&lt;OgreNewt::Body*, LQTBodies&gt; mLevelBodiesQuadTree;
+         //! the extents of the level
+         Ogre::AxisAlignedBox mWorldAABB;
+         
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-28 15:47:03 UTC (rev 3203)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-03-28 21:19:09 UTC (rev 3204)
+@@ -36,7 +36,36 @@
+ {
+     const Ogre::Real PhysicsManager::NEWTON_GRID_WIDTH = 0.01;
+ 
++	LQTBodies::LQTBodies(int maxData, int maxDepth, float looseness,
++		const Ogre::Vector2&amp; tlc, const Ogre::Vector2&amp; brc, float mWidth)
++		: TLooseQuadTreeNode&lt;OgreNewt::Body*, LQTBodies&gt;( maxData, maxDepth, looseness, tlc, brc, mWidth)
++	{
++	}
+ 
++    LQTBodies::LQTBodies(const LQTBodies&amp; LQT)
++        : TLooseQuadTreeNode&lt;OgreNewt::Body*, LQTBodies&gt;(LQT)
++    {
++        for (BodyList::const_iterator it = LQT.mData.begin(); it != LQT.mData.end(); it++)
++		{
++            mData.push_back(*it);
++        }
++    }
++
++	LQTBodies::~LQTBodies()
++	{
++		for (BodyList::iterator it = mData.begin(); it != mData.end(); it++)
++		{
++			delete (*it);
++		}
++		mData.clear();
++	}
++
++
++	const Ogre::AxisAlignedBox LQTBodies::getAABB(OgreNewt::Body* body) 
++	{
++		return body-&gt;getCollision()-&gt;getAABB();
++	}
++
+     PhysicsManager&amp; PhysicsManager::getSingleton(void)
+     {
+         return Singleton&lt;PhysicsManager&gt;::getSingleton();
+@@ -82,7 +111,13 @@
+         // setup character material
+         // actually this is needed here, because the actor is created in advance before the
+         // character controller who actually does create 'character' material too.
+-        createMaterialID(&quot;character&quot;);      
++        createMaterialID(&quot;character&quot;);
++
++        // setup level quadtree extents
++        mLevelBodiesQuadTree.setMaxData(20);
++        mLevelBodiesQuadTree.setMaxDepth(10);
++        mLevelBodiesQuadTree.setLoosenessFactor(0.5f);
++        mLevelBodiesQuadTree.setExtents(Ogre::Vector2(-100,-100), Ogre::Vector2(100,100));
+     }
+ 
+     PhysicsManager::~PhysicsManager()
+@@ -224,8 +259,9 @@
+             body-&gt;setPositionOrientation(node-&gt;getWorldPosition(),
+                 node-&gt;getWorldOrientation());
+             body-&gt;setMaterialGroupID(getMaterialID(&quot;level&quot;));
+-
+-            mLevelBodies.push_back(body);
++			
++			mLevelBodiesQuadTree.add(body);
++            //mLevelBodies.push_back(body);
+         }
+ 
+         // adjust worldAABB
+@@ -249,11 +285,13 @@
+ 
+     void PhysicsManager::clearLevelGeometry(  )
+     {
+-        for (size_t i = 0; i &lt; mLevelBodies.size(); i++ )
++		mLevelBodiesQuadTree.removeAll();
++        /*for (size_t i = 0; i &lt; mLevelBodies.size(); i++ )
+         {
+             delete mLevelBodies[i];
+         }
+         mLevelBodies.clear();
++		*/
+     }
+ 
+     // adopted from the chararcter demo in the newton sdk
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000274.html">[Dsa-hl-svn] r3203 - rl/trunk/engine/core/include
+</A></li>
+	<LI>Next message: <A HREF="000276.html">[Dsa-hl-svn] r3205 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#275">[ date ]</a>
+              <a href="thread.html#275">[ thread ]</a>
+              <a href="subject.html#275">[ subject ]</a>
+              <a href="author.html#275">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

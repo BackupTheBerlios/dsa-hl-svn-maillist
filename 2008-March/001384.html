@@ -1,0 +1,897 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4313 - modules/common/scripts	modules/common/scripts/effects rl/trunk/engine/rules/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4313%20-%20modules/common/scripts%0A%09modules/common/scripts/effects%20rl/trunk/engine/rules/include%0A%09rl/trunk/engine/rules/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200803272328.m2RNSOG9008924%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001383.html">
+   <LINK REL="Next"  HREF="001385.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4313 - modules/common/scripts	modules/common/scripts/effects rl/trunk/engine/rules/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4313%20-%20modules/common/scripts%0A%09modules/common/scripts/effects%20rl/trunk/engine/rules/include%0A%09rl/trunk/engine/rules/src%20rl/trunk/engine/script/swig&In-Reply-To=%3C200803272328.m2RNSOG9008924%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4313 - modules/common/scripts	modules/common/scripts/effects rl/trunk/engine/rules/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Mar 28 00:28:24 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001383.html">[Dsa-hl-svn] r4312 - rl/trunk/engine/core/include
+</A></li>
+        <LI>Next message: <A HREF="001385.html">[Dsa-hl-svn] r4314 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1384">[ date ]</a>
+              <a href="thread.html#1384">[ thread ]</a>
+              <a href="subject.html#1384">[ subject ]</a>
+              <a href="author.html#1384">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-28 00:28:18 +0100 (Fri, 28 Mar 2008)
+New Revision: 4313
+
+Added:
+   modules/common/scripts/effects/lifestateeffects.rb
+Modified:
+   modules/common/scripts/effects/paralues.rb
+   modules/common/scripts/initialize_factories.rb
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Effect.h
+   rl/trunk/engine/rules/include/EffectManager.h
+   rl/trunk/engine/rules/include/RulesConstants.h
+   rl/trunk/engine/rules/include/RulesMessages.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/rules/src/Effect.cpp
+   rl/trunk/engine/rules/src/EffectManager.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+- Rename Effect::Status to Effect::LifeState, also getStatus() to getLifeState()
+- Add/remove effects when a creature's life state changes
+
+Added: modules/common/scripts/effects/lifestateeffects.rb
+===================================================================
+--- modules/common/scripts/effects/lifestateeffects.rb	2008-03-27 23:21:27 UTC (rev 4312)
++++ modules/common/scripts/effects/lifestateeffects.rb	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -0,0 +1,31 @@
++class DeadEffect &lt; Effect
++  def initialize(stufe)
++    super(0);
++    setName(&quot;Tot.&quot;);
++    setDescription(&quot;Das Leben ist unwideruflich vorbei.&quot;);
++  end
++
++  def getLifeState()
++    return LS_DEAD;
++  end
++    
++  def timeCheck()
++    return PERMANENT;
++  end
++end
++
++class IncapacitatedEffect &lt; Effect
++  def initialize(stufe)
++    super(0);
++    setName(&quot;Kampfunf&#228;hig.&quot;);
++    setDescription(&quot;Die Verletzungen sind zu stark um zu k&#228;mpfen.&quot;);
++  end
++
++  def getLifeState()
++    return LS_INCAPACITATED;
++  end
++    
++  def timeCheck()
++    return PERMANENT;
++  end
++end
+\ No newline at end of file
+
+Modified: modules/common/scripts/effects/paralues.rb
+===================================================================
+--- modules/common/scripts/effects/paralues.rb	2008-03-27 23:21:27 UTC (rev 4312)
++++ modules/common/scripts/effects/paralues.rb	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -1,12 +1,12 @@
+ class Paralues &lt; Effect
+-  def initialize()
++  def initialize(stufe)
+     super(0);
+     setName(&quot;Versteinert&quot;);
+     setDescription(&quot;Die Haut sieht aus wie aus feinem Marmor.&quot;);
+   end
+ 
+-  def getStatus()
+-    rval = (STATUS_PETRIFIED | STATUS_INVULNERABLE | STATUS_DEAF);
++  def getLifeState()
++    rval = (LS_PETRIFIED | LS_INVULNERABLE | LS_DEAF);
+     return rval;
+   end
+     
+
+Modified: modules/common/scripts/initialize_factories.rb
+===================================================================
+--- modules/common/scripts/initialize_factories.rb	2008-03-27 23:21:27 UTC (rev 4312)
++++ modules/common/scripts/initialize_factories.rb	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -1,4 +1,5 @@
+ load &quot;effects/ruestung.rb&quot;
++load &quot;effects/lifestateeffects.rb&quot;
+ load &quot;triggers/test.rb&quot;
+ load &quot;triggers/limitedtimestrigger.rb&quot;
+ 
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/include/Creature.h	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -171,14 +171,14 @@
+                 DAMAGETAG_NORMAL = 1,
+                 DAMAGETAG_PIERCING, ///&lt; Wie Pfeile, Bolzen oder gezielte Stiche, verletzen schon bei KO/2 &lt; SP
+                 DAMAGETAG_FIRE
+-        };
++            };
+             /// The differente states a @ref abbdes &quot;SF&quot; can be in.
+              enum SfStatus
+             {
+                 SFSTATUS_IN_TRAINING = 1,
+                 SFSTATUS_OK,
+                 SFSTATUS_REQUIREMENTS_NOT_MET /// @todo Is this even needed?
+-        };
++            };
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Werte
+@@ -516,7 +516,7 @@
+             /**
+              * Gets the status of a creature.
+              **/
+-			Effect::Status getStatus() const;
++			Effect::LifeState getLifeState() const;
+ 
+ 
+             bool isMagic() const;
+@@ -825,9 +825,6 @@
+             /// Zuletzt zugewiesene Bewegungsart
+             int mMovementType;
+ 
+-			/// Life state, alive or dead or in between
+-			LifeState mLifeState;
+-
+             /// Zeigt auf die gerade aktive Waffe.
+             EigenschaftMap mEigenschaften;
+             TalentMap mTalente;
+
+Modified: rl/trunk/engine/rules/include/Effect.h
+===================================================================
+--- rl/trunk/engine/rules/include/Effect.h	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/include/Effect.h	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -29,22 +29,23 @@
+ 	{
+ 	public:
+       
+-        typedef unsigned long Status;
+-        static const Status STATUS_NONE           = 1&lt;&lt;0;
+-        static const Status STATUS_BLIND          = 1&lt;&lt;1;   ///&lt; The creature can't see anything.
+-        static const Status STATUS_DEAD           = 1&lt;&lt;2;   ///&lt; The creature is dead.
+-        static const Status STATUS_DEAF           = 1&lt;&lt;3;   ///&lt; The creature can't hear anything.
+-        static const Status STATUS_PARALYZED      = 1&lt;&lt;4;   ///&lt; The creature can't move, turn, jump etc.
+-        static const Status STATUS_INCAPACITATED  = 1&lt;&lt;5;   ///&lt; The creature can't fight anymore due to serious injuries. The creature can barely move.
+-        static const Status STATUS_INVISIBLE      = 1&lt;&lt;6;   ///&lt; The creature can't be seen.
+-        static const Status STATUS_INVULNERABLE   = 1&lt;&lt;7;   ///&lt; The creature is immune to any mundane attacks.
+-        static const Status STATUS_PETRIFIED      = 1&lt;&lt;8;   ///&lt; The creature is coated with stone and has all the effects of paralyzation
+-        static const Status STATUS_SILENCED       = 1&lt;&lt;9;   ///&lt; The creature doesn't make any noises.
+-        static const Status STATUS_SLEEPING       = 1&lt;&lt;10;  ///&lt; The creature is asleep.
+-        static const Status STATUS_UNCONSCIOUS    = 1&lt;&lt;11;  ///&lt; Like SLEEPING, but more difficult to wake.
++        typedef unsigned long LifeState;
++        static const LifeState LS_NONE           = 1&lt;&lt;0;
++        static const LifeState LS_BLIND          = 1&lt;&lt;1;   ///&lt; The creature can't see anything.
++        static const LifeState LS_DEAD           = 1&lt;&lt;2;   ///&lt; The creature is dead.
++        static const LifeState LS_DEAF           = 1&lt;&lt;3;   ///&lt; The creature can't hear anything.
++        static const LifeState LS_PARALYZED      = 1&lt;&lt;4;   ///&lt; The creature can't move, turn, jump etc.
++        static const LifeState LS_INCAPACITATED  = 1&lt;&lt;5;   ///&lt; The creature can't fight anymore due to serious injuries. The creature can barely move.
++        static const LifeState LS_INVISIBLE      = 1&lt;&lt;6;   ///&lt; The creature can't be seen.
++        static const LifeState LS_INVULNERABLE   = 1&lt;&lt;7;   ///&lt; The creature is immune to any mundane attacks.
++        static const LifeState LS_PETRIFIED      = 1&lt;&lt;8;   ///&lt; The creature is coated with stone and has all the effects of paralyzation
++        static const LifeState LS_SILENCED       = 1&lt;&lt;9;   ///&lt; The creature doesn't make any noises.
++        static const LifeState LS_SLEEPING       = 1&lt;&lt;10;  ///&lt; The creature is asleep.
++        static const LifeState LS_UNCONSCIOUS    = 1&lt;&lt;11;  ///&lt; Like SLEEPING, but more difficult to wake.
+ 
+         // Meta stati
+-        static const Status STATUS_IMMOBILE = STATUS_PARALYZED | STATUS_SLEEPING | STATUS_UNCONSCIOUS | STATUS_PETRIFIED | STATUS_DEAD;
++        static const LifeState LS_IMMOBILE = LS_PARALYZED | LS_SLEEPING | LS_UNCONSCIOUS | LS_PETRIFIED | LS_DEAD;
++        static const LifeState LS_NO_COMBAT = LS_IMMOBILE | LS_INCAPACITATED;
+ 
+         typedef int ModType;
+         static const ModType MODTYPE_NONE         = 1 &lt;&lt; 0;
+@@ -121,7 +122,7 @@
+ 		virtual RL_LONGLONG timeCheck();
+         
+         /// Returns the status that is applied to the creature by this effect.
+-        virtual Status getStatus();
++        virtual LifeState getLifeState() const;
+         
+         /// Returns the modificator applied on the value specified by the parameters.
+         virtual int getMod(CeGuiString target, ModType type, ModTag tag);
+
+Modified: rl/trunk/engine/rules/include/EffectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/EffectManager.h	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/include/EffectManager.h	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -18,25 +18,28 @@
+ #define __EFFECTMANAGER_H__
+ 
+ #include &quot;RulesPrerequisites.h&quot;
++
++#include &lt;set&gt;
++
+ #include &quot;Date.h&quot;
+ #include &quot;Effect.h&quot;
+-#include &lt;set&gt;
+ 
+-
+ namespace rl
+ {
++    class GameObject;
++
+     /**
+-     * Verwaltet die Effekte die auf einer Kreatur wirken.
+-     * Diese Klasse verwaltet alle Effekte, die auf einer Kreatur liegen.
+-     * Jede Kreatur hat ihren eigenen EffectManager. Die Funktion checkeffects
+-     * sollte waehrend jeder Aktion (gemeint ist die DSA-Zeiteinheit) aufgerufen
+-     * werden.
++     * @brief Manages the effects affecting a game object
++     * 
++     * This class manages all effects applied to a game object.
++     * Each game object has a seperate EffectManager. The method checkEffects()
++     * should be called every Aktion (the dark eye time unit)
+      **/
+ 
+ 	class _RlRulesExport EffectManager
+ 	{
+ 	public:
+-		EffectManager();
++		EffectManager(GameObject* gameobject);
+ 		~EffectManager();
+ 
+         /**
+@@ -78,7 +81,7 @@
+         /**
+          * Checks the effects for the given status.
+          **/
+-        Effect::Status getStatus();
++        Effect::LifeState getLifeState();
+         
+         /**
+          * Returns the specified modificator.
+@@ -93,7 +96,12 @@
+          **/
+         CeGuiString getEffects();
+ 
++        void checkStateChange(Effect::LifeState oldState);
++
+ 	private:
++
++        GameObject* mGameObject;
++
+         /// Eine einfache Menge von Effekten
+ 		typedef std::set&lt;Effect*&gt; Effects;
+ 		Effects mEffects;
+
+Modified: rl/trunk/engine/rules/include/RulesConstants.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesConstants.h	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/include/RulesConstants.h	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -59,16 +59,6 @@
+ 		GET_DIALOG,  ///!&lt; Dialog events (&quot;Charisma roll succeded.&quot;)
+ 		GET_QUEST    ///!&lt; Quest related events (&quot;Quest succeded: Kill Wolf.&quot;)
+ 	};
+-
+-    /// General life condition state of creatures.
+-    enum LifeState
+-    {
+-        LIFESTATE_ALIVE         = 1, ///&lt; Creature is alive and kicking.
+-		LIFESTATE_INCAPACITATED = 2, ///&lt; Creature is alive and not quite kicking.
+-        LIFESTATE_UNCONCIOUS    = 3, ///&lt; Creature is alive but not kicking.
+-        LIFESTATE_DEAD          = 4, ///&lt; Creature is neither alive nor kicking.
+-		LIFESTATE_UNDEAD        = 5  ///&lt; Creature is not alive but kicking. (DO NOT USE BTW)
+-    };
+ }
+ 
+ #endif // __RULESCONSTANTS_H__
+
+Modified: rl/trunk/engine/rules/include/RulesMessages.h
+===================================================================
+--- rl/trunk/engine/rules/include/RulesMessages.h	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/include/RulesMessages.h	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -1,70 +1,75 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-* 
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-
+-#ifndef __Rl_RulesMessages_H__
+-#define __Rl_RulesMessages_H__
+-
+-#include &quot;RulesPrerequisites.h&quot;
+-
+-#include &quot;MessageType.h&quot;
+-#include &quot;RulesConstants.h&quot;
+-#include &quot;CoreMessages.h&quot;
+-
+-namespace rl
+-{
+-	class Combatant;
+-	class Creature;
+-
+-	/// 0x03xxxxxx as mask for rules messages
+-    enum RulesMessageTypeIds
+-    {
+-        // Game event log //
+-        // Mask
+-        RLMSG_GAMEEVENTLOG_EVENTS = 0x03000100,
+-        // Events
+-        RLMSG_GAMEEVENTLOG_EVENT_ADDED = 0x03000101,
+-
+-		// Combat
+-		// Mask
+-		RLMSG_COMBAT_EVENTS = 0x03000200,
+-		// Events
+-		RLMSG_COMBAT_OPPONENT_ENTERED = 0x03000201,
+-		RLMSG_COMBAT_OPPONENT_LEFT = 0x03000202,
+-
+-		// Game object related events
+-        // Mask
+-        RLMSG_GAMEOBJECT_EVENTS = 0x03000300,
+-        // Events
+-        RLMSG_CREATURE_LIFESTATE_CHANGED = 0x03000301
+-    };
+-
+-    /// Message sent right after a new game log event has been added.
+-	typedef MessageType&lt;RLMSG_GAMEEVENTLOG_EVENT_ADDED, GameEventType, CeGuiString&gt;
+-		MessageType_GameEventLog_EventAdded;
+-
+-	typedef MessageType&lt;RLMSG_COMBAT_OPPONENT_ENTERED, Combatant*&gt;
+-		MessageType_CombatOpponentEntered;
+-
+-	typedef MessageType&lt;RLMSG_COMBAT_OPPONENT_LEFT, Combatant*&gt;
+-		MessageType_CombatOpponentLeft;
+-
+-	typedef MessageType&lt;RLMSG_CREATURE_LIFESTATE_CHANGED, Creature*, LifeState&gt;
+-		MessageType_CreatureLifeStateChanged;
+-    
+-    typedef MessageType&lt;RLMSG_SAVEGAME_GOS_LOADED&gt; MessageType_GameObjectsLoaded;
+-
+-}
+-#endif
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_RulesMessages_H__
++#define __Rl_RulesMessages_H__
++
++#include &quot;RulesPrerequisites.h&quot;
++
++#include &quot;MessageType.h&quot;
++#include &quot;RulesConstants.h&quot;
++#include &quot;CoreMessages.h&quot;
++#include &quot;Effect.h&quot;
++
++namespace rl
++{
++	class Combatant;
++	class GameObject;
++
++	/// 0x03xxxxxx as mask for rules messages
++    enum RulesMessageTypeIds
++    {
++        // Game event log //
++        // Mask
++        RLMSG_GAMEEVENTLOG_EVENTS = 0x03000100,
++        // Events
++        RLMSG_GAMEEVENTLOG_EVENT_ADDED = 0x03000101,
++
++		// Combat
++		// Mask
++		RLMSG_COMBAT_EVENTS = 0x03000200,
++		// Events
++		RLMSG_COMBAT_OPPONENT_ENTERED = 0x03000201,
++		RLMSG_COMBAT_OPPONENT_LEFT = 0x03000202,
++		RLMSG_COMBAT_ENDED = 0x03000210,
++
++		// Game object related events
++        // Mask
++        RLMSG_GAMEOBJECT_EVENTS = 0x03000300,
++        // Events
++        RLMSG_GAMEOBJECT_LIFESTATE_CHANGED = 0x03000301
++    };
++
++    /// Message sent right after a new game log event has been added.
++	typedef MessageType&lt;RLMSG_GAMEEVENTLOG_EVENT_ADDED, GameEventType, CeGuiString&gt;
++		MessageType_GameEventLog_EventAdded;
++
++	typedef MessageType&lt;RLMSG_COMBAT_OPPONENT_ENTERED, Combatant*&gt;
++		MessageType_CombatOpponentEntered;
++
++	typedef MessageType&lt;RLMSG_COMBAT_OPPONENT_LEFT, Combatant*&gt;
++		MessageType_CombatOpponentLeft;
++
++    typedef MessageType&lt;RLMSG_COMBAT_ENDED, bool&gt;
++		MessageType_CombatEnded;
++
++    typedef MessageType&lt;RLMSG_GAMEOBJECT_LIFESTATE_CHANGED, GameObject*, Effect::LifeState, Effect::LifeState&gt;
++		MessageType_GameObjectLifeStateChanged;
++    
++    typedef MessageType&lt;RLMSG_SAVEGAME_GOS_LOADED&gt; MessageType_GameObjectsLoaded;
++
++}
++#endif
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/src/Creature.cpp	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -22,6 +22,7 @@
+ #include &quot;CreatureControllerManager.h&quot;
+ #include &quot;DsaManager.h&quot;
+ #include &quot;Eigenschaft.h&quot;
++#include &quot;EffectFactory.h&quot;
+ #include &quot;EffectManager.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;Inventory.h&quot;
+@@ -34,10 +35,6 @@
+ #include &quot;Talent.h&quot;
+ #include &quot;Weapon.h&quot;
+ 
+-///@todo Just for debugging, remove when not needed anymore
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;RubyInterpreter.h&quot;
+-
+ using namespace std;
+ 
+ namespace rl
+@@ -249,7 +246,7 @@
+    void Creature::modifyLe(int mod, bool ignoreMax)
+     {
+         int oldLe = mCurrentLe;
+-		LifeState oldLifeState = mLifeState;
++        Effect::LifeState oldLifeState = getLifeState();
+         mCurrentLe += mod;
+ 		if (!ignoreMax)
+ 		{
+@@ -258,29 +255,35 @@
+ 
+         if (mCurrentLe &lt;= -getEigenschaft(&quot;KO&quot;) &amp;&amp; oldLe &gt; -getEigenschaft(&quot;KO&quot;))
+         {
+-            mLifeState = LIFESTATE_DEAD;
++            mEffectManager-&gt;addEffect(EffectFactoryManager::getSingleton().createEffect(&quot;DeadEffect&quot;));
+         }
++        else if (mCurrentLe &gt; -getEigenschaft(&quot;KO&quot;) &amp;&amp; oldLe &lt;= -getEigenschaft(&quot;KO&quot;))
++        {
++            mEffectManager-&gt;removeEffect(&quot;DeadEffect&quot;);
++        }
+         else if (mCurrentLe &lt;= 0 &amp;&amp; oldLe &gt; 0)
+         {
+-			mLifeState = LIFESTATE_UNCONCIOUS;
++            mEffectManager-&gt;addEffect(EffectFactoryManager::getSingleton().createEffect(&quot;UnconciousEffect&quot;));
+         }
++        else if (mCurrentLe &gt; 0 &amp;&amp; oldLe &lt;= 0)
++        {
++            mEffectManager-&gt;removeEffect(&quot;UnconciousEffect&quot;);
++        }
+ 		else if (mCurrentLe &lt;= getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE) &amp;&amp;
+             oldLe &gt; getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE))
+ 		{
+-			mLifeState = LIFESTATE_INCAPACITATED;
++            mEffectManager-&gt;addEffect(EffectFactoryManager::getSingleton().createEffect(&quot;IncapacitatedEffect&quot;));
+ 		}
+-		else
++		else if (mCurrentLe &gt; getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE) &amp;&amp;
++            oldLe &lt;= getWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE))
+ 		{
+-			mLifeState = LIFESTATE_ALIVE;
++            mEffectManager-&gt;removeEffect(&quot;IncapacitatedEffect&quot;);
+ 		}
+ 
+-		fireObjectStateChangeEvent();
++        Effect::LifeState newLifeState = getLifeState();
+ 
+-		if (mLifeState != oldLifeState)
+-		{
+-			MessagePump::getSingleton().sendMessage&lt;MessageType_CreatureLifeStateChanged&gt;(this,
+-				mLifeState);
+-		}
++        fireObjectStateChangeEvent();
++
+     }
+ 
+     int Creature::getLe() const
+@@ -626,9 +629,9 @@
+ 		return it-&gt;second;
+ 	}
+ 
+-    Effect::Status Creature::getStatus() const
++    Effect::LifeState Creature::getLifeState() const
+     {
+-      return mEffectManager-&gt;getStatus();
++      return mEffectManager-&gt;getLifeState();
+     }
+ 
+ 	bool Creature::isMagic() const
+@@ -888,20 +891,35 @@
+         {
+             tp = 0;
+         }
++
+         ///@todo auf Verletzlichkeiten und Immunitaeten achten
+         if ((damageType &amp; LEDAMAGE_FIRE) == LEDAMAGE_FIRE)
+-            CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(&quot;p \&quot;Fire!\&quot;&quot;);
++        {
++            LOG_ERROR(&quot;Creature&quot;, &quot;Fire damage not handled!&quot;); ///@todo implement
++        }
+         if ((damageType &amp; LEDAMAGE_WATER) == LEDAMAGE_WATER)
+-            CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(&quot;p \&quot;Water!\&quot;&quot;);
++        {
++            LOG_ERROR(&quot;Creature&quot;, &quot;Water damage not handled!&quot;); ///@todo implement
++        }
+         if ((damageType &amp; LEDAMAGE_DEMONIC) == LEDAMAGE_DEMONIC)
+-            CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(&quot;p \&quot;Demons!\&quot;&quot;);
++        {
++            LOG_ERROR(&quot;Creature&quot;, &quot;Demonic damage not handled!&quot;); ///@todo implement
++        }
++
+         if ((damageType &amp; LEDAMAGE_TP_A) == LEDAMAGE_TP_A)
+         {
+             damageAu(tp, AUDAMAGE_NORMAL);
+             tp = (int)floor(tp/2.);
+         }
+-		int rs = getWert(WERT_RS);
+-		modifyLe(-tp + rs);
++
++        int rs = getWert(WERT_RS);
++        int sp = -tp + rs;
++		modifyLe(sp);
++
++        if (sp &gt;= getEigenschaft(&quot;KO&quot;))
++        {
++            LOG_ERROR(&quot;Creature&quot;, &quot;TODO: Add a wound.&quot;); ///@todo implement
++        }
+ 	}
+ 
+     void Creature::damageAe(int asp)
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -193,7 +193,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -316,7 +316,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+         }
+         virtual void activate()
+         {
+@@ -405,7 +405,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; Effect::STATUS_IMMOBILE);
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; Effect::LS_IMMOBILE);
+         }
+         virtual bool run(Ogre::Real elapsedTime, Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
+@@ -984,13 +984,13 @@
+                     (mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR ||
+                     mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE) &amp;&amp;
+                     mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
+-                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                    !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+             else
+                 return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8 &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -1197,13 +1197,13 @@
+                     (mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR ||
+                     mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_AIRBORNE) &amp;&amp;
+                     mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 6 &amp;&amp;
+-                    !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                    !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+             else
+                 return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 8 &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; mMovingCreature-&gt;getCreature()-&gt;getAuMax()/3.0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_IMMOBILE));
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+@@ -1384,7 +1384,7 @@
+             return
+                 mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 0 &amp;&amp;
+-                !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_DEAD | Effect::STATUS_UNCONSCIOUS | Effect::STATUS_SLEEPING));
++                !(mMovingCreature-&gt;getCreature()-&gt;getLifeState() &amp; (Effect::LS_DEAD | Effect::LS_UNCONSCIOUS | Effect::LS_SLEEPING));
+         }
+         virtual void calculateForceAndTorque(Vector3 &amp;force, Vector3 &amp;torque, Real timestep)
+         {
+
+Modified: rl/trunk/engine/rules/src/Effect.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Effect.cpp	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/src/Effect.cpp	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -92,15 +92,15 @@
+       return PERMANENT;
+     }
+ 
+-	Effect::Status Effect::getStatus()
++	Effect::LifeState Effect::getLifeState() const
+     {
+       // should be overlaoaded in the specific derivated effects.
+-      return STATUS_NONE;
++      return LS_NONE;
+     }
+ 
+     int Effect::getMod(CeGuiString target, ModType type, ModTag tag)
+     {
+-      return 0;
++        return 0;
+     }
+ 
+     const Property Effect::getProperty(const CeGuiString&amp; key) const
+
+Modified: rl/trunk/engine/rules/src/EffectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EffectManager.cpp	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/src/EffectManager.cpp	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -15,18 +15,21 @@
+  */
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
++#include &quot;EffectManager.h&quot;
++
+ #include &lt;sstream&gt;
+ 
+-#include &quot;EffectManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
+ #include &quot;DsaManager.h&quot;
+ #include &quot;Exception.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;RubyInterpreter.h&quot;
++#include &quot;MessagePump.h&quot;
++#include &quot;RulesMessages.h&quot;
+ #include &quot;ScriptWrapper.h&quot;
+ 
+ namespace rl
+ {
+-	EffectManager::EffectManager()
++	EffectManager::EffectManager(GameObject* gameobject)
++        : mGameObject(gameobject)
+ 	{
+ 	}
+ 
+@@ -102,10 +105,9 @@
+ 
+ 	void EffectManager::addEffect(Effect* effect)
+ 	{
+-				std::stringstream debugInfo;
+-				debugInfo &lt;&lt; &quot;Adding effect &quot; &lt;&lt; effect-&gt;getName() &lt;&lt; std::endl;
+-                LOG_DEBUG(Logger::RULES,
+-					debugInfo.str());
++        Effect::LifeState oldState = getLifeState();
++
++        LOG_DEBUG(Logger::RULES, &quot;Adding effect &quot; + effect-&gt;getName());
+ 		for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
+ 		{
+ 			if ((*it)-&gt;getName() == effect-&gt;getName())
+@@ -124,16 +126,23 @@
+ 				}
+ 			}
+ 		}
+-        ScriptWrapper::getSingleton().owned( effect );
++        ScriptWrapper::getSingleton().owned(effect);
+ 		mEffects.insert(effect);
+ 		effect-&gt;enable();
++
++        checkStateChange(oldState);
+ 	}
+ 
+     void EffectManager::removeEffect(Effect* effect)
+     {
+-      mEffects.erase(effect);
+-      ScriptWrapper::getSingleton().disowned(effect);
+-      ///@todo also remove from the check lists?
++        Effect::LifeState oldState = getLifeState();
++    
++        effect-&gt;disable();
++        mEffects.erase(effect);
++        ScriptWrapper::getSingleton().disowned(effect);
++        ///@todo also remove from the check lists?
++
++        checkStateChange(oldState);
+     }
+ 
+     void EffectManager::removeEffect(CeGuiString name)
+@@ -142,24 +151,31 @@
+ 		{
+             if ((*it)-&gt;getName() == name)
+             {
+-                ScriptWrapper::getSingleton().disowned(*it);
+-                mEffects.erase(it);
++                removeEffect(*it);
+                 return;
+             }
+         }
+     }
+ 
++    Effect::LifeState EffectManager::getLifeState()
++    {
++        checkEffects();
++        Effect::LifeState status = 0;
++        for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
++        {
++            status = status | ((*it)-&gt;getLifeState());
++        }
++        return status;
++    }
+ 
+-
+-    Effect::Status EffectManager::getStatus()
++    void EffectManager::checkStateChange(Effect::LifeState oldState)
+     {
+-      checkEffects();
+-      Effect::Status status = 0;
+-      for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
+-      {
+-            status = status | ((*it)-&gt;getStatus());
+-      }
+-      return status;
++        Effect::LifeState currentState = getLifeState();
++        if (currentState != oldState)
++        {
++			MessagePump::getSingleton().sendMessage&lt;MessageType_GameObjectLifeStateChanged&gt;(mGameObject,
++				oldState, currentState);
++        }
+     }
+ 
+     int EffectManager::getMod(CeGuiString target, Effect::ModType type, Effect::ModTag tag)
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -73,7 +73,7 @@
+             mDefaultAction(DEFAULT_VIEW_OBJECT_ACTION),
+             mState(GOS_LOADED)
+     {
+-        mEffectManager = new EffectManager();
++        mEffectManager = new EffectManager(this);
+ 
+         // Standardactions registrieren
+         Action* defaultAction = ActionManager::getSingleton().getAction(DEFAULT_VIEW_OBJECT_ACTION);
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2008-03-27 23:21:27 UTC (rev 4312)
++++ rl/trunk/engine/script/swig/RlRules.swig	2008-03-27 23:28:18 UTC (rev 4313)
+@@ -578,22 +578,23 @@
+     class Effect
+     {
+     public:    
+-        typedef unsigned long Status;
+-        static const Status STATUS_NONE           = 1&lt;&lt;0;
+-        static const Status STATUS_BLIND          = 1&lt;&lt;1;   ///&lt; The creature can't see anything.
+-        static const Status STATUS_DEAD           = 1&lt;&lt;2;   ///&lt; The creature is dead.
+-        static const Status STATUS_DEAF           = 1&lt;&lt;3;   ///&lt; The creature can't hear anything.
+-        static const Status STATUS_PARALYZED      = 1&lt;&lt;4;   ///&lt; The creature can't move, turn, jump etc.
+-        static const Status STATUS_INCAPACITATED  = 1&lt;&lt;5;   ///&lt; The creature can't fight anymore due to serious injuries. The creature can barely move.
+-        static const Status STATUS_INVISIBLE      = 1&lt;&lt;6;   ///&lt; The creature can't be seen.
+-        static const Status STATUS_INVULNERABLE   = 1&lt;&lt;7;   ///&lt; The creature is immune to any mundane attacks.
+-        static const Status STATUS_PETRIFIED      = 1&lt;&lt;8;   ///&lt; The creature is coated with stone and has all the effects of paralyzation
+-        static const Status STATUS_SILENCED       = 1&lt;&lt;9;   ///&lt; The creature doesn't make any noises.
+-        static const Status STATUS_SLEEPING       = 1&lt;&lt;10;  ///&lt; The creature is asleep.
+-        static const Status STATUS_UNCONSCIOUS    = 1&lt;&lt;11;  ///&lt; Like SLEEPING, but more difficult to wake.
++        typedef unsigned long LifeState;
++        static const LifeState LS_NONE           = 1&lt;&lt;0;
++        static const LifeState LS_BLIND          = 1&lt;&lt;1;   ///&lt; The creature can't see anything.
++        static const LifeState LS_DEAD           = 1&lt;&lt;2;   ///&lt; The creature is dead.
++        static const LifeState LS_DEAF           = 1&lt;&lt;3;   ///&lt; The creature can't hear anything.
++        static const LifeState LS_PARALYZED      = 1&lt;&lt;4;   ///&lt; The creature can't move, turn, jump etc.
++        static const LifeState LS_INCAPACITATED  = 1&lt;&lt;5;   ///&lt; The creature can't fight anymore due to serious injuries. The creature can barely move.
++        static const LifeState LS_INVISIBLE      = 1&lt;&lt;6;   ///&lt; The creature can't be seen.
++        static const LifeState LS_INVULNERABLE   = 1&lt;&lt;7;   ///&lt; The creature is immune to any mundane attacks.
++        static const LifeState LS_PETRIFIED      = 1&lt;&lt;8;   ///&lt; The creature is coated with stone and has all the effects of paralyzation
++        static const LifeState LS_SILENCED       = 1&lt;&lt;9;   ///&lt; The creature doesn't make any noises.
++        static const LifeState LS_SLEEPING       = 1&lt;&lt;10;  ///&lt; The creature is asleep.
++        static const LifeState LS_UNCONSCIOUS    = 1&lt;&lt;11;  ///&lt; Like SLEEPING, but more difficult to wake.
+ 
+         // Meta stati
+-        static const Status STATUS_IMMOBILE = STATUS_PARALYZED | STATUS_SLEEPING | STATUS_UNCONSCIOUS | STATUS_PETRIFIED | STATUS_DEAD;
++        static const LifeState LS_IMMOBILE = LS_PARALYZED | LS_SLEEPING | LS_UNCONSCIOUS | LS_PETRIFIED | LS_DEAD;
++        static const LifeState LS_NO_COMBAT = LS_IMMOBILE | LS_INCAPACITATED;
+ 
+         typedef int ModType;
+         static const ModType MODTYPE_NONE         = 1 &lt;&lt; 0;
+@@ -640,7 +641,7 @@
+         virtual void disable();
+         virtual RL_LONGLONG timeCheck() = 0;
+ 
+-        virtual Status getStatus();
++        virtual LifeState getLifeState() const;
+         virtual int getMod(rl::CeGuiString target, ModType type, ModTag tag);
+ 
+         virtual const rl::Property getProperty(const rl::CeGuiString&amp; key) const;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001383.html">[Dsa-hl-svn] r4312 - rl/trunk/engine/core/include
+</A></li>
+	<LI>Next message: <A HREF="001385.html">[Dsa-hl-svn] r4314 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1384">[ date ]</a>
+              <a href="thread.html#1384">[ thread ]</a>
+              <a href="subject.html#1384">[ subject ]</a>
+              <a href="author.html#1384">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

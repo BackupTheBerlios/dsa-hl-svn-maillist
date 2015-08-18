@@ -1,0 +1,325 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4857 - in rl/trunk/editors/Lockenwickler/src: . media	media/icons
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4857%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media%0A%09media/icons&In-Reply-To=%3C200903212248.n2LMmECH029088%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001913.html">
+   <LINK REL="Next"  HREF="001915.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4857 - in rl/trunk/editors/Lockenwickler/src: . media	media/icons</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4857%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media%0A%09media/icons&In-Reply-To=%3C200903212248.n2LMmECH029088%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4857 - in rl/trunk/editors/Lockenwickler/src: . media	media/icons">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar 21 23:48:14 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001913.html">[Dsa-hl-svn] r4856 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+        <LI>Next message: <A HREF="001915.html">[Dsa-hl-svn] r4858 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1914">[ date ]</a>
+              <a href="thread.html#1914">[ thread ]</a>
+              <a href="subject.html#1914">[ subject ]</a>
+              <a href="author.html#1914">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-21 23:48:06 +0100 (Sat, 21 Mar 2009)
+New Revision: 4857
+
+Added:
+   rl/trunk/editors/Lockenwickler/src/media/icons/dissociatecell.png
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+   rl/trunk/editors/Lockenwickler/src/media/UniCube.mesh
+Log:
+- Some more work on Zone and Area stuff
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-21 18:33:54 UTC (rev 4856)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-03-21 22:48:06 UTC (rev 4857)
+@@ -37,7 +37,6 @@
+         self.connect(buttonBox, SIGNAL(&quot;accepted()&quot;), self, SLOT(&quot;accept()&quot;))        
+         self.connect(buttonBox, SIGNAL(&quot;rejected()&quot;), self, SLOT(&quot;reject()&quot;))
+         
+-        
+ class ModuleTreeWidget(QTreeWidget):
+     def __init__(self, parent = None):
+         super(ModuleTreeWidget, self).__init__(parent)
+@@ -83,14 +82,14 @@
+         if self.mapSelectedCallback is None:
+             return
+         
+-
+-        
+         name = str(item.text(0))
+         if name.startswith(&quot;Map: &quot;):
+             if column == 1:
+                 if self.module.getMap(name.replace(&quot;Map: &quot;, &quot;&quot;)).isHidden:
++                    item.setIcon(1 , QIcon(&quot;media/icons/14_layer_visible.png&quot;))
+                     self.module.getMap(name.replace(&quot;Map: &quot;, &quot;&quot;)).show()
+                 else:
++                    item.setIcon(1 , QIcon(&quot;media/icons/14_layer_invisible.png&quot;))
+                     self.module.getMap(name.replace(&quot;Map: &quot;, &quot;&quot;)).hide()
+                     
+             self.mapSelectedCallback(str(item.parent().text(0)).replace(&quot;Scene: &quot;, &quot;&quot;), name.replace(&quot;Map: &quot;, &quot;&quot;))
+@@ -204,14 +203,10 @@
+         if mn == self.lastSelectedMap:
+             childItem.setSelected(True)
+             childItem.parent().setExpanded(True)
+-        
++            
++            self.parseZone(map, childItem)
+         i = 0
+-        while i &lt; map.mapNode.numChildren():
+-            if map.mapNode.getChild(i).getName().startswith(&quot;zone_&quot;):
+-                self.parseZone(map.mapNode.getChild(i), childItem)
+-                i = i+1
+-                continue
+-                
++        while i &lt; map.mapNode.numChildren():                
+             childItem2 = QTreeWidgetItem(childItem) 
+             childItem2.setText(0, map.mapNode.getChild(i).getName())            
+             
+@@ -235,9 +230,11 @@
+ #            if  val is not None:
+ #                childItem2.setText(0, val.getName())
+ 
+-    def parseZone(self, node, parentItem):
+-        childItem = QTreeWidgetItem(parentItem) 
+-        childItem.setText(0, node.getName())
++    def parseZone(self, map, parentItem):
++        for zone in map.zoneList:
++            childItem = QTreeWidgetItem(parentItem) 
++            childItem.setText(0, &quot;Zone: &quot; + zone.name)
++            childItem.setIcon(0, QIcon(&quot;media/icons/dissociatecell.png&quot;))
+         
+     def setCurrentModule(self, module):
+         self.module = module
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-21 18:33:54 UTC (rev 4856)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-21 22:48:06 UTC (rev 4857)
+@@ -119,6 +119,8 @@
+         self.gocManager = gocManager
+         self.isHidden = False
+         
++        self.zoneList = []
++        
+         if not emptyMap:
+             xmlTree = xml.parse(pathToFile)
+             root = xmlTree.getroot()
+@@ -805,7 +807,7 @@
+ 
+         self.parseModuleConfig()
+ 
+-        dlg = QDialog()
++        dlg = QDialog(QApplication.focusWidget())
+         list = QListWidget()
+         btnBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+         dlg.connect(btnBox, SIGNAL(&quot;accepted()&quot;), dlg.accept)
+@@ -1294,21 +1296,22 @@
+         self.contextMenuClickPosition = og.Vector2(screenX, screenY)
+         self.contextMenuRay = ray
+         
+-        if so is not None and so.entity.getParentNode().getName().startswith(&quot;entity_&quot;):
+-            pos = og.Vector3()
+-            query = self.sceneManager.createRayQuery(self.contextMenuRay)
+-            query.ray = self.contextMenuRay
+-            query.setSortByDistance(True)
+-            query.execute(self.raySceneQueryListener)
+-            if self.raySceneQueryListener.dist &lt; 100000:
+-                pos = self.contextMenuRay.getPoint(self.raySceneQueryListener.dist)
+-                self.raySceneQueryListener.dist = 100000
+-
++        pos = og.Vector3()
++        query = self.sceneManager.createRayQuery(self.contextMenuRay)
++        query.ray = self.contextMenuRay
++        query.setSortByDistance(True)
++        query.execute(self.raySceneQueryListener)
++        if self.raySceneQueryListener.dist &lt; 100000:
++            pos = self.contextMenuRay.getPoint(self.raySceneQueryListener.dist)
++            self.raySceneQueryListener.dist = 100000
++        
++        if so is not None:
+             self.zoneManager.entityUnderMouse = so.entity
+-            self.zoneManager.newAreaPosition = pos
+-            menus.append(self.zoneManager.getZoneMenu())
++        
++        self.zoneManager.newAreaPosition = pos
++        menus.append(self.zoneManager.getZoneMenu())
+ 
+-        elif so is not None and so.entity.getParentNode().getName().startswith(&quot;gameobject_&quot;):
++        if so is not None and so.entity.getParentNode().getName().startswith(&quot;gameobject_&quot;):
+             actions.append(self.createAction(&quot;Set Player Starterpoint&quot;, self.setPlayerStart))
+             self.playerStartGameObjectId = so.entity.getUserObject().inWorldId
+             
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-21 18:33:54 UTC (rev 4856)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-03-21 22:48:06 UTC (rev 4857)
+@@ -24,6 +24,7 @@
+  
+ import ogre.renderer.OGRE as og
+  
++from ModuleExplorer import NameInputDlg
+  
+ #                &lt;zone name=&quot;Testzone&quot;&gt;
+ #                        &lt;area type=&quot;sphere&quot;&gt;
+@@ -74,7 +75,14 @@
+             print &quot;not yet&quot;
+         elif type == &quot;mesh&quot;:
+             self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
+-            
++        elif type == &quot;othermesh&quot;:
++            try:
++                self.areaEntity = sceneManager.createEntity(&quot;area_&quot; + parentZone.name + str(id) + &quot;_entity&quot;, self.meshFile)
++            except:
++                print &quot;Mesh &quot; + self.meshFile + &quot; not found!&quot;
++                return None
++                
++        self.areaEntity.setMaterialName(&quot;Lockenwickler_Area&quot;)
+         self.areaNode.attachObject(self.areaEntity)
+         self.areaNode.setPosition(position)
+         if orientation is not None:
+@@ -86,7 +94,7 @@
+             self.areaNode.setScale(self.areaNode.getScale() + 0.05)
+             
+ class Zone():
+-    def __init__(self,map, name):
++    def __init__(self,sceneManager, map, name):
+         self.map = map
+         self.name = name
+         self.areaList = []
+@@ -94,14 +102,24 @@
+         self.soundListList = []
+         self.triggerList = []
+         self.areaCounter = 0
++        self.sceneManager = sceneManager
++        self.isHidden = False
+         
+-        self.zoneNode =  self.map.mapNode.createChildSceneNode(&quot;zone_&quot; + name + &quot;_node&quot;)
++        self.zoneNode =  self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;zone_&quot; + name + &quot;_node&quot;)
+         
+-    def addArea(self, sceneManager , type, position, orientation, scale, meshFile = None):
+-        area = Area(sceneManager, type, self, self.areaCounter, position, orientation, scale, meshFile)
+-        self.areaList.append(area)
++    def addArea(self, type, position, orientation, scale, meshFile = None):
++        area = Area(self.sceneManager, type, self, self.areaCounter, position, orientation, scale, meshFile)
++        if area is not None:
++            self.areaList.append(area)
++            self.areaCounter = self.areaCounter + 1
+         
+-        self.areaCounter = self.areaCounter + 1
++    def hide(self):
++        self.sceneManager.getRootSceneNode().detachChild(self.zoneNode)
++        self.isHidden = True
++    
++    def show(self):
++        self.sceneManager.getRootSceneNode().attachChild(self.zoneNode)
++        self.isHidden = False
+         
+     def __del__(self):
+         self.areaNode.getParentSceneNode().detachChild(self.areaNode)
+@@ -123,9 +141,11 @@
+         if self.currentMap == None:
+             print &quot;No map selected!&quot;
+             return
++            
++        z = Zone(self.sceneManager, self.currentMap, name)
++        self.zoneList.append(z)
++        self.currentMap.zoneList.append(z)
+         
+-        self.zoneList.append(Zone(self.currentMap, name))
+-        
+     def getZoneMenu(self):
+         self.menuList = []
+         menu = QMenu(&quot;Add Area&quot;)
+@@ -159,13 +179,30 @@
+             self.menuList.append(meshAction)
+             m.addAction(meshAction)
+             
++            otherMeshAction = self.createAction(&quot;convex hull from another mesh &quot;, functools.partial(self.onZoneNameTriggered, zone, &quot;othermesh&quot;))
++            self.menuList.append(otherMeshAction)
++            m.addAction(otherMeshAction)
++            
+         return menu
+         
+     def onZoneNameTriggered(self, zone, type):
+         if self.newAreaPosition is not None:
+             if type == &quot;box&quot;:
+                 zone.addArea(self.sceneManager, &quot;box&quot;, self.newAreaPosition, None, None)
+-        
++            elif type == &quot;sphere&quot;:
++                zone.addArea(self.sceneManager, &quot;sphere&quot;, self.newAreaPosition, None, None)
++            elif type == &quot;mesh&quot;:
++                resName = self.entityUnderMouse.getMesh().getName()
++                parentNode = self.entityUnderMouse.getParentSceneNode()
++                zone.addArea(self.sceneManager, &quot;mesh&quot;, parentNode.getPosition(), parentNode.getOrientation(), parentNode.getScale(), resName)
++            elif type == &quot;othermesh&quot;:
++                dlg = NameInputDlg(QApplication.focusWidget())
++                resName = &quot;&quot;
++                if dlg.exec_():
++                    resName = str(dlg.nameInput.text())
++
++                zone.addArea(self.sceneManager, &quot;othermesh&quot;, self.newAreaPosition, None, None, resName)
++                
+     def getZone(self, name):
+         for zone in self.zoneList:
+             if zone.name == name:
+
+Modified: rl/trunk/editors/Lockenwickler/src/media/UniCube.mesh
+===================================================================
+(Binary files differ)
+
+Added: rl/trunk/editors/Lockenwickler/src/media/icons/dissociatecell.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: rl/trunk/editors/Lockenwickler/src/media/icons/dissociatecell.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001913.html">[Dsa-hl-svn] r4856 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+	<LI>Next message: <A HREF="001915.html">[Dsa-hl-svn] r4858 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1914">[ date ]</a>
+              <a href="thread.html#1914">[ thread ]</a>
+              <a href="subject.html#1914">[ subject ]</a>
+              <a href="author.html#1914">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

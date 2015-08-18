@@ -1,0 +1,411 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4125 - in rl/trunk/engine: ai/include ai/src core/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4125%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09ui/src&In-Reply-To=%3C200803041945.m24JjO6l007820%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001195.html">
+   <LINK REL="Next"  HREF="001197.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4125 - in rl/trunk/engine: ai/include ai/src core/src	ui/src</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4125%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%20core/src%0A%09ui/src&In-Reply-To=%3C200803041945.m24JjO6l007820%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4125 - in rl/trunk/engine: ai/include ai/src core/src	ui/src">iblis at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  4 20:45:24 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001195.html">[Dsa-hl-svn] r4124 - modules/regressiontest/dialogs
+</A></li>
+        <LI>Next message: <A HREF="001197.html">[Dsa-hl-svn] r4126 - in rl/trunk/engine: core/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1196">[ date ]</a>
+              <a href="thread.html#1196">[ thread ]</a>
+              <a href="subject.html#1196">[ subject ]</a>
+              <a href="author.html#1196">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-04 20:45:23 +0100 (Tue, 04 Mar 2008)
+New Revision: 4125
+
+Modified:
+   rl/trunk/engine/ai/include/DialogElement.h
+   rl/trunk/engine/ai/include/DialogManager.h
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/ai/src/DialogParagraph.cpp
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+Log:
+added localization support to dialogs. 
+minor fixes in handling the DialogState: The NPC is used as sound actor as long as the PC is not able to play sounds. fixed problem with the camera in dialog
+
+Modified: rl/trunk/engine/ai/include/DialogElement.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogElement.h	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/ai/include/DialogElement.h	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -64,13 +64,13 @@
+ 
+         virtual std::list&lt;DialogParagraph*&gt; getParagraphs(Dialog* dialog)
+         {
++            RlAssert(dialog, &quot;No dialog given! Possible reason: DialogSelection has no label set&quot;);
+             DialogElementType* selectedElem = getSelectedElement(dialog);
+ 
+             if (selectedElem)
+             {
+                 return selectedElem-&gt;getParagraphs(dialog);
+             }
+-            
+             std::list&lt;DialogParagraph*&gt; empty;
+             return empty;
+         }
+
+Modified: rl/trunk/engine/ai/include/DialogManager.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogManager.h	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/ai/include/DialogManager.h	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -116,6 +116,7 @@
+         DialogCondition* processConditionClasses(XERCES_CPP_NAMESPACE::DOMElement* conditionXml);
+         DialogParagraph* processParagraph(XERCES_CPP_NAMESPACE::DOMElement* paragraphXml);
+         DialogImplication* processImplicationClasses(XERCES_CPP_NAMESPACE::DOMNode* implicationXml);
++        void processTranslation(DialogElement* element, XERCES_CPP_NAMESPACE::DOMNode* translationXml);
+         void createDialogVariable(XERCES_CPP_NAMESPACE::DOMElement* variableXml, DialogPrototype* dialogPrototype);
+         void processElementNodes(XERCES_CPP_NAMESPACE::DOMElement* dialogXml, const Ogre::String&amp; nodeName, DialogPrototype* dialogPrototype);
+ 
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -30,6 +30,7 @@
+ #include &quot;DialogVariable.h&quot;
+ #include &quot;GameObjectManager.h&quot;
+ #include &quot;XmlPropertyReader.h&quot;
++#include &quot;ConfigurationManager.h&quot;
+ 
+ using namespace Ogre;
+ using namespace XERCES_CPP_NAMESPACE;
+@@ -275,7 +276,9 @@
+         DialogResponse* response = dialogPrototype-&gt;getResponse(id);
+ 
+         if (!response)  Throw(IllegalArgumentException, &quot;No response with ID &quot;+StringConverter::toString(id));
+-
++        
++        bool languageDefined = false;
++        DOMElement* defaultLanguage = NULL;
+         if (subelements)
+         {
+             bool paragraphsDefined = false;
+@@ -301,6 +304,24 @@
+                     response-&gt;addParagraph(processParagraph(static_cast&lt;DOMElement*&gt;(cur)));
+                     paragraphsDefined = true;
+                 }
++                // process translations
++                else if (hasNodeName(cur, &quot;t&quot;))
++                {
++                    DOMElement* translation = static_cast&lt;DOMElement*&gt;(cur);
++                    // check loca
++                    if(getAttributeValueAsStdString(translation, &quot;language&quot;) 
++                        == ConfigurationManager::getSingleton().getStringSetting(&quot;Localization&quot;, &quot;language&quot;))
++                    {
++                        processTranslation(response, translation);
++                        languageDefined = true;
++                    }
++                    // set german as default language
++                    if(getAttributeValueAsStdString(translation, &quot;language&quot;) == &quot;de&quot;)
++                    {
++                        defaultLanguage = translation;
++                    }
++                    paragraphsDefined = true;
++                }
+                 else if (hasNodeName(cur, &quot;gotoresponse&quot;))
+                 {
+                     int id = getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(cur), &quot;id&quot;);
+@@ -314,6 +335,14 @@
+                 response-&gt;addParagraph(new DialogParagraph(responseXmlText));
+             }
+         }            
++        // use german as the default language if german is not set as
++        // default language but no other language was found!
++        if(!languageDefined &amp;&amp; defaultLanguage != NULL 
++            &amp;&amp; ConfigurationManager::getSingleton().getStringSetting(&quot;Localization&quot;, &quot;language&quot;) != &quot;de&quot;)
++        {
++            processTranslation(response, defaultLanguage);
++            languageDefined = true;
++        }
+ 
+         return response;
+     }
+@@ -376,6 +405,9 @@
+ 
+         if (!option)    Throw(IllegalArgumentException, &quot;No option with ID &quot;+StringConverter::toString(id));
+ 
++        bool languageDefined = false;
++        DOMElement* defaultLanguage = NULL;
++
+         if (subelements)
+         {
+             bool paragraphsDefined = false;
+@@ -396,6 +428,30 @@
+                     option-&gt;addParagraph(processParagraph(static_cast&lt;DOMElement*&gt;(cur)));
+                     paragraphsDefined = true;
+                 }
++                // process translations
++                else if (hasNodeName(cur, &quot;t&quot;))
++                {
++                    DOMElement* translation = static_cast&lt;DOMElement*&gt;(cur);
++                    // check loca
++                    if(getAttributeValueAsStdString(translation, &quot;language&quot;) 
++                        == ConfigurationManager::getSingleton().getStringSetting(&quot;Localization&quot;, &quot;language&quot;))
++                    {
++                        defaultLanguage = translation;
++                        processTranslation(option, translation);
++                        std::string label = getAttributeValueAsStdString(translation, &quot;label&quot;);
++                        if(!label.empty())
++                        {
++                            option-&gt;setLabel(label);
++                        }
++                        languageDefined = true;
++                    }
++                    // set german as default language
++                    if(getAttributeValueAsStdString(translation, &quot;language&quot;) == &quot;de&quot;)
++                    {
++                        defaultLanguage = translation;
++                    }
++                    paragraphsDefined = true;
++                }
+             }
+ 
+             if (!paragraphsDefined)
+@@ -404,6 +460,19 @@
+                 option-&gt;addParagraph(new DialogParagraph(optionXmlText));
+             }
+         }
++        // use german as the default language if german is not set as
++        // default language but no other language was found!
++        if(!languageDefined &amp;&amp; defaultLanguage != NULL 
++            &amp;&amp; ConfigurationManager::getSingleton().getStringSetting(&quot;Localization&quot;, &quot;language&quot;) != &quot;de&quot;)
++        {
++            processTranslation(option, defaultLanguage);
++            std::string label = getAttributeValueAsStdString(defaultLanguage, &quot;label&quot;);
++            if(!label.empty())
++            {
++                option-&gt;setLabel(label);
++            }
++            languageDefined = true;
++        }
+ 
+         return option;
+     }
+@@ -435,6 +504,21 @@
+                     }
+                 }               
+             }
++            // process translations
++            else if (hasNodeName(cur, &quot;t&quot;))
++            {
++                DOMElement* translation = static_cast&lt;DOMElement*&gt;(cur);
++                // check loca
++                if(getAttributeValueAsStdString(translation, &quot;language&quot;) == 
++                    ConfigurationManager::getSingleton().getStringSetting(&quot;Localization&quot;, &quot;language&quot;))
++                {
++                    std::string label = getAttributeValueAsStdString(translation, &quot;label&quot;);
++                    if(!label.empty())
++                    {
++                        option-&gt;setLabel(label);
++                    }
++                } 
++            }
+         }
+             
+         return option;
+@@ -731,4 +815,15 @@
+ 
+         return NULL;
+     }
++
++    void DialogManager::processTranslation(DialogElement* element, DOMNode* translationXml)
++    {
++        for (DOMNode* cur = translationXml-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
++        {
++            if (hasNodeName(cur, &quot;p&quot;))
++            {
++                element-&gt;addParagraph(processParagraph(static_cast&lt;DOMElement*&gt;(cur)));
++            }
++        }
++    }
+ }
+
+Modified: rl/trunk/engine/ai/src/DialogParagraph.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogParagraph.cpp	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/ai/src/DialogParagraph.cpp	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -24,6 +24,8 @@
+         const CeGuiString&amp; text, const Ogre::String&amp; voicefile)
+     : mText(text), mVoiceFile(voicefile)
+     {
++        // for debug information
++        mText.c_str();
+     }
+ 
+     DialogParagraph::~DialogParagraph(void)
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -122,6 +122,8 @@
+         addSetting(&quot;MovementController keys&quot;, &quot;toggle_view_mode&quot;, &quot;F&quot;);
+         addSetting(&quot;MovementController keys&quot;, &quot;reset_camera&quot;, &quot;0 (Nummernblock)&quot;);
+ 
++        addSetting(&quot;Localization&quot;, &quot;language&quot;, &quot;de&quot;);
++
+         setRastullahCfgPath();
+     }
+ 
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2008-03-04 19:42:32 UTC (rev 4124)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2008-03-04 19:45:23 UTC (rev 4125)
+@@ -277,10 +277,12 @@
+         CeGuiString text = paragraph-&gt;getText();
+         processTextVariables(text);
+ 
+-        recalculateCamera(mCurrentSpeaker, mCurrentListener);
++        recalculateCamera(mCurrentListener, mCurrentSpeaker);
+ 
+         Actor* actor = mCurrentSpeaker-&gt;getActor();
+-
++        // @todo: find out why we don't here anything if the sound is attached to the player
++        // atm, we attach it everytime to the npc to here at least anything
++        actor = mDialog-&gt;getNpc(0)-&gt;getActor();
+         // Ungef&#228;hre Lesedauer bestimmen
+         float fadeTime = getShowTextLength(text);
+         if (soundFile.length() == 0)
+@@ -390,18 +392,25 @@
+ 
+ 		mDialogWindow-&gt;setVisible(false);
+ 
+-        mCurrentListener = mCurrentSpeaker;
++        mCurrentListener = mDialog-&gt;getPc(0);
+         mCurrentSpeaker = mCurrentResponse-&gt;getNpc(mDialog);
+         mCurrentParagraphs = mCurrentResponse-&gt;getParagraphs(mDialog);
+-        DialogParagraph* firstParagraph = mCurrentParagraphs.front();
+-        mCurrentResponse-&gt;applyImplications(mDialog);
+-        if (!firstParagraph-&gt;getResponse())
++        if(!mCurrentParagraphs.empty())
+         {
+-            doTalk(firstParagraph);
++            DialogParagraph* firstParagraph = mCurrentParagraphs.front();
++            mCurrentResponse-&gt;applyImplications(mDialog);
++            if (!firstParagraph-&gt;getResponse())
++            {
++                doTalk(firstParagraph);
++            }
++            else
++            {
++                showResponse(firstParagraph-&gt;getResponse());
++            }
+         }
+         else
+         {
+-            showResponse(firstParagraph-&gt;getResponse());
++            handleDialogClose();
+         }
+ 	}
+ 
+@@ -430,8 +439,8 @@
+         {
+ 		    if (mState == TALKING_PARTNER_CHARACTER)
+ 		    {
+-                mCurrentListener = mCurrentSpeaker;
+-                mCurrentSpeaker = mCharacter;
++                mCurrentListener = mCurrentResponse-&gt;getNpc(mDialog);
++                mCurrentSpeaker = mDialog-&gt;getPc(0);
+ 
+                 DialogResponse::Options options = mCurrentResponse-&gt;getAvailableOptions(mDialog);
+                 mDialogWindow-&gt;setAvailableOptions(options);
+@@ -461,7 +470,7 @@
+ 			mCurrentOption = option;
+ 		}
+         mState = TALKING_PLAYER_CHARACTER;
+-        mCurrentListener = mCurrentSpeaker;
++        mCurrentListener = mDialog-&gt;getNpc(0);
+         mCurrentSpeaker = mDialog-&gt;getPc(0); ///@todo allow char switch 
+         mCurrentParagraphs = mCurrentOption-&gt;getParagraphs(mDialog);
+         doTalk(mCurrentParagraphs.front());
+@@ -476,20 +485,28 @@
+ 		mSubtitleWindow-&gt;setVisible(false, true);
+         mDialogWindow = NULL;
+         mSubtitleWindow = NULL;
+-        const std::vector&lt;Creature*&gt; list = mDialog-&gt;getPlayerCharacters();
+-        for (std::vector&lt;Creature*&gt;::const_iterator it = list.begin(); it != list.end(); ++it)
++        if (mDialog != NULL)
+         {
+-            Actor* actor = (*it)-&gt;getActor();
+-            if (actor != NULL)
++            const std::vector&lt;Creature*&gt; list = mDialog-&gt;getPlayerCharacters();
++            for (std::vector&lt;Creature*&gt;::const_iterator it = list.begin(); it != list.end(); ++it)
+             {
+-                MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
+-                if (mesh != NULL &amp;&amp; mesh-&gt;hasAnimation(&quot;reden&quot;))
++                Actor* actor = (*it)-&gt;getActor();
++                if (actor != NULL)
+                 {
+-                    mesh-&gt;stopAnimation(&quot;reden&quot;);
+-                }
+-            }        
++                    MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++                    if (mesh != NULL &amp;&amp; mesh-&gt;hasAnimation(&quot;reden&quot;))
++                    {
++                        mesh-&gt;stopAnimation(&quot;reden&quot;);
++                    }
++                }        
++            }
++            return true;
+         }
+-		return true;
++        else
++        {
++            LOG_ERROR(Logger::UI, &quot;There is no Dialog to be closed!&quot;);
++            return false;
++        }
+ 	}
+ 
+ 	bool DialogControlState::requestDialogClose()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001195.html">[Dsa-hl-svn] r4124 - modules/regressiontest/dialogs
+</A></li>
+	<LI>Next message: <A HREF="001197.html">[Dsa-hl-svn] r4126 - in rl/trunk/engine: core/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1196">[ date ]</a>
+              <a href="thread.html#1196">[ thread ]</a>
+              <a href="subject.html#1196">[ subject ]</a>
+              <a href="author.html#1196">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

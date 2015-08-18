@@ -1,0 +1,248 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3103 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3103%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703010034.l210YpwM021151%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000173.html">
+   <LINK REL="Next"  HREF="000175.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3103 - in rl/trunk/engine/core: include src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3103%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703010034.l210YpwM021151%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3103 - in rl/trunk/engine/core: include src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Thu Mar  1 01:34:51 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000173.html">[Dsa-hl-svn] r3102 - in modules/regressiontest: dsa scripts	scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000175.html">[Dsa-hl-svn] r3104 - rl/trunk/docs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#174">[ date ]</a>
+              <a href="thread.html#174">[ thread ]</a>
+              <a href="subject.html#174">[ subject ]</a>
+              <a href="author.html#174">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-01 01:34:48 +0100 (Thu, 01 Mar 2007)
+New Revision: 3103
+
+Modified:
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+Log:
+corrected offset/orientation code for createCollision()
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2007-03-01 00:33:27 UTC (rev 3102)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2007-03-01 00:34:48 UTC (rev 3103)
+@@ -188,8 +188,6 @@
+ 		void setBody(OgreNewt::Body* body);
+ 
+ 		/** creates a collision primitive for OgreNewt.
+-		 * Currently this is Work In Progress - so it's changing 
+-		 *    and the offset/orientation is not working accordling at the moment ...
+ 		 * The collision primitive created has got a basic orientation which can be influenced by
+ 		 * offset and orientation parameters. Additionally an initial inertiaCoefficents vector is
+ 		 * calculated according to the size and type of collision primitiv.
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-01 00:33:27 UTC (rev 3102)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-03-01 00:34:48 UTC (rev 3103)
+@@ -354,6 +354,8 @@
+     {
+ 		const Vector3 size( aabb.getSize() );
+ 		OgreNewt::World* physWorld = PhysicsManager::getSingleton()._getNewtonWorld();
++		Ogre::Vector3 object_offset = Ogre::Vector3::ZERO;
++		Ogre::Quaternion object_orientation = Ogre::Quaternion::IDENTITY;
+ 
+         CollisionPtr rval;
+ 
+@@ -369,12 +371,20 @@
+ 	    */
+ 		if (mGeometryType == PhysicsManager::GT_BOX)
+         {
++			// set offset/orientation when they are null
++			if (! offset) {
++				offset = &amp;object_offset;
++				*offset = aabb.getCenter();
++			}
++			if (! orientation)
++				orientation = &amp;object_orientation;
++
+ 			// a box collision primitiv has got it's coordinate system at it's center, so we need to shift it
+-			rval = CollisionPtr(new CollisionPrimitives::Box(
++			rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Box(
+ 				physWorld,
+ 				size,
+-				Ogre::Quaternion::IDENTITY,
+-				aabb.getCenter())
++				*orientation,
++				*offset)
+ 				);
+ 
+ 			if (inertiaCoefficients != NULL)
+@@ -388,12 +398,21 @@
+         else if (mGeometryType == PhysicsManager::GT_SPHERE)
+         {
+ 			double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
++
++			// set offset/orientation when they are null
++			if (! offset) {
++				offset = &amp;object_offset;
++				*offset = Vector3(0,radius,0);
++			}
++			if (! orientation)
++				orientation = &amp;object_orientation;
++
+ 			// a sphere primitiv has got its coordinate system at its center, so shift it with radius
+             rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+ 				physWorld,
+ 				Vector3(radius, radius, radius),
+-				Ogre::Quaternion::IDENTITY,
+-				Vector3(0,radius,0))
++				*orientation,
++				*offset)
+ 				);
+             
+ 			if (inertiaCoefficients != NULL)
+@@ -408,12 +427,21 @@
+             s.x = std::max(s.x, s.z);
+             s.z = s.x;
+ 
++			// set offset/orientation when they are null
++			if (! offset) {
++				offset = &amp;object_offset;
++				*offset = Vector3(0,s.y,0);
++			}
++			if (! orientation)
++				orientation = &amp;object_orientation;
++
+ 			// an ellipsoid primitiv has got its coordinate system at its center, so shift it with radius
+             rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+ 				physWorld, 
+ 				s,
+-				Ogre::Quaternion::IDENTITY,
+-				Vector3(0,s.y,0)));
++				*orientation,
++				*offset)
++				);
+ 
+             if (inertiaCoefficients != NULL)
+ 			{
+@@ -424,20 +452,26 @@
+ 		{
+ 			double radius = std::max(size.x, size.z) / 2.0;
+ 			double height = size.y;
+-			
+-			Quaternion orientCaps;
+-			orientCaps.FromAngleAxis(Degree(90), Vector3::UNIT_Z);
+ 
+-			Vector3 offsetCaps (0, size.y/2, 0);
++			// set offset/orientation when they are null
++			if (! offset) {
++				offset = &amp;object_offset;
++				*offset = Vector3(0, size.y/2, 0);
++			}
++			if (! orientation) {
++				orientation = &amp;object_orientation;
++				orientation-&gt;FromAngleAxis(Degree(90), Vector3::UNIT_Z);
++			}
+ 
+ 			// an capsule primitiv has got its coordinate system at its center, so shift it with radius
+ 			// additionally it is x axis aligned, so rotate it 90 degrees around z axis
+ 			rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Capsule(
+-						physWorld, 
+-						radius, 
+-						height,
+-						orientCaps,
+-						offsetCaps));
++				physWorld, 
++				radius, 
++				height,
++				*orientation,
++				*offset)
++				);
+ 			
+ 			if (inertiaCoefficients != NULL)
+ 			{
+@@ -458,10 +492,30 @@
+ 				{
+ 					// Objekt zu klein!
+ 					LOG_MESSAGE(Logger::CORE, &quot; PhyiscalThing too small to create a convexhull, using 'box' instead! &quot;);
+-					rval = CollisionPtr(new CollisionPrimitives::Box(physWorld, size));
++
++					// set offset/orientation when they are null
++					if (! offset) {
++						offset = &amp;object_offset;
++						*offset = aabb.getCenter();
++					}
++					if (! orientation)
++						orientation = &amp;object_orientation;
++					
++					rval = CollisionPtr(new CollisionPrimitives::Box(
++						physWorld, 
++						size, 
++						*orientation,
++						*offset)
++						);
+ 				}
+ 				else
+ 				{
++					// set offset/orientation when they are null
++					if (! offset)
++						offset = &amp;object_offset;
++					if (! orientation)
++						orientation = &amp;object_orientation;
++
+ 					// the problem fixed and it's source:
+ 					// entity is a MeshObject containing the basic state of the Mesh, but
+ 					// this function should create the physical bounding convex hull for one of the
+@@ -479,7 +533,7 @@
+ 
+ 					// calculate the convex hull of the animated mesh
+ 					rval = CollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull(physWorld,
+-						entity, true));
++						entity, true, *orientation, *offset));
+ 
+ 					// cleanup the temporary mesh
+ 					delete tempMesh;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000173.html">[Dsa-hl-svn] r3102 - in modules/regressiontest: dsa scripts	scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000175.html">[Dsa-hl-svn] r3104 - rl/trunk/docs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#174">[ date ]</a>
+              <a href="thread.html#174">[ thread ]</a>
+              <a href="subject.html#174">[ subject ]</a>
+              <a href="author.html#174">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

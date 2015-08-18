@@ -1,0 +1,361 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3365 - in rl/trunk/engine: rules/src script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3365%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/src&In-Reply-To=%3C200704300558.l3U5wKBf030262%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000435.html">
+   <LINK REL="Next"  HREF="000437.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3365 - in rl/trunk/engine: rules/src script/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3365%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/src&In-Reply-To=%3C200704300558.l3U5wKBf030262%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3365 - in rl/trunk/engine: rules/src script/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Apr 30 07:58:20 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000435.html">[Dsa-hl-svn] r3364 - in rl/trunk/engine: rules/src script/src
+</A></li>
+        <LI>Next message: <A HREF="000437.html">[Dsa-hl-svn] r3366 - in rl/trunk/engine: rules/src script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#436">[ date ]</a>
+              <a href="thread.html#436">[ thread ]</a>
+              <a href="subject.html#436">[ subject ]</a>
+              <a href="author.html#436">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-30 07:58:15 +0200 (Mon, 30 Apr 2007)
+New Revision: 3365
+
+Added:
+   rl/trunk/engine/script/src/EntityNodeProcessor.cpp
+Removed:
+   rl/trunk/engine/rules/src/EntityNodeProcessor.cpp
+Log:
+Map loading moved to RlScript to allow access on RlAi classes
+
+Deleted: rl/trunk/engine/rules/src/EntityNodeProcessor.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EntityNodeProcessor.cpp	2007-04-30 05:57:17 UTC (rev 3364)
++++ rl/trunk/engine/rules/src/EntityNodeProcessor.cpp	2007-04-30 05:58:15 UTC (rev 3365)
+@@ -1,281 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &quot;EntityNodeProcessor.h&quot;
+-
+-#include &lt;OgreEntity.h&gt;
+-#include &lt;OgreMeshManager.h&gt;
+-#include &lt;OgreNewt_CollisionPrimitives.h&gt;
+-
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;PhysicsManager.h&quot;
+-#include &quot;World.h&quot;
+-#include &quot;XmlHelper.h&quot;
+-
+-using namespace Ogre;
+-using namespace XERCES_CPP_NAMESPACE;
+-
+-namespace rl
+-{
+-    EntityNodeProcessor::EntityNodeProcessor(const Ogre::String&amp; resourceGroup)
+-    :   AbstractMapNodeProcessor(),
+-        mResourceGroup(resourceGroup)
+-    {
+-    }
+-
+-    bool EntityNodeProcessor::processNode(XERCES_CPP_NAMESPACE::DOMElement* nodeElem, bool loadGameObjects)
+-    {
+-        if (!XmlHelper::hasNodeName(nodeElem, &quot;entity&quot;))
+-        {
+-            return false;
+-        }
+-    
+-        Ogre::String entName = XmlHelper::getAttributeValueAsStdString(nodeElem, &quot;name&quot;);
+-
+-        LOG_DEBUG(Logger::RULES, 
+-            &quot;Processing entity node &quot; 
+-                + entName);
+-
+-        if (!XmlHelper::hasAttribute(nodeElem, &quot;meshfile&quot;))
+-        {
+-            LOG_ERROR(Logger::RULES, &quot;Entity node defines no meshfile attribute&quot;);
+-            return false;
+-        }
+-        
+-        Ogre::String meshFile = XmlHelper::getAttributeValueAsStdString(nodeElem, &quot;meshfile&quot;);
+-        if (entName == &quot;&quot;)
+-        {
+-            entName = getRandomName(meshFile);
+-        }
+-
+-        //Actor* act = ActorManager::getSingleton().createMeshActor(
+-        //    XmlHelper::getAttributeValueAsStdString(entityElem, &quot;name&quot;),
+-        //    meshFile); ///@todo: Collision proxy
+-
+-        Vector3 position(Vector3::ZERO);
+-        Quaternion orientation(Quaternion::IDENTITY);
+-
+-        DOMElement* posElem = XmlHelper::getChildNamed(nodeElem, &quot;position&quot;);
+-        if (posElem != NULL)
+-        {
+-            position = processVector3(posElem);
+-        }
+-        else 
+-        {
+-            LOG_WARNING(Logger::RULES, &quot;No position given for entity, used (0,0,0)&quot;);
+-        }
+-
+-        DOMElement* oriElem = XmlHelper::getChildNamed(nodeElem, &quot;rotation&quot;);
+-        if (oriElem != NULL)
+-        {
+-            orientation = processQuaternion(oriElem);
+-        }
+-        else 
+-        {
+-            LOG_WARNING(Logger::RULES, &quot;No orientation given for entity, used Identity&quot;);
+-        }
+-
+-        ///@todo static geometry groups
+-        SceneNode* parentNode = getRootSceneNode()-&gt;createChildSceneNode(entName, position, orientation);
+-
+-        ResourceGroupManager&amp; resGroupMgr = ResourceGroupManager::getSingleton();
+-        while(parentNode-&gt;getCreator()-&gt;hasEntity(entName))
+-        {
+-            entName = getRandomName(entName);
+-        }
+-
+-        Entity* newEnt = NULL;
+-        try
+-        {
+-            // if this mesh exists in our module's resource group: preload it
+-            if (resGroupMgr.resourceExists(mResourceGroup, meshFile))
+-            {
+-                MeshManager::getSingleton().load(meshFile, mResourceGroup);
+-            }
+-
+-            // If not, it is now loaded implicitly from the default group
+-            newEnt = CoreSubsystem::getSingleton().getWorld()
+-                        -&gt;getSceneManager()-&gt;createEntity(entName, meshFile);
+-
+-            LOG_DEBUG(Logger::RULES, &quot; Loaded meshfile &quot;+meshFile);
+-        }
+-        catch(...)
+-        {
+-	        LOG_ERROR(Logger::RULES, &quot; Entity '&quot;+meshFile+&quot;' mit dem Namen '&quot;+entName+&quot;' konnte nicht geladen werden.&quot;);
+-            return false;
+-        }
+-
+-        parentNode-&gt;attachObject(newEnt);
+-        createCollision(newEnt, meshFile, XmlHelper::getChildNamed(nodeElem, &quot;physicsproxy&quot;));
+-
+-        DOMElement* scaleElem = XmlHelper::getChildNamed(nodeElem, &quot;scale&quot;);
+-        if (scaleElem != NULL)
+-        {
+-            parentNode-&gt;scale(processVector3(scaleElem));
+-        }
+-        
+-        return true;
+-    }
+-
+-    void EntityNodeProcessor::createCollision(Entity* entity, Ogre::String meshName, DOMElement* physicsProxyElem)
+-	{
+-        std::vector&lt;OgreNewt::CollisionPtr&gt; collisions;
+-        
+-        Ogre::String physicsProxyType;
+-        if (physicsProxyElem == NULL || !XmlHelper::hasAttribute(physicsProxyElem, &quot;type&quot;))
+-        {
+-            physicsProxyType = &quot;auto&quot;;
+-        }
+-        else
+-        {
+-            physicsProxyType = XmlHelper::getAttributeValueAsStdString(physicsProxyElem, &quot;type&quot;);
+-        }
+-
+-        // ------- Falls noetig automatisch bodyproxy erstellen -------------
+-        // (wenn physicsProxyType gesetzt wurde)
+-        OgreNewt::CollisionPtr collision = OgreNewt::CollisionPtr();
+-        OgreNewt::World *thisWorld = PhysicsManager::getSingleton()._getNewtonWorld();
+-
+-        if (physicsProxyType == &quot;custom&quot;)
+-        {
+-            ///@todo create physics proxy from custom collision primitives which are defined in children elements of &lt;code&gt;physicsProxyElem&lt;code&gt;
+-        }
+-        else if (physicsProxyType == &quot;none&quot;)
+-        {
+-            LOG_DEBUG(Logger::RULES, &quot;No physics proxy for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-        }
+-        else
+-        {
+-            const AxisAlignedBox &amp;aab = entity-&gt;getMesh()-&gt;getBounds();
+-            Ogre::Node* parentNode = entity-&gt;getParentNode();
+-            Ogre::Vector3 size = (aab.getMaximum() - aab.getMinimum()) * parentNode-&gt;getScale();
+-            bool forceBox = false;
+-
+-            if ((size.x &lt; PhysicsManager::NEWTON_GRID_WIDTH ||
+-                 size.y &lt; PhysicsManager::NEWTON_GRID_WIDTH ||
+-                 size.z &lt; PhysicsManager::NEWTON_GRID_WIDTH) &amp;&amp;
+-                 physicsProxyType == &quot;convexhull&quot;)
+-            {
+-                if (size.x &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+-                    size.x = PhysicsManager::NEWTON_GRID_WIDTH;
+-                if (size.y &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+-                    size.y = PhysicsManager::NEWTON_GRID_WIDTH;
+-                if (size.z &lt; PhysicsManager::NEWTON_GRID_WIDTH)
+-                    size.z = PhysicsManager::NEWTON_GRID_WIDTH;
+-
+-                LOG_MESSAGE(Logger::RULES, &quot;Entity '&quot;+entity-&gt;getName()+&quot;' is planar, using 'box' as instead of '&quot;+physicsProxyType+&quot;'.&quot;);
+-                forceBox = true;
+-            }
+-            const Quaternion orientation(0,0,0,0);// = parentNode-&gt;getOrientation();
+-            const Ogre::Vector3 pos = aab.getMinimum() * parentNode-&gt;getScale() + (size/2.0);
+-
+-
+-            // Pruefen, ob schon ein identischer Proxy erstellt wurde um diesen erneut zu verwenden
+-            AlreadyUsedCollision &amp;aucol (mAutoCreatedCollisions[meshName]);
+-            if (aucol.Type == physicsProxyType  &amp;&amp;
+-                aucol.Scale == parentNode-&gt;getScale() &amp;&amp;
+-                (!forceBox)) // sicherheitshalber
+-            {
+-                collision = aucol.ColPtr;
+-                LOG_DEBUG(Logger::RULES, &quot; Reused physical body for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-            }
+-            else
+-            {
+-                if (physicsProxyType == &quot;box&quot; || forceBox)
+-                {
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Box(
+-                                     thisWorld, size, orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'box' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;pyramid&quot;)
+-                {
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Pyramid(
+-                                    thisWorld, size, orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'pyramid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;sphere&quot;)
+-                {
+-                    double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+-                                    thisWorld, Vector3(radius, radius, radius),
+-                                    orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'sphere' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;ellipsoid&quot;)
+-                {
+-                    // set the size x/z values to the maximum
+-                    Ogre::Vector3 s(size/2.0);
+-                    s.x = std::max(s.x, s.z);
+-                    s.z = s.x;
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
+-                                    thisWorld, s,
+-                                    orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'ellipsoid' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;capsule&quot;)
+-                {
+-                    double radius = std::max(size.x, size.z) / 2.0;
+-                    double height = size.y;
+-
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::Capsule(
+-                                    thisWorld,
+-                                    radius,
+-                                    height,
+-                                    orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'capsule' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;convexhull&quot;)
+-                {
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull(
+-                                    thisWorld,
+-                                    entity,
+-                                    false));
+-                    //orientation, pos));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'convexhull' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else if (physicsProxyType == &quot;mesh&quot; || physicsProxyType == &quot;auto&quot;)
+-                {
+-                    collision = OgreNewt::CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(
+-                                    thisWorld, entity, false));
+-                    LOG_DEBUG(Logger::RULES, &quot;Created physics proxy type 'mesh' for entity '&quot;+entity-&gt;getName()+&quot;'.&quot;);
+-                }
+-                else
+-                {
+-                    LOG_ERROR(Logger::RULES,
+-                        &quot;Physics proxy type '&quot;+physicsProxyType+&quot;' of entity '&quot;+entity-&gt;getName()+&quot;' is unknown.&quot;);
+-                    return;
+-                }
+-
+-                aucol.ColPtr = collision;
+-                aucol.Scale = parentNode-&gt;getScale();
+-                aucol.Type = physicsProxyType;
+-            }
+-        }
+-
+-        if (!collision.isNull())
+-        {
+-            collisions.push_back(collision);
+-        }
+-
+-
+-        // Add to physics of map
+-        if (collisions.size() &gt; 0)
+-        {
+-            PhysicsManager::getSingleton().addLevelGeometry(entity, collisions);
+-            LOG_DEBUG(Logger::RULES, &quot; Entity '&quot;+entity-&gt;getName()+&quot;' in levelGeometry geladen&quot;);
+-        }
+-	}
+-
+-}
+
+Copied: rl/trunk/engine/script/src/EntityNodeProcessor.cpp (from rev 3364, rl/trunk/engine/rules/src/EntityNodeProcessor.cpp)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000435.html">[Dsa-hl-svn] r3364 - in rl/trunk/engine: rules/src script/src
+</A></li>
+	<LI>Next message: <A HREF="000437.html">[Dsa-hl-svn] r3366 - in rl/trunk/engine: rules/src script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#436">[ date ]</a>
+              <a href="thread.html#436">[ thread ]</a>
+              <a href="subject.html#436">[ subject ]</a>
+              <a href="author.html#436">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

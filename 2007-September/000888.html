@@ -1,0 +1,302 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3817 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3817%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200709051653.l85Grlux032614%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000887.html">
+   <LINK REL="Next"  HREF="000889.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3817 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src</H1>
+    <B>no22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3817%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui/include%20ui/src&In-Reply-To=%3C200709051653.l85Grlux032614%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3817 - in rl/trunk/engine: rules/include rules/src	script/swig ui/include ui/src">no22 at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep  5 18:53:47 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000887.html">[Dsa-hl-svn] r3816 - rl/trunk/engine
+</A></li>
+        <LI>Next message: <A HREF="000889.html">[Dsa-hl-svn] r3818 - in modules/common: gui/windows scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#888">[ date ]</a>
+              <a href="thread.html#888">[ thread ]</a>
+              <a href="subject.html#888">[ subject ]</a>
+              <a href="author.html#888">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: no22
+Date: 2007-09-05 18:53:39 +0200 (Wed, 05 Sep 2007)
+New Revision: 3817
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/EffectManager.h
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Person.h
+   rl/trunk/engine/rules/src/EffectManager.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Person.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/ui/include/CharacterSheetWindow.h
+   rl/trunk/engine/ui/src/CharacterSheetWindow.cpp
+Log:
+CharacterSheetWindow:
+*Actually displays Rasse, Kultur and Profession
+*Displays a list of all active effects
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/include/Creature.h	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -281,7 +281,7 @@
+              **/
+             int getAp();
+             /**
+-             *  Ver&#65533;dert die verbrauchten @ref abbdea &quot;AP&quot;, wird beim Steigern
++             *  Veraendert die verbrauchten @ref abbdea &quot;AP&quot;, wird beim Steigern
+              *  aufgerufen.
+              *  @param modifier Kann auch negativ sein (z.B. Borbarad-Moskitos).
+              **/
+
+Modified: rl/trunk/engine/rules/include/EffectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/EffectManager.h	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/include/EffectManager.h	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -29,7 +29,7 @@
+      * Verwaltet die Effekte die auf einer Kreatur wirken.
+      * Diese Klasse verwaltet alle Effekte, die auf einer Kreatur liegen.
+      * Jede Kreatur hat ihren eigenen EffectManager. Die Funktion checkeffects
+-     * sollte w&#65533;rend jeder Aktion (gemeint ist die DSA-Zeiteinheit) aufgerufen
++     * sollte waehrend jeder Aktion (gemeint ist die DSA-Zeiteinheit) aufgerufen
+      * werden.
+      **/
+ 
+@@ -88,6 +88,11 @@
+          **/
+         int getMod(CeGuiString target, Effect::ModType type, Effect::ModTag tag = Effect::MODTAG_NONE);
+ 
++        /**
++         * Returns a printable list of all effects
++         **/
++        CeGuiString getEffects();
++
+ 	private:
+         /// Eine einfache Menge von Effekten
+ 		typedef std::set&lt;Effect*&gt; Effects;
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/include/GameObject.h	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -167,6 +167,10 @@
+         void addEffectWithCheckTime(Effect* effect, RL_LONGLONG time);
+         void addEffectWithCheckDate(Effect* effect, RL_LONGLONG date);
+         void removeEffect(Effect* effect);
++        /**
++         * Returns a printable list of all Effects app
++         */
++        CeGuiString getEffects();
+ 
+     protected:
+         int mId;
+
+Modified: rl/trunk/engine/rules/include/Person.h
+===================================================================
+--- rl/trunk/engine/rules/include/Person.h	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/include/Person.h	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -29,6 +29,18 @@
+         static const Ogre::String CLASS_NAME;
+ 
+         Person(unsigned int id);
++
++        CeGuiString getRasse();
++        void setRasse(CeGuiString rasse);
++        CeGuiString getKultur();
++        void setKultur(CeGuiString kultur);
++        CeGuiString getProfession();
++        void setProfession(CeGuiString profession);
++
++    private:
++        CeGuiString mRasse;
++        CeGuiString mKultur;
++        CeGuiString mProfession;
+ 	};	
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/EffectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EffectManager.cpp	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/src/EffectManager.cpp	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -173,5 +173,16 @@
+       }
+       return mod;
+     }
++
++    CeGuiString EffectManager::getEffects()
++    {
++        CeGuiString retVal = &quot;&quot;;
++        for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
++        {
++            retVal += (*it)-&gt;getName() + &quot;\n&quot;;
++            retVal += (*it)-&gt;getDescription() + &quot;\n&quot;;
++        }
++        return retVal;
++    }
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -430,6 +430,11 @@
+ 		mEffectManager-&gt;removeEffect(effect);
+ 	}
+ 
++    CeGuiString GameObject::getEffects()
++    {
++        return mEffectManager-&gt;getEffects();
++    }
++
+     const Property GameObject::getProperty(const Ogre::String&amp; key) const
+     {
+         Property prop;
+
+Modified: rl/trunk/engine/rules/src/Person.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Person.cpp	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/rules/src/Person.cpp	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -29,4 +29,34 @@
+         setWert(WERT_KAMPFUNFAEHIGKEITSSCHWELLE, 5);
+     }
+ 
++    CeGuiString Person::getRasse()
++    {
++        return mRasse;
++    }
++
++    void Person::setRasse(CeGuiString rasse)
++    {
++        mRasse = rasse;
++    }
++
++    CeGuiString Person::getKultur()
++    {
++        return mKultur;
++    }
++
++    void Person::setKultur(CeGuiString kultur)
++    {
++        mKultur = kultur;
++    }
++
++    CeGuiString Person::getProfession()
++    {
++        return mProfession;
++    }
++
++    void Person::setProfession(CeGuiString profession)
++    {
++        mProfession = profession;
++    }
++
+ }
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -732,6 +732,13 @@
+    public:
+         Person(unsigned int id);
+ 
++        rl::CeGuiString getRasse();
++        void setRasse(rl::CeGuiString rasse);
++        rl::CeGuiString getKultur();
++        void setKultur(rl::CeGuiString kultur);
++        rl::CeGuiString getProfession();
++        void setProfession(rl::CeGuiString profession);
++
+         virtual const rl::Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value);
+         virtual rl::PropertySet* getAllProperties() const;
+
+Modified: rl/trunk/engine/ui/include/CharacterSheetWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/CharacterSheetWindow.h	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/ui/include/CharacterSheetWindow.h	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -58,7 +58,9 @@
+ 		CEGUI::Window* mAP;
+ 		CEGUI::Window* mName;
+ 		CEGUI::Window* mRasse;
++        CEGUI::Window* mKultur;
+ 		CEGUI::Window* mProfession;
++        CEGUI::Window* mEffekte;
+ 		
+ 		void updateTalents();
+ 
+
+Modified: rl/trunk/engine/ui/src/CharacterSheetWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CharacterSheetWindow.cpp	2007-09-05 16:45:06 UTC (rev 3816)
++++ rl/trunk/engine/ui/src/CharacterSheetWindow.cpp	2007-09-05 16:53:39 UTC (rev 3817)
+@@ -49,7 +49,9 @@
+ 	mAP = getWindow(&quot;CharacterSheet/CharacterSheet/AP&quot;);
+ 	mName = getWindow(&quot;CharacterSheet/CharacterSheet/Name&quot;);
+ 	mRasse = getWindow(&quot;CharacterSheet/CharacterSheet/Rasse&quot;);
++    mKultur = getWindow(&quot;CharacterSheet/CharacterSheet/Kultur&quot;);
+ 	mProfession = getWindow(&quot;CharacterSheet/CharacterSheet/Profession&quot;);
++    mEffekte = getWindow(&quot;CharacterSheet/CharacterSheet/Effekte&quot;);
+ 
+ 	bindHideWindowToXButton();
+ 
+@@ -98,8 +100,10 @@
+ void CharacterSheetWindow::updateValues()
+ {
+ 	mName-&gt;setText(&quot;Name: &quot;+mCharacter-&gt;getName());
+-	mRasse-&gt;setText(&quot;Rasse: &quot;);
+-	mProfession-&gt;setText(&quot;Profession: &quot;);
++    mRasse-&gt;setText(&quot;Rasse: &quot;+mCharacter-&gt;getRasse());
++    mKultur-&gt;setText(&quot;Kultur: &quot;+mCharacter-&gt;getKultur());
++    mProfession-&gt;setText(&quot;Profession: &quot;+mCharacter-&gt;getProfession());
++    mEffekte-&gt;setText(&quot;Effekte:\n&quot;+mCharacter-&gt;getEffects());
+ 
+ 	mLE-&gt;setText(&quot;LeP: &quot;+
+ 		StringConverter::toString(mCharacter-&gt;getLe())+&quot;/&quot;+
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000887.html">[Dsa-hl-svn] r3816 - rl/trunk/engine
+</A></li>
+	<LI>Next message: <A HREF="000889.html">[Dsa-hl-svn] r3818 - in modules/common: gui/windows scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#888">[ date ]</a>
+              <a href="thread.html#888">[ thread ]</a>
+              <a href="subject.html#888">[ subject ]</a>
+              <a href="author.html#888">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,360 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3085 - in rl/trunk/engine: core/include core/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3085%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200702280300.l1S30Yr7015768%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000155.html">
+   <LINK REL="Next"  HREF="000157.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3085 - in rl/trunk/engine: core/include core/src	ui/src</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3085%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200702280300.l1S30Yr7015768%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3085 - in rl/trunk/engine: core/include core/src	ui/src">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Feb 28 04:00:34 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000155.html">[Dsa-hl-svn] r3084 - rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="000157.html">[Dsa-hl-svn] r3086 - in dependencies/OgreNewt: . include/OgreNewt	src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#156">[ date ]</a>
+              <a href="thread.html#156">[ thread ]</a>
+              <a href="subject.html#156">[ subject ]</a>
+              <a href="author.html#156">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-02-28 04:00:28 +0100 (Wed, 28 Feb 2007)
+New Revision: 3085
+
+Modified:
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+ui/src/MovementCharacterController.cpp bugfix because using CharacterHeight for offseting collision detection is not a good idea (This offset is removed)
+
+The rest of the changes fixes the offset/orientationbias problem of all the collision primitives.
+
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2007-02-27 15:18:25 UTC (rev 3084)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2007-02-28 03:00:28 UTC (rev 3085)
+@@ -118,12 +118,23 @@
+ 		PhysicalObject* mPhysicalObject;
+ 		bool mHullModifier;
+ 
+-		void setOffset(const Ogre::Vector3&amp; offset);
+-		void setOrientationBias(const Ogre::Quaternion&amp; orientation);
++		//void setOffset(const Ogre::Vector3&amp; offset);
++		//void setOrientationBias(const Ogre::Quaternion&amp; orientation);
+ 		PhysicsManager::GeometryType getGeometryType() const;
+ 		void setBody(OgreNewt::Body* body);
+ 
+-		/** creates a collision primitive for OgreNewt
++		/** creates a collision primitive for OgreNewt.
++		 * Currently this is Work In Progress - so it's changing 
++		 *    and the offset/orientation is not working accordling at the moment ...
++		 * The collision primitive created has got a basic orientation which can be influenced by
++		 * offset and orientation parameters. Additionally an initial inertiaCoefficents vector is
++		 * calculated according to the size and type of collision primitiv.
++		 * @param aabb AxisAlignedBox that contains the extents of mesh whose coll. primitiv is to be created
++		 * @param offset Vector3 gives the offset of the coordinate system of the coll. primitiv
++		 * @param orientation Quaternion gives an euler rotation for the coordinate system of the coll. primitiv
++		 * @param inertiaCoefficients Vector3 returns the inertia coefficients for the created coll. primitiv
++		 * @param animName String specifies the name of the animation of the mesh whose coll. primitiv should be created,
++		 *        when &quot;&quot;, then the basic mesh is used as a basis.
+ 		*/
+ 		OgreNewt::CollisionPtr createCollision(
+ 			const Ogre::AxisAlignedBox&amp; aabb, Ogre::Vector3* offset = NULL, 
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2007-02-27 15:18:25 UTC (rev 3084)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2007-02-28 03:00:28 UTC (rev 3085)
+@@ -102,11 +102,12 @@
+         mBody-&gt;setVelocity(vel);
+     }
+ 
+-	void PhysicalThing::setOffset(const Vector3&amp; offset)
++/*	void PhysicalThing::setOffset(const Vector3&amp; offset)
+ 	{
+ 		mOffset = offset;
+-        mBody-&gt;setOffset(offset);
++        //mBody-&gt;setOffset(offset);
+ 	}
++	*/
+ 
+     Actor *PhysicalThing::getActor(void) const
+     {
+@@ -127,7 +128,7 @@
+     void PhysicalThing::_update()
+     {
+         mBody-&gt;setPositionOrientation(
+-            mActor-&gt;_getSceneNode()-&gt;getWorldPosition() + mBody-&gt;getOffset(),
++            mActor-&gt;_getSceneNode()-&gt;getWorldPosition(), // + mBody-&gt;getOffset(),
+             mOrientationBias.Inverse() * mActor-&gt;_getSceneNode()-&gt;getWorldOrientation());
+ 		mActor-&gt;_update(Actor::UF_ALL &amp; ~Actor::UF_PHYSICAL_THING);
+     }
+@@ -141,7 +142,7 @@
+ 
+     void PhysicalThing::_attachToSceneNode(Ogre::SceneNode* node)
+     {
+-        mBody-&gt;attachToNode(node, mOffset, mOrientationBias);
++        mBody-&gt;attachToNode(node); //, mOffset, mOrientationBias);
+     }
+ 
+     void PhysicalThing::_attachToBone(MeshObject* object, const std::string&amp; boneName )
+@@ -322,8 +323,8 @@
+ 
+     void PhysicalThing::fitToPose(const Ogre::String&amp; name)
+     {
+-		Vector3 offset;
+-		Quaternion orientationBias;
++		Vector3 offset = Vector3::ZERO;
++		Quaternion orientationBias = Quaternion::IDENTITY;;
+ 		CollisionPtr coll;
+         
+         if (mPhysicalObject-&gt;isMeshObject())
+@@ -341,24 +342,10 @@
+             }
+             else
+             {
+-                // Yes
++                // collision primitiv is cached, retrieve it
+                 coll = it-&gt;second;
+-
+-				orientationBias = Quaternion::IDENTITY;
+-
+-				// CONVEXHULL has got a zero offset (see createCollision)
+-				if (mGeometryType == PhysicsManager::GT_CONVEXHULL)
+-					offset = Vector3::ZERO;
+-				else if (mGeometryType == PhysicsManager::GT_CAPSULE) {
+-					const Vector3 diff = size.getMaximum() - size.getMinimum();
+-					offset = Vector3(-diff.y/2,0,0); //(-diff.y/2, 0, 0);
+-					offset = Vector3::ZERO;
+-					//orientationBias.FromAngleAxis(Degree(90), Vector3::UNIT_Y);
+-				} else
+-					offset = size.getCenter();
+-				
+             }
+-            setOffset(offset);
++            //setOffset(offset);
+             mBody-&gt;setCollision(coll);
+             mOrientationBias = orientationBias;
+ 
+@@ -378,18 +365,30 @@
+     {
+ 		const Vector3 size = aabb.getMaximum() - aabb.getMinimum();
+ 
+-		if (offset != NULL)
+-		{
+-			*offset = aabb.getCenter();
+-		}
+-
+ 		OgreNewt::World* physWorld = PhysicsManager::getSingleton()._getNewtonWorld();
+ 
+         CollisionPtr rval;
+ 
++		/* inertiaCoefficients could be calculated like OgreNewt::MomentOfInertia 
++			or even better is to use it ? */
++
++		/* differentiate between the different collision primitives, because they all
++		   need different offset and probably different orientation values.
++		   Newton SDK is really nifty and helps here, because we can shift the origin
++		   of the coordinate system of the primitiv we create into any position we
++		   desire. Actually this is the bottom middle of our mesh - as the meshes are
++		   always constructed like that.
++	    */
+ 		if (mGeometryType == PhysicsManager::GT_BOX)
+         {
+-            rval = CollisionPtr(new CollisionPrimitives::Box(physWorld, size));
++			// a box collision primitiv has got it's coordinate system at it's center, so we need to shift it
++			rval = CollisionPtr(new CollisionPrimitives::Box(
++				physWorld,
++				size,
++				Ogre::Quaternion::IDENTITY,
++				aabb.getCenter())
++				);
++
+ 			if (inertiaCoefficients != NULL)
+ 			{
+                 *inertiaCoefficients = Vector3(
+@@ -400,9 +399,14 @@
+         }
+         else if (mGeometryType == PhysicsManager::GT_SPHERE)
+         {
+-            double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
+-            rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(physWorld,
+-                Vector3(radius, radius, radius)));
++			double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
++			// a sphere primitiv has got its coordinate system at its center, so shift it with radius
++            rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
++				physWorld,
++				Vector3(radius, radius, radius),
++				Ogre::Quaternion::IDENTITY,
++				Vector3(0,radius,0))
++				);
+             
+ 			if (inertiaCoefficients != NULL)
+ 			{
+@@ -415,8 +419,14 @@
+             Vector3 s(size/2.0);
+             s.x = std::max(s.x, s.z);
+             s.z = s.x;
+-            rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(physWorld, s));
+ 
++			// an ellipsoid primitiv has got its coordinate system at its center, so shift it with radius
++            rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Ellipsoid(
++				physWorld, 
++				s,
++				Ogre::Quaternion::IDENTITY,
++				Vector3(0,s.y,0)));
++
+             if (inertiaCoefficients != NULL)
+ 			{
+ 				*inertiaCoefficients = Vector3(s.x*s.x, s.y*s.y, s.z*s.z);
+@@ -428,30 +438,19 @@
+ 			double height = size.y;
+ 			
+ 			Quaternion orientCaps;
+-			orientCaps.FromAngleAxis(Degree(90), Vector3::UNIT_Y);
++			orientCaps.FromAngleAxis(Degree(90), Vector3::UNIT_Z);
+ 
+-			//Vector3 offsetCaps (-size.y/2, 0, 0);
+-			//Vector3 offsetCaps (-size.y/2, 0, 0);
+-			Vector3 offsetCaps (0, 0, 0);
++			Vector3 offsetCaps (0, size.y/2, 0);
+ 
++			// an capsule primitiv has got its coordinate system at its center, so shift it with radius
++			// additionally it is x axis aligned, so rotate it 90 degrees around z axis
+ 			rval = CollisionPtr(new OgreNewt::CollisionPrimitives::Capsule(
+ 						physWorld, 
+ 						radius, 
+ 						height,
+ 						orientCaps,
+ 						offsetCaps));
+-			//Alte Variante
+-			//coll = CollisionPtr(new CollisionPrimitives::Capsule(mWorld, radius, size.y));
+-			if (offset != NULL)
+-			{
+-				*offset = aabb.getCenter(); //offsetCaps;
+-			}
+-
+-			if (orientation != NULL)
+-			{
+-				*orientation = orientCaps;
+-			}
+-
++			
+ 			if (inertiaCoefficients != NULL)
+ 			{
+ 				double sradius = radius*radius;
+@@ -472,14 +471,6 @@
+ 					// Objekt zu klein!
+ 					LOG_MESSAGE(Logger::CORE, &quot; PhyiscalThing too small to create a convexhull, using 'box' instead! &quot;);
+ 					rval = CollisionPtr(new CollisionPrimitives::Box(physWorld, size));
+-					
+-					if (inertiaCoefficients != NULL)
+-					{
+-						*inertiaCoefficients = Vector3(
+-						size.x*size.x/6.0f,
+-						size.y*size.y/6.0f,
+-						size.z*size.z/6.0f);
+-					}
+ 				}
+ 				else
+ 				{
+@@ -504,12 +495,14 @@
+ 
+ 					// cleanup the temporary mesh
+ 					delete tempMesh;
+-										
+-					if (offset != NULL)
+-					{
+-						*offset = Vector3::ZERO;
+-					}
+ 				}
++				if (inertiaCoefficients != NULL)
++				{
++					*inertiaCoefficients = Vector3(
++					size.x*size.x/6.0f,
++					size.y*size.y/6.0f,
++					size.z*size.z/6.0f);
++				}
+             }
+             else
+             {
+@@ -523,11 +516,6 @@
+                 Entity* entity = dynamic_cast&lt;MeshObject*&gt;(mPhysicalObject)-&gt;getEntity();
+                 rval = CollisionPtr(new OgreNewt::CollisionPrimitives::TreeCollision(physWorld,
+                     entity, false, true));
+-
+-                if (offset != NULL)
+-                {
+-                    *offset = Vector3::ZERO;
+-                }
+             }
+             else
+             {
+@@ -572,7 +560,7 @@
+ 			body-&gt;setCustomForceAndTorqueCallback(PhysicsManager::genericForceCallback);
+ 
+             setBody(body);
+-            setOffset(offset);
++            //setOffset(offset);
+ 			mOrientationBias = orientationBias;
+         }
+ 	}
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-02-27 15:18:25 UTC (rev 3084)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-02-28 03:00:28 UTC (rev 3085)
+@@ -552,7 +552,7 @@
+             //if( charPos.y &gt; point.y &amp;&amp; angle &lt; Degree(50.0f)  )
+             AxisAlignedBox CharAab = mCharBody-&gt;getCollision()-&gt;getAABB();
+             Real CharHeight = CharAab.getMaximum().y - CharAab.getMinimum().y;
+-            Real stepHeight = point.y - charPos.y + CharHeight / 2.0f;
++            Real stepHeight = point.y - charPos.y; //+ CharHeight / 2.0f;
+             if( stepHeight &lt; 0.4f &amp;&amp; mCharacterState.mHasFloorContact ||
+                 stepHeight &lt; 0.1f )
+                 isFloorCollision = true;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000155.html">[Dsa-hl-svn] r3084 - rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="000157.html">[Dsa-hl-svn] r3086 - in dependencies/OgreNewt: . include/OgreNewt	src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#156">[ date ]</a>
+              <a href="thread.html#156">[ thread ]</a>
+              <a href="subject.html#156">[ subject ]</a>
+              <a href="author.html#156">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

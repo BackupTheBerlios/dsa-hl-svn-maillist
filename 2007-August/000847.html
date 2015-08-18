@@ -1,0 +1,680 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3776 - in rl/trunk/engine: core/include core/src	rules/src script/swig ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3776%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20script/swig%20ui/src&In-Reply-To=%3C200708302009.l7UK9Jop021248%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000846.html">
+   <LINK REL="Next"  HREF="000848.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3776 - in rl/trunk/engine: core/include core/src	rules/src script/swig ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3776%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20script/swig%20ui/src&In-Reply-To=%3C200708302009.l7UK9Jop021248%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3776 - in rl/trunk/engine: core/include core/src	rules/src script/swig ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu Aug 30 22:09:19 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000846.html">[Dsa-hl-svn] r3775 - in dependencies/OgreNewt: include/OgreNewt src
+</A></li>
+        <LI>Next message: <A HREF="000848.html">[Dsa-hl-svn] r3777 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#847">[ date ]</a>
+              <a href="thread.html#847">[ thread ]</a>
+              <a href="subject.html#847">[ subject ]</a>
+              <a href="author.html#847">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-30 22:09:06 +0200 (Thu, 30 Aug 2007)
+New Revision: 3776
+
+Modified:
+   rl/trunk/engine/core/include/GameAreaTypes.h
+   rl/trunk/engine/core/include/GameEventManager.h
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/GameEventManager.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/ui/src/ControlState.cpp
+Log:
+(ogrenewt update needed!)
+-added GameMeshAreaType (works with newton bodies)
+-added colors for different materialIds (areas are green, creatures owned by the creaturecontroller red, camera is black, level is blue, standard is white) use 'l' to enjoy the colors :-P
+-areas are not found by material-raycasts (i don't think anybody wants to raycast an area)
+
+Modified: rl/trunk/engine/core/include/GameAreaTypes.h
+===================================================================
+--- rl/trunk/engine/core/include/GameAreaTypes.h	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/include/GameAreaTypes.h	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -17,15 +17,13 @@
+ #ifndef __GameAreaTypes_H__
+ #define __GameAreaTypes_H__
+ 
++#include &quot;Actor.h&quot;
+ #include &quot;CorePrerequisites.h&quot;
++#include &quot;CoreDefines.h&quot;
+ 
+-#include &lt;OgreNewt_ContactCallback.h&gt;
+ 
+-#include &quot;Actor.h&quot;
+-
+ namespace rl {
+ 
+-	class MeshObject;
+ 	class PhysicalThing;
+ 
+ /** GameAreaType
+@@ -57,11 +55,18 @@
+     /// Setzt die genaue Position der Anfrage, wird in Unterklassen implementiert
+     virtual void setQueryPosition( const Ogre::Vector3&amp; vec ) = 0;
+     /// Gibt die Position der Anfrage zur&#252;ck, wird in Unterklassen implementiert
+-    virtual const Ogre::Vector3&amp; getQueryPosition() const = 0;
++    virtual Ogre::Vector3 getQueryPosition() const = 0;
++    /// Setzt die genaue Orientierung der Anfrage, wird in Unterklassen implementiert
++    virtual void setQueryOrientation( const Ogre::Quaternion&amp; ori ) = 0;
++    /// Gibt die Orientierung der Anfrage zur&#252;ck, wird in Unterklassen implementiert
++    virtual Ogre::Quaternion getQueryOrientation() const = 0;
++
+     /// Blendet ein Debug-Objekt ein, um das Areal zu verdeutlichen
+     //virtual setShowDebug() = 0;
+     /// Gibt zur&#252;ck ob ein Debug-Objekt eingeblendet ist
+     //virtual bool getShowDebug() const = 0;
++
++    virtual OgreNewt::Body* getBody() { return NULL;}
+ };
+ 
+ /** GameSphereAreaType
+@@ -91,36 +96,69 @@
+      /// Setzt die genaue Position der Anfrage
+     virtual void setQueryPosition( const Ogre::Vector3&amp; vec );
+     /// Gibt die Position der Anfrage zur&#252;ck
+-    virtual const Ogre::Vector3&amp; getQueryPosition() const;    
++    virtual Ogre::Vector3 getQueryPosition() const;
++    /// Setzt die genaue Orientierung der Anfrage, wird in Unterklassen implementiert
++    virtual void setQueryOrientation( const Ogre::Quaternion&amp; ori ) {}
++    /// Gibt die Orientierung der Anfrage zur&#252;ck, wird in Unterklassen implementiert
++    virtual Ogre::Quaternion getQueryOrientation() const {return Ogre::Quaternion::IDENTITY;}
+ private:
+     /// Die Kugel-Anfrage
+     Ogre::SphereSceneQuery* mSphereQuery;
+ };
+ 
+-//class _RlCoreExport GameMeshAreaType : public GameAreaType
+-//{
+-//public:
+-//	GameMeshAreaType(MeshObject* mo, PhysicalThing* testObj); ///@todo allow character change
+-//	virtual ~GameMeshAreaType();
+-//
+-//	virtual ActorMap performQuery();
+-//
+-//	/// Setzt die genaue Position der Anfrage
+-//    virtual void setQueryPosition( const Ogre::Vector3&amp; vec );
+-//    /// Gibt die Position der Anfrage zur&#252;ck
+-//    virtual const Ogre::Vector3&amp; getQueryPosition() const;   
+-//
+-//	/// Gibt die Anfrage-Maske zur&#252;ck, wird in Unterklassen implementiert
+-//	virtual unsigned long getQueryMask() const { return 0xFFFFFFFF; }
+-//    /// Setzt die Anfrage-Maske, wird in Unterklassen implementiert
+-//	virtual void setQueryMask( unsigned long mask = 0xFFFFFFFF ) {}
+-//
+-//private:
+-//	OgreNewt::CollisionPtr mCollision;
+-//	PhysicalThing* mTestObj;
+-//	Ogre::Vector3 mPosition;
+-//};
+ 
++/// ein Problem k&#246;nnte die zeitliche Verschiebung um eine Framedauer sein, wenn position und orientation
++/// neu gesetzt werden, muss erst newton wieder upgedated werden!
++class _RlCoreExport GameNewtonBodyAreaType : 
++    public GameAreaType
++{
++public:
++    /// Konstruktor
++    GameNewtonBodyAreaType();
++
++    /// Destruktor
++    virtual ~GameNewtonBodyAreaType();
++
++    /// Implementierung der Anfrage &#252;ber einen SphereSceneQuery
++    virtual ActorMap performQuery(  );
++
++    /// Gibt die Anfrage-Maske zur&#252;ck
++    virtual unsigned long getQueryMask() const;
++    /// Setzt die Anfrage-Maske
++    virtual void setQueryMask( unsigned long mask = 0xFFFFFFFF );
++
++     /// Setzt die genaue Position der Anfrage
++    virtual void setQueryPosition( const Ogre::Vector3&amp; vec );
++    /// Gibt die Position der Anfrage zur&#252;ck
++    virtual Ogre::Vector3 getQueryPosition() const;
++    /// Setzt die genaue Orientierung der Anfrage, wird in Unterklassen implementiert
++    virtual void setQueryOrientation( const Ogre::Quaternion&amp; ori );
++    /// Gibt die Orientierung der Anfrage zur&#252;ck, wird in Unterklassen implementiert
++    virtual Ogre::Quaternion getQueryOrientation() const;
++
++    virtual void foundCollision(Actor* actor);
++
++    virtual void resetFoundCollisions();
++
++    virtual OgreNewt::Body* getBody() { return mBody;}
++protected:
++    OgreNewt::Body* mBody;
++    ActorMap mFoundActors;
++    unsigned long mQueryMask;
++};
++
++
++class _RlCoreExport GameMeshAreaType :
++    public GameNewtonBodyAreaType
++{
++public:
++    GameMeshAreaType(
++            Ogre::Entity* entity,
++            const GeometryType&amp; geomType = GT_NONE,
++			Ogre::Vector3* offset = NULL,
++			Ogre::Quaternion* orientation = NULL);
++};
++
+ }
+ 
+ #endif
+
+Modified: rl/trunk/engine/core/include/GameEventManager.h
+===================================================================
+--- rl/trunk/engine/core/include/GameEventManager.h	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/include/GameEventManager.h	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -25,10 +25,13 @@
+ #include &quot;GameAreaEventSource.h&quot;
+ #include &quot;GameAreaListener.h&quot;
+ #include &quot;CorePrerequisites.h&quot;
++#include &quot;PhysicsGenericContactCallback.h&quot;
+ 
++
+ namespace rl {
+ 
+ class PhysicalThing;
++class GameNewtonBodyAreaType;
+ 
+ typedef std::set&lt;GameAreaEventSource*&gt; GameAreaEventSourceList;
+ 
+@@ -38,7 +41,8 @@
+  */
+ class _RlCoreExport GameEventManager
+   : public GameTask,
+-    public Ogre::Singleton&lt;GameEventManager&gt;
++    public Ogre::Singleton&lt;GameEventManager&gt;,
++    public PhysicsGenericContactCallback
+ {
+ public:
+     /** Default Constructor */
+@@ -62,7 +66,7 @@
+     void addSphereAreaListener( Actor* actor, Ogre::Real radius,
+         GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+ 
+-	void addMeshAreaListener( Actor* meshactor, GameAreaListener* list, PhysicalThing* testObj );
++	void addMeshAreaListener( Actor* meshactor, GeometryType geom, GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+ 
+     /** Entfernt an allen Areas diesen Listener
+     *
+@@ -82,9 +86,19 @@
+ 
+ 	void removeQueuedDeletionSources();
+ 
++
++    /// newton collision callback function
++    int userProcess();
++
++    /// notify about newton world update
++    void notifyNewtonWorldUpdate();
+ private:
+     GameAreaEventSourceList mAreaEventSources;
+ 	GameAreaEventSourceList mQueuedDeletionSources;
++    typedef std::map&lt;OgreNewt::Body*, GameNewtonBodyAreaType*&gt; NewtonBodyGameAreaMap;
++    NewtonBodyGameAreaMap mBodyGameAreaMap;
++
++    Actor* bodyToActor(OgreNewt::Body* body);
+ };
+ 
+ }
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -270,6 +270,9 @@
+          */
+         static Ogre::String convertGeometryTypeToString(const GeometryType&amp; geomType);
+ 
++        /// returns newton debugger
++        OgreNewt::Debugger* getNewtonDebugger() {return mNewtonDebugger;}
++
+     private:
+ 
+         /** structure containing further information about the collision primitive.
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -19,7 +19,9 @@
+ 
+ #include &quot;World.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
++#include &quot;PhysicsManager.h&quot;
+ 
++
+ using namespace Ogre;
+ 
+ namespace rl {
+@@ -93,10 +95,104 @@
+             mSphereQuery-&gt;setSphere( Sphere(vec,mSphereQuery-&gt;getSphere().getRadius()) );
+     }
+ 
+-    const Ogre::Vector3&amp; GameSphereAreaType::getQueryPosition() const
++    Ogre::Vector3 GameSphereAreaType::getQueryPosition() const
+     {
+         return mSphereQuery-&gt;getSphere().getCenter( );
+     }
+ 
++
++
++
++    GameNewtonBodyAreaType::GameNewtonBodyAreaType() :
++        mBody(NULL)
++    {
++    }
++
++
++    GameNewtonBodyAreaType::~GameNewtonBodyAreaType()
++    {
++        if(mBody != NULL)
++            delete mBody;
++        mBody = NULL;
++    }
++
++    unsigned long GameNewtonBodyAreaType::getQueryMask() const
++    {
++        return mQueryMask;
++    }
++
++    void GameNewtonBodyAreaType::setQueryMask(unsigned long mask)
++    {
++        mQueryMask = mask;
++    }
++
++    Quaternion GameNewtonBodyAreaType::getQueryOrientation() const
++    {
++        Vector3 pos;
++        Quaternion orient;
++        mBody-&gt;getPositionOrientation(pos, orient);
++        return orient;
++    }
++
++    Vector3 GameNewtonBodyAreaType::getQueryPosition() const
++    {
++        Vector3 pos;
++        Quaternion orient;
++        mBody-&gt;getPositionOrientation(pos, orient);
++        return pos;
++    }
++
++    void GameNewtonBodyAreaType::setQueryPosition(const Vector3 &amp;pos)
++    {
++        Quaternion orient;
++        Vector3 old_pos;
++        mBody-&gt;getPositionOrientation(old_pos, orient);
++        mBody-&gt;setPositionOrientation(pos, orient);
++    }
++
++    void GameNewtonBodyAreaType::setQueryOrientation(const Quaternion &amp;orient)
++    {
++        Quaternion old_orient;
++        Vector3 pos;
++        mBody-&gt;getPositionOrientation(pos, old_orient);
++        mBody-&gt;setPositionOrientation(pos, orient);
++    }
++
++    void GameNewtonBodyAreaType::foundCollision(Actor* actor)
++    {
++        if( actor )
++        {
++            if( actor-&gt;getQueryFlags() &amp; mQueryMask )
++                mFoundActors[actor-&gt;getName()] = actor;
++        }
++    }
++
++    void GameNewtonBodyAreaType::resetFoundCollisions()
++    {
++        mFoundActors.clear();
++    }
++
++    ActorMap GameNewtonBodyAreaType::performQuery()
++    {
++        return mFoundActors;
++    }
++
++    GameMeshAreaType::GameMeshAreaType(
++            Ogre::Entity* entity,
++            const GeometryType&amp; geomType,
++			Ogre::Vector3* offset,
++			Ogre::Quaternion* orientation)
++    {
++        OgreNewt::CollisionPtr col =
++            PhysicsManager::getSingleton().createCollision(entity,
++            geomType, &quot;&quot;, offset, orientation);
++        mBody = new OgreNewt::Body(
++            PhysicsManager::getSingleton()._getNewtonWorld(),
++            col);
++        mBody-&gt;setMaterialGroupID(
++            PhysicsManager::getSingleton().getMaterialID(&quot;gamearea&quot;));
++        mBody-&gt;setUserData(NULL);
++    }
++
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameEventManager.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/src/GameEventManager.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -19,6 +19,8 @@
+ #include &quot;GameAreaTypes.h&quot;
+ #include &quot;ScriptWrapper.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
++#include &quot;MeshObject.h&quot;
++#include &quot;PhysicsManager.h&quot;
+ 
+ 
+ template&lt;&gt; rl::GameEventManager* Ogre::Singleton&lt;rl::GameEventManager&gt;::ms_Singleton = 0;
+@@ -29,11 +31,41 @@
+         mAreaEventSources(),
+ 		mQueuedDeletionSources()
+     {
++        // set newton collision callback
++        PhysicsManager* physicsManager = PhysicsManager::getSingletonPtr();
+ 
++        const OgreNewt::MaterialID *area_mat = physicsManager-&gt;createMaterialID(&quot;gamearea&quot;);
++        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;createMaterialID(&quot;character&quot;);
++        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;createMaterialID(&quot;default&quot;);
++        const OgreNewt::MaterialID *cam_mat = physicsManager-&gt;createMaterialID(&quot;camera&quot;);
++        const OgreNewt::MaterialID *lev_mat = physicsManager-&gt;createMaterialID(&quot;level&quot;);
++
++        physicsManager-&gt;createMaterialPair(area_mat, char_mat)-&gt;setContactCallback(this);
++        physicsManager-&gt;createMaterialPair(area_mat, def_mat)-&gt;setContactCallback(this);
++        physicsManager-&gt;createMaterialPair(area_mat, cam_mat)-&gt;setDefaultCollidable(0);// -&gt;setContactCallback(this);
++        physicsManager-&gt;createMaterialPair(area_mat, lev_mat)-&gt;setDefaultCollidable(0);// -&gt;setContactCallback(this);
++
++        // set collision-debug color
++        physicsManager-&gt;getNewtonDebugger()-&gt;setMaterialColor(area_mat, Ogre::ColourValue::Green);
+     }
+ 
+     GameEventManager::~GameEventManager( )
+     {
++        // remove collision callbacks
++        PhysicsManager *physicsManager = PhysicsManager::getSingletonPtr();
++
++        const OgreNewt::MaterialID *area_mat = physicsManager-&gt;createMaterialID(&quot;gamearea&quot;);
++        const OgreNewt::MaterialID *char_mat = physicsManager-&gt;createMaterialID(&quot;character&quot;);
++        const OgreNewt::MaterialID *def_mat = physicsManager-&gt;createMaterialID(&quot;default&quot;);
++        const OgreNewt::MaterialID *cam_mat = physicsManager-&gt;createMaterialID(&quot;camera&quot;);
++        const OgreNewt::MaterialID *lev_mat = physicsManager-&gt;createMaterialID(&quot;level&quot;);
++
++        physicsManager-&gt;resetMaterialPair(area_mat, char_mat);
++        physicsManager-&gt;resetMaterialPair(area_mat, def_mat);
++        physicsManager-&gt;resetMaterialPair(area_mat, cam_mat);
++        physicsManager-&gt;resetMaterialPair(area_mat, lev_mat);
++
++
+         GameAreaEventSourceList::iterator it;
+         for( it = mAreaEventSources.begin(); it != mAreaEventSources.end();++it)
+         {
+@@ -44,6 +76,7 @@
+         }
+         mAreaEventSources.clear();
+ 		mQueuedDeletionSources.clear();
++        mBodyGameAreaMap.clear();
+     }
+ 
+ 	/// @todo  Doppelte Aktoren nachnutzen??
+@@ -61,6 +94,28 @@
+         gam-&gt;addAreaListener( list );
+     }
+ 
++    void GameEventManager::addMeshAreaListener( Actor* actor, GeometryType geom, GameAreaListener* list, unsigned long queryMask )
++    {
++        // neues areal ereugen
++        MeshObject* meshObj = static_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++
++        GameNewtonBodyAreaType* at = new GameMeshAreaType(
++            meshObj-&gt;getEntity(), geom);
++
++        at-&gt;setQueryMask(queryMask);
++
++        // Event-Quelle erzeugen
++        GameAreaEventSource* gam = new GameAreaEventSource( at, actor );
++        // In die Menge einf&#252;gen
++        mAreaEventSources.insert( gam );
++		ScriptWrapper::getSingleton().owned( gam );
++        // Und Listener anh&#228;ngen
++        gam-&gt;addAreaListener( list );
++
++        // add to newton collision list
++        mBodyGameAreaMap.insert(std::make_pair(at-&gt;getBody(), at));
++    }
++
+     void GameEventManager::removeAreaListener( GameAreaListener* list )
+     {
+         GameAreaEventSourceList::iterator it;
+@@ -110,6 +165,15 @@
+ 			ScriptWrapper::getSingleton().deleted( gam );
+ 			mQueuedDeletionSources.erase(mQueuedDeletionSources.begin());
+ 
++            // gegebenenfalls bodymap-eintrag l&#246;schen
++            if( gam-&gt;getGameAreaType()-&gt;getBody() )
++            {
++                NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.find(gam-&gt;getGameAreaType()-&gt;getBody());
++                if( it != mBodyGameAreaMap.end() )
++                    mBodyGameAreaMap.erase(it);
++            }
++
++			ScriptWrapper::getSingleton().deleted( gam );
+ 			// Die Area-Art l&#246;schen
+ 			delete gam-&gt;getGameAreaType();
+ 			// Das Objekt l&#246;schen
+@@ -136,4 +200,36 @@
+ 
+         return NAME;
+     }
++
++    int GameEventManager::userProcess()
++    {
++        NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.find(m_body0);
++        if( it != mBodyGameAreaMap.end() )
++        {
++            it-&gt;second-&gt;foundCollision(bodyToActor(m_body1));
++            return false;
++        }
++
++        it = mBodyGameAreaMap.find(m_body1);
++        if( it != mBodyGameAreaMap.end() )
++        {
++            it-&gt;second-&gt;foundCollision(bodyToActor(m_body0));
++            return 0;
++        }
++
++        LOG_WARNING(Logger::CORE, &quot;Der Kollisionsk&#246;rper konne keiner GameArea zugeordnet werden!&quot;);
++        return 0;
++    }
++
++    void GameEventManager::notifyNewtonWorldUpdate()
++    {
++        NewtonBodyGameAreaMap::iterator it = mBodyGameAreaMap.begin();
++        for( ; it != mBodyGameAreaMap.end(); it++ )
++            it-&gt;second-&gt;resetFoundCollisions();
++    }
++
++    Actor* GameEventManager::bodyToActor(OgreNewt::Body* body)
++    {
++        return static_cast&lt;Actor*&gt;(body-&gt;getUserData());
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -21,6 +21,7 @@
+ #include &quot;ActorManager.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;Exception.h&quot;
++#include &quot;GameEventManager.h&quot;
+ #include &quot;PhysicsController.h&quot;
+ #include &quot;PhysicsGenericContactCallback.h&quot;
+ #include &quot;PhysicalObject.h&quot;
+@@ -69,7 +70,7 @@
+ 
+     PhysicsManager::PhysicsManager( )
+         : mEnabled(false),
+-        mNewtonDebugger(),
++        mNewtonDebugger(&amp;OgreNewt::Debugger::getSingleton()),
+         mPhysicalThings(),
+         mDebugMode(false),
+         mGravity(0, -9.81, 0),
+@@ -97,6 +98,8 @@
+         // setup level material
+         createMaterialID(&quot;level&quot;);
+ 
++        mNewtonDebugger-&gt;setMaterialColor(getMaterialID(&quot;level&quot;), Ogre::ColourValue::Blue);
++
+         // below here starts 'old' stale fix code that should be removed
+ 
+         // setup level quadtree extents
+@@ -141,6 +144,10 @@
+         mElapsed += elapsedTime;
+         while( mElapsed &gt;= mMaxTimestep)
+         {
++            // perhaps we should add a newtonupdate listener, but i don't
++            // know if it's really neccessary
++            GameEventManager::getSingleton().notifyNewtonWorldUpdate();
++
+             mWorld-&gt;update(mMaxTimestep);
+             mElapsed-=mMaxTimestep;
+ #ifdef _DEBUG
+@@ -156,6 +163,10 @@
+         }
+         if( mElapsed &gt; mMinTimestep)
+         {
++            // perhaps we should add a newtonupdate listener, but i don't
++            // know if it's really neccessary
++            GameEventManager::getSingleton().notifyNewtonWorldUpdate();
++
+             mWorld-&gt;update(mElapsed);
+             mElapsed = 0;
+ #ifdef _DEBUG
+
+Modified: rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/core/src/PhysicsMaterialRaycast.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -16,6 +16,7 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;PhysicsMaterialRaycast.h&quot;
++#include &quot;PhysicsManager.h&quot;
+ 
+ using namespace Ogre;
+ using namespace OgreNewt;
+@@ -70,6 +71,9 @@
+             mGetNearest = true;
+             LOG_MESSAGE(Logger::CORE, &quot;Warning PhysicsMaterialRaycast found body without material (getMaterialGroupId() == NULL)!&quot;);
+         }
++        else if( body-&gt;getMaterialGroupID() == PhysicsManager::getSingleton().createMaterialID(&quot;gamearea&quot;) ) // don't trigger gameareas
++        {
++        }
+         else
+         {
+             if( mMaterial == NULL &amp;&amp; mMaterialVector == NULL)
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -49,6 +49,8 @@
+         
+         physicsManager-&gt;getMaterialPair(char_mat, def_mat)-&gt;setDefaultFriction(0,0);
+         physicsManager-&gt;getMaterialPair(char_mat, level_mat)-&gt;setDefaultFriction(0,0);
++
++        physicsManager-&gt;getNewtonDebugger()-&gt;setMaterialColor(char_mat, Ogre::ColourValue::Red);
+     }
+ 
+     CreatureControllerManager::~CreatureControllerManager()
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -242,7 +242,8 @@
+ public:
+     void addSphereAreaListener( rl::Actor* actor, Ogre::Real radius, 
+ 		rl::GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+-	//void addMeshAreaListener( rl::Actor* meshactor, rl::GameAreaListener* list, rl::PhysicalThing* testObj );
++	void addMeshAreaListener( rl::Actor* meshactor, rl::GeometryType geom, 
++	    rl::GameAreaListener* list, unsigned long queryMask = 0xFFFFFFFF );
+ 	
+     void removeAreaListener( rl::GameAreaListener* list );
+     void removeAllAreas( rl::Actor* actor );
+
+Modified: rl/trunk/engine/ui/src/ControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ControlState.cpp	2007-08-30 19:32:34 UTC (rev 3775)
++++ rl/trunk/engine/ui/src/ControlState.cpp	2007-08-30 20:09:06 UTC (rev 3776)
+@@ -100,6 +100,10 @@
+         PhysicsManager::getSingleton().createMaterialPair(
+             PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
+             PhysicsManager::getSingleton().getMaterialID(&quot;character&quot;))-&gt;setDefaultCollidable(0);
++
++        PhysicsManager::getSingleton().getNewtonDebugger()-&gt;setMaterialColor(
++            PhysicsManager::getSingleton().getMaterialID(&quot;camera&quot;),
++            Ogre::ColourValue::Black);
+ 	}
+ 
+     ControlState::~ControlState()
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000846.html">[Dsa-hl-svn] r3775 - in dependencies/OgreNewt: include/OgreNewt src
+</A></li>
+	<LI>Next message: <A HREF="000848.html">[Dsa-hl-svn] r3777 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#847">[ date ]</a>
+              <a href="thread.html#847">[ thread ]</a>
+              <a href="subject.html#847">[ subject ]</a>
+              <a href="author.html#847">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

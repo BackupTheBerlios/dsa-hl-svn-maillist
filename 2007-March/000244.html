@@ -1,0 +1,403 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3173 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3173%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200703120359.l2C3xKGq021527%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000243.html">
+   <LINK REL="Next"  HREF="000245.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3173 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>no22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3173%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200703120359.l2C3xKGq021527%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3173 - in rl/trunk/engine: rules/include rules/src	script/swig">no22 at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar 12 04:59:20 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000243.html">[Dsa-hl-svn] r3172 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+        <LI>Next message: <A HREF="000245.html">[Dsa-hl-svn] r3174 - in modules: common/scripts/effects	regressiontest/dsa regressiontest/scripts	regressiontest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#244">[ date ]</a>
+              <a href="thread.html#244">[ thread ]</a>
+              <a href="subject.html#244">[ subject ]</a>
+              <a href="author.html#244">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: no22
+Date: 2007-03-12 04:59:16 +0100 (Mon, 12 Mar 2007)
+New Revision: 3173
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Effect.h
+   rl/trunk/engine/rules/include/EffectManager.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/rules/src/Effect.cpp
+   rl/trunk/engine/rules/src/EffectManager.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+*working on further changes of the effect system.
+
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/include/Creature.h	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -293,7 +293,7 @@
+              *   Gross/Kleinschreibung beachtet?).
+                    *  @ingroup CreatureRubyExports
+              **/
+-            virtual int getEigenschaft(const CeGuiString eigenschaftName);
++            virtual int getEigenschaft(const CeGuiString eigenschaftName, Effect::ModTag tag = Effect::MODTAG_NONE);
+             /**
+              *  Setzt den Wert der Eigenschaft \a eigenschaftName auf \a value.
+              *  @param eigenschaftName Der Name als Abkuerzung (z.B. @ref abbdem &quot;MU&quot;, 
+@@ -790,13 +790,7 @@
+             void setTaktischeBewegung(int type);
+ 
+         protected:
+-            /**
+-             * Liefert den Eigenschaftswert \a eigenschaftName fuer eine 
+-             * Basiswertberechnung zurueck. Manche Effekte veraendern zwar den
+-             * Eigenschaftswert, nicht jedoch die Basiswerte.
+-             **/
+-            virtual int getEigenschaftForBasiswertCalculation(const CeGuiString eigenschaftName);
+-            /**
++           /**
+              *  Berechnet den Basiswert von der @ref abbdea &quot;Astralenergie&quot;.
+              **/
+             virtual int getAeBasis();
+
+Modified: rl/trunk/engine/rules/include/Effect.h
+===================================================================
+--- rl/trunk/engine/rules/include/Effect.h	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/include/Effect.h	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -47,6 +47,19 @@
+       // Meta stati
+       static const Status STATUS_IMMOBILE = STATUS_PARALYZED | STATUS_SLEEPING | STATUS_UNCONSCIOUS | STATUS_PETRIFIED | STATUS_DEAD;
+       
++      typedef int ModType;
++      static const ModType MODTYPE_NONE         = 1 &lt;&lt; 0;
++      static const ModType MODTYPE_WERTMOD      = 1 &lt;&lt; 1;   ///&lt; Modifies the actual value.
++      static const ModType MODTYPE_PROBENMOD    = 1 &lt;&lt; 2;   ///&lt; Modifies the test.
++      static const ModType MODTYPE_WERTMULT     = 1 &lt;&lt; 3;   ///&lt; Will be multiplied on the value.
++      static const ModType MODTYPE_MAXWERTMOD   = 1 &lt;&lt; 4;   ///&lt; Modifies only the maximum of the value.
++      
++      typedef unsigned long ModTag;
++      static const ModTag MODTAG_NONE           = 1 &lt;&lt; 0;
++      static const ModTag MODTAG_KRANKHEIT      = 1 &lt;&lt; 1;
++      static const ModTag MODTAG_RECALCULATE    = 1 &lt;&lt; 2;
++
++      
+       // other constants
+       static const int REMOVE = -1;
+       static const int PERMANENT = 0;
+@@ -134,8 +147,11 @@
+          **/
+ 		virtual RL_LONGLONG check();
+         
+-        /// Returns if status is applied to the creature
++        /// Returns the status that is applied to the creature by this effect.
+         virtual Status getStatus();
++        
++        /// Returns the modificator applied on the value specified by the parameters.
++        virtual int getMod(CeGuiString target, ModType type, ModTag tag);
+ 
+ 	protected:
+ 		/// Bringt die Aenderungen ein.
+
+Modified: rl/trunk/engine/rules/include/EffectManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/EffectManager.h	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/include/EffectManager.h	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -75,6 +75,14 @@
+          * Checks the effects for the given status.
+          **/
+         Effect::Status getStatus();
++        
++        /**
++         * Returns the specified modificator.
++         * @param target specifies what modificator you want to get (e.g. &quot;Athletik&quot;)
++         * @param type specifies what type of modificator you want (e.g. modificator of the TaW or the Probenzuschlag)
++         * @param tag add some additional restrictions (e.g. KO Probe for sicknesses or Athletik for balance acts)
++         **/
++        int getMod(CeGuiString target, Effect::ModType type, Effect::ModTag tag = Effect::MODTAG_NONE);
+ 
+ 	private:
+         /// Eine einfache Menge von Effekten
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -119,71 +119,71 @@
+ 
+     int Creature::getAttackeBasis()
+     {
+-        double es = getEigenschaftForBasiswertCalculation(E_MUT) +
+-            getEigenschaftForBasiswertCalculation(E_GEWANDTHEIT) +
+-            getEigenschaftForBasiswertCalculation(E_KOERPERKRAFT);
++        double es = getEigenschaft(E_MUT, Effect::MODTAG_RECALCULATE) +
++            getEigenschaft(E_GEWANDTHEIT, Effect::MODTAG_RECALCULATE) +
++              getEigenschaft(E_KOERPERKRAFT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 5.0 + 0.5);
+     }
+ 
+     int Creature::getParadeBasis()
+     {
+-        double es = getEigenschaftForBasiswertCalculation(E_INTUITION) +
+-            getEigenschaftForBasiswertCalculation(E_GEWANDTHEIT) +
+-            getEigenschaftForBasiswertCalculation(E_KOERPERKRAFT);
++      double es = getEigenschaft(E_INTUITION, Effect::MODTAG_RECALCULATE) +
++            getEigenschaft(E_GEWANDTHEIT, Effect::MODTAG_RECALCULATE) +
++            getEigenschaft(E_KOERPERKRAFT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 5.0 + 0.5);
+     }
+ 
+     int Creature::getFernkampfBasis()
+     {
+-        double es = getEigenschaftForBasiswertCalculation(E_INTUITION) +
+-            getEigenschaftForBasiswertCalculation(E_FINGERFERTIGKEIT) +
+-            getEigenschaftForBasiswertCalculation(E_KOERPERKRAFT);
++      double es = getEigenschaft(E_INTUITION, Effect::MODTAG_RECALCULATE) +
++            getEigenschaft(E_FINGERFERTIGKEIT, Effect::MODTAG_RECALCULATE) +
++            getEigenschaft(E_KOERPERKRAFT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 5.0 + 0.5);
+     }
+ 
+     int Creature::getInitiativeBasis()
+     {
+-        int es = 2 * getEigenschaftForBasiswertCalculation(E_MUT) +
+-            getEigenschaftForBasiswertCalculation(E_INTUITION) +
+-            getEigenschaftForBasiswertCalculation(E_GEWANDTHEIT);
++      int es = 2 * getEigenschaft(E_MUT, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_INTUITION, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_GEWANDTHEIT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 5.0 + 0.5);
+     }
+ 
+     int Creature::getMrBasis()
+     {
+-        int es = getEigenschaftForBasiswertCalculation(E_MUT) +
+-            getEigenschaftForBasiswertCalculation(E_KLUGHEIT) +
+-            getEigenschaftForBasiswertCalculation(E_KONSTITUTION);
++      int es = getEigenschaft(E_MUT, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_KLUGHEIT, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_KONSTITUTION, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 5.0 + 0.5);
+     }
+ 
+     int Creature::getLeBasis()
+     {
+-        int es =  2 * getEigenschaftForBasiswertCalculation(E_KONSTITUTION) +
+-            getEigenschaftForBasiswertCalculation(E_KOERPERKRAFT);
++      int es =  2 * getEigenschaft(E_KONSTITUTION, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_KOERPERKRAFT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 2.0 + 0.5);
+     }
+ 
+     int Creature::getAuBasis()
+     {
+-        int es = getEigenschaftForBasiswertCalculation(E_MUT) +
+-            getEigenschaftForBasiswertCalculation(E_KONSTITUTION) +
+-            getEigenschaftForBasiswertCalculation(E_GEWANDTHEIT);
++      int es = getEigenschaft(E_MUT, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_KONSTITUTION, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_GEWANDTHEIT, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 2.0 + 0.5);
+     }
+ 
+ 	int Creature::getAeBasis()
+ 	{
+-        int es = getEigenschaftForBasiswertCalculation(E_MUT) +
+-			getEigenschaftForBasiswertCalculation(E_INTUITION) +
+-            getEigenschaftForBasiswertCalculation(E_CHARISMA);
++      int es = getEigenschaft(E_MUT, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_INTUITION, Effect::MODTAG_RECALCULATE) +
++          getEigenschaft(E_CHARISMA, Effect::MODTAG_RECALCULATE);
+ 
+         return static_cast&lt;int&gt;(es / 2.0 + 0.5);
+     }
+@@ -331,7 +331,7 @@
+         return mAp.used;
+     }
+ 
+-    int Creature::getEigenschaft(const CeGuiString eigenschaftName)
++    int Creature::getEigenschaft(const CeGuiString eigenschaftName, Effect::ModTag tag)
+     {
+ 		checkEffects();
+ 		EigenschaftMap::const_iterator it = mEigenschaften.find(eigenschaftName);
+@@ -339,20 +339,11 @@
+ 		{
+ 			Throw(IllegalArgumentException, &quot;Eigenschaft nicht gefunden.&quot;);
+ 		}
+-		return it-&gt;second-&gt;getValue();
++		int result = it-&gt;second-&gt;getValue();
++        result += mEffectManager-&gt;getMod(eigenschaftName, Effect::MODTYPE_WERTMOD, tag);
++        return result;
+     }
+ 
+-    int Creature::getEigenschaftForBasiswertCalculation(const CeGuiString eigenschaftName)
+-    {
+-		checkEffects();
+-		EigenschaftMap::const_iterator it = mEigenschaften.find(eigenschaftName);
+-		if (it == mEigenschaften.end())
+-		{
+-			Throw(IllegalArgumentException, &quot;Eigenschaft nicht gefunden.&quot;);
+-		}
+-		return it-&gt;second-&gt;getValueForBasiswertCalculation();
+-    }
+-
+     void Creature::setEigenschaft(const CeGuiString eigenschaftName, int value)
+     {
+         EigenschaftMap::iterator it = mEigenschaften.find(eigenschaftName);
+
+Modified: rl/trunk/engine/rules/src/Effect.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Effect.cpp	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/src/Effect.cpp	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -161,4 +161,9 @@
+       // should be overlaoaded in the specific derivated effects.
+       return STATUS_NONE;
+     }
++    
++    int Effect::getMod(CeGuiString target, ModType type, ModTag tag)
++    {
++      return 0;
++    }
+ }
+
+Modified: rl/trunk/engine/rules/src/EffectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/EffectManager.cpp	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/rules/src/EffectManager.cpp	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -74,9 +74,6 @@
+         RL_LONGLONG timeForCheck = now + timeUntilCheck;
+         // Fuege die Summe und Effekt in die Checklist ein
+         mChecklist[timeForCheck].insert(effect);
+-        std::cout &lt;&lt; &quot;####################### Effect expires in: &quot; &lt;&lt; timeUntilCheck &lt;&lt; &quot; ms.&quot; &lt;&lt; std::endl;
+-        std::cout &lt;&lt; &quot;####################### Now              : &quot; &lt;&lt; now &lt;&lt; std::endl;
+-        std::cout &lt;&lt; &quot;####################### Check            : &quot; &lt;&lt; timeForCheck &lt;&lt; std::endl;
+     }
+     
+     void EffectManager::addDateCheck(RL_LONGLONG date, Effect* effect)
+@@ -110,7 +107,6 @@
+ 				}
+ 			}
+ 		}
+-        CoreSubsystem::getSingleton().getRubyInterpreter()-&gt;execute(&quot;p \&quot;Adding Effect \&quot;&quot;);
+         ScriptWrapper::getSingleton().owned( effect );
+ 		mEffects.insert(effect);
+ 		effect-&gt;enable();
+@@ -130,16 +126,20 @@
+       Effect::Status status = 0;
+       for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
+       {
+-        //try
+-        //{
+             status = status | ((*it)-&gt;getStatus());
+-        //}
+-        //catch (ScriptInvocationFailedException&amp; sife)
+-        //{
+-        //  Logger::getSingleton().log(Logger::CORE, Logger::LL_ERROR, sife.toString() );
+-        //}
+       }
+       return status;
+     }
++    
++    int EffectManager::getMod(CeGuiString target, Effect::ModType type, Effect::ModTag tag)
++    {
++      checkEffects();
++      int mod = 0;
++      for (Effects::iterator it = mEffects.begin(); it != mEffects.end(); it++)
++      {
++        mod += (*it)-&gt;getMod(target, type, tag);
++      }
++      return mod;
++    }
+ }
+ 
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-03-11 19:45:31 UTC (rev 3172)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-03-12 03:59:16 UTC (rev 3173)
+@@ -575,6 +575,17 @@
+       // Meta stati
+         static const Status STATUS_IMMOBILE = STATUS_PARALYZED | STATUS_SLEEPING | STATUS_UNCONSCIOUS | STATUS_PETRIFIED | STATUS_DEAD;
+       
++        typedef int ModType;
++        static const ModType MODTYPE_NONE         = 1 &lt;&lt; 0;
++        static const ModType MODTYPE_WERTMOD      = 1 &lt;&lt; 1;   ///&lt; Modifies the actual value.
++        static const ModType MODTYPE_PROBENMOD    = 1 &lt;&lt; 2;   ///&lt; Modifies the test.
++        static const ModType MODTYPE_WERTMULT     = 1 &lt;&lt; 3;   ///&lt; Will be multiplied on the value.
++        static const ModType MODTYPE_MAXWERTMOD   = 1 &lt;&lt; 4;   ///&lt; Modifies only the maximum of the value.
++      
++        typedef unsigned long ModTag;
++        static const ModTag MODTAG_NONE           = 1 &lt;&lt; 0;
++        static const ModTag MODTAG_KRANKHEIT      = 1 &lt;&lt; 1;
++
+       // other constants
+         static const int REMOVE = -1;
+         static const int PERMANENT = 0;
+@@ -604,6 +615,7 @@
+ 		virtual RL_LONGLONG check() = 0;
+ 
+         virtual Status getStatus();
++        virtual int getMod(rl::CeGuiString target, ModType type, ModTag tag);
+         
+ 	protected:
+ 		virtual void apply() = 0;
+@@ -655,7 +667,7 @@
+         void setWert(Wert wertId, int value);
+         virtual StateSet* getWertStateSet(Wert wertId);
+         
+-        virtual int getEigenschaft(const rl::CeGuiString eigenschaftName);
++        virtual int getEigenschaft(const rl::CeGuiString eigenschaftName, Effect::ModTag = Effect::MODTAG_NONE);
+         virtual void setEigenschaft(const rl::CeGuiString eigenschaftName, int value);
+         virtual void modifyEigenschaft(const rl::CeGuiString eigenschaftName, int mod);
+ 		virtual EigenschaftenStateSet* getEigenschaftenStateSet(const rl::CeGuiString eigenschaftName);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000243.html">[Dsa-hl-svn] r3172 - in rl/trunk/engine: rules/include rules/src	script/swig
+</A></li>
+	<LI>Next message: <A HREF="000245.html">[Dsa-hl-svn] r3174 - in modules: common/scripts/effects	regressiontest/dsa regressiontest/scripts	regressiontest/scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#244">[ date ]</a>
+              <a href="thread.html#244">[ thread ]</a>
+              <a href="subject.html#244">[ subject ]</a>
+              <a href="author.html#244">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

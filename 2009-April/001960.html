@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4903 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4903%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904171924.n3HJOLfj030494%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001959.html">
+   <LINK REL="Next"  HREF="001961.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4903 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4903%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200904171924.n3HJOLfj030494%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4903 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr 17 21:24:21 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001959.html">[Dsa-hl-svn] r4902 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+        <LI>Next message: <A HREF="001961.html">[Dsa-hl-svn] r4904 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1960">[ date ]</a>
+              <a href="thread.html#1960">[ thread ]</a>
+              <a href="subject.html#1960">[ subject ]</a>
+              <a href="author.html#1960">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-04-17 21:24:20 +0200 (Fri, 17 Apr 2009)
+New Revision: 4903
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleDirectoryView.py
+   rl/trunk/editors/Lockenwickler/src/PreferencesDialog.py
+Log:
+- save text editor path on shutdown
+
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-04-17 18:31:40 UTC (rev 4902)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-04-17 19:24:20 UTC (rev 4903)
+@@ -85,6 +85,8 @@
+             self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
+         else:
+             self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
++            
++        self.prefDialog.setExternalEditorPath(str(settings.value(&quot;Preferences/externalEditorPath&quot;).toString()))
+         
+         self.moduleDirectoryViewWin.modulesPath = self.prefDialog.moduleCfgPath.replace(&quot;modules.cfg&quot;, &quot;&quot;)
+         
+@@ -210,7 +212,7 @@
+         self.actionModuleDirView = self.createAction(&quot;&amp;Directory Explorer&quot;,  self.toggleModuleDirView,  &quot;Alt+D&quot;,  &quot;view_tree.png&quot;,  &quot;Module Directory Explorer&quot;,  False)
+         self.actionModuleDirView.setObjectName(&quot;actionDirectoryExplorer&quot;)
+         
+-        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  &quot;Alt+P&quot;,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
++        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  None,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
+         self.actionPreferences.setObjectName(&quot;actionPreferences&quot;)
+ 
+         self.actionProperty_Window = self.createAction(&quot;Pr&amp;operty Window&quot;,  self.togglePropertyWindow,  &quot;Alt+P&quot;,  &quot;unsortedlist1.png&quot;,  &quot;Property Window&quot;)
+@@ -543,7 +545,7 @@
+             settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
+             settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
+             settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
+-            
++            settings.setValue(&quot;Preferences/externalEditorPath&quot;,  QtCore.QVariant(self.prefDialog.externalTextAppLineEdit.text()))
+             #self.ogreRoot.shutdown()
+         else:
+             event.ignore()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleDirectoryView.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleDirectoryView.py	2009-04-17 18:31:40 UTC (rev 4902)
++++ rl/trunk/editors/Lockenwickler/src/ModuleDirectoryView.py	2009-04-17 19:24:20 UTC (rev 4903)
+@@ -40,6 +40,7 @@
+         
+         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)        
+         self.connect(self.tree, SIGNAL(&quot;customContextMenuRequested(const QPoint &amp;)&quot;), self.doMenu)
++        self.connect(self.tree, SIGNAL(&quot;doubleClicked(const QModelIndex &amp;)&quot;), self.onDoubleClicked)
+         
+         self.tree.setModel(self.model)
+         self.tree.setWindowTitle(&quot;Module Dir View&quot;)
+@@ -50,16 +51,31 @@
+         
+     def doMenu(self, point):
+         menu = QMenu(self)
+-        #item = self.tree.itemAt(point)
+             
+         action= self.createAction(&quot;Delete&quot;, self.onDelete, None, &quot;editdelete.png&quot;)
+         menu.addAction(action)
+         
++        action= self.createAction(&quot;Refresh&quot;, self.model.refresh)
++        menu.addAction(action)
++        
++        
++        
+         menu.exec_(QCursor.pos())
+         #subprocess.Popen(PreferencesDialog.externalTextAppCmd)
+-
++    
++    def onDoubleClicked(self, index):
++        if PreferencesDialog.externalTextAppCmd is not None:
++            fileInfo = self.model.fileInfo(index)
++            if not fileInfo.isDir():
++                fileName = str(fileInfo.fileName())
++                if fileName.endswith(&quot;.rb&quot;) or fileName.endswith(&quot;.material&quot;) or fileName.endswith(&quot;.xml&quot;):
++                    subprocess.Popen([PreferencesDialog.externalTextAppCmd, str(fileInfo.filePath())])
++        
++    
+     def onDelete(self):
+-        print &quot;delete&quot;
++        fileInfo = self.model.fileInfo(self.tree.currentIndex())
++        os.remove(str(fileInfo.filePath()))
++        self.model.refresh()
+         
+     def getFilters(self, dir, list):
+         for f in os.listdir(dir):
+@@ -75,9 +91,6 @@
+ #            self.getFilters(dir, nameFilters)
+ 
+         self.tree.setRootIndex(self.model.index(self.modulesPath))
+-
+-    
+-
+         
+     def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
+         action = QAction(text, self)
+
+Modified: rl/trunk/editors/Lockenwickler/src/PreferencesDialog.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/PreferencesDialog.py	2009-04-17 18:31:40 UTC (rev 4902)
++++ rl/trunk/editors/Lockenwickler/src/PreferencesDialog.py	2009-04-17 19:24:20 UTC (rev 4903)
+@@ -75,6 +75,9 @@
+         PreferencesDialog.externalTextAppCmd = str(self.externalTextAppLineEdit.text())
+         self.accept()
+         
++    def setExternalEditorPath(self, path):
++        PreferencesDialog.externalTextAppCmd = path
++        self.externalTextAppLineEdit.setText(path)
+         
+     def setCfgPath(self, inPath):
+         path = str(inPath)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001959.html">[Dsa-hl-svn] r4902 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+	<LI>Next message: <A HREF="001961.html">[Dsa-hl-svn] r4904 - in rl/trunk/editors/Lockenwickler: . src ui	files
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1960">[ date ]</a>
+              <a href="thread.html#1960">[ thread ]</a>
+              <a href="subject.html#1960">[ subject ]</a>
+              <a href="author.html#1960">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

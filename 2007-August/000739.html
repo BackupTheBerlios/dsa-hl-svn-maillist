@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3668 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3668%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200708061736.l76Ha02R017563%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000738.html">
+   <LINK REL="Next"  HREF="000740.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3668 - in rl/trunk/engine/core: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3668%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200708061736.l76Ha02R017563%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3668 - in rl/trunk/engine/core: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Aug  6 19:36:00 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000738.html">[Dsa-hl-svn] r3667 - modules/common/materials/programs
+</A></li>
+        <LI>Next message: <A HREF="000740.html">[Dsa-hl-svn] r3669 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#739">[ date ]</a>
+              <a href="thread.html#739">[ thread ]</a>
+              <a href="subject.html#739">[ subject ]</a>
+              <a href="author.html#739">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-06 19:35:52 +0200 (Mon, 06 Aug 2007)
+New Revision: 3668
+
+Modified:
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+Log:
+added possibility to log the properties of all newton-bodies
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2007-08-06 11:59:23 UTC (rev 3667)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2007-08-06 17:35:52 UTC (rev 3668)
+@@ -352,6 +352,11 @@
+ 
+         //! generic physics contact callback handler object
+         PhysicsGenericContactCallback* mGenericCallback;
++
++#ifdef _DEBUG
++        static void _CDECL PhysicsManager::newtonPerBodyLogProperties( const NewtonBody* body );
++#endif
++
+     };
+ 
+     class PhysicsCollisionFactory
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-08-06 11:59:23 UTC (rev 3667)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-08-06 17:35:52 UTC (rev 3668)
+@@ -99,11 +99,6 @@
+ 
+         // below here starts 'old' stale fix code that should be removed
+ 
+-        // setup character material
+-        // actually this is needed here, because the actor is created in advance before the
+-        // character controller who actually does create 'character' material too.
+-        createMaterialID(&quot;character&quot;);
+-
+         // setup level quadtree extents
+         mLevelBodiesQuadTree.setMaxData(20);
+         mLevelBodiesQuadTree.setMaxDepth(10);
+@@ -148,14 +143,62 @@
+         {
+             mWorld-&gt;update(mMaxTimestep);
+             mElapsed-=mMaxTimestep;
++#ifdef _DEBUG
++            if( mDebugMode )
++            {
++                LOG_DEBUG(Logger::CORE, &quot;\tNewtonBodyLog: &amp;Body  Position  Orientation  Velocity  &quot;\
++                    &quot;Omega  Force  Torque  NewtonBodyGetSleepingState  NewtonBodyGetAutoFreeze  &quot;\
++                    &quot;NewtonBodyGetContinuousCollisionMode  ( invMass  invIxx  invIyy  invIzz )&quot;);
++                NewtonWorldForEachBodyDo(mWorld-&gt;getNewtonWorld(), newtonPerBodyLogProperties);
++            }
++#endif
+         }
+         if( mElapsed &gt; mMinTimestep)
+         {
+             mWorld-&gt;update(mElapsed);
+             mElapsed = 0;
++#ifdef _DEBUG
++            if( mDebugMode )
++            {
++                LOG_DEBUG(Logger::CORE, &quot;\tNewtonBodyLog: &amp;Body  Position  Orientation  Velocity  &quot;\
++                    &quot;Omega  Force  Torque  NewtonBodyGetSleepingState  NewtonBodyGetAutoFreeze  &quot;\
++                    &quot;NewtonBodyGetContinuousCollisionMode  ( invMass  invIxx  invIyy  invIzz )&quot;);
++                NewtonWorldForEachBodyDo(mWorld-&gt;getNewtonWorld(), newtonPerBodyLogProperties);
++            }
++#endif
+         }
+     }
+ 
++#ifdef _DEBUG
++    void _CDECL PhysicsManager::newtonPerBodyLogProperties( const NewtonBody* body )
++    {
++        std::ostringstream oss;
++        Quaternion orient;
++        Vector3 pos;
++        float matrix[16];
++        NewtonBodyGetMatrix(body,matrix);
++        OgreNewt::Converters::MatrixToQuatPos(matrix,orient,pos);
++        Vector3 force;
++        NewtonBodyGetForce(body, &amp;force.x);
++        Vector3 torque;
++        NewtonBodyGetTorque(body, &amp;torque.x);
++        Vector3 omega;
++        NewtonBodyGetOmega(body, &amp;omega.x);
++        Vector3 velocity;
++        NewtonBodyGetVelocity(body, &amp;velocity.x);
++        Vector3 invMass, invIxx, invIyy, invIzz;
++        NewtonBodyGetInvMass(body, &amp;invMass.x, &amp;invIxx.x, &amp;invIyy.x, &amp;invIzz.x);
++        oss &lt;&lt; &quot;\tNewtonBodyLog: &quot; &lt;&lt; body &lt;&lt; &quot;  &quot; &lt;&lt; pos &lt;&lt; &quot;  &quot; &lt;&lt; orient &lt;&lt; &quot;  &quot; &lt;&lt; velocity &lt;&lt; &quot;  &quot;
++            &lt;&lt; omega &lt;&lt; &quot;  &quot; &lt;&lt; force &lt;&lt; &quot;  &quot; &lt;&lt; torque &lt;&lt; &quot;  &quot; &lt;&lt; NewtonBodyGetSleepingState(body)
++            &lt;&lt; &quot;  &quot; &lt;&lt; NewtonBodyGetAutoFreeze(body) &lt;&lt; &quot;  &quot; &lt;&lt; NewtonBodyGetContinuousCollisionMode(body) &lt;&lt; &quot;  ( &quot;
++            &lt;&lt; invMass &lt;&lt; &quot;  &quot; &lt;&lt; invIxx &lt;&lt; &quot;  &quot; &lt;&lt; invIyy &lt;&lt; &quot;  &quot; &lt;&lt; invIzz &lt;&lt; &quot; )&quot;;
++        LOG_DEBUG(Logger::CORE, oss.str());
++    }
++#endif
++
++
++
++
+     void PhysicsManager::setGravity( Real x, Real y, Real z )
+     {
+         mGravity = Vector3(x, y, z);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000738.html">[Dsa-hl-svn] r3667 - modules/common/materials/programs
+</A></li>
+	<LI>Next message: <A HREF="000740.html">[Dsa-hl-svn] r3669 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#739">[ date ]</a>
+              <a href="thread.html#739">[ thread ]</a>
+              <a href="subject.html#739">[ subject ]</a>
+              <a href="author.html#739">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

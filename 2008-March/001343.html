@@ -1,0 +1,454 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4272%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig&In-Reply-To=%3C200803081706.m28H66d4020236%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001342.html">
+   <LINK REL="Next"  HREF="001344.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4272%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/include%20script/src%20script/swig&In-Reply-To=%3C200803081706.m28H66d4020236%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4272 - in rl/trunk/engine: core core/include core/src	script/include script/src script/swig">timm at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 18:06:06 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001342.html">[Dsa-hl-svn] r4271 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001344.html">[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1343">[ date ]</a>
+              <a href="thread.html#1343">[ thread ]</a>
+              <a href="subject.html#1343">[ subject ]</a>
+              <a href="author.html#1343">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-08 18:05:59 +0100 (Sat, 08 Mar 2008)
+New Revision: 4272
+
+Added:
+   rl/trunk/engine/core/include/ContentLoader.h
+   rl/trunk/engine/core/src/ContentLoader.cpp
+Modified:
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/ContentModule.h
+   rl/trunk/engine/core/src/ContentModule.cpp
+   rl/trunk/engine/core/src/RubyInterpreter.cpp
+   rl/trunk/engine/script/include/MapLoader.h
+   rl/trunk/engine/script/src/MapLoader.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+Started making map changes persistent
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -384,6 +384,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\ContentLoader.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\ContentModule.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -701,6 +705,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\ContentLoader.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\ContentModule.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Added: rl/trunk/engine/core/include/ContentLoader.h
+===================================================================
+--- rl/trunk/engine/core/include/ContentLoader.h	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/include/ContentLoader.h	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -0,0 +1,41 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __ContentLoader_H__
++#define __ContentLoader_H__
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;Properties.h&quot;
++
++namespace rl
++{
++    class _RlCoreExport ContentLoader : public PropertyHolder
++    {
++    public:
++        virtual ~ContentLoader();
++
++        const Property getProperty(const CeGuiString&amp; key) const;
++        void setProperty(const CeGuiString&amp; key, const Property&amp; value);
++
++        PropertyKeys getAllPropertyKeys() const;
++
++        virtual const CeGuiString getClassName() const = 0;
++    protected:
++        ContentLoader();
++    };
++}
++
++#endif
+
+Modified: rl/trunk/engine/core/include/ContentModule.h
+===================================================================
+--- rl/trunk/engine/core/include/ContentModule.h	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/include/ContentModule.h	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -18,11 +18,13 @@
+ #define __ContentModule_H__
+ 
+ #include &quot;CorePrerequisites.h&quot;
++#include &quot;SaveGameManager.h&quot;
++#include &quot;ContentLoader.h&quot;
+ 
+ namespace rl
+ {
+ 
+-	class _RlCoreExport ContentModule
++    class _RlCoreExport ContentModule : public SaveGameData
+ 	{
+ 	public:
+ 		ContentModule(const Ogre::String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion);
+@@ -38,6 +40,7 @@
+ 		virtual const Ogre::StringVector&amp; getTextureLocations() const = 0;
+ 		virtual const Ogre::StringVector&amp; getSoundLocations() const = 0;
+ 		virtual const Ogre::StringVector&amp; getModelLocations() const = 0;
++        virtual const Ogre::StringVector&amp; getDefaultMaps() const = 0;
+ 		virtual void start() = 0;
+ 
+ 		static const Ogre::String getInitFile(const Ogre::String&amp; moduleId);
+@@ -48,6 +51,12 @@
+ 
+         bool isLoaded() const;
+ 
++
++        CeGuiString getXmlNodeIdentifier() const;
++        void writeData(SaveGameFileWriter* writer);
++        void readData(SaveGameFileReader* reader);
++        /// defines the loading/saving order higher priority are saved last and loaded first
++        int getPriority() const;
+ 	private:
+ 		static const Ogre::String getDirectory(const Ogre::String&amp; moduleId);
+ 		void addSearchPath(const Ogre::String&amp; path, const Ogre::String&amp; resourceGroup) const;
+
+Added: rl/trunk/engine/core/src/ContentLoader.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentLoader.cpp	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/src/ContentLoader.cpp	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -0,0 +1,45 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#include &quot;stdinc.h&quot;
++
++#include &quot;ContentLoader.h&quot;
++
++namespace rl
++{
++    ContentLoader::ContentLoader()
++    {
++    }
++
++    ContentLoader::~ContentLoader()
++    {
++    }
++
++    const Property ContentLoader::getProperty(const CeGuiString&amp; key) const
++    {
++        return Property();
++    }
++      
++    void ContentLoader::setProperty(const CeGuiString&amp; key, const Property&amp; value)
++    {
++    }
++
++    PropertyKeys ContentLoader::getAllPropertyKeys() const
++    {
++        PropertyKeys keys;
++        return keys;
++    }
++}
+\ No newline at end of file
+
+Modified: rl/trunk/engine/core/src/ContentModule.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ContentModule.cpp	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/src/ContentModule.cpp	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -28,7 +28,7 @@
+ 
+ namespace rl
+ {
+-    ContentModule::ContentModule(const String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion)
++    ContentModule::ContentModule(const Ogre::String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion)
+     :    mId(id),
+         mName(name),
+         mCommon(common),
+@@ -41,18 +41,18 @@
+     {
+     }
+ 
+-    const String ContentModule::getInitFile(const String&amp; moduleId)
++    const Ogre::String ContentModule::getInitFile(const Ogre::String&amp; moduleId)
+     {
+         return getDirectory(moduleId) + &quot;/scripts/moduleconfig.rb&quot;;
+     }
+ 
+-    const String ContentModule::getDirectory(const String&amp; moduleId)
++    const Ogre::String ContentModule::getDirectory(const Ogre::String&amp; moduleId)
+     {
+         return ConfigurationManager::getSingleton().
+                 getModulesRootDirectory() + &quot;/&quot; + moduleId;
+     }
+ 
+-    const String ContentModule::getDirectory() const
++    const Ogre::String ContentModule::getDirectory() const
+     {
+         return ContentModule::getDirectory(mId);
+     }
+@@ -62,7 +62,7 @@
+         return mName;
+     }
+ 
+-    const String&amp; ContentModule::getId() const
++    const Ogre::String&amp; ContentModule::getId() const
+     {
+         return mId;
+     }
+@@ -79,18 +79,18 @@
+ 
+     void ContentModule::initializeTextures() const
+     {
+-        String resourceGroup = getId();
++        Ogre::String resourceGroup = getId();
+ 
+         StringVector texLocations = getTextureLocations();
+         for(StringVector::iterator iter = texLocations.begin();
+             iter != texLocations.end();
+             iter++)
+         {
+-            String location = *iter;
+-            if (location.find(&quot;.zip&quot;) != String::npos)
++            Ogre::String location = *iter;
++            if (location.find(&quot;.zip&quot;) != Ogre::String::npos)
+             {
+                 ResourceGroupManager::getSingleton().addResourceLocation(
+-                    getDirectory() + &quot;/materials/&quot; + location, &quot;Zip&quot;, resourceGroup);
++                    getDirectory() + &quot;/materials/&quot; + location, Ogre::String(&quot;Zip&quot;), resourceGroup);
+             }
+             else
+             {
+@@ -104,10 +104,12 @@
+ 
+     void ContentModule::initialize()
+     {
+-        String moduleDir = getDirectory();
++        SaveGameManager::getSingleton().registerSaveGameData(this);
+ 
+-        String resourceGroup = getId();
++        Ogre::String moduleDir = getDirectory();
+ 
++        Ogre::String resourceGroup = getId();
++
+         addSearchPath(moduleDir + &quot;/conf&quot;, resourceGroup);
+         addSearchPath(moduleDir + &quot;/dsa&quot;, resourceGroup);
+         addSearchPath(moduleDir + &quot;/maps&quot;, resourceGroup);
+@@ -175,6 +177,7 @@
+ 
+     void ContentModule::unload()
+     {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+         //TODO: unloadModule
+         CoreSubsystem::getSingleton().getWorld()-&gt;clearScene();
+         mLoaded = false;
+@@ -184,4 +187,23 @@
+     {
+         return mLoaded;
+     }
++
++    CeGuiString ContentModule::getXmlNodeIdentifier() const
++    {
++        return &quot;ContentModule&quot;;
++    }
++
++    void ContentModule::writeData(SaveGameFileWriter* writer)
++    {
++    }
++
++    void ContentModule::readData(SaveGameFileReader* reader)
++    {
++    }
++
++    /// defines the loading/saving order higher priority are saved last and loaded first
++    int ContentModule::getPriority() const
++    {
++        return 10;
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/RubyInterpreter.cpp
+===================================================================
+--- rl/trunk/engine/core/src/RubyInterpreter.cpp	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/core/src/RubyInterpreter.cpp	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -90,7 +90,7 @@
+     rb_define_singleton_method(rb_defout, &quot;write&quot;, func, 1);
+ }
+ 
+-void RubyInterpreter::addSearchPath(const String&amp; path)
++void RubyInterpreter::addSearchPath(const Ogre::String&amp; path)
+ {
+     ruby_incpush(path.c_str());
+ }
+@@ -125,7 +125,7 @@
+     }
+ }
+ 
+-bool RubyInterpreter::execute(const String&amp; command)
++bool RubyInterpreter::execute(const Ogre::String&amp; command)
+ {
+     int status = -1;
+ 
+@@ -143,7 +143,7 @@
+     return true;
+ }
+ 
+-bool RubyInterpreter::executeFile(String rubyfile)
++bool RubyInterpreter::executeFile(Ogre::String rubyfile)
+ {
+     bool error = execute(&quot;load '&quot; + rubyfile + &quot;'&quot;);
+     if (CoreSubsystem::getSingleton().isInitialized())
+
+Modified: rl/trunk/engine/script/include/MapLoader.h
+===================================================================
+--- rl/trunk/engine/script/include/MapLoader.h	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/script/include/MapLoader.h	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -21,14 +21,15 @@
+ #include &quot;ScriptPrerequisites.h&quot;
+ 
+ #include &lt;list&gt;
+-#include &quot;XmlProcessor.h&quot;
++#include &lt;XmlProcessor.h&gt;
++#include &lt;ContentLoader.h&gt;
+ 
+ namespace rl {
+ 
+     class AbstractMapNodeProcessor;
+     class ProgressWindow;
+ 
+-    class _RlScriptExport MapLoader : private XmlProcessor 
++    class _RlScriptExport MapLoader : public ContentLoader,private XmlProcessor 
+     {
+     public:
+         MapLoader(const Ogre::String&amp; resourceGroup);
+@@ -41,6 +42,7 @@
+         */
+         void loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects = true);
+ 
++        const CeGuiString getClassName() const;
+     private:
+         std::list&lt;AbstractMapNodeProcessor*&gt; mNodeProcessors;
+ 
+
+Modified: rl/trunk/engine/script/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/script/src/MapLoader.cpp	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/script/src/MapLoader.cpp	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -110,6 +110,11 @@
+         shutdownXml();
+     }
+ 
++    const CeGuiString MapLoader::getClassName() const
++    {
++        return &quot;MapLoader&quot;;
++    }
++
+     void MapLoader::processSceneNodes(DOMElement* nodesElem, bool loadGameObjects)
+     {
+ 		if (nodesElem == NULL)
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2008-03-08 16:54:21 UTC (rev 4271)
++++ rl/trunk/engine/script/swig/RlCore.swig	2008-03-08 17:05:59 UTC (rev 4272)
+@@ -667,6 +667,7 @@
+ 	virtual const Ogre::StringVector&amp; getTextureLocations() const = 0;
+ 	virtual const Ogre::StringVector&amp; getSoundLocations() const = 0;
+ 	virtual const Ogre::StringVector&amp; getModelLocations() const = 0;
++	virtual const Ogre::StringVector&amp; getDefaultMaps() const = 0;
+ 
+ 	virtual void start() = 0;
+ };
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001342.html">[Dsa-hl-svn] r4271 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001344.html">[Dsa-hl-svn] r4273 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1343">[ date ]</a>
+              <a href="thread.html#1343">[ thread ]</a>
+              <a href="subject.html#1343">[ subject ]</a>
+              <a href="author.html#1343">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

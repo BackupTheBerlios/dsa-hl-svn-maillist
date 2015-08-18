@@ -1,0 +1,333 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3198 - rl/trunk/engine/core/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3198%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703280326.l2S3QrpK023067%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000268.html">
+   <LINK REL="Next"  HREF="000270.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3198 - rl/trunk/engine/core/include</H1>
+    <B>natoka at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3198%20-%20rl/trunk/engine/core/include&In-Reply-To=%3C200703280326.l2S3QrpK023067%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3198 - rl/trunk/engine/core/include">natoka at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar 28 05:26:53 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000268.html">[Dsa-hl-svn] r3197 - rl/trunk/engine/core/include
+</A></li>
+        <LI>Next message: <A HREF="000270.html">[Dsa-hl-svn] r3199 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#269">[ date ]</a>
+              <a href="thread.html#269">[ thread ]</a>
+              <a href="subject.html#269">[ subject ]</a>
+              <a href="author.html#269">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: natoka
+Date: 2007-03-28 05:26:49 +0200 (Wed, 28 Mar 2007)
+New Revision: 3198
+
+Modified:
+   rl/trunk/engine/core/include/QuadTree.h
+Log:
+reversed y coordinate handling to properly support right hand side coordinate system
+
+
+Modified: rl/trunk/engine/core/include/QuadTree.h
+===================================================================
+--- rl/trunk/engine/core/include/QuadTree.h	2007-03-27 20:59:52 UTC (rev 3197)
++++ rl/trunk/engine/core/include/QuadTree.h	2007-03-28 03:26:49 UTC (rev 3198)
+@@ -156,7 +156,11 @@
+ 		return Ogre::Vector2(0.0f,0.0f);
+ 	}
+ 
++    /** retrieves the topleft vertex
++     */
+     inline Ogre::Vector2 getTopLeft() { return mVertexTL; }
++    /** retrieves the bottom right vertex
++     */
+     inline Ogre::Vector2 getBottomRight() { return mVertexBR; }
+ 
+ 	/** tests if the given u value is inside the quad.
+@@ -197,14 +201,8 @@
+   mVertexTL(tlc),
+   mVertexBR(brc)
+ {
+-	/*
+-	mVertices[TOP_LEFT] = tlc;
+-	mVertices[BOTTOM_LEFT].x = tlc.x;
+-	mVertices[BOTTOM_LEFT].z = brc.z;
+-	mVertices[BOTTOM_RIGHT] = brc;
+-	mVertices[TOP_RIGHT].x = brc.x;
+-	mVertices[TOP_RIGHT].z = tlc.z;
+-	*/
++    // right hand side coordinate system (2D part) xz plane
++    RlAssert ( (tlc &lt; brc), &quot;coordinates don't fit together&quot; );
+ }
+ 
+ /** A basic loose quadtree.
+@@ -348,8 +346,6 @@
+ 	inline bool isUInsideLoose(Ogre::Real u)
+ 	{ 
+ 		return (mVertexTL.x - mLooseness &lt; u &amp;&amp; u &lt; mVertexBR.x + mLooseness);
+-		//return (mVertices[TOP_LEFT].x - mLooseness &lt; u &amp;&amp;
+-		//	u &lt; mVertices[BOTTOM_RIGHT].x + mLooseness);
+ 	}
+ 	/** tests if the given v value is inside the quad.
+ 	 * Since this is a 2D test, the name refers to v coordinate
+@@ -359,8 +355,6 @@
+ 	inline bool isVInsideLoose(Ogre::Real v) 
+ 	{
+ 		return (mVertexTL.y - mLooseness &lt; v &amp;&amp; v &lt; mVertexBR.y + mLooseness);
+-		//return (mVertices[TOP_LEFT].y - mLooseness &lt; v &amp;&amp;
+-		//	v &lt; mVertices[BOTTOM_RIGHT].y + mLooseness);
+ 	}
+ 
+    	/** inserts the specified data.
+@@ -392,6 +386,10 @@
+ 	 */
+ 	void split();
+ 
++    /** sets the specified vertex to a new value
++     * @param location gives the position of the vertex
++     * @param vertex contains the new value
++     */
+     void SetVertex(enum rl::TQuadTreeBasicNode&lt;TData&gt;::NodeLocation location, Ogre::Vector2 vertex);
+ 
+     /** maximum number of elements in one leaf.
+@@ -466,7 +464,7 @@
+ void TLooseQuadTreeNode&lt;TData,TNode&gt;::split()
+ {
+ 	Ogre::Real HalfWidth = mWidth/2.0f;
+-	Ogre::Vector2 center (getVertex(TOP_LEFT) + Ogre::Vector2(HalfWidth, -HalfWidth));
++	Ogre::Vector2 center (getVertex(TOP_LEFT) + Ogre::Vector2(HalfWidth, HalfWidth));
+ 	// create 4 subnodes
+ 	mNodes[TOP_LEFT] = 
+ 		new TNode(mMaxData,mMaxDepth-1,mLooseness/2.0f,
+@@ -637,74 +635,83 @@
+ 	{
+ 	case BNode::TOP_LEFT:
+         // first create new root (top) node
+-        newVertexTL = vertexTL + Ogre::Vector2(-oldWidth,oldWidth);
++        newVertexBR = vertexBR + Ogre::Vector2(oldWidth,oldWidth);
+         mRoot = new TNode(mMaxData, mMaxDepth, newLooseness,
+-            newVertexTL, vertexBR, newWidth);
++            vertexTL, newVertexBR, newWidth);
+ 
+-        mRoot-&gt;mNodes[BNode::TOP_LEFT] = 
++		mRoot-&gt;mNodes[BNode::TOP_LEFT] = oldroot;
++        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] = 
+             new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-                      vertexTL + Ogre::Vector2(-oldWidth,oldWidth), 
+-                      vertexTL, oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] =
++                      Ogre::Vector2(vertexTL.x,vertexBR.y), 
++                      Ogre::Vector2(vertexBR.x,newVertexBR.y), oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] =
+             new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-                      vertexTL + Ogre::Vector2(-oldWidth,0.0f), 
+-                      vertexBR + Ogre::Vector2(-oldWidth,0.0f), oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] = oldroot;
++                      vertexBR,
++                      newVertexBR, oldWidth);
+         mRoot-&gt;mNodes[BNode::TOP_RIGHT] =
+-            new TNode(mMaxData, mMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(0.0f,oldWidth), 
+-            vertexBR + Ogre::Vector2(0.0f,oldWidth), oldWidth);
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(vertexBR.x,vertexTL.y),
++                      Ogre::Vector2(newVertexBR.x,vertexBR.y), oldWidth);
++
+ 		break;
+     case BNode::BOTTOM_LEFT:
+-        newVertexTL = vertexTL + Ogre::Vector2(-oldWidth,0.0f);
+-        newVertexBR = vertexBR + Ogre::Vector2(0.0f,-oldWidth);
++        newVertexTL = vertexTL + Ogre::Vector2(0.0f, -oldWidth);
++        newVertexBR = vertexBR + Ogre::Vector2(oldWidth, 0.0f);
+         mRoot = new TNode(mMaxData, mMaxDepth, newLooseness,
+             newVertexTL, newVertexBR, newWidth);
+ 
+-        mRoot-&gt;mNodes[BNode::TOP_LEFT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(-oldWidth,0.0f), 
+-            vertexBR + Ogre::Vector2(-oldWidth,0.0f), oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(-oldWidth,-oldWidth), 
+-            vertexBR + Ogre::Vector2(-oldWidth,-oldWidth), oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(0.0f,-oldWidth), 
+-            vertexBR + Ogre::Vector2(0.0f,-oldWidth), oldWidth);
+-        mRoot-&gt;mNodes[BNode::TOP_RIGHT] = oldroot;
++        mRoot-&gt;mNodes[BNode::TOP_LEFT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      newVertexTL, 
++                      Ogre::Vector2(vertexBR.x,vertexTL.y), oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] = oldroot;
++        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(vertexBR.x,vertexTL.y),
++                      newVertexBR, oldWidth);
++        mRoot-&gt;mNodes[BNode::TOP_RIGHT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(vertexBR.x,newVertexTL.y), 
++                      Ogre::Vector2(newVertexBR.x,vertexTL.y), oldWidth);
+         break;
+     case BNode::BOTTOM_RIGHT:
+-        newVertexBR = vertexBR + Ogre::Vector2(oldWidth,-oldWidth);
++        newVertexTL = vertexTL + Ogre::Vector2(-oldWidth,-oldWidth);
+         mRoot = new TNode(mMaxData, mMaxDepth, newLooseness,
+-            vertexTL, newVertexBR, newWidth);
++            newVertexTL, vertexBR, newWidth);
+ 
+-		mRoot-&gt;mNodes[BNode::TOP_LEFT] = oldroot;
+-        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(0.0f,-oldWidth), 
+-            vertexBR + Ogre::Vector2(0.0f,-oldWidth), oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexBR,
+-            vertexBR + Ogre::Vector2(oldWidth,-oldWidth), oldWidth);
+-        mRoot-&gt;mNodes[rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_RIGHT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(oldWidth,0.0f), 
+-            vertexBR + Ogre::Vector2(oldWidth,0.0f), oldWidth);
+-        
++        mRoot-&gt;mNodes[BNode::TOP_LEFT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      newVertexTL,
++                      vertexTL, oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(newVertexTL.x,vertexTL.y),
++                      Ogre::Vector2(vertexTL.x,vertexBR.y), oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] = oldroot;
++        mRoot-&gt;mNodes[BNode::TOP_RIGHT] =
++            new TNode(mMaxData, mMaxDepth, oldLooseness,
++                      Ogre::Vector2(vertexTL.x,newVertexTL.y),
++                      Ogre::Vector2(vertexBR.x,vertexTL.y), oldWidth);
+ 		break;
+ 	case BNode::TOP_RIGHT:
+-        newVertexTL = vertexTL + Ogre::Vector2(0.0f,oldWidth);
+-        newVertexBR = vertexBR + Ogre::Vector2(oldWidth,0.0f);
++        newVertexTL = vertexTL + Ogre::Vector2(-oldWidth, 0.0f);
++        newVertexBR = vertexBR + Ogre::Vector2(0.0f, oldWidth);
+         mRoot = new TNode(mMaxData, mMaxDepth, newLooseness,
+             newVertexTL, newVertexBR, newWidth);
+ 
+-        mRoot-&gt;mNodes[BNode::TOP_LEFT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(0.0f,oldWidth),
+-            vertexBR + Ogre::Vector2(0.0f,oldWidth), oldWidth);
+-        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] = oldroot;
+-        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(oldWidth,0.0f),
+-            vertexBR + Ogre::Vector2(oldWidth,0.0f), oldWidth);
+-        mRoot-&gt;mNodes[BNode::TOP_RIGHT] = new TNode(mMaxData, oldMaxDepth, oldLooseness,
+-            vertexTL + Ogre::Vector2(oldWidth,oldWidth),
+-            vertexBR + Ogre::Vector2(oldWidth,oldWidth), oldWidth);
++        mRoot-&gt;mNodes[BNode::TOP_LEFT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      newVertexTL,
++                      Ogre::Vector2(vertexTL.x,vertexBR.y), oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_LEFT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(newVertexTL.x,vertexBR.y),
++                      Ogre::Vector2(vertexTL.x,newVertexBR.y), oldWidth);
++        mRoot-&gt;mNodes[BNode::BOTTOM_RIGHT] =
++            new TNode(mMaxData, oldMaxDepth, oldLooseness,
++                      Ogre::Vector2(vertexTL.x,vertexBR.y),
++                      newVertexBR, oldWidth);
++        mRoot-&gt;mNodes[BNode::TOP_RIGHT] = oldroot;
+ 		break;
+ 	default:
+ 		Throw (IllegalArgumentException, &quot;unknown NodeLocation type.&quot;);
+@@ -719,46 +726,46 @@
+     {
+         if ( v &lt; mRoot-&gt;mVertexTL.y )
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_LEFT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_RIGHT);
+             extend(u,v);
+         }
+         else if ( v &gt; mRoot-&gt;mVertexBR.y )
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_LEFT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_RIGHT);
+             extend(u,v);
+         }
+         else
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_LEFT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_RIGHT);
+             extend(u,v);
+         }
+     }
+     else if ( u &gt; mRoot-&gt;mVertexBR.x )
+     {
+-        if ( v &lt; mRoot-&gt;mVertexBR.y )
++        if ( v &lt; mRoot-&gt;mVertexTL.y )
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_RIGHT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_LEFT);
+             extend(u,v);
+         }
+-        else if ( v &gt; mRoot-&gt;mVertexTL.y )
++        else if ( v &gt; mRoot-&gt;mVertexBR.y )
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_RIGHT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_LEFT);
+             extend(u,v);
+         }  
+         else
+         {
+-            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_RIGHT);
++            createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_LEFT);
+             extend(u,v);
+         }
+     }
+     else //  u is inside
+     {
+-        if ( v &lt; mRoot-&gt;mVertexBR.y )
++        if ( v &lt; mRoot-&gt;mVertexTL.y )
+         {
+             createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::BOTTOM_RIGHT);
+             extend(u,v);
+         }
+-        else if ( v &gt; mRoot-&gt;mVertexTL.y )
++        else if ( v &gt; mRoot-&gt;mVertexBR.y )
+         {
+             createNewRootNode(rl::TQuadTreeBasicNode&lt;TData&gt;::TOP_RIGHT);
+             extend(u,v);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000268.html">[Dsa-hl-svn] r3197 - rl/trunk/engine/core/include
+</A></li>
+	<LI>Next message: <A HREF="000270.html">[Dsa-hl-svn] r3199 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#269">[ date ]</a>
+              <a href="thread.html#269">[ thread ]</a>
+              <a href="subject.html#269">[ subject ]</a>
+              <a href="author.html#269">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

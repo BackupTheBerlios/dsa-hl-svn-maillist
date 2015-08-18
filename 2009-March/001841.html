@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4784 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4784%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903022051.n22KpJN6031846%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001840.html">
+   <LINK REL="Next"  HREF="001842.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4784 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4784%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903022051.n22KpJN6031846%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4784 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Mon Mar  2 21:51:19 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001840.html">[Dsa-hl-svn] r4783 - in rl/trunk/editors/Lockenwickler: .	_eric4project src src/media
+</A></li>
+        <LI>Next message: <A HREF="001842.html">[Dsa-hl-svn] r4785 - in dependencies/OgreNewt: inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1841">[ date ]</a>
+              <a href="thread.html#1841">[ thread ]</a>
+              <a href="subject.html#1841">[ subject ]</a>
+              <a href="author.html#1841">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-02 21:51:16 +0100 (Mon, 02 Mar 2009)
+New Revision: 4784
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+Log:
+- Added a &quot;OneClickPlacement&quot; option to the edit menu
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-02 19:44:45 UTC (rev 4783)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-02 20:51:16 UTC (rev 4784)
+@@ -184,8 +184,11 @@
+         self.actionRotate.setObjectName(&quot;actionRotate&quot;)
+ 
+         self.actionScale = self.createAction(&quot;&amp;Scale&quot;,  self.actionScaleSlot,  &quot;x&quot;,  &quot;resizecol.png&quot;,  &quot;Scale selected object&quot;)
+-        self.actionRotate.setObjectName(&quot;actionRotate&quot;)
++        self.actionScale.setObjectName(&quot;actionScale&quot;)
+ 
++        self.actionOneClickEntityPlacement = self.createAction(&quot;&amp;OneClickEntityPlacement&quot;,  self.actionOneClickEntityPlacementSlot,  &quot;&quot;,  &quot;resizecol.png&quot;,  &quot;Add an Entity just by a click&quot;)
++        self.actionOneClickEntityPlacement.setObjectName(&quot;actionOneClickEntityPlacement&quot;)
++        self.actionOneClickEntityPlacement.setCheckable(True)
+ 
+ #####################################
+ #####################################
+@@ -228,6 +231,9 @@
+         self.menuEdit.addAction(self.actionCopy)
+         self.menuEdit.addAction(self.actionCut)
+         self.menuEdit.addAction(self.actionPaste)
++        self.menuEdit.addSeparator()
++        self.menuEdit.addAction(self.actionOneClickEntityPlacement)
++        
+ 
+         self.menuView.addAction(self.actionSceneExplorer)
+         self.menuView.addAction(self.actionPreferences)
+@@ -343,6 +349,9 @@
+     def actionScaleSlot(self):
+         self.moduleManager.pivot.setScaleMode()
+ 
++    def actionOneClickEntityPlacementSlot(self):
++        self.moduleManager.setOneClickEntityPlacement(self.actionOneClickEntityPlacement.isChecked())
++
+     def togglePreferencesWindow(self):
+         if self.prefDialog.isHidden():
+             self.prefDialog.show()
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-02 19:44:45 UTC (rev 4783)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-02 20:51:16 UTC (rev 4784)
+@@ -540,6 +540,8 @@
+         self.selectionBuffer = None
+         self.propertyWindow = None
+     
++        self.oneClickEntityPlacement = False
++    
+     def resetParsedModuleConfig(self):
+         self.moduleConfigIsParsed = False
+         self.moduleList = []
+@@ -654,6 +656,11 @@
+         
+     # called when a click into Main Ogre Window occurs
+     def selectionClick(self, screenX, screenY, ray,  controlDown=False,  shiftDown=False):
++        if self.oneClickEntityPlacement:
++            meshFile = str(self.modelSelectionDialog.listWidget.currentItem().text())
++            self.startDropModelAction(meshFile, ray)
++            return
++            
+         so = None
+         if self.selectionBuffer is not None:
+             so = self.selectionBuffer.onSelectionClick(screenX, screenY)
+@@ -692,26 +699,26 @@
+             if self.pivot is not None:
+                 self.pivot.hide()
+ 
+-        if self.rayLine == None:
+-            self.rayLine = self.sceneManager.createManualObject(&quot;rayLine&quot;)
+-            self.rayLine.setDynamic(True)
+-            self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;raynode&quot;).attachObject(self.rayLine)
++#        if self.rayLine == None:
++#            self.rayLine = self.sceneManager.createManualObject(&quot;rayLine&quot;)
++#            self.rayLine.setDynamic(True)
++#            self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;raynode&quot;).attachObject(self.rayLine)
++#
++#            self.rayLine.begin(&quot;BaseWhiteNoLighting&quot;, og.RenderOperation.OT_LINE_STRIP)
++#
++#            self.rayLine.position(ray.getOrigin())
++#            self.rayLine.position( ray.getPoint(10000))
++#
++#            self.rayLine.end()
++#
++#        else:
++#            self.rayLine.beginUpdate(0)
++#
++#            self.rayLine.position(ray.getOrigin())
++#            self.rayLine.position( ray.getPoint(10000))
++#
++#            self.rayLine.end()
+ 
+-            self.rayLine.begin(&quot;BaseWhiteNoLighting&quot;, og.RenderOperation.OT_LINE_STRIP)
+-
+-            self.rayLine.position(ray.getOrigin())
+-            self.rayLine.position( ray.getPoint(10000))
+-
+-            self.rayLine.end()
+-
+-        else:
+-            self.rayLine.beginUpdate(0)
+-
+-            self.rayLine.position(ray.getOrigin())
+-            self.rayLine.position( ray.getPoint(10000))
+-
+-            self.rayLine.end()
+-
+     def deleteObjects(self):
+         if len(self.userSelectionList) &lt; 1:
+             return
+@@ -884,6 +891,7 @@
+ 
+     def startDropModelAction(self, meshFile, ray):
+         if self.currentMap is None:
++            print &quot;No map selected!&quot;
+             return
+             
+         self.dropEntity = self.sceneManager.createEntity(&quot;dropMesh&quot; + str(ModuleManager.dropCount), meshFile)
+@@ -937,4 +945,5 @@
+                 if reply == QMessageBox.Yes:
+                     so.entity.setMaterialName(self.dropMat)
+         
+-        
++    def setOneClickEntityPlacement(self, state):
++        self.oneClickEntityPlacement = state
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001840.html">[Dsa-hl-svn] r4783 - in rl/trunk/editors/Lockenwickler: .	_eric4project src src/media
+</A></li>
+	<LI>Next message: <A HREF="001842.html">[Dsa-hl-svn] r4785 - in dependencies/OgreNewt: inc src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1841">[ date ]</a>
+              <a href="thread.html#1841">[ thread ]</a>
+              <a href="subject.html#1841">[ subject ]</a>
+              <a href="author.html#1841">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,367 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4972 - in dependencies/OgreNewt:	demos/Demo09_PlayerController inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4972%20-%20in%20dependencies/OgreNewt%3A%0A%09demos/Demo09_PlayerController%20inc%20src&In-Reply-To=%3C200911272156.nARLugW8000634%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="002027.html">
+   <LINK REL="Next"  HREF="002029.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4972 - in dependencies/OgreNewt:	demos/Demo09_PlayerController inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4972%20-%20in%20dependencies/OgreNewt%3A%0A%09demos/Demo09_PlayerController%20inc%20src&In-Reply-To=%3C200911272156.nARLugW8000634%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4972 - in dependencies/OgreNewt:	demos/Demo09_PlayerController inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Fri Nov 27 22:56:42 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="002027.html">[Dsa-hl-svn] r4971 - in rl/trunk/engine: core/src ui ui/src
+</A></li>
+        <LI>Next message: <A HREF="002029.html">[Dsa-hl-svn] r4973 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2028">[ date ]</a>
+              <a href="thread.html#2028">[ thread ]</a>
+              <a href="subject.html#2028">[ subject ]</a>
+              <a href="author.html#2028">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-11-27 22:56:39 +0100 (Fri, 27 Nov 2009)
+New Revision: 4972
+
+Modified:
+   dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.cpp
+   dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.h
+   dependencies/OgreNewt/inc/OgreNewt.h
+   dependencies/OgreNewt/inc/OgreNewt_Body.h
+   dependencies/OgreNewt/inc/OgreNewt_Joint.h
+   dependencies/OgreNewt/inc/OgreNewt_Prerequisites.h
+   dependencies/OgreNewt/inc/OgreNewt_Vehicle.h
+   dependencies/OgreNewt/src/OgreNewt_Body.cpp
+   dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+Log:
+added a destructor callback for OgreNewt::Joint and OgreNewt::Body (because these can be destroyed indirectly through newton callbacks!)
+
+
+Modified: dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.cpp
+===================================================================
+--- dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.cpp	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.cpp	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -134,6 +134,25 @@
+ 		OgreNewt::Body* bod = makeSimpleBox( size, pos, orient );
+ 	}
+ 
++
++    // player playground
++
++    bod = NULL;
++    for( int i = 0; i &lt; 20; i++ )
++    {
++        bod = makeSimpleBox( Ogre::Vector3(4.0, 0.4, 1.0), Ogre::Vector3(15.0, -10.0+i*0.4, -2.0-i*0.4), Ogre::Quaternion::IDENTITY);
++        bod-&gt;setMassMatrix(0, Ogre::Vector3::ZERO);
++    }
++
++    bod = makeSimpleBox( Ogre::Vector3(10.0, 0.4, 10.0), Ogre::Vector3(-17.0, -8.0, -15.0), Ogre::Quaternion(Ogre::Degree(60), Ogre::Vector3::UNIT_X));
++    bod-&gt;setMassMatrix(0, Ogre::Vector3::ZERO);
++
++    bod = makeSimpleBox( Ogre::Vector3(10.0, 0.4, 10.0), Ogre::Vector3(-27.0, -8.5, -15.0), Ogre::Quaternion(Ogre::Degree(20), Ogre::Vector3::UNIT_X));
++    bod-&gt;setMassMatrix(0, Ogre::Vector3::ZERO);
++    
++    bod = makeSimpleBox( Ogre::Vector3(10.0, 0.4, 10.0), Ogre::Vector3(-37.0, -8.0, -15.0), Ogre::Quaternion(Ogre::Degree(80), Ogre::Vector3::UNIT_Y) * Ogre::Quaternion(Ogre::Degree(50), Ogre::Vector3::UNIT_X));
++    bod-&gt;setMassMatrix(0, Ogre::Vector3::ZERO);
++
+     makePlayer();
+ 
+ 	
+@@ -171,7 +190,7 @@
+ }
+ 
+ 
+-OgreNewt::Body* OgreNewtonApplication::makeSimpleBox( Ogre::Vector3&amp; size, Ogre::Vector3&amp; pos, Ogre::Quaternion&amp; orient )
++OgreNewt::Body* OgreNewtonApplication::makeSimpleBox( const Ogre::Vector3&amp; size, const Ogre::Vector3&amp; pos, const Ogre::Quaternion&amp; orient )
+ {
+ 	Entity* box1;
+ 	SceneNode* box1node;
+
+Modified: dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.h
+===================================================================
+--- dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/demos/Demo09_PlayerController/OgreNewtonApplication.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -30,7 +30,7 @@
+ 	void destroyScene();
+ 
+ 	// our custom function to simplify making simpe dynamics rigid body boxes.
+-	OgreNewt::Body* makeSimpleBox( Ogre::Vector3&amp; size, Ogre::Vector3&amp; pos, Ogre::Quaternion&amp; orient );
++	OgreNewt::Body* makeSimpleBox( const Ogre::Vector3&amp; size, const Ogre::Vector3&amp; pos, const Ogre::Quaternion&amp; orient );
+ 
+     void makePlayer();
+ 
+
+Modified: dependencies/OgreNewt/inc/OgreNewt.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/inc/OgreNewt.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -66,6 +66,7 @@
+     \section new New in this version
+ 
+     New in this version
++        - added a destructor callback for OgreNewt::Joint and OgreNewt::Body (because these can be destroyed indirectly through newton callbacks!)
+         - removed CollisionTools::CollisionCalculateAABB (because there's col-&gt;getAABB() ) and added a function to calculate the correct AABB
+           CollisionTools::CollisionCalculateFittingAABB
+         - ConvexCast:
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_Body.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_Body.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/inc/OgreNewt_Body.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -35,7 +35,7 @@
+         this class represents a NewtonBody rigid body!
+ */
+ //! main class for all Rigid Bodies in the system.
+-class _OgreNewtExport Body
++class _OgreNewtExport Body : public _DestructorCallback&lt;Body&gt;
+ {
+ public:
+     //! custom force callback.
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_Joint.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_Joint.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/inc/OgreNewt_Joint.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -25,7 +25,7 @@
+ /*!
+     this class is inherited by all other specific joint types.
+ */
+-class _OgreNewtExport Joint
++class _OgreNewtExport Joint : public _DestructorCallback&lt;Joint&gt;
+ {
+ public:
+ 
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_Prerequisites.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_Prerequisites.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/inc/OgreNewt_Prerequisites.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -79,6 +79,64 @@
+     class CollisionSerializer;
+     class ConvexCollision;
+     class Debugger;
++
++
++    //! helper class: OgreNewt-classes can derive from this class to implement a destructor-callback
++    /*!
++     * Consider the following example:
++     * You delete a body thats part of joint, so newton deletes the joint, then you could still have a pointer to that joint. Using this pointer will fail,
++     * thats why you need a way to get to know, when an object gets deleted...
++     */
++    template&lt;class DerivedClass&gt;
++    class _DestructorCallback
++    {
++        public:
++            //! destructor callback
++            /*!
++             * This function is called, when the object is destroyed. It's only argument is a pointer to the instance currently destroyed
++             * @warning the pointer to the destroyed class instance is already invalid (the class is already destroyed!)
++             */
++            typedef boost::function&lt;void(DerivedClass*)&gt; DestructorCallbackFunction;
++
++            //! constructor
++            _DestructorCallback() : m_callback(NULL) {}
++
++            //! destructor
++            virtual ~_DestructorCallback()
++            {
++                if( m_callback )
++                    m_callback((DerivedClass*)(this));
++            }
++
++            //! remove any destructor callback
++            void removeDestructorCallback() {m_callback = NULL;}
++
++            //! set the destructor callback
++            /*!
++             *
++             * This specifies a custom callback that's called when this class is destroyed. If you are using a standard non-member function,
++             * or a static member function, you can simply pass a pointer to the function here.. like this:
++             *      setDestructorCallback( &amp;myCallbackFunction );
++             *
++             * If you want to bind to a class member, you also need to pass a pointer to the class itself, using the boost::bind system, like so:
++             *      setDestructorCallback( boost::bind( &amp;MyClass::myCallback, (MyClass*)classInstance, _1 ) );  (from outside the class) or:
++             *      setDestructorCallback( boost::bind( &amp;MyClass::myCallback, this, _1 ) );  (from inside the class).
++             *
++             * You can also use:
++             *      setDestructorCallback&lt;&gt;( &amp;MyClass::myCallback, (MyClass*)classInstance );  (from outside the class) or:
++             *      setDestructorCallback&lt;&gt;( &amp;MyClass::myCallback, this );  (from inside the class).
++             * Note: Notice the &quot;&lt;&gt;&quot; after the function name.
++             *
++             */
++            void setDestructorCallback( DestructorCallbackFunction fun ) { m_callback = fun; }
++            template&lt;class c&gt; void setDestructorCallback( boost::function&lt;void(c*, DerivedClass*)&gt; callback, c *instancedClassPointer )
++            {
++                setDestructorCallback( boost::bind(callback, instancedClassPointer, _1) );
++            }
++        private:
++            DestructorCallbackFunction m_callback;
++
++    };
+ }
+ 
+ #endif 
+
+Modified: dependencies/OgreNewt/inc/OgreNewt_Vehicle.h
+===================================================================
+--- dependencies/OgreNewt/inc/OgreNewt_Vehicle.h	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/inc/OgreNewt_Vehicle.h	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -25,7 +25,7 @@
+ /*!
+     this class represents a basic vehicle, meant to be inherited by the user, with functionality added.
+ */
+-    class _OgreNewtExport Vehicle
++    class _OgreNewtExport Vehicle : public _DestructorCallback&lt;Vehicle&gt;
+     {
+     public:
+ 
+
+Modified: dependencies/OgreNewt/src/OgreNewt_Body.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_Body.cpp	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/src/OgreNewt_Body.cpp	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -351,9 +351,9 @@
+     getPositionOrientation( bodypos, bodyorient );
+ 
+     Ogre::Vector3 localMassCenter = getCenterOfMass();
+-    Ogre::Vector3 globalMassCenter = bodyorient * localMassCenter;
++    Ogre::Vector3 globalMassCenter = bodypos + bodyorient * localMassCenter;
+ 
+-    Ogre::Vector3 topoint = pos - bodypos - globalMassCenter;
++    Ogre::Vector3 topoint = pos - globalMassCenter;
+     Ogre::Vector3 torque = topoint.crossProduct( force );
+ 
+     addForce( force );
+
+Modified: dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp
+===================================================================
+--- dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-11-16 21:19:13 UTC (rev 4971)
++++ dependencies/OgreNewt/src/OgreNewt_PlayerController.cpp	2009-11-27 21:56:39 UTC (rev 4972)
+@@ -265,15 +265,18 @@
+     Ogre::Quaternion ori;
+     Ogre::Real invMass;
+     Ogre::Vector3 invInertia;
+-    Ogre::Vector3 frontDir, upDir, strafeDir;
++    Ogre::Vector3 localFrontDir, localUpDir, localStrafeDir, globalFrontDir, globalUpDir, globalStrafeDir;
+ 
+     m_body-&gt;getInvMass(invMass, invInertia);
+     m_body-&gt;getPositionOrientation(pos,ori);
+ 
+     Ogre::Quaternion localFrameRotation = m_localFrame.extractQuaternion();
+-    frontDir = localFrameRotation * Ogre::Vector3::NEGATIVE_UNIT_Z;
+-    upDir = localFrameRotation * Ogre::Vector3::UNIT_Y;
+-    strafeDir = localFrameRotation * Ogre::Vector3::UNIT_X;
++    localFrontDir = localFrameRotation * Ogre::Vector3::NEGATIVE_UNIT_Z;
++    localUpDir = localFrameRotation * Ogre::Vector3::UNIT_Y;
++    localStrafeDir = localFrameRotation * Ogre::Vector3::UNIT_X;
++    globalFrontDir = ori*localFrontDir;
++    globalUpDir = ori*localUpDir;
++    globalStrafeDir = ori*localStrafeDir;
+ 
+ 
+ 
+@@ -283,8 +286,7 @@
+ 
+ 
+     // if the body has rotated by some amount, there will be a plane of rotation
+-    Ogre::Vector3 realUp = ori*(localFrameRotation*Ogre::Vector3::UNIT_Y);
+-    Ogre::Vector3 lateralDir = realUp.crossProduct(upDir);
++    Ogre::Vector3 lateralDir = globalUpDir.crossProduct(localUpDir);
+     Ogre::Real mag = lateralDir.length();
+     if( mag &gt; 1.0e-3f)
+     {
+@@ -297,14 +299,14 @@
+ 
+         // in theory only one correction is needed, but this produces instability as the body may move sideway.
+         // a lateral correction prevent this from happening.
+-        Ogre::Vector3 frontDir = lateralDir.crossProduct(upDir);
++        Ogre::Vector3 frontDir = lateralDir.crossProduct(globalUpDir);
+         addAngularRow(Ogre::Radian(0), lateralDir);
+     }
+     else
+     {
+         // if the angle error is very small then two angular correction along the plane axis do the trick
+-        addAngularRow( Ogre::Radian(0), strafeDir );
+-        addAngularRow( Ogre::Radian(0), frontDir );
++        addAngularRow( Ogre::Radian(0), globalStrafeDir );
++        addAngularRow( Ogre::Radian(0), globalFrontDir );
+     }
+ 
+ 
+@@ -313,7 +315,7 @@
+     if( m_playerState == PS_ONLAND )
+     {
+         Ogre::Vector3 vel = m_body-&gt;getVelocity();
+-        Ogre::Vector3 desiredVel = frontDir* m_forwardSpeed + upDir * (vel.dotProduct(upDir)) + strafeDir * m_sideSpeed;
++        Ogre::Vector3 desiredVel = globalFrontDir* m_forwardSpeed + globalUpDir * (vel.dotProduct(globalUpDir)) + globalStrafeDir * m_sideSpeed;
+         
+         m_body-&gt;setVelocity(desiredVel);
+     }
+@@ -525,7 +527,7 @@
+             Ogre::Vector3 newPos;
+             
+             newPos = castStart + (castTarget - castStart)*dist - step + upDir * m_kinematicCushion;
+-            m_body-&gt;setPositionOrientation(pos, ori);
++            m_body-&gt;setPositionOrientation(newPos, ori);
+ 
+             Ogre::Vector3 floorNormal = allBodyConvexCast.getInfoAt(0).mContactNormal;
+ 
+@@ -596,7 +598,7 @@
+                 
+                 allBodyConvexCast2.go(m_bodyFloorSensorShape, castStart2, ori, castTarget2, 1, threadIndex, filterBodies);
+ 
+-                if( distanceToFirstHit &gt;= allBodyConvexCast2.getDistanceToFirstHit() &amp;&amp; allBodyConvexCast2.getContactsCount() &gt; 0 )
++                if( distanceToFirstHit &gt;= allBodyConvexCast2.getDistanceToFirstHit() || allBodyConvexCast2.getContactsCount() == 0 )
+                 {
+                     setPlayerState(PS_ONILLEGALRAMP);
+                 }
+@@ -623,7 +625,7 @@
+                         castStart3 = pos + step + upDir*(m_stairHeight - m_kinematicCushion);
+                         castTarget3 = castStart3 - upDir*2.0f * m_stairHeight;
+ 
+-                        allBodyConvexCast3.go(m_bodyFloorSensorShape, castStart3, ori, castTarget3, 1, threadIndex, filterBodies);
++                        allBodyConvexCast3.go(m_bodyFloorSensorShape, castStart3, ori, castTarget3, 1, threadIndex);
+                         contactCount = allBodyConvexCast3.getContactsCount();
+                         if( contactCount &gt; 0 )
+                         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="002027.html">[Dsa-hl-svn] r4971 - in rl/trunk/engine: core/src ui ui/src
+</A></li>
+	<LI>Next message: <A HREF="002029.html">[Dsa-hl-svn] r4973 - dependencies/OgreNewt/inc
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#2028">[ date ]</a>
+              <a href="thread.html#2028">[ thread ]</a>
+              <a href="subject.html#2028">[ subject ]</a>
+              <a href="author.html#2028">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

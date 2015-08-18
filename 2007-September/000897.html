@@ -1,0 +1,280 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3826 - in rl/trunk/engine: ai/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3826%20-%20in%20rl/trunk/engine%3A%20ai/src%20script/swig&In-Reply-To=%3C200709082024.l88KOQhY004946%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000896.html">
+   <LINK REL="Next"  HREF="000898.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3826 - in rl/trunk/engine: ai/src script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3826%20-%20in%20rl/trunk/engine%3A%20ai/src%20script/swig&In-Reply-To=%3C200709082024.l88KOQhY004946%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3826 - in rl/trunk/engine: ai/src script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Sep  8 22:24:26 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000896.html">[Dsa-hl-svn] r3825 - in rl/trunk/engine: ai/include ai/src	common/include common/src core/include core/src rules/include	rules/src script/include script/src ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="000898.html">[Dsa-hl-svn] r3827 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#897">[ date ]</a>
+              <a href="thread.html#897">[ thread ]</a>
+              <a href="subject.html#897">[ subject ]</a>
+              <a href="author.html#897">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-09-08 22:24:18 +0200 (Sat, 08 Sep 2007)
+New Revision: 3826
+
+Modified:
+   rl/trunk/engine/ai/src/WayPointGraph.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+Log:
+Load WayPointGraph from XML files
+
+Modified: rl/trunk/engine/ai/src/WayPointGraph.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/WayPointGraph.cpp	2007-09-08 20:22:19 UTC (rev 3825)
++++ rl/trunk/engine/ai/src/WayPointGraph.cpp	2007-09-08 20:24:18 UTC (rev 3826)
+@@ -16,16 +16,20 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;WayPointGraph.h&quot;
+-#include &quot;WayPointNode.h&quot;
++
+ #include &lt;algorithm&gt;
+-#include &quot;OgreVector3.h&quot;
++#include &lt;xercesc/dom/DOM.hpp&gt;
++
++#include &quot;ConfigurationManager.h&quot;
++#include &quot;ContentModule.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+-#include &quot;World.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;LineSetPrimitive.h&quot;
+-#include &quot;ConfigurationManager.h&quot;
++#include &quot;WayPointNode.h&quot;
++#include &quot;World.h&quot;
+ 
+ using namespace std;
++using namespace Ogre;
+ 
+ namespace rl {
+ 
+@@ -54,7 +58,7 @@
+     }
+ }
+ 
+-WayPointNode* WayPointGraph::addWayPoint(const Ogre::Vector3&amp; position, const WayPointNode::WayPointNodeType type)
++WayPointNode* WayPointGraph::addWayPoint(const Vector3&amp; position, const WayPointNode::WayPointNodeType type)
+ {
+ 	WayPointNodeList::iterator it;
+ 
+@@ -69,7 +73,7 @@
+ 
+ }
+ 
+-WayPointNode* WayPointGraph::rawAddWayPoint(const Ogre::Vector3&amp; position, const WayPointNode::WayPointNodeType type)
++WayPointNode* WayPointGraph::rawAddWayPoint(const Vector3&amp; position, const WayPointNode::WayPointNodeType type)
+ {
+ 	WayPointNode* newWayPoint = new WayPointNode(position, type);
+ 	mNodeList.push_back(newWayPoint);
+@@ -91,7 +95,7 @@
+ 	mChanged = true;
+ }
+ 
+-void WayPointGraph::load (const Ogre::String&amp; filename)
++void WayPointGraph::loadBinary(const Ogre::String&amp; filename)
+ {
+ 	// fetch modules directory
+ 	Ogre::String modulespath(
+@@ -127,7 +131,7 @@
+ 	input.getline(line, sizeof(line));
+ 
+ 	// read in the points
+-	Ogre::Vector3 Position;
++	Vector3 Position;
+ 	WayPointNode::WayPointNodeType type;
+ 	unsigned int count = 0;
+ 	while (!input.eof() &amp;&amp; count &lt; numberOfNodes)
+@@ -177,7 +181,7 @@
+ 	mChanged = true;
+ }
+ 
+-void WayPointGraph::save (const Ogre::String&amp; filename) const
++void WayPointGraph::saveBinary(const Ogre::String&amp; filename) const
+ {
+ 	unsigned int count;
+ 	WayPointNodeList::const_iterator it;
+@@ -203,7 +207,7 @@
+ 	// save the full list of points
+ 	// and construct an index map for the nodes
+ 	count = 0;
+-	Ogre::Vector3 Position;
++	Vector3 Position;
+ 	WayPointNode::WayPointNodeType type;
+ 	for (it = mNodeList.begin(); it != mNodeList.end(); it++)
+ 	{
+@@ -243,11 +247,75 @@
+ 	output.close();
+ }
+ 
+-const WayPointNode* WayPointGraph::getNearestWayPoint(const Ogre::Vector3&amp; position) const
++void WayPointGraph::load(const Ogre::String&amp; filename, const Ogre::String&amp; resourceGroup)
+ {
++    using namespace XERCES_CPP_NAMESPACE;
++
++    Ogre::String group = resourceGroup;
++    if (group.empty())
++    {
++        group = CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId();
++    }
++
++    initializeXml();
++
++    DOMDocument* doc = loadDocument(filename, group);
++    if (doc)
++    {
++        DOMElement* rootElem = doc-&gt;getDocumentElement();
++
++        DOMElement* nodesElem = getChildNamed(rootElem, &quot;waypointnodes&quot;);
++        std::map&lt;int, WayPointNode*&gt; lookupTable;
++        for (DOMNode* curNode = nodesElem-&gt;getFirstChild(); curNode; curNode = curNode-&gt;getNextSibling())
++        {
++            if (curNode-&gt;getNodeType() == DOMNode::ELEMENT_NODE
++                || hasNodeName(curNode, &quot;node&quot;))
++            {
++                DOMElement* curElem = static_cast&lt;DOMElement*&gt;(curNode);
++
++                Vector3 pos = getValueAsVector3(curElem);
++                CeGuiString typeS = getAttributeValueAsString(curElem, &quot;type&quot;);
++                int id = getAttributeValueAsInteger(curElem, &quot;id&quot;);
++
++                WayPointNode::WayPointNodeType type = WayPointNode::WP_UNKNOWN;
++                if (typeS == &quot;int&quot;)
++                {
++                    type = WayPointNode::WP_INTERIOR;
++                }
++                else if (typeS == &quot;ext&quot;)
++                {
++                    type = WayPointNode::WP_EXTERIOR;
++                }
++
++                WayPointNode* node = addWayPoint(pos, type);
++                lookupTable[id] = node;
++            }
++        }
++
++        DOMElement* edgesElem = getChildNamed(rootElem, &quot;waypointedges&quot;);
++        for (DOMNode* curNode = edgesElem-&gt;getFirstChild(); curNode; curNode = curNode-&gt;getNextSibling())
++        {
++            if (curNode-&gt;getNodeType() == DOMNode::ELEMENT_NODE
++                || hasNodeName(curNode, &quot;edge&quot;))
++            {
++                DOMElement* curElem = static_cast&lt;DOMElement*&gt;(curNode);
++                int source = getAttributeValueAsInteger(curElem, &quot;source&quot;);
++                int destination = getAttributeValueAsInteger(curElem, &quot;destination&quot;);
++                addDirectedConnection(lookupTable[source], lookupTable[destination]);
++            }
++        }
++
++        doc-&gt;release();
++    }
++
++    shutdownXml();
++}
++
++const WayPointNode* WayPointGraph::getNearestWayPoint(const Vector3&amp; position) const
++{
+ 	WayPointNodeList::const_iterator it;
+ 	WayPointNode* nearestWayPoint = NULL;
+-	Ogre::Vector3 nearestVec;
++	Vector3 nearestVec;
+ 	Ogre::Real nearestDistance;
+ 
+ 	// if list is empty simply return no waypoint
+@@ -318,14 +386,14 @@
+ 	std::multimap&lt;const WayPointNode*,const WayPointNode*&gt;::iterator edgeListIt;
+ 
+ 	WayPointNodeList::const_iterator it;
+-	Ogre::Vector3 wp1Vec;
+-	Ogre::Vector3 wp2Vec;
++	Vector3 wp1Vec;
++	Vector3 wp2Vec;
+ 
+ 	for (it = mNodeList.begin(); it != mNodeList.end(); it++)
+ 	{
+ 		wp1Vec = (*it)-&gt;getPosition();
+ 		// draw the waypoint itself
+-		lineSet-&gt;addLine(wp1Vec, wp1Vec + Ogre::Vector3(0,1,0), Ogre::ColourValue::Red);
++		lineSet-&gt;addLine(wp1Vec, wp1Vec + Vector3(0,1,0), Ogre::ColourValue::Red);
+ 
+ 		const WayPointNode::WayPointWeightNodeList subnodes = (*it)-&gt;getNeighbours();
+ 		WayPointNode::WayPointWeightNodeList::const_iterator nit;
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2007-09-08 20:22:19 UTC (rev 3825)
++++ rl/trunk/engine/script/swig/RlAi.swig	2007-09-08 20:24:18 UTC (rev 3826)
+@@ -16,9 +16,9 @@
+ 
+ %include std_vector.i
+ 
+-//namespace std {
+-//	%template(Ogrevec3Vector) vector&lt;Ogre::Vector3 &gt;;
+-//};
++namespace std {
++	%template(Ogrevec3Vector) vector&lt;Ogre::Vector3 &gt;;
++};
+ 
+ namespace rl 
+ {
+@@ -253,8 +253,8 @@
+ 		WayPointNode* addWayPoint(const Ogre::Vector3&amp; position, const WayPointNode::WayPointNodeType type);
+ 		void addConnection(rl::WayPointNode* wp1, rl::WayPointNode* wp2);
+ 		void addDirectedConnection(rl::WayPointNode* wp1, const rl::WayPointNode* wp2);
+-		void load (const Ogre::String&amp; filename);
+-		void save (const Ogre::String&amp; filename) const;
++		void load(const Ogre::String&amp; filename);
++		void saveBinary(const Ogre::String&amp; filename) const;
+ 		const rl::WayPointNode* getNearestWayPoint(const Ogre::Vector3&amp; position) const;
+ 		const rl::WayPointNode* getWayPointAt(unsigned int index) const;
+ 	};
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000896.html">[Dsa-hl-svn] r3825 - in rl/trunk/engine: ai/include ai/src	common/include common/src core/include core/src rules/include	rules/src script/include script/src ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="000898.html">[Dsa-hl-svn] r3827 - rl/trunk/engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#897">[ date ]</a>
+              <a href="thread.html#897">[ thread ]</a>
+              <a href="subject.html#897">[ subject ]</a>
+              <a href="author.html#897">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

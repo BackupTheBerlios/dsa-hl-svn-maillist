@@ -1,0 +1,236 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3677 - in rl/trunk/engine: ai/include ai/src	rules/include rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3677%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200708081934.l78JY31M013085%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000747.html">
+   <LINK REL="Next"  HREF="000749.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3677 - in rl/trunk/engine: ai/include ai/src	rules/include rules/src ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3677%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09rules/include%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200708081934.l78JY31M013085%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3677 - in rl/trunk/engine: ai/include ai/src	rules/include rules/src ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Aug  8 21:34:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000747.html">[Dsa-hl-svn] r3676 - rl/trunk/engine/ai/src
+</A></li>
+        <LI>Next message: <A HREF="000749.html">[Dsa-hl-svn] r3678 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#748">[ date ]</a>
+              <a href="thread.html#748">[ thread ]</a>
+              <a href="subject.html#748">[ subject ]</a>
+              <a href="author.html#748">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-08-08 21:33:50 +0200 (Wed, 08 Aug 2007)
+New Revision: 3677
+
+Modified:
+   rl/trunk/engine/ai/include/AgentCombatState.h
+   rl/trunk/engine/ai/src/Agent.cpp
+   rl/trunk/engine/ai/src/AgentCombatState.cpp
+   rl/trunk/engine/ai/src/AgentManager.cpp
+   rl/trunk/engine/rules/include/Combatant.h
+   rl/trunk/engine/rules/src/CombatManager.cpp
+   rl/trunk/engine/ui/include/CombatControlState.h
+   rl/trunk/engine/ui/src/CombatControlState.cpp
+Log:
+Fixed combat too now so that it works with new AgentStates. (&quot;Works&quot; as in &quot;Does not crash right away&quot;)
+
+Modified: rl/trunk/engine/ai/include/AgentCombatState.h
+===================================================================
+--- rl/trunk/engine/ai/include/AgentCombatState.h	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ai/include/AgentCombatState.h	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -34,7 +34,7 @@
+ 
+         virtual ~AgentCombatState();
+ 
+-        virtual Ogre::String getTypeName();
++        virtual Ogre::String getCombatantTypeName() const;
+ 
+ 		/** Function invoked by Agents to advance the AI.
+ 		 * Decision making is done here.
+
+Modified: rl/trunk/engine/ai/src/Agent.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/Agent.cpp	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ai/src/Agent.cpp	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -18,6 +18,7 @@
+ #include &quot;Agent.h&quot;
+ 
+ #include &quot;Actor.h&quot;
++#include &quot;AgentCombatState.h&quot;
+ #include &quot;AgentSteeringState.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;DialogCharacter.h&quot;
+@@ -76,6 +77,7 @@
+     }
+     else if (stateType == AST_COMBAT)
+     {
++        state = new AgentCombatState(this);
+     }
+     else if (stateType == AST_DIALOG)
+     {
+
+Modified: rl/trunk/engine/ai/src/AgentCombatState.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentCombatState.cpp	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ai/src/AgentCombatState.cpp	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -33,9 +33,9 @@
+     {
+     }
+ 
+-    Ogre::String AgentCombatState::getTypeName()
++    Ogre::String AgentCombatState::getCombatantTypeName() const
+     {
+-        return &quot;AgentCombatState&quot;;
++        return &quot;default&quot;;
+     }
+ 
+ 	void AgentCombatState::update(const float elapsedTime)
+
+Modified: rl/trunk/engine/ai/src/AgentManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AgentManager.cpp	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ai/src/AgentManager.cpp	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;Agent.h&quot;
+ #include &quot;AgentCombatState.h&quot;
++#include &quot;CombatManager.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;GameObjectManager.h&quot;
+ 
+@@ -35,8 +36,9 @@
+     // Creatures that are placed into the scene.
+     GameObjectManager::getSingleton().registerGameObjectStateListener(this);
+ 
+-    // Register the AgentCombatStateFactory with the CombatManager, so that they can
+-    // be created when a creature is taking part the combat.
++    // Register self as CombatantFactory with the CombatManager, so that State is switched
++    // when agent is taking part in a combat.
++    CombatManager::getSingleton().registerCombatantFactory(&quot;default&quot;, this);
+ }
+ 
+ AgentManager::~AgentManager(void)
+
+Modified: rl/trunk/engine/rules/include/Combatant.h
+===================================================================
+--- rl/trunk/engine/rules/include/Combatant.h	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/rules/include/Combatant.h	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -30,7 +30,7 @@
+         Combatant(CreatureController* controller);
+         virtual ~Combatant();
+ 
+-        virtual Ogre::String getTypeName() = 0;
++        virtual Ogre::String getCombatantTypeName() const = 0;
+ 
+         CreatureController* getCreatureController() const;
+ 
+
+Modified: rl/trunk/engine/rules/src/CombatManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CombatManager.cpp	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/rules/src/CombatManager.cpp	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -69,13 +69,34 @@
+ 
+     void CombatManager::destroyCombatant(Combatant* combatant)
+     {
++        String name = combatant-&gt;getCombatantTypeName();
++        CombatantFactoryMap::iterator it = mCombatantFactories.find(name);
++        if (it != mCombatantFactories.end())
++        {
++            return it-&gt;second-&gt;destroyCombatant(combatant);
++        }
++        else
++        {
++            Throw(IllegalArgumentException, &quot;No such CombatantType registered: &quot; + name);
++        }
+     }
+ 
+     void CombatManager::registerCombatantFactory(const String&amp; name, CombatantFactory* factory)
+     {
++        // If there was one already, it is overwritten.
++        mCombatantFactories[name] = factory;
+     }
+ 
+     void CombatManager::unregisterCombatantFactory(CombatantFactory* factory)
+     {
++        for (CombatantFactoryMap::iterator it = mCombatantFactories.begin();
++            it != mCombatantFactories.end(); ++it)
++        {
++            if (it-&gt;second == factory)
++            {
++                mCombatantFactories.erase(it);
++                break;
++            }
++        }
+     }
+ }
+
+Modified: rl/trunk/engine/ui/include/CombatControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatControlState.h	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ui/include/CombatControlState.h	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -47,7 +47,7 @@
+ 		void run(Ogre::Real elapsedTime);
+ 
+         // Combatant override
+-        virtual Ogre::String getTypeName();
++        virtual Ogre::String getCombatantTypeName() const;
+ 
+     private:
+         CombatManager* mCombatManager;
+
+Modified: rl/trunk/engine/ui/src/CombatControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatControlState.cpp	2007-08-08 19:02:48 UTC (rev 3676)
++++ rl/trunk/engine/ui/src/CombatControlState.cpp	2007-08-08 19:33:50 UTC (rev 3677)
+@@ -183,7 +183,7 @@
+         return rval;
+     }
+ 
+-    Ogre::String CombatControlState::getTypeName()
++    Ogre::String CombatControlState::getCombatantTypeName() const
+     {
+         return &quot;CombatControlState&quot;;
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000747.html">[Dsa-hl-svn] r3676 - rl/trunk/engine/ai/src
+</A></li>
+	<LI>Next message: <A HREF="000749.html">[Dsa-hl-svn] r3678 - rl/trunk/engine/common/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#748">[ date ]</a>
+              <a href="thread.html#748">[ thread ]</a>
+              <a href="subject.html#748">[ subject ]</a>
+              <a href="author.html#748">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

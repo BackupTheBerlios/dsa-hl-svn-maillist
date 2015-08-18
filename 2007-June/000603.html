@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3532%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200706121727.l5CHRcsx013508%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000602.html">
+   <LINK REL="Next"  HREF="000604.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3532%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src&In-Reply-To=%3C200706121727.l5CHRcsx013508%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3532 - in rl/trunk/engine: core/src rules/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun 12 19:27:38 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000602.html">[Dsa-hl-svn] r3531 - in rl/trunk/engine/ai: include src
+</A></li>
+        <LI>Next message: <A HREF="000604.html">[Dsa-hl-svn] r3533 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#603">[ date ]</a>
+              <a href="thread.html#603">[ thread ]</a>
+              <a href="subject.html#603">[ subject ]</a>
+              <a href="author.html#603">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-12 19:27:18 +0200 (Tue, 12 Jun 2007)
+New Revision: 3532
+
+Modified:
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+Repaired Bug: wrong massmatrix of game-objects.
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2007-06-11 22:19:43 UTC (rev 3531)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2007-06-12 17:27:18 UTC (rev 3532)
+@@ -411,6 +411,55 @@
+             } else {
+                 // found it
+                 rval = usedcol.colPtr;
++                
++
++                if( inertia )
++                {
++                    // we must set inertia here, the calling function doesn't know we are not creating a new collision
++                    Ogre::AxisAlignedBox aabb(entity-&gt;getBoundingBox());
++                    Vector3 size( aabb.getSize() );
++                    switch(usedcol.geomType)
++                    {
++                    case GT_BOX: // from createBox
++                        *inertia = OgreNewt::MomentOfInertia::CalcBoxSolid(mass, aabb.getSize());
++                        break;
++                    case GT_CAPSULE: // from createCapsule
++                        {
++                            double radius = std::max(size.x, size.z) / 2.0;
++                            double sradius = radius*radius;
++                            *inertia = Vector3(sradius, size.y*size.y, sradius) * mass;
++                        }
++                        break;
++                    case GT_CONVEXHULL: // from createCollisionFromEntity
++				        *inertia = Vector3(
++				        size.x*size.x/6.0f,
++				        size.y*size.y/6.0f,
++			            size.z*size.z/6.0f) * mass;
++                        break;
++                    case GT_ELLIPSOID: // from createEllipsoid
++                        {
++                            Vector3 s(size/2.0);
++                            s.x = std::max(s.x, s.z);
++                            s.z = s.x;
++                            *inertia = Vector3(s.x*s.x, s.y*s.y, s.z*s.z) * mass;
++                        }
++                        break;
++                    case GT_MESH:
++                    case GT_NONE:
++                        *inertia = Ogre::Vector3::ZERO;
++                        break;
++                    case GT_PYRAMID: // createPyramid
++                        *inertia = Ogre::Vector3(size.x,size.y/2.0f, size.z) * mass;
++                        break;
++                    case GT_SPHERE:
++                        {
++                            double radius = std::max(size.x, std::max(size.y, size.z)) / 2.0;
++                            //*inertia = OgreNewt::MomentOfInertia::CalcSphereSolid(Mass,radius);
++                            *inertia = mass * Vector3(radius*radius, radius*radius, radius*radius);
++                        }
++                        break;
++                    }
++                }
+             }
+         }
+         
+
+Modified: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-11 22:19:43 UTC (rev 3531)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-12 17:27:18 UTC (rev 3532)
+@@ -191,8 +191,8 @@
+             Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+ 
+             /// @ todo change this
+-            //torque = springAcc * inertia; // this would be correct
+-            torque = springAcc * mass * 40;
++            torque = springAcc * inertia; // this would be correct
++            //torque = springAcc * mass * 40;
+         }
+         virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000602.html">[Dsa-hl-svn] r3531 - in rl/trunk/engine/ai: include src
+</A></li>
+	<LI>Next message: <A HREF="000604.html">[Dsa-hl-svn] r3533 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#603">[ date ]</a>
+              <a href="thread.html#603">[ thread ]</a>
+              <a href="subject.html#603">[ subject ]</a>
+              <a href="author.html#603">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

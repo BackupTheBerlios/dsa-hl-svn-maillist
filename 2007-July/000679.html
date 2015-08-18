@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3608 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3608%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707182328.l6INSH2Z023382%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000678.html">
+   <LINK REL="Next"  HREF="000680.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3608 - rl/trunk/engine/rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3608%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200707182328.l6INSH2Z023382%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3608 - rl/trunk/engine/rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Jul 19 01:28:17 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000678.html">[Dsa-hl-svn] r3607 - modules/common/scripts	modules/regressiontest/dsa modules/regressiontest/materials	modules/regressiontest/materials/textures	modules/regressiontest/models modules/regressiontest/scripts	modules/regressiontest/scripts/maps	rl/trunk/engine/core/include rl/trunk/engine/core/src	rl/trunk/engine/rules rl/trunk/engine/rules/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="000680.html">[Dsa-hl-svn] r3609 - rl/trunk/engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#679">[ date ]</a>
+              <a href="thread.html#679">[ thread ]</a>
+              <a href="subject.html#679">[ subject ]</a>
+              <a href="author.html#679">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-07-19 01:28:16 +0200 (Thu, 19 Jul 2007)
+New Revision: 3608
+
+Modified:
+   rl/trunk/engine/rules/src/Slot.cpp
+Log:
+Added a third slot type - this slot changes the material of a submesh (item must have property &quot;material&quot;)
+
+Modified: rl/trunk/engine/rules/src/Slot.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Slot.cpp	2007-07-18 23:26:04 UTC (rev 3607)
++++ rl/trunk/engine/rules/src/Slot.cpp	2007-07-18 23:28:16 UTC (rev 3608)
+@@ -87,15 +87,27 @@
+ 
+     void SubmeshSlot::setItem(Item* item)
+     {
+-		///@todo: what to do if actor is null?
+-		if (mOwner-&gt;getActor() != NULL)
++		///@todo: what to do if actor is null?, think about changing the inventory of an gameobject not in scene
++		if (mOwner-&gt;getActor())
+ 		{
+ 			MergeableMeshObject* mmo = dynamic_cast&lt;MergeableMeshObject*&gt;(
+ 				mOwner-&gt;getActor()-&gt;getControlledObject());
+-			if (mmo != NULL)
++
++			if (mmo)
+ 			{
+-				if (item == NULL)
++				if (item)
+ 				{
++					if (isAllowed(item))
++					{
++						item-&gt;setState(GOS_IN_POSSESSION);
++						mmo-&gt;replaceSubmesh(
++							mSubmesh,
++							item-&gt;getMeshfile().c_str());
++						mItem = item;
++					}
++				}
++				else
++				{
+ 					MeshPartMap::const_iterator it = mOwner-&gt;getMeshParts().find(mSubmesh);
+ 					if (it != mOwner-&gt;getMeshParts().end())
+ 					{
+@@ -109,17 +121,6 @@
+ 					}
+ 					mItem = NULL;
+ 				}
+-				else
+-				{
+-					if (isAllowed(item))
+-					{
+-						item-&gt;setState(GOS_IN_POSSESSION);
+-						mmo-&gt;replaceSubmesh(
+-							mSubmesh,
+-							item-&gt;getMeshfile().c_str());
+-						mItem = item;
+-					}
+-				}
+ 			}
+ 
+             if (mOwner-&gt;getActor()
+@@ -129,4 +130,46 @@
+             }
+ 		}
+     }
++
++    MaterialSlot::MaterialSlot(Creature* owner, const CeGuiString&amp; name, int itemMask, const Ogre::String&amp; submesh)
++      : Slot(owner, name, itemMask),
++        mSubmesh(submesh)
++    {
++    }
++
++    void MaterialSlot::setItem(Item* item)
++    {
++        if (item)
++        {
++            try
++            {
++                CeGuiString mat = item-&gt;getProperty(&quot;material&quot;).toString();
++
++                ///@todo: what to do if actor is null?, think about changing the inventory of an gameobject not in scene
++		        if (mOwner-&gt;getActor())
++		        {
++			        MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(
++				        mOwner-&gt;getActor()-&gt;getControlledObject());
++
++			        if (mo)
++			        {
++                        mo-&gt;setMaterial(mat.c_str(), mSubmesh);
++                    }
++                }
++            }
++            catch (const IllegalArgumentException&amp;)
++            {
++                LOG_ERROR(Logger::RULES, &quot;Item &quot; + item-&gt;getName() + &quot; has no property material.&quot;);
++            }
++            catch (const WrongFormatException&amp;)
++            {
++                LOG_ERROR(Logger::RULES, &quot;Item &quot; + item-&gt;getName() + &quot; has a property material, but it is no string property.&quot;);
++            }
++        }
++        else
++        {
++            ///@todo reset material?
++        }
++    }
++
+ } // namespace rl
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000678.html">[Dsa-hl-svn] r3607 - modules/common/scripts	modules/regressiontest/dsa modules/regressiontest/materials	modules/regressiontest/materials/textures	modules/regressiontest/models modules/regressiontest/scripts	modules/regressiontest/scripts/maps	rl/trunk/engine/core/include rl/trunk/engine/core/src	rl/trunk/engine/rules rl/trunk/engine/rules/include	rl/trunk/engine/rules/src rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="000680.html">[Dsa-hl-svn] r3609 - rl/trunk/engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#679">[ date ]</a>
+              <a href="thread.html#679">[ thread ]</a>
+              <a href="subject.html#679">[ subject ]</a>
+              <a href="author.html#679">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

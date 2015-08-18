@@ -1,0 +1,190 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3752 - in rl/trunk/engine: rules/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3752%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200708261313.l7QDDUlB008664%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000822.html">
+   <LINK REL="Next"  HREF="000824.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3752 - in rl/trunk/engine: rules/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3752%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/include%20ui/src&In-Reply-To=%3C200708261313.l7QDDUlB008664%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3752 - in rl/trunk/engine: rules/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Aug 26 15:13:30 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000822.html">[Dsa-hl-svn] r3751 - modules/common/gui/schemes
+</A></li>
+        <LI>Next message: <A HREF="000824.html">[Dsa-hl-svn] r3753 - rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#823">[ date ]</a>
+              <a href="thread.html#823">[ thread ]</a>
+              <a href="subject.html#823">[ subject ]</a>
+              <a href="author.html#823">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-26 15:13:21 +0200 (Sun, 26 Aug 2007)
+New Revision: 3752
+
+Modified:
+   rl/trunk/engine/rules/src/Inventory.cpp
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+Log:
+the slot can be become green red or yellow to indicate wether an item can be dropped or not
+
+Modified: rl/trunk/engine/rules/src/Inventory.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Inventory.cpp	2007-08-26 13:12:15 UTC (rev 3751)
++++ rl/trunk/engine/rules/src/Inventory.cpp	2007-08-26 13:13:21 UTC (rev 3752)
+@@ -212,7 +212,7 @@
+             Throw(rl::IllegalArgumentException, Ogre::String(&quot;Slot '&quot;)+slotName.c_str()+&quot;' doesn't exist.&quot;);
+         }
+ 
+-		return true;//slotIter-&gt;second-&gt;canReady(item);
++		return slotIter-&gt;second-&gt;canReady(item);
+     }
+ 
+     Item* Inventory::getItem(const CeGuiString&amp; slotName) const
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-26 13:12:15 UTC (rev 3751)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-26 13:13:21 UTC (rev 3752)
+@@ -63,6 +63,8 @@
+         //ItemDragContainer* getItemDragContainer(Item* item, bool description);
+         CeGuiString getDragContainerNameFromItem(const Item* item, bool description);
+ 		bool handleItemDroppedOnSlot(const CEGUI::EventArgs&amp; evt);
++        bool handleItemEntersSlot(const CEGUI::EventArgs&amp; evt);
++        bool handleItemLeavesSlot(const CEGUI::EventArgs&amp; evt);
+ 		bool handleItemDroppedOnWorld(const CEGUI::EventArgs&amp; evt);
+ 		bool handleMouseMovedInWorld(const CEGUI::EventArgs&amp; evt);
+ 		//bool handleKeys(const CEGUI::EventArgs&amp; evt, bool down);
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-26 13:12:15 UTC (rev 3751)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-26 13:13:21 UTC (rev 3752)
+@@ -128,6 +128,10 @@
+ 			slotWindow-&gt;setDragDropTarget(true);
+ 			slotWindow-&gt;subscribeEvent(Window::EventDragDropItemDropped,
+ 				boost::bind(&amp;InventoryWindow::handleItemDroppedOnSlot, this, _1));
++            slotWindow-&gt;subscribeEvent(Window::EventDragDropItemEnters,
++                boost::bind(&amp;InventoryWindow::handleItemEntersSlot, this, _1));
++            slotWindow-&gt;subscribeEvent(Window::EventDragDropItemLeaves,
++                boost::bind(&amp;InventoryWindow::handleItemLeavesSlot, this, _1));
+ 
+             if (item != NULL)
+             {
+@@ -267,17 +271,73 @@
+ 				newCont-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+ 				newCont-&gt;setItemParent(mInventory, targetSlot);
+ 
++                handleItemLeavesSlot(evt);
+ 				return true;
+ 			}
+ 			else
+ 			{
++                handleItemLeavesSlot(evt);
+ 				return false;
+ 			}
+ 		}
+ 
++        handleItemLeavesSlot(evt);
+ 		return false;
+ 	}
+ 
++    bool InventoryWindow::handleItemEntersSlot(const CEGUI::EventArgs&amp; evt)
++    {
++		const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
++
++		if (evtArgs.dragDropItem-&gt;testClassName(&quot;ItemDragContainer&quot;))
++		{
++			ItemDragContainer* dragcont = static_cast&lt;ItemDragContainer*&gt;(
++				evtArgs.dragDropItem);
++			Item* item = dragcont-&gt;getItem();
++			CeGuiString targetSlot = evtArgs.window-&gt;getUserString(SLOTNAME);
++            CEGUI::Window* slotWindow = mSlotWindows[targetSlot];
++
++
++            if( mInventory-&gt;canReady(item, targetSlot) )
++            {
++                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                    slotWindow-&gt;getProperty(&quot;ContainerColour_DropReady&quot;));
++            }
++            else if( mInventory-&gt;canHold(item, targetSlot) )
++            {
++                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                    slotWindow-&gt;getProperty(&quot;ContainerColour_DropPossible&quot;));
++            }
++            else
++            {
++                slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                    slotWindow-&gt;getProperty(&quot;ContainerColour_DropImpossible&quot;));
++            }
++
++
++            return true;
++        }
++        return false;
++    }
++
++    bool InventoryWindow::handleItemLeavesSlot(const CEGUI::EventArgs&amp; evt)
++    {
++		const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
++
++		if (evtArgs.dragDropItem-&gt;testClassName(&quot;ItemDragContainer&quot;))
++		{
++			CeGuiString targetSlot = evtArgs.window-&gt;getUserString(SLOTNAME);
++            CEGUI::Window* slotWindow = mSlotWindows[targetSlot];
++
++
++            slotWindow-&gt;setProperty(&quot;ContainerColour&quot;, 
++                slotWindow-&gt;getProperty(&quot;ContainerColour_Standard&quot;));
++
++            return true;
++        }
++        return false;
++    }
++
+ 	bool InventoryWindow::handleItemDroppedOnWorld(const EventArgs&amp; evt)
+ 	{
+ 		const DragDropEventArgs&amp; evtArgs = static_cast&lt;const DragDropEventArgs&amp;&gt;(evt);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000822.html">[Dsa-hl-svn] r3751 - modules/common/gui/schemes
+</A></li>
+	<LI>Next message: <A HREF="000824.html">[Dsa-hl-svn] r3753 - rl/trunk/engine/script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#823">[ date ]</a>
+              <a href="thread.html#823">[ thread ]</a>
+              <a href="subject.html#823">[ subject ]</a>
+              <a href="author.html#823">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

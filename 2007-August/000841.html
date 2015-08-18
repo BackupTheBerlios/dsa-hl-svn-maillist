@@ -1,0 +1,239 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3770 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3770%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708282126.l7SLQ4sM011937%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000840.html">
+   <LINK REL="Next"  HREF="000843.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3770 - in rl/trunk/engine/ui: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3770%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708282126.l7SLQ4sM011937%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3770 - in rl/trunk/engine/ui: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Aug 28 23:26:04 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000840.html">[Dsa-hl-svn] r3769 - in rl/trunk/engine: core script
+</A></li>
+        <LI>Next message: <A HREF="000843.html">[Dsa-hl-svn] r3771 - in rl/trunk/engine: core/src rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#841">[ date ]</a>
+              <a href="thread.html#841">[ thread ]</a>
+              <a href="subject.html#841">[ subject ]</a>
+              <a href="author.html#841">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-28 23:25:58 +0200 (Tue, 28 Aug 2007)
+New Revision: 3770
+
+Modified:
+   rl/trunk/engine/ui/include/InputManager.h
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+- InputManager initiates the dialog state on &quot;start dialog&quot; message
+- renamed getCharacterController to getControlState
+
+Modified: rl/trunk/engine/ui/include/InputManager.h
+===================================================================
+--- rl/trunk/engine/ui/include/InputManager.h	2007-08-28 21:22:37 UTC (rev 3769)
++++ rl/trunk/engine/ui/include/InputManager.h	2007-08-28 21:25:58 UTC (rev 3770)
+@@ -78,7 +78,7 @@
+         /// Remove all control states.
+         void clearControlStates();
+ 
+-        ControlState* getCharacterController() const;
++        ControlState* getControlState() const;
+ 
+         int getModifierCode() const;
+         const CEGUI::utf8&amp; getKeyChar(int keycode, int modifiers) const;
+@@ -88,6 +88,7 @@
+         enum Modifiers {ALT_MASK = 1, CTRL_MASK = 2, SHIFT_MASK = 4, SUPER_MASK = 8};
+ 
+         void initializeOis(Ogre::RenderWindow* wnd);
++        bool startDialog(/* CeGuiString dialog */);
+ 
+         Ogre::Vector3 mSavedMouseState;
+ 
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-08-28 21:22:37 UTC (rev 3769)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-08-28 21:25:58 UTC (rev 3770)
+@@ -93,7 +93,7 @@
+             {
+                 mesh-&gt;stopAllAnimations();
+                 if (mesh-&gt;hasAnimation(&quot;idle&quot;))
+-                {
++                { 
+                     mTalkAnimation = mesh-&gt;startAnimation(&quot;idle&quot;);
+                 }
+             }
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-08-28 21:22:37 UTC (rev 3769)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-08-28 21:25:58 UTC (rev 3770)
+@@ -30,11 +30,12 @@
+ #include &quot;XmlResource.h&quot;
+ #include &quot;XmlResourceManager.h&quot;
+ 
++#include &quot;AbstractWindow.h&quot;
+ #include &quot;Action.h&quot;
+ #include &quot;ActionManager.h&quot;
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
+-#include &quot;AbstractWindow.h&quot;
++#include &quot;AiMessages.h&quot;
+ #include &quot;ControlState.h&quot;
+ #include &quot;CombatControlState.h&quot;
+ #include &quot;CommandMapper.h&quot;
+@@ -130,6 +131,9 @@
+         mMouse-&gt;getMouseState().width = width;
+         mMouse-&gt;getMouseState().height = height;
+ 
++        MessagePump::getSingleton().addMessageHandler&lt;MessageType_DialogStarted&gt;(
++            boost::bind(&amp;InputManager::startDialog, this/*, _1*/));
++
+         LOG_DEBUG(Logger::UI, &quot;Done initializing input manager.&quot;);
+     }
+ 
+@@ -469,7 +473,7 @@
+         }
+     }
+ 
+-    ControlState* InputManager::getCharacterController() const
++    ControlState* InputManager::getControlState() const
+     {
+         if (!mControlStates.empty())
+         {
+@@ -480,4 +484,10 @@
+             return NULL;
+         }
+     }
++
++    bool InputManager::startDialog(/* CeGuiString dialog */) 
++    {
++        pushControlState(CST_DIALOG);
++        return true;
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-28 21:22:37 UTC (rev 3769)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-28 21:25:58 UTC (rev 3770)
+@@ -555,17 +555,17 @@
+         {
+             ///@todo das hier ueberpruefen!
+             CeGuiString action = 
+-                InputManager::getSingleton().getCharacterController()
++                InputManager::getSingleton().getControlState()
+                     -&gt;getCommandMapper()-&gt;getControlStateAction(
+                     kevt.scancode,
+-                    InputManager::getSingleton().getCharacterController()-&gt;getType()
++                    InputManager::getSingleton().getControlState()-&gt;getType()
+                     );
+             if( action == &quot;&quot; )
+             {
+-                action = InputManager::getSingleton().getCharacterController()
++                action = InputManager::getSingleton().getControlState()
+                             -&gt;getCommandMapper()-&gt;getGlobalAction(kevt.scancode);
+             }
+-            InputManager::getSingleton().getCharacterController()-&gt;startAction(
++            InputManager::getSingleton().getControlState()-&gt;startAction(
+                 action,
+                 mInventory-&gt;getOwner()
+                 );
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-08-28 21:22:37 UTC (rev 3769)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-08-28 21:25:58 UTC (rev 3770)
+@@ -18,41 +18,30 @@
+ #include &quot;UiSubsystem.h&quot;
+ 
+ #include &lt;CEGUISystem.h&gt;
++#include &lt;CEGUIWindow.h&gt;
+ #include &lt;CEGUIWindowManager.h&gt;
+ #include &lt;OgreCEGUIRenderer.h&gt;
+ #include &lt;OgreCEGUIResourceProvider.h&gt;
+ 
+-#include &quot;Action.h&quot;
+-#include &quot;ActionManager.h&quot;
+ #include &quot;Actor.h&quot;
+-#include &quot;ActorManager.h&quot;
++#include &quot;AiMessages.h&quot;
++#include &quot;CeGuiHelper.h&quot;
+ #include &quot;ConfigurationManager.h&quot;
+ #include &quot;CoreMessages.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+-#include &quot;Creature.h&quot;
+-#include &quot;CombatControlState.h&quot;
+-#include &quot;CutsceneControlState.h&quot;
+-#include &quot;DialogControlState.h&quot;
+-#include &quot;DsaManager.h&quot;
++#include &quot;ControlState.h&quot;
+ #include &quot;Exception.h&quot;
+-#include &quot;FreeflightControlState.h&quot;
+-#include &quot;GameObject.h&quot;
+-#include &quot;GameLoggerWindow.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;InputManager.h&quot;
+-#include &quot;ListenerMovable.h&quot;
+ #include &quot;Logger.h&quot;
+-#include &quot;MovementControlState.h&quot;
+ #include &quot;Person.h&quot;
+ #include &quot;ScriptWrapper.h&quot;
+ #include &quot;SoundManager.h&quot;
+ #include &quot;WindowFactory.h&quot;
+ #include &quot;WindowManager.h&quot;
+-#include &quot;World.h&quot;
+-#include &quot;CeGuiHelper.h&quot;
+ 
+-template&lt;&gt; rl::UiSubsystem* Singleton&lt;rl::UiSubsystem&gt;::ms_Singleton = 0;
+ using namespace Ogre;
++template&lt;&gt; rl::UiSubsystem* Singleton&lt;rl::UiSubsystem&gt;::ms_Singleton = 0;
+ 
+ namespace rl {
+     const char* UiSubsystem::CEGUI_ROOT = &quot;RootWindow&quot;;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000840.html">[Dsa-hl-svn] r3769 - in rl/trunk/engine: core script
+</A></li>
+	<LI>Next message: <A HREF="000843.html">[Dsa-hl-svn] r3771 - in rl/trunk/engine: core/src rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#841">[ date ]</a>
+              <a href="thread.html#841">[ thread ]</a>
+              <a href="subject.html#841">[ subject ]</a>
+              <a href="author.html#841">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

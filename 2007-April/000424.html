@@ -1,0 +1,559 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3353 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3353%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200704291923.l3TJNY6e027534%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000423.html">
+   <LINK REL="Next"  HREF="000425.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3353 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3353%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200704291923.l3TJNY6e027534%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3353 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sun Apr 29 21:23:34 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000423.html">[Dsa-hl-svn] r3352 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000425.html">[Dsa-hl-svn] r3354 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#424">[ date ]</a>
+              <a href="thread.html#424">[ thread ]</a>
+              <a href="subject.html#424">[ subject ]</a>
+              <a href="author.html#424">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-29 21:23:18 +0200 (Sun, 29 Apr 2007)
+New Revision: 3353
+
+Modified:
+   rl/trunk/engine/rules/include/CombatManager.h
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/include/Selector.h
+   rl/trunk/engine/rules/src/CombatManager.cpp
+   rl/trunk/engine/rules/src/Selector.cpp
+   rl/trunk/engine/ui/include/CombatCharacterController.h
+   rl/trunk/engine/ui/src/CombatCharacterController.cpp
+   rl/trunk/engine/ui/src/InputManager.cpp
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+Selectors can now have filters that further filter result set. A *simple* creature filter implemented.
+
+Selector now supports auto tracking in order to get Position/Orientation from a GameObject.
+
+Combat detection and start of combat controller works now, but no control in this case whatsoever for the player yet.
+
+Modified: rl/trunk/engine/rules/include/CombatManager.h
+===================================================================
+--- rl/trunk/engine/rules/include/CombatManager.h	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/rules/include/CombatManager.h	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -39,7 +39,7 @@
+         /// @param character the player character
+         /// @param firstOpponent the opponent, that caused the combat.
+         /// @throw IllegalStateException if there is already a combat running.
+-        void startCombat(Creature* character, Creature* firstOpponent);
++        Combat* startCombat(Creature* character, Creature* firstOpponent);
+ 
+         /// Return the combat currently running, NULL if there is none.
+         Combat* getCurrentCombat() const;
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/rules/include/Creature.h	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -142,9 +142,9 @@
+             /// whether a combat is entered.
+             enum Alignment
+             {
+-                ALIGNMENT_ALLY,    ///&lt; Creature fights with the player.
+-                ALIGNMENT_NEUTRAL, ///&lt; Creature doesn't fight for either side.
+-                ALIGNMENT_ENEMY    ///&lt; Creature fights against the player.
++                ALIGNMENT_ALLY    = 1, ///&lt; Creature fights with the player.
++                ALIGNMENT_NEUTRAL = 2, ///&lt; Creature doesn't fight for either side.
++                ALIGNMENT_ENEMY   = 4  ///&lt; Creature fights against the player.
+             };
+ 
+             /// Beschreibt die art des zugefuegten Schadens
+
+Modified: rl/trunk/engine/rules/include/Selector.h
+===================================================================
+--- rl/trunk/engine/rules/include/Selector.h	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/rules/include/Selector.h	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -20,11 +20,34 @@
+ #include &quot;RulesPrerequisites.h&quot;
+ #include &quot;SceneQuery.h&quot;
+ #include &quot;GameObject.h&quot;
++#include &quot;Creature.h&quot;
+ #include &quot;LineSetPrimitive.h&quot;
+ #include &quot;DebugVisualisable.h&quot;
+ 
+ namespace rl {
+ 
++    class _RlRulesExport SelectionFilter
++    {
++    public:
++        virtual ~SelectionFilter() {}
++        /// Return true, if the GameObject passes the filter, false else.
++        virtual bool pass(GameObject*) const = 0;
++    };
++
++    class _RlRulesExport CreatureSelectionFilter : public SelectionFilter
++    {
++    public:
++        CreatureSelectionFilter();
++
++        void setAlignmentMask(unsigned int);
++
++        /// Return true, if the GameObject is a Creature with properties as set in the filter.
++        virtual bool pass(GameObject*) const;
++    private:
++        /// Only have alignment here. Can be mademore generic, if needed later on.
++        unsigned int mAlignment;
++    };
++
+     /// Superclass for all Selectors in RL.
+     /// Selectors provide a way to query for GameObjects in a game.
+     /// Either in the scene, or inventory, or anywhere else.
+@@ -40,14 +63,21 @@
+         void setSelectionMask(unsigned long mask);
+         unsigned long getSelectionMask() const;
+ 
++        /// Set an additional filter to narrow down selection. Set NULL, to unset filtering.
++        void setFilter(SelectionFilter*);
++        SelectionFilter* getFilter() const;
++
+         GameObject* getFirstSelectedObject() const;
+         const GameObjectVector&amp; getAllSelectedObjects() const;
+ 
+     protected:
+         GameObjectVector mSelection;
+         unsigned long mSelectionMask;
++        SelectionFilter* mFilter;
+ 
+         virtual const ActorVector&amp; doExecuteQuery() = 0;
++        /// Apply the filter if set, or just return true, if no selection filter is set.
++        virtual bool filter(GameObject*);
+     };
+ 
+ 
+@@ -86,6 +116,10 @@
+ 
+         void setOrientation(const Ogre::Quaternion&amp; ori);
+ 
++        /// Instead of using transform set with setPosition/Orientation, use the
++        /// GameObject's transform. Set to NULL to disable tracking.
++        void track(GameObject* go);
++
+         /// If check is true, visibility is checked from the POV of the GameObject reference
+         /// This is currently done by casting a ray from the GameObject to the candidate GOs
+         void setCheckVisibility(bool check, GameObject* reference = NULL);
+@@ -98,7 +132,8 @@
+     protected:
+         HalfSphereSceneQuery mQuery;
+         bool mCheckVisibility;
+-        GameObject* mReferenceGo;
++        GameObject* mLoSReferenceGo;
++        GameObject* mTrackedGo;
+ 
+         virtual const ActorVector&amp; doExecuteQuery();
+ 
+
+Modified: rl/trunk/engine/rules/src/CombatManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CombatManager.cpp	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/rules/src/CombatManager.cpp	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -43,7 +43,7 @@
+     {
+     }
+ 
+-    void CombatManager::startCombat(Creature* character, Creature* firstOpponent)
++    Combat* CombatManager::startCombat(Creature* character, Creature* firstOpponent)
+     {
+         if (mCurrentCombat != NULL)
+         {
+@@ -52,7 +52,8 @@
+ 
+         mCurrentCombat = new Combat(character);
+         mCurrentCombat-&gt;addOpponent(firstOpponent);
+-        // TODO, add further opponents if found
++
++        return mCurrentCombat;
+     }
+ 
+     Combat* CombatManager::getCurrentCombat() const
+
+Modified: rl/trunk/engine/rules/src/Selector.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Selector.cpp	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/rules/src/Selector.cpp	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -22,14 +22,46 @@
+ 
+ namespace rl
+ {
+-    Selector::Selector(unsigned long mask) : mSelectionMask(mask)
++    CreatureSelectionFilter::CreatureSelectionFilter()
++        : mAlignment(Creature::ALIGNMENT_ALLY |
++                     Creature::ALIGNMENT_NEUTRAL |
++                     Creature::ALIGNMENT_ENEMY)
+     {
+     }
+ 
++    void CreatureSelectionFilter::setAlignmentMask(unsigned int mask)
++    {
++        mAlignment = mask;
++    }
++
++    bool CreatureSelectionFilter::pass(GameObject* go) const
++    {
++        Creature* creature = dynamic_cast&lt;Creature*&gt;(go);
++        if (creature != NULL)
++        {
++            return (mAlignment &amp; creature-&gt;getAlignment()) != 0;
++        }
++        return false;
++    }
++
++    Selector::Selector(unsigned long mask) : mSelection(), mSelectionMask(mask), mFilter(NULL)
++    {
++    }
++
+     Selector::~Selector()
+     {
+     }
+ 
++    void Selector::setFilter(SelectionFilter* filter)
++    {
++        mFilter = filter;
++    }
++
++    SelectionFilter* Selector::getFilter() const
++    {
++        return mFilter;
++    }
++
+     void Selector::setSelectionMask(unsigned long mask)
+     {
+         mSelectionMask = mask;
+@@ -64,13 +96,18 @@
+         {
+             Actor* actor = *it;
+             GameObject* go = static_cast&lt;GameObject*&gt;(actor-&gt;getGameObject());
+-            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
++            if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask) &amp;&amp; filter(go))
+             {
+                 mSelection.push_back(go);
+             }
+         }
+     }
+ 
++    bool Selector::filter(GameObject* go)
++    {
++        return mFilter == NULL || mFilter-&gt;pass(go);
++    }
++
+     //------------------------------------------------------------------------
+ 
+     RaySelector::RaySelector(unsigned long mask)
+@@ -113,7 +150,7 @@
+         : Selector(mask),
+           mQuery(smgr, mask),
+           mCheckVisibility(false),
+-          mReferenceGo(NULL)
++          mLoSReferenceGo(NULL)
+     {
+     }
+ 
+@@ -122,6 +159,20 @@
+         // Remove old selection
+         mSelection.clear();
+ 
++        // Auto tracking enabled?
++        if (mTrackedGo != NULL)
++        {
++            // If not in scene, then we're done
++            if ((mTrackedGo-&gt;getState() &amp; GOS_IN_SCENE) == 0)
++            {
++                return;
++            }
++
++            // Set query transform according to position and orientation of tracked GO.
++            setPosition(mTrackedGo-&gt;getPosition());
++            setOrientation(mTrackedGo-&gt;getOrientation());
++        }
++
+         // Do the query, results are in proper order
+         const ActorVector&amp; actors = doExecuteQuery();
+ 
+@@ -134,14 +185,17 @@
+             if (go != NULL &amp;&amp; (go-&gt;getQueryFlags() &amp; mSelectionMask))
+             {
+                 // Is this GO seen when we need it to be seen?
+-                if (mCheckVisibility &amp;&amp; mReferenceGo &amp;&amp;
+-                    !SelectionHelper::checkLineOfSight(mReferenceGo, go))
++                if (mCheckVisibility &amp;&amp; mLoSReferenceGo &amp;&amp;
++                    !SelectionHelper::checkLineOfSight(mLoSReferenceGo, go))
+                 {
+                     // Nope, check next.
+                     continue;
+                 }
+-                // Ok, LoS either not needed or given.
+-                mSelection.push_back(go);
++                else if (filter(go))
++                {
++                    // Ok, LoS either not needed or given.
++                    mSelection.push_back(go);
++                }
+             }
+         }
+     }
+@@ -179,9 +233,14 @@
+     void HalfSphereSelector::setCheckVisibility(bool check, GameObject* reference)
+     {
+         mCheckVisibility = check;
+-        mReferenceGo = reference;
++        mLoSReferenceGo = reference;
+     }
+ 
++    void HalfSphereSelector::track(GameObject* go)
++    {
++        mTrackedGo = go;
++    }
++
+     DebugVisualisableFlag HalfSphereSelector::getFlag() const
+     {
+         return DVF_CONTROL;
+
+Modified: rl/trunk/engine/ui/include/CombatCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/ui/include/CombatCharacterController.h	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -18,7 +18,9 @@
+ #define __CombatCharacterController_H__
+ 
+ #include &quot;UiPrerequisites.h&quot;
++
+ #include &quot;CharacterController.h&quot;
++#include &quot;Selector.h&quot;
+ 
+ namespace rl {
+ 
+@@ -48,6 +50,7 @@
+         CombatManager* mCombatManager;
+         // Current combat that is controlled.
+         Combat* mCombat;
++        HalfSphereSelector mEnemySelector;
+ 	};
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/src/CombatCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/ui/src/CombatCharacterController.cpp	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -19,20 +19,31 @@
+ #include &quot;Actor.h&quot;
+ #include &quot;Combat.h&quot;
+ #include &quot;CombatManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
+ #include &quot;Creature.h&quot;
++#include &quot;InputManager.h&quot;
++#include &quot;Person.h&quot;
+ #include &quot;PhysicalThing.h&quot;
++#include &quot;Selector.h&quot;
++#include &quot;World.h&quot;
+ 
+ namespace rl {
+     CombatCharacterController::CombatCharacterController(CommandMapper* cmdMapper,
+         Actor* camera, Person* character)
+         : CharacterController(cmdMapper, camera, character),
+           mCombatManager(CombatManager::getSingletonPtr()),
+-          mCombat(NULL)
++          mCombat(NULL),
++          mEnemySelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
++            QUERYFLAG_CREATURE)
+     {
++        CreatureSelectionFilter* filter = new CreatureSelectionFilter();
++        filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
++        mEnemySelector.setFilter(filter);
+     }
+ 
+ 	CombatCharacterController::~CombatCharacterController()
+     {
++        delete mEnemySelector.getFilter();
+     }
+ 
+     void CombatCharacterController::resume()
+@@ -40,15 +51,38 @@
+         mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+         mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+ 
++        // Set reference to character
++        mEnemySelector.setCheckVisibility(true, mCharacter);
++        mEnemySelector.track(mCharacter);
++        mEnemySelector.setRadius(10.0);
++
+         // Is there a combat running already?
+         if (mCombatManager-&gt;getCurrentCombat() != NULL)
+         {
+-            // Yes, set this one as active.
++            // Yes. Set this one as active.
+             mCombat = mCombatManager-&gt;getCurrentCombat();
+         }
+         else
+         {
+-            // No, test, if we can start one.
++            // No. Test, if we can start one.
++            mEnemySelector.updateSelection();
++            const Selector::GameObjectVector&amp; enemies = mEnemySelector.getAllSelectedObjects();
++            if (!enemies.empty())
++            {
++                // There are enemies in vicinity, so start a new combat and set it up properly.
++                mCombat = mCombatManager-&gt;startCombat(mCharacter,
++                    static_cast&lt;Creature*&gt;(enemies[0]));
++                for (size_t i = 1; i &lt; enemies.size(); ++i)
++                {
++                    mCombat-&gt;addOpponent(static_cast&lt;Creature*&gt;(enemies[i]));
++                }
++            }
++            else
++            {
++                // Oops. Nothing to fight. Pop self.
++                InputManager::getSingleton().popControlState();
++                return;
++            }
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/ui/src/InputManager.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InputManager.cpp	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/ui/src/InputManager.cpp	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -34,8 +34,9 @@
+ #include &quot;ActorManager.h&quot;
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;CharacterController.h&quot;
++#include &quot;CombatCharacterController.h&quot;
++#include &quot;CommandMapper.h&quot;
+ #include &quot;ConfigurationManager.h&quot;
+-#include &quot;CommandMapper.h&quot;
+ #include &quot;Console.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;CutsceneCharacterController.h&quot;
+@@ -664,6 +665,9 @@
+         case CST_DIALOG:
+             controller = new DialogCharacterController(mCommandMapper, camera, character);
+             break;
++        case CST_COMBAT:
++            controller = new CombatCharacterController(mCommandMapper, camera, character);
++            break;
+         default:
+             Throw(IllegalStateException, &quot;Unknown controller type.&quot;);
+         }
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-28 22:48:06 UTC (rev 3352)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-29 19:23:18 UTC (rev 3353)
+@@ -134,13 +134,15 @@
+         // wird sp&#65533;er neu berechnet in calculateOptimalCameraPosition
+         mLookAtOffset = Vector3(0, (aabb.getMaximum() - aabb.getMinimum()).y * 0.45f, 0);
+ 
+-        // We want to check for visibility from char's POV.
+-        mSelector.setCheckVisibility(true, mCharacter);
++        CreatureSelectionFilter* filter = new CreatureSelectionFilter();
++        filter-&gt;setAlignmentMask(Creature::ALIGNMENT_ENEMY);
++        mCombatSelector.setFilter(filter);
+     }
+ 
+     //------------------------------------------------------------------------
+     MovementCharacterController::~MovementCharacterController()
+     {
++        delete mCombatSelector.getFilter();
+         delete mRaycast;
+ 
+         if (DebugWindow::getSingletonPtr())
+@@ -181,6 +183,16 @@
+     //------------------------------------------------------------------------
+     void MovementCharacterController::resume()
+     {
++        // We want to check for visibility from char's POV.
++        mSelector.setCheckVisibility(true, mCharacter);
++        mSelector.track(mCharacter);
++        mSelector.setRadius(3.0);
++
++        // Same for combat selector
++        mCombatSelector.setCheckVisibility(true, mCharacter);
++        mCombatSelector.track(mCharacter);
++        mCombatSelector.setRadius(10.0);
++
+         // The actor should be controlled manually,
+         // so let the PM prepare it accordingly
+         mCharacterActor-&gt;getPhysicalThing()-&gt;setMaterialID(
+@@ -254,7 +266,7 @@
+ 
+         if (isEnemyNear())
+         {
+-            RlAssert1(false &amp;&amp; &quot;Not yet implemented&quot;);
++            InputManager::getSingleton().pushControlState(CST_COMBAT);
+         }
+     }
+ 
+@@ -1634,9 +1646,6 @@
+     //------------------------------------------------------------------------
+     bool MovementCharacterController::isEnemyNear()
+     {
+-        mCombatSelector.setPosition(mCharacterActor-&gt;getWorldPosition());
+-        mCombatSelector.setOrientation(mCharacterActor-&gt;getWorldOrientation());
+-        mCombatSelector.setRadius(10.0);
+         mCombatSelector.updateSelection();
+ 
+         const Selector::GameObjectVector&amp; gov = mCombatSelector.getAllSelectedObjects();
+@@ -1661,9 +1670,6 @@
+ 
+         GameObject* oldGo = mSelector.getFirstSelectedObject();
+ 
+-        mSelector.setPosition(mCharacterActor-&gt;getWorldPosition());
+-        mSelector.setOrientation(mCharacterActor-&gt;getWorldOrientation());
+-        mSelector.setRadius(3.0);
+         mSelector.updateSelection();
+ 
+         GameObject* newGo = mSelector.getFirstSelectedObject();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000423.html">[Dsa-hl-svn] r3352 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000425.html">[Dsa-hl-svn] r3354 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#424">[ date ]</a>
+              <a href="thread.html#424">[ thread ]</a>
+              <a href="subject.html#424">[ subject ]</a>
+              <a href="author.html#424">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

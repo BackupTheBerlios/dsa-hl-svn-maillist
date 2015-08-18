@@ -1,0 +1,483 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3686 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3686%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708122158.l7CLwX6e007208%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000756.html">
+   <LINK REL="Next"  HREF="000758.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3686 - in rl/trunk/engine/ui: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3686%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708122158.l7CLwX6e007208%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3686 - in rl/trunk/engine/ui: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sun Aug 12 23:58:33 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000756.html">[Dsa-hl-svn] r3685 - in rl/trunk/engine: ai ai/include ai/src	rules/include rules/src
+</A></li>
+        <LI>Next message: <A HREF="000758.html">[Dsa-hl-svn] r3687 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#757">[ date ]</a>
+              <a href="thread.html#757">[ thread ]</a>
+              <a href="subject.html#757">[ subject ]</a>
+              <a href="author.html#757">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-08-12 23:58:23 +0200 (Sun, 12 Aug 2007)
+New Revision: 3686
+
+Modified:
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/include/ItemDragContainer.h
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/ItemDescriptionDragContainer.cpp
+   rl/trunk/engine/ui/src/ItemDragContainer.cpp
+   rl/trunk/engine/ui/src/ItemIconDragContainer.cpp
+Log:
+Moved inventory drag container events to the drag container classes
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -45,7 +45,8 @@
+ 		Inventory* mInventory;
+         std::map&lt;CeGuiString, CEGUI::Window*&gt; mSlotWindows;
+ 		CEGUI::Window* mWorldBackground;
+-		DndContainerMap mDragContainers;
++		DndContainerMap mWorldDragContainers;
++		DndContainerMap mSlotDragContainers;
+ 		RaySelector* mMouseSelector;
+ 
+ 		void createSlotWindows(Inventory* inventory);
+@@ -54,8 +55,6 @@
+ 		ItemDragContainer* createItemDragContainer(Item* item, bool showdescription, const CeGuiString&amp; containerName = &quot;&quot;);
+ 		bool handleItemDroppedOnSlot(const CEGUI::EventArgs&amp; evt);
+ 		bool handleItemDroppedOnWorld(const CEGUI::EventArgs&amp; evt);
+-		bool handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item);
+-		bool handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item);
+ 		bool handleMouseMovedInWorld(const CEGUI::EventArgs&amp; evt);
+ 		bool handleKeys(const CEGUI::EventArgs&amp; evt, bool down);
+ 		bool destroyDragContainer(ItemDragContainer* cont);
+
+Modified: rl/trunk/engine/ui/include/ItemDragContainer.h
+===================================================================
+--- rl/trunk/engine/ui/include/ItemDragContainer.h	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/include/ItemDragContainer.h	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -32,7 +32,7 @@
+ 	public:
+ 		static const Ogre::String ICON_UNKNOWN_ITEM;
+ 		
+-		~ItemDragContainer();
++		virtual ~ItemDragContainer();
+ 		
+ 		void setItemParent(Container* container);
+ 		void setItemParent(Inventory* inventory, const CeGuiString&amp; slotname);
+@@ -42,6 +42,9 @@
+ 		Item* getItem() const;
+ 		CEGUI::Window* getContentWindow() const;
+ 	
++		bool _handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item);
++		bool _handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item);
++
+ 	protected:
+ 		CEGUI::Window* mContentWindow;
+ 		
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -25,6 +25,7 @@
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
+ #include &quot;CameraObject.h&quot;
++#include &quot;Container.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
+@@ -32,7 +33,6 @@
+ #include &quot;ItemIconDragContainer.h&quot;
+ #include &quot;Selector.h&quot;
+ #include &quot;WindowFactory.h&quot;
+-#include &quot;Container.h&quot;
+ 
+ using namespace CEGUI;
+ using namespace Ogre;
+@@ -148,11 +148,13 @@
+ 	{
+ 		CeGuiString dragContainerName =
+ 			mWindow-&gt;getName() +  &quot;/item/&quot;
+-			+ Ogre::StringConverter::toString(item-&gt;getId())+&quot;_DragContainer&quot;;
++			+ Ogre::StringConverter::toString(item-&gt;getId())+&quot;_DragContainer&quot;+
++			(showdescription?&quot;_D&quot;:&quot;_I&quot;);
+ 		ItemDragContainer* itemhandler = NULL;
+ 
+-		DndContainerMap::iterator it = mDragContainers.find(dragContainerName);
+-		if (it != mDragContainers.end())
++		DndContainerMap::iterator itW = mWorldDragContainers.find(dragContainerName);
++		DndContainerMap::iterator itS = mSlotDragContainers.find(dragContainerName);
++		if (itW != mWorldDragContainers.end() || itS != mSlotDragContainers.end())
+ 		{
+ 			//itemhandler = it-&gt;second;
+ 			return NULL; ///@todo just a test
+@@ -167,21 +169,21 @@
+ 			if (slotName != &quot;&quot;)
+ 			{
+ 				itemhandler-&gt;setItemParent(mInventory, slotName);
++				mSlotDragContainers[dragContainerName] = itemhandler;
+ 			}
++			else
++			{
++				mWorldDragContainers[dragContainerName] = itemhandler;
++			}
+ 
+-			Window* itemWindow = itemhandler-&gt;getContentWindow();
++			//Window* itemWindow = itemhandler-&gt;getContentWindow();
+ 
+-			itemWindow-&gt;subscribeEvent(
+-				Window::EventMouseClick,
+-				boost::bind(&amp;InventoryWindow::handleItemMouseClick, this, _1, item));
++			//itemWindow-&gt;subscribeEvent(
++			//	Window::EventMouseLeaves,
++			//	boost::bind(&amp;InventoryWindow::destroyDragContainer, this, itemhandler));
+ 
+-			itemWindow-&gt;subscribeEvent(
+-				Window::EventMouseDoubleClick,
+-				boost::bind(&amp;InventoryWindow::handleItemDoubleClick, this, _1, item));
+-
++			itemhandler-&gt;setRiseOnClickEnabled(true);
+ 			itemhandler-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+-
+-			mDragContainers[dragContainerName] = itemhandler;
+ 		}
+ 
+ 		return itemhandler;
+@@ -203,25 +205,33 @@
+ 				if (dragcont-&gt;getItemParentContainer() != NULL)
+ 				{
+ 					dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
++					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+ 					///@todo Swap with old content (if there is some)
+ 				}
+ 				else if (dragcont-&gt;getItemParentSlot() != &quot;&quot;)
+ 				{
+ 					dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
++					dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+ 					///@todo Swap with old content (if there is some)
+ 				}
++
++				ItemDragContainer* newCont = createItemDragContainer(item, false, targetSlot);
++
++				if (newCont)
++				{
++					destroyDragContainer(dragcont);
++				}
+ 				else
+ 				{
+-					dragcont-&gt;removeEvent(Window::EventMouseLeaves);
+-					mDragContainers.erase(dragcont-&gt;getName());
++					newCont = dragcont;
+ 				}
+ 
+ 				mInventory-&gt;hold(item, targetSlot);
+-				dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-				mSlotWindows[targetSlot]-&gt;addChildWindow(dragcont);
+-				dragcont-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
+-				dragcont-&gt;setItemParent(mInventory, targetSlot);
+ 
++				mSlotWindows[targetSlot]-&gt;addChildWindow(newCont);
++				newCont-&gt;setPosition(UVector2(cegui_reldim(0), cegui_reldim(0)));
++				newCont-&gt;setItemParent(mInventory, targetSlot);
++
+ 				return true;
+ 			}
+ 			else
+@@ -246,30 +256,12 @@
+ 				dragcont-&gt;getPixelRect().d_top / getRoot()-&gt;getPixelSize().d_height,
+ 				-1);
+ 
+-			if (dragcont-&gt;getItemParentContainer() != NULL)
+-			{
+-				dragcont-&gt;getItemParentContainer()-&gt;removeItem(item);
+-				dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-				CEGUI::WindowManager::getSingleton().destroyWindow(dragcont-&gt;getContentWindow());
+-				CEGUI::WindowManager::getSingleton().destroyWindow(dragcont);
+-			}
+-			else if (dragcont-&gt;getItemParentSlot() != &quot;&quot;)
+-			{
+-				dragcont-&gt;getItemParentInventory()-&gt;dropItem(dragcont-&gt;getItemParentSlot());
++			destroyDragContainer(dragcont);
+ 
+-				dragcont-&gt;getParent()-&gt;removeChildWindow(dragcont);
+-				CEGUI::WindowManager::getSingleton().destroyWindow(dragcont-&gt;getContentWindow());
+-				CEGUI::WindowManager::getSingleton().destroyWindow(dragcont);
+-			}
+-			else
+-			{
+-				destroyDragContainer(dragcont);
+-			}
+-
+ 			Ogre::Vector3 targetPosWorldSpace =
+ 				mInventory-&gt;getOwner()-&gt;getPosition()
+ 				+ mInventory-&gt;getOwner()-&gt;getOrientation()
+-				* targetPosWindow; ///@todo check why coordinates are negative
++				* targetPosWindow; 
+ 			item-&gt;placeIntoScene();
+ 			item-&gt;setPosition(targetPosWorldSpace);
+ 
+@@ -328,10 +320,6 @@
+ 							UDim((aabb.top+aabb.bottom)/2.0, 0));
+ 					posCont -= cont-&gt;getSize() / UVector2(UDim(2, 2), UDim(2, 2));
+ 					cont-&gt;setPosition(posCont);
+-
+-					cont-&gt;subscribeEvent(
+-						Window::EventMouseLeaves,
+-						boost::bind(&amp;InventoryWindow::destroyDragContainer, this, cont));
+ 				}
+ 			}
+ 		}
+@@ -341,34 +329,6 @@
+ 		return true;
+ 	}
+ 
+-	bool InventoryWindow::handleItemMouseClick(const EventArgs&amp; evt, Item* item)
+-	{
+-		const MouseEventArgs&amp; mevt = static_cast&lt;const MouseEventArgs&amp;&gt;(evt);
+-		if (mevt.button == RightButton)
+-		{
+-			WindowFactory::getSingleton().showActionChoice(item);
+-			return true;
+-		}
+-		else
+-		{
+-			return false;
+-		}
+-	}
+-
+-	bool InventoryWindow::handleItemDoubleClick(const EventArgs&amp; evt, Item* item)
+-	{
+-		const MouseEventArgs&amp; mevt = static_cast&lt;const MouseEventArgs&amp;&gt;(evt);
+-		if (mevt.button == LeftButton)
+-		{
+-			item-&gt;doDefaultAction(mInventory-&gt;getOwner(), NULL);
+-			return true;
+-		}
+-		else
+-		{
+-			return false;
+-		}
+-	}
+-
+ 	bool InventoryWindow::handleKeys(const CEGUI::EventArgs &amp;evt, bool down)
+ 	{
+ 		const KeyEventArgs&amp; kevt = static_cast&lt;const KeyEventArgs&amp;&gt;(evt);
+@@ -403,18 +363,14 @@
+ 							UDim((aabb.top+aabb.bottom)/2.0, 0));
+ 						posCont -= cont-&gt;getSize() / UVector2(UDim(2, 2), UDim(2, 2));
+ 						cont-&gt;setPosition(posCont);
+-
+-						cont-&gt;subscribeEvent(
+-							Window::EventMouseLeaves,
+-							boost::bind(&amp;InventoryWindow::destroyDragContainer, this, cont));
+ 					}
+ 				}
+ 			}
+ 			else
+ 			{
+-				while (!mDragContainers.empty())
++				while (!mWorldDragContainers.empty())
+ 				{
+-					destroyDragContainer(mDragContainers.begin()-&gt;second);
++					destroyDragContainer(mWorldDragContainers.begin()-&gt;second);
+ 				}
+ 			}
+ 
+@@ -426,11 +382,16 @@
+ 
+ 	bool InventoryWindow::destroyDragContainer(rl::ItemDragContainer* cont)
+ 	{
++		cont-&gt;hide();
+ 		cont-&gt;removeAllEvents();
+-		mWorldBackground-&gt;removeChildWindow(cont);
+-		mDragContainers.erase(cont-&gt;getName());
++		if (cont-&gt;getParent())
++		{
++			cont-&gt;getParent()-&gt;removeChildWindow(cont);
++		}
++		mWorldDragContainers.erase(cont-&gt;getName());
++		mSlotDragContainers.erase(cont-&gt;getName());
+ 		CEGUI::WindowManager::getSingleton().destroyWindow(cont-&gt;getContentWindow());
+-
++		
+ 		return true;
+ 	}
+ 
+
+Modified: rl/trunk/engine/ui/src/ItemDescriptionDragContainer.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ItemDescriptionDragContainer.cpp	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/src/ItemDescriptionDragContainer.cpp	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -17,6 +17,8 @@
+ 
+ #include &quot;ItemDescriptionDragContainer.h&quot;
+ 
++#include &lt;boost/bind.hpp&gt;
++
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;Item.h&quot;
+ 
+@@ -35,15 +37,23 @@
+ 		mContentWindow = AbstractWindow::loadWindow(&quot;itemdescriptiondragcontainer.xml&quot;, prefix);
+ 
+ 		mContentWindow-&gt;getChild(
+-			mContentWindow-&gt;getName()+&quot;/Icon&quot;)
++			name+&quot;ItemDescriptionDragContainer/Icon&quot;)
+ 			-&gt;setProperty(&quot;Image&quot;, icon);
+ 		mContentWindow-&gt;getChild(
+-			mContentWindow-&gt;getName()+&quot;/Name&quot;)
++			name+&quot;ItemDescriptionDragContainer/Name&quot;)
+ 			-&gt;setText(item-&gt;getName());
+ 		mContentWindow-&gt;getChild(
+-			mContentWindow-&gt;getName()+&quot;/Description&quot;)
++			name+&quot;ItemDescriptionDragContainer/Description&quot;)
+ 			-&gt;setText(item-&gt;getDescription());
+ 
++		mContentWindow-&gt;subscribeEvent(
++			Window::EventMouseClick,
++			boost::bind(&amp;ItemDragContainer::_handleItemMouseClick, this, _1, item));
++
++		mContentWindow-&gt;subscribeEvent(
++			Window::EventMouseDoubleClick,
++			boost::bind(&amp;ItemDragContainer::_handleItemDoubleClick, this, _1, item));
++
+ 		setSize(mContentWindow-&gt;getSize());
+ 		addChildWindow(mContentWindow);
+ 	}
+
+Modified: rl/trunk/engine/ui/src/ItemDragContainer.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/src/ItemDragContainer.cpp	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -20,7 +20,9 @@
+ #include &lt;CEGUIWindowManager.h&gt;
+ 
+ #include &quot;AbstractWindow.h&quot;
++#include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
++#include &quot;WindowFactory.h&quot;
+ 
+ namespace rl {
+ 	const Ogre::String ItemDragContainer::ICON_UNKNOWN_ITEM = &quot;set:ModelThumbnails image:item_unknown&quot;;
+@@ -86,4 +88,34 @@
+ 	{
+ 		return mContentWindow;
+ 	}
++
++	bool ItemDragContainer::_handleItemMouseClick(const CEGUI::EventArgs&amp; evt, Item* item)
++	{
++		const CEGUI::MouseEventArgs&amp; mevt = static_cast&lt;const CEGUI::MouseEventArgs&amp;&gt;(evt);
++		if (mevt.button == CEGUI::RightButton)
++		{
++			WindowFactory::getSingleton().showActionChoice(item);
++			return true;
++		}
++		else
++		{
++			return false;
++		}
++	}
++
++	bool ItemDragContainer::_handleItemDoubleClick(const CEGUI::EventArgs&amp; evt, Item* item)
++	{
++		const CEGUI::MouseEventArgs&amp; mevt = static_cast&lt;const CEGUI::MouseEventArgs&amp;&gt;(evt);
++		if (mevt.button == CEGUI::LeftButton)
++		{
++			item-&gt;doDefaultAction(mInventory-&gt;getOwner(), NULL);
++			return true;
++		}
++		else
++		{
++			return false;
++		}
++	}
++
++
+ }
+
+Modified: rl/trunk/engine/ui/src/ItemIconDragContainer.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ItemIconDragContainer.cpp	2007-08-12 21:53:07 UTC (rev 3685)
++++ rl/trunk/engine/ui/src/ItemIconDragContainer.cpp	2007-08-12 21:58:23 UTC (rev 3686)
+@@ -17,6 +17,8 @@
+ 
+ #include &quot;ItemIconDragContainer.h&quot;
+ 
++#include &lt;boost/bind.hpp&gt;
++
+ #include &quot;AbstractWindow.h&quot;
+ #include &quot;Item.h&quot;
+ 
+@@ -33,9 +35,23 @@
+ 
+ 		CeGuiString prefix = name;
+ 		mContentWindow = AbstractWindow::loadWindow(&quot;itemicondragcontainer.xml&quot;, prefix);
+-		mContentWindow-&gt;getChild(mContentWindow-&gt;getName()+&quot;/Icon&quot;)
++
++		for (size_t idx = 0; idx &lt; mContentWindow-&gt;getChildCount(); ++idx)
++		{
++			LOG_MESSAGE(Logger::UI, mContentWindow-&gt;getChildAtIdx(idx)-&gt;getName());
++		}
++
++		mContentWindow-&gt;getChild(name+&quot;ItemIconDragContainer/Icon&quot;)
+ 			-&gt;setProperty(&quot;Image&quot;, icon);
+ 
++		mContentWindow-&gt;subscribeEvent(
++			Window::EventMouseClick,
++			boost::bind(&amp;ItemDragContainer::_handleItemMouseClick, this, _1, item));
++
++		mContentWindow-&gt;subscribeEvent(
++			Window::EventMouseDoubleClick,
++			boost::bind(&amp;ItemDragContainer::_handleItemDoubleClick, this, _1, item));
++
+ 		setSize(CEGUI::UVector2(
+ 			cegui_absdim(item-&gt;getSize().first*30),
+ 			cegui_absdim(item-&gt;getSize().second*30)));
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000756.html">[Dsa-hl-svn] r3685 - in rl/trunk/engine: ai ai/include ai/src	rules/include rules/src
+</A></li>
+	<LI>Next message: <A HREF="000758.html">[Dsa-hl-svn] r3687 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#757">[ date ]</a>
+              <a href="thread.html#757">[ thread ]</a>
+              <a href="subject.html#757">[ subject ]</a>
+              <a href="author.html#757">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

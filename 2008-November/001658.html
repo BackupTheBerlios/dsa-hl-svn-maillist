@@ -1,0 +1,608 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4601 - in rl/branches/persistence: ai/src common/src	core/include core/src rules/src script/include script/src ui
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4601%20-%20in%20rl/branches/persistence%3A%20ai/src%20common/src%0A%09core/include%20core/src%20rules/src%20script/include%20script/src%20ui&In-Reply-To=%3C200811231809.mANI9mtb029780%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001657.html">
+   <LINK REL="Next"  HREF="001659.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4601 - in rl/branches/persistence: ai/src common/src	core/include core/src rules/src script/include script/src ui</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4601%20-%20in%20rl/branches/persistence%3A%20ai/src%20common/src%0A%09core/include%20core/src%20rules/src%20script/include%20script/src%20ui&In-Reply-To=%3C200811231809.mANI9mtb029780%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4601 - in rl/branches/persistence: ai/src common/src	core/include core/src rules/src script/include script/src ui">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Nov 23 19:09:48 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001657.html">[Dsa-hl-svn] r4600 - in rl/trunk: . engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="001659.html">[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1658">[ date ]</a>
+              <a href="thread.html#1658">[ thread ]</a>
+              <a href="subject.html#1658">[ subject ]</a>
+              <a href="author.html#1658">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-11-23 19:09:31 +0100 (Sun, 23 Nov 2008)
+New Revision: 4601
+
+Modified:
+   rl/branches/persistence/ai/src/DialogManager.cpp
+   rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp
+   rl/branches/persistence/core/include/CoreSubsystem.h
+   rl/branches/persistence/core/include/SaveAbleCollection.h
+   rl/branches/persistence/core/include/SaveAbleManager.h
+   rl/branches/persistence/core/include/SaveAbleSerializer.h
+   rl/branches/persistence/core/include/SaveGameFileWriter.h
+   rl/branches/persistence/core/src/CoreSubsystem.cpp
+   rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+   rl/branches/persistence/core/src/SaveGameFileWriter.cpp
+   rl/branches/persistence/core/src/SaveGameManager.cpp
+   rl/branches/persistence/rules/src/Makefile.am
+   rl/branches/persistence/script/include/Scene.h
+   rl/branches/persistence/script/src/Scene.cpp
+   rl/branches/persistence/ui/RlUI2005.vcproj
+Log:
+begin to join different parts of save able system
+
+Modified: rl/branches/persistence/ai/src/DialogManager.cpp
+===================================================================
+--- rl/branches/persistence/ai/src/DialogManager.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/ai/src/DialogManager.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -113,7 +113,7 @@
+         LOG_MESSAGE(Logger::RULES, &quot;Saving dialogs&quot;);
+ 
+         PropertyRecordPtr set = getAllProperties();
+-        writer-&gt;writeEachProperty(this, set-&gt;toPropertyMap());
++        //writer-&gt;writeEachProperty(this, set-&gt;toPropertyMap());
+     }
+ 
+     void DialogManager::readData(SaveGameFileReader* reader)
+
+Modified: rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp
+===================================================================
+--- rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -74,12 +74,6 @@
+     {
+         String full_path = concatenate_path(mName, filename);
+ 
+-        // Use filesystem to determine size 
+-        // (quicker than streaming to the end and back)
+-        struct stat tagStat;
+-	int ret = stat(full_path.c_str(), &amp;tagStat);
+-        assert(ret == 0 &amp;&amp; &quot;Problem getting file size&quot; );
+-
+         // Always open in binary mode
+         std::fstream *origStream = new std::fstream();
+         origStream-&gt;open(full_path.c_str(), std::ios::in | std::ios::out | std::ios::binary);
+@@ -89,19 +83,19 @@
+         {
+             delete origStream;
+             OGRE_EXCEPT(Exception::ERR_FILE_NOT_FOUND,
+-                &quot;Cannot open file: &quot; + filename,
++                &quot;Cannot open or create file: &quot; + filename,
+                 &quot;WriteableFileSystemArchive::open&quot;);
+         }
+ 
+         /// Construct return stream, tell it to delete on destroy
+         WriteableFileStreamDataStream* stream = new WriteableFileStreamDataStream(filename,
+-            origStream, tagStat.st_size, true);
++            origStream, true);
+         return DataStreamPtr(stream);
+     }
+     
+     const String&amp; WriteableFileSystemArchiveFactory::getType(void) const
+     {
+-        static String name = &quot;FileSystem&quot;;
++        static String name = &quot;WriteableFileSystem&quot;;
+         return name;
+     }
+ 
+
+Modified: rl/branches/persistence/core/include/CoreSubsystem.h
+===================================================================
+--- rl/branches/persistence/core/include/CoreSubsystem.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/include/CoreSubsystem.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -43,6 +43,7 @@
+ class SoundManager;
+ class DebugVisualsManager;
+ class SaveGameManager;
++class SaveAbleSerializer;
+ class JobScheduler;
+ class ZoneManager;
+ class TimeSourceManager;
+@@ -140,6 +141,7 @@
+     SoundManager* mSoundManager;
+     DebugVisualsManager* mDebugVisualsManager;
+     SaveGameManager* mSaveGameManager;
++	SaveAbleSerializer* mSaveAbleSerializer;
+     JobScheduler* mJobScheduler;
+ 	ZoneManager* mZoneManager;
+     TimeSourceManager* mTimeSourceManager;
+
+Modified: rl/branches/persistence/core/include/SaveAbleCollection.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleCollection.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/include/SaveAbleCollection.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -20,7 +20,7 @@
+ namespace rl
+ {
+ 
+-	class SaveAbleCollection
++	class _RlCoreExport SaveAbleCollection
+ 	{
+ 	public:
+ 		SaveAbleCollection(const CeGuiString &amp;id);
+
+Modified: rl/branches/persistence/core/include/SaveAbleManager.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleManager.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/include/SaveAbleManager.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -25,6 +25,8 @@
+ {
+ 	class _RlCoreExport SaveAbleManager : public Ogre::Singleton&lt;SaveAbleManager&gt;
+ 	{
++	protected:
++		typedef std::map&lt;CeGuiString, SaveAbleCollection*&gt; SaveAbleCollectionMap;
+ 	public:
+ 		void saveState();
+ 		void addSaveAble(SaveAblePtr save);
+@@ -34,10 +36,13 @@
+ 		void attachSaveAbleToCollection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId);
+ 		void deattachSaveAbleFromColltection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId);
+ 		void restoreState();
++		void restoreSaveAble(const CeGuiString &amp;id);
++		SaveAbleCollectionMap getCollections();
+ 	protected:
+-		std::map&lt;int, PropertyRecordPtr&gt; mSaveAbleStates;
+-		std::map&lt;int, SaveAblePtr&gt; mSaveAbles;
+-		std::map&lt;Ogre::String,SaveAbleCollection*&gt; mSaveAbleCollections;
++		std::map&lt;CeGuiString, PropertyRecordPtr&gt; mSaveAbleStates;
++		std::map&lt;CeGuiString, SaveAblePtr&gt; mSaveAbles;
++		
++		SaveAbleCollectionMap mSaveAbleCollections;
+ 	};
+ }
+ 
+
+Modified: rl/branches/persistence/core/include/SaveAbleSerializer.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleSerializer.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/include/SaveAbleSerializer.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -27,15 +27,35 @@
+ 
+ namespace rl
+ {
+-	class _RlCoreExport SaveAbleSerializer : public ScriptSerializer
++	class _RlCoreExport SaveAbleSerializer : public Ogre::Singleton&lt;SaveAbleSerializer&gt;, public ScriptSerializer
+ 	{
+ 	public:
+-		void writeToSaveGameFile();
+-		void readFromSaveGameFile();
++		SaveAbleSerializer();
++
++		typedef std::map&lt;int, SaveGameFile*&gt; SaveGameEntryMap;
++
++		SaveGameEntryMap listSaveGames();
++		SaveGameEntryMap listSaveGames(const CeGuiString &amp;moduleId);
++
++		virtual const Ogre::StringVector&amp;  getScriptPatterns(void) const;
++        virtual void parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
++        virtual Ogre::Real getLoadingOrder(void) const;
++
++		void createNewSaveGame();
++		void writeSaveGame(int fileId);
++		void readSaveGame(int fileId);
++
++		int getHighestSaveGameNumber();
+ 	protected:
+-		std::map&lt;CeGuiString, SaveGameFile*&gt; mSaveGameFile;
++		void writeToSaveGameFile(SaveGameFile* file);
++		void readFromSaveGameFile(SaveGameFile* file);
++
++		SaveGameEntryMap mSaveGameFile;
+ 		SaveGameFileReader mReader;
+ 		SaveGameFileWriter mWriter;
++
++		Ogre::StringVector mScriptPatterns;
++		int mHighestSaveGameNumber;
+ 	};
+ }
+ 
+
+Modified: rl/branches/persistence/core/include/SaveGameFileWriter.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveGameFileWriter.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/include/SaveGameFileWriter.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -25,15 +25,16 @@
+ 
+ namespace rl
+ {
+-    class SaveGameData;
+-    typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
++    //class SaveGameData;
++    //typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+     class _RlCoreExport SaveGameFileWriter 
+         : public XmlPropertyWriter
+     {
+     public:
+-        void buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map);
+-        void writeEachProperty(SaveGameData* data, const rl::PropertyMap &amp;map);
++		void buildSaveGameFile(SaveGameFile* file);
++        //void buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map);
++        //void writeEachProperty(SaveGameData* data, const rl::PropertyMap &amp;map);
+     };
+ }
+ 
+
+Modified: rl/branches/persistence/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/branches/persistence/core/src/CoreSubsystem.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/src/CoreSubsystem.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -36,6 +36,7 @@
+ #include &quot;PhysicsManager.h&quot;
+ #include &quot;RubyInterpreter.h&quot;
+ #include &quot;SaveGameManager.h&quot;
++#include &quot;SaveAbleSerializer.h&quot;
+ #include &quot;ScriptWrapper.h&quot;
+ #include &quot;SoundManager.h&quot;
+ #include &quot;TimeSource.h&quot;
+@@ -100,6 +101,7 @@
+         delete mRubyInterpreter;
+         delete mTimeSourceManager;
+         delete mSaveGameManager;
++		delete mSaveAbleSerializer;
+         delete mGameLoop;
+         //mXmlResourceManager-&gt;unloadAll();
+         //delete mXmlResourceManager;
+@@ -244,6 +246,9 @@
+ 
+         mSaveGameManager = new SaveGameManager();
+         LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
++
++		mSaveAbleSerializer = new SaveAbleSerializer();
++        LOG_MESSAGE(Logger::RULES, &quot;SaveAbleSerializer erzeugt&quot;);
+ 		
+ 		mTimeSourceManager = new TimeSourceManager();
+         mTimeSourceManager-&gt;registerTimeSource(new RealTimeContinuous());
+
+Modified: rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -17,7 +17,64 @@
+ #include &quot;stdinc.h&quot;
+ 
+ #include &quot;SaveAbleSerializer.h&quot;
++#include &quot;ConfigurationManager.h&quot;
+ 
++template&lt;&gt; rl::SaveAbleSerializer* Ogre::Singleton&lt;rl::SaveAbleSerializer&gt;::ms_Singleton = 0;
++
++
++
+ namespace rl
+ {
+-}
+\ No newline at end of file
++	CeGuiString convertTimeToString(tm* time)
++    {
++        CeGuiString string = ((Ogre::String)(Ogre::StringConverter::toString(time-&gt;tm_mday) + &quot;.&quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_mon) + &quot;.&quot;
++            + Ogre::StringConverter::toString(time-&gt;tm_year + 1900) + &quot; - &quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_hour) + &quot;:&quot;
++            + Ogre::StringConverter::toString(time-&gt;tm_min) + &quot;:&quot; 
++            + Ogre::StringConverter::toString(time-&gt;tm_sec))).c_str();
++        return string;
++    }
++
++	SaveAbleSerializer::SaveAbleSerializer()
++	{
++		Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGameFiles&quot;);
++
++        mScriptPatterns.push_back(&quot;*.save&quot;);
++        Ogre::ResourceGroupManager::getSingleton()._registerScriptLoader(this);
++
++        Ogre::ResourceGroupManager::getSingleton().addResourceLocation(ConfigurationManager::getSingleton().getModulesRootDirectory() 
++            + &quot;/saves&quot;, &quot;WriteableFileSystem&quot;, &quot;SaveGameFiles&quot;);
++        Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGameFiles&quot;);
++	}
++
++	void SaveAbleSerializer::readFromSaveGameFile(rl::SaveGameFile *file)
++	{
++	}
++
++	void SaveAbleSerializer::writeToSaveGameFile(rl::SaveGameFile *file)
++	{
++		if(file)
++		{
++			mWriter.buildSaveGameFile(file);
++		}
++		else
++			LOG_ERROR(&quot;CORE&quot;, &quot;Error: could not save game, ne file given!!&quot;);
++	}
++
++	void SaveAbleSerializer::parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
++	{
++	}
++
++	const Ogre::StringVector&amp; SaveAbleSerializer::getScriptPatterns() const
++    {
++        return mScriptPatterns;
++    }
++
++    Ogre::Real SaveAbleSerializer::getLoadingOrder() const
++    {
++        return 2000.0f;
++    }
++
++
++}
+
+Modified: rl/branches/persistence/core/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveGameFileWriter.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/src/SaveGameFileWriter.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -43,65 +43,75 @@
+ 
+ namespace rl
+ {
+-    void SaveGameFileWriter::buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map)
+-    {
+-        //@toto: build
+-        initializeXml();
+ 
+-        XMLCh tempStr[100];
+-        XMLString::transcode(&quot;LS&quot;, tempStr, 99);
+-        mImplementation = DOMImplementationRegistry::getDOMImplementation(tempStr);
+-        mWriter = static_cast&lt;DOMImplementationLS*&gt;(mImplementation)-&gt;createDOMWriter();
+-        mTarget = file-&gt;getFormatTarget();
+-        mDocument = static_cast&lt;DOMImplementation*&gt;(mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameFile&quot;), 0);
++	void SaveGameFileWriter::buildSaveGameFile(rl::SaveGameFile *file)
++	{
++		initializeXml();
+ 
+-        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
+-            mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
+ 
+-        if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
+-             mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
+ 
+-        mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameFile&quot;)); //Set name of document root node
++		shutdownXml();
++	}
+ 
+-        //Write SaveGameVersion
+-        setAttributeValueAsString(mDocument-&gt;getDocumentElement(), &quot;SaveGameFormatVersion&quot;, &quot;0.5&quot;);
+-        setAttributeValueAsInteger(mDocument-&gt;getDocumentElement(), &quot;Engineversion&quot;, CoreSubsystem::getSingleton().getEngineBuildNumber());
++    //void SaveGameFileWriter::buildSaveGameFile(SaveGameFile *file, const SaveGameDataOrderMap &amp;map)
++    //{
++    //    //@toto: build
++    //    initializeXml();
+ 
+-        //Write modul of save game
+-        DOMElement* header = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;header&quot;);
+-        
+-        PropertyRecordPtr headerSet = file-&gt;getAllProperties();
+-        for (PropertyRecord::PropertyRecordMap::const_iterator it_header = headerSet-&gt;begin(); it_header != headerSet-&gt;end(); it_header++)
+-        {
+-            this-&gt;processProperty(header, PropertyEntry(it_header-&gt;first.c_str(), it_header-&gt;second));
+-        }
++    //    XMLCh tempStr[100];
++    //    XMLString::transcode(&quot;LS&quot;, tempStr, 99);
++    //    mImplementation = DOMImplementationRegistry::getDOMImplementation(tempStr);
++    //    mWriter = static_cast&lt;DOMImplementationLS*&gt;(mImplementation)-&gt;createDOMWriter();
++    //    mTarget = file-&gt;getFormatTarget();
++    //    mDocument = static_cast&lt;DOMImplementation*&gt;(mImplementation)-&gt;createDocument(0, XMLString::transcode(&quot;SaveGameFile&quot;), 0);
+ 
+-        ////Write globals
+-        //DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
+-        //DOMElement* gameTime = appendChildElement(mDocument, globals, &quot;gametime&quot;);
+-        //TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
+-        //setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
++    //    if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true))
++    //        mWriter-&gt;setFeature(XMLUni::fgDOMWRTDiscardDefaultContent, true);
+ 
+-        for(SaveGameDataOrderMap::const_iterator data_iter = map.begin(); data_iter != map.end(); data_iter++)
+-        {
+-            data_iter-&gt;second-&gt;writeData(this);
+-        }
++    //    if (mWriter-&gt;canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
++    //         mWriter-&gt;setFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true);
+ 
+-        mWriter-&gt;writeNode(mTarget, *mDocument);
++    //    mDocument-&gt;setNodeValue(XMLString::transcode(&quot;SaveGameFile&quot;)); //Set name of document root node
+ 
++    //    //Write SaveGameVersion
++    //    setAttributeValueAsString(mDocument-&gt;getDocumentElement(), &quot;SaveGameFormatVersion&quot;, &quot;0.5&quot;);
++    //    setAttributeValueAsInteger(mDocument-&gt;getDocumentElement(), &quot;Engineversion&quot;, CoreSubsystem::getSingleton().getEngineBuildNumber());
+ 
+-        mWriter-&gt;release();
++    //    //Write modul of save game
++    //    DOMElement* header = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;header&quot;);
++    //    
++    //    PropertyRecordPtr headerSet = file-&gt;getAllProperties();
++    //    for (PropertyRecord::PropertyRecordMap::const_iterator it_header = headerSet-&gt;begin(); it_header != headerSet-&gt;end(); it_header++)
++    //    {
++    //        this-&gt;processProperty(header, PropertyEntry(it_header-&gt;first.c_str(), it_header-&gt;second));
++    //    }
+ 
+-        delete mDocument;
+-        delete mTarget;
++    //    ////Write globals
++    //    //DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
++    //    //DOMElement* gameTime = appendChildElement(mDocument, globals, &quot;gametime&quot;);
++    //    //TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
++    //    //setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
+ 
+-        shutdownXml();
+-    }
++    //    for(SaveGameDataOrderMap::const_iterator data_iter = map.begin(); data_iter != map.end(); data_iter++)
++    //    {
++    //        data_iter-&gt;second-&gt;writeData(this);
++    //    }
+ 
+-    void SaveGameFileWriter::writeEachProperty(SaveGameData* data, const rl::PropertyMap &amp;map)
+-    {
+-        DOMElement* saveElem = appendChildElement(getDocument(), getDocument()-&gt;getDocumentElement(), data-&gt;getXmlNodeIdentifier().c_str());
++    //    mWriter-&gt;writeNode(mTarget, *mDocument);
+ 
+-        XmlPropertyWriter::writeEachPropertyToElem(saveElem, map);
+-    }
++
++    //    mWriter-&gt;release();
++
++    //    delete mDocument;
++    //    delete mTarget;
++
++    //    shutdownXml();
++    //}
++
++    //void SaveGameFileWriter::writeEachProperty(SaveGameData* data, const rl::PropertyMap &amp;map)
++    //{
++    //    DOMElement* saveElem = appendChildElement(getDocument(), getDocument()-&gt;getDocumentElement(), data-&gt;getXmlNodeIdentifier().c_str());
++
++    //    XmlPropertyWriter::writeEachPropertyToElem(saveElem, map);
++    //}
+ }
+
+Modified: rl/branches/persistence/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveGameManager.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/core/src/SaveGameManager.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -119,7 +119,7 @@
+         mSaveGames[file-&gt;getId()] = file;
+ 
+         SaveGameFileWriter writer;
+-        writer.buildSaveGameFile(file, mSaveGameDataOrderMap);
++        //writer.buildSaveGameFile(file, mSaveGameDataOrderMap);
+ 
+         //freeSaveGameMap();
+ 
+
+Modified: rl/branches/persistence/rules/src/Makefile.am
+===================================================================
+--- rl/branches/persistence/rules/src/Makefile.am	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/rules/src/Makefile.am	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -29,6 +29,7 @@
+ 	GameTimeSource.cpp \
+ 	GlobalProperties.cpp \
+ 	GoToJob.cpp \
++	FetchItemJob.cpp \
+ 	Item.cpp \
+ 	Inventory.cpp \
+ 	JournalEntry.cpp \
+
+Modified: rl/branches/persistence/script/include/Scene.h
+===================================================================
+--- rl/branches/persistence/script/include/Scene.h	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/script/include/Scene.h	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -26,7 +26,7 @@
+ 
+ namespace rl {
+ 
+-    class Scene : public PropertyHolder, public SaveAbleCollection
++    class _RlScriptExport Scene : public PropertyHolder, public SaveAbleCollection
+     {
+     public:
+         static const Ogre::String PROPERTY_GAMEOBJECTS;
+@@ -42,6 +42,10 @@
+         virtual void setProperty(const CeGuiString&amp; key, const Property&amp; value);
+         virtual PropertyKeys getAllPropertyKeys() const;
+ 
++		virtual void attachSaveAble(SaveAblePtr saveAble);
++		virtual void deattachSaveAble(SaveAblePtr saveAble);
++		virtual void deattachSaveAble(const CeGuiString &amp;id);
++		virtual void deattachAllSaveAbles();
+     private:
+         CeGuiString mName;
+         std::vector&lt;Ogre::String&gt; mMaps;
+
+Modified: rl/branches/persistence/script/src/Scene.cpp
+===================================================================
+--- rl/branches/persistence/script/src/Scene.cpp	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/script/src/Scene.cpp	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -30,7 +30,7 @@
+ const Ogre::String Scene::PROPERTY_GAMEOBJECTS = &quot;gameobjects&quot;;
+ 
+ Scene::Scene(const CeGuiString&amp; name)
+-: mName(name)
++: mName(name), SaveAbleCollection(name)
+ {
+ }
+ 
+@@ -125,4 +125,20 @@
+     return keys;
+ }
+ 
++void Scene::attachSaveAble(SaveAblePtr saveAble)
++{
++}
++
++void Scene::deattachSaveAble(SaveAblePtr saveAble)
++{
++}
++
++void Scene::deattachSaveAble(const CeGuiString &amp;id)
++{
++}
++
++void Scene::deattachAllSaveAbles()
++{
++}
++
+ }
+\ No newline at end of file
+
+Modified: rl/branches/persistence/ui/RlUI2005.vcproj
+===================================================================
+--- rl/branches/persistence/ui/RlUI2005.vcproj	2008-11-21 19:26:07 UTC (rev 4600)
++++ rl/branches/persistence/ui/RlUI2005.vcproj	2008-11-23 18:09:31 UTC (rev 4601)
+@@ -46,7 +46,7 @@
+ 			/&gt;
+ 			&lt;Tool
+ 				Name=&quot;VCCLCompilerTool&quot;
+-				AdditionalOptions=&quot;-Zm130&quot;
++				AdditionalOptions=&quot;-Zm140&quot;
+ 				Optimization=&quot;0&quot;
+ 				AdditionalIncludeDirectories=&quot;.\include;..\common\include;..\ai\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
+ 				PreprocessorDefinitions=&quot;WITH_FMOD3;_WINDOWS,_DEBUG,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE;RL_USE_PCH&quot;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001657.html">[Dsa-hl-svn] r4600 - in rl/trunk: . engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="001659.html">[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1658">[ date ]</a>
+              <a href="thread.html#1658">[ thread ]</a>
+              <a href="subject.html#1658">[ subject ]</a>
+              <a href="author.html#1658">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

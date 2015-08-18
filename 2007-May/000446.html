@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3375 - in rl/trunk/engine: core/include core/src	script/include script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3375%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/include%20script/src&In-Reply-To=%3C200705012014.l41KEBMo012396%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000445.html">
+   <LINK REL="Next"  HREF="000447.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3375 - in rl/trunk/engine: core/include core/src	script/include script/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3375%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script/include%20script/src&In-Reply-To=%3C200705012014.l41KEBMo012396%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3375 - in rl/trunk/engine: core/include core/src	script/include script/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue May  1 22:14:11 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000445.html">[Dsa-hl-svn] r3374 - in rl/trunk/engine: ai/include ai/src	common/include common/src core/include core/src	dialog/include dialog/src rules/include rules/src	script/include script/src ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="000447.html">[Dsa-hl-svn] r3376 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#446">[ date ]</a>
+              <a href="thread.html#446">[ thread ]</a>
+              <a href="subject.html#446">[ subject ]</a>
+              <a href="author.html#446">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-05-01 22:13:52 +0200 (Tue, 01 May 2007)
+New Revision: 3375
+
+Modified:
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/GameLoop.cpp
+   rl/trunk/engine/script/include/MapLoader.h
+   rl/trunk/engine/script/src/MapLoader.cpp
+Log:
+Pause all game tasks while loading a map
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -69,10 +69,6 @@
+     /** Renders one frame (for internal use) */
+     void renderOneFrame();
+ 
+-    /** Returns the Singleton */
+-    //static CoreSubsystem &amp; getSingleton();
+-    //static CoreSubsystem * getSingletonPtr();
+-
+     World* getWorld();
+     void loadMap(const Ogre::String type, const Ogre::String filename,
+         const Ogre::String module);
+@@ -117,6 +113,10 @@
+      */
+     Ogre::RenderWindow* getRenderWindow();
+ 
++	/// Sets the pause state of the game
++	/// @param paused &lt;code&gt;true&lt;/code&gt; if the game should be paused, &lt;code&gt;false&lt;/code&gt; if it should be continued
++	void setPaused(bool paused);
++
+ private:
+     World* mWorld;
+     RubyInterpreter* mRubyInterpreter;
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -31,7 +31,7 @@
+ /// GameLoop::loop is called immediately after RL has been initialised.
+ /// GameLoop is dumb, it only calls added tasks in the set order.
+ /// No game logic whatsoever is handled here.
+-class _RlCoreExport GameLoop : protected Ogre::Singleton&lt;GameLoop&gt;
++class _RlCoreExport GameLoop : public Ogre::Singleton&lt;GameLoop&gt;
+ {
+ public:
+     /// Groups a task can belong to. Tasks are executed in the order listed.
+@@ -60,6 +60,13 @@
+ 	/// Request the game to quit. The current task loop will finish though.
+ 	void quitGame();
+ 
++	/// Returns &lt;code&gt;true&lt;/code&gt; if the game is paused
++	bool isPaused() const;
++
++	/// Sets the pause state of the game
++	/// @param paused &lt;code&gt;true&lt;/code&gt; if the game should be paused, &lt;code&gt;false&lt;/code&gt; if it should be continued
++	void setPaused(bool paused);
++
+     /// Returns time since game started in Milliseconds.
+     unsigned long getClock() const;
+ 
+@@ -70,9 +77,6 @@
+     /// @see CoreSubsystem
+     void _executeOneRenderLoop();
+       
+-    static GameLoop &amp; getSingleton(void);
+-	static GameLoop * getSingletonPtr(void);
+-
+ private:
+     /// Internal struct for storing the tasks in the queue.
+     /// Contains additional meta-information useful for scheduling.
+@@ -115,6 +119,7 @@
+     /// Time cap for frame time, to prevent interpolation problems during spikes.
+     Ogre::Real mMaxFrameTime;
+ 	bool mQuitRequested;
++	bool mPaused;
+ 
+     /// Averages frame rate over mSmoothPeriod milliseconds.
+     /// Steadies Controls and Physics a bit.
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -155,6 +155,11 @@
+         return mRenderWindow;
+     }
+ 
++	void CoreSubsystem::setPaused(bool paused)
++	{
++		mGameLoop-&gt;setPaused(paused);
++	}
++
+     bool CoreSubsystem::initializeCoreSubsystem()
+     {
+         // By not specifying the first two parameters, OGRE will not try
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -29,17 +29,8 @@
+ 
+ template&lt;&gt; rl::GameLoop* Singleton&lt;rl::GameLoop&gt;::ms_Singleton = 0;
+ 
+-namespace rl {
+-
+-    GameLoop* GameLoop::getSingletonPtr(void)
+-    {
+-        return Singleton&lt;GameLoop&gt;::getSingletonPtr();
+-    }
+-    GameLoop&amp; GameLoop::getSingleton(void)
+-    {
+-        return Singleton&lt;GameLoop&gt;::getSingleton();
+-    }
+-
++namespace rl 
++{
+     GameLoop::GameLoop()
+         : mTaskLists(),
+           mAddedTasks(),
+@@ -49,14 +40,15 @@
+           mLastTimes(),
+           mSmoothPeriod(500),
+           mMaxFrameTime(0.250f),
+-          mQuitRequested(false)
++          mQuitRequested(false),
++		  mPaused(false)
+     {
+         // create five task lists, one for each taskgroup
+-        mTaskLists.push_back(new GameTaskList);
+-        mTaskLists.push_back(new GameTaskList);
+-        mTaskLists.push_back(new GameTaskList);
+-        mTaskLists.push_back(new GameTaskList);
+-        mTaskLists.push_back(new GameTaskList);
++        mTaskLists.push_back(new GameTaskList());
++        mTaskLists.push_back(new GameTaskList());
++        mTaskLists.push_back(new GameTaskList());
++        mTaskLists.push_back(new GameTaskList());
++        mTaskLists.push_back(new GameTaskList());
+ 
+         mTimer = new Timer();
+     }
+@@ -114,6 +106,16 @@
+         }
+     }
+ 
++	bool GameLoop::isPaused() const
++	{
++		return mPaused;
++	}
++
++	void GameLoop::setPaused(bool paused)
++	{
++		mPaused = paused;
++	}
++
+     void GameLoop::_executeOneRenderLoop()
+     {
+         // Calculate frame time. This time is smoothed and capped.
+@@ -134,9 +136,9 @@
+             GameTaskList* tasks = mTaskLists[i];
+             for (GameTaskList::iterator it = tasks-&gt;begin(); it != tasks-&gt;end(); ++it)
+             {
+-                if (it-&gt;valid &amp;&amp; !(it-&gt;task-&gt;isPaused()))
++                if (it-&gt;valid &amp;&amp; !(it-&gt;task-&gt;isPaused()) &amp;&amp; !isPaused())
+                 {
+-                    it-&gt;task-&gt;run(frameTime);
++					it-&gt;task-&gt;run(frameTime);
+                 }
+             }
+         }
+
+Modified: rl/trunk/engine/script/include/MapLoader.h
+===================================================================
+--- rl/trunk/engine/script/include/MapLoader.h	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/script/include/MapLoader.h	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -43,10 +43,7 @@
+         void loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects = true);
+ 
+     private:
+-        enum {ENTITIES, GAMEOBJECTS, SOUNDS, LIGHTS};
+-    
+         XmlPropertyReader* mXmlPropertyProcessor;
+-        int mStatistics[4];
+         std::list&lt;AbstractMapNodeProcessor*&gt; mNodeProcessors;
+ 
+         Ogre::SceneNode* mRootSceneNode;
+
+Modified: rl/trunk/engine/script/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/script/src/MapLoader.cpp	2007-05-01 20:12:01 UTC (rev 3374)
++++ rl/trunk/engine/script/src/MapLoader.cpp	2007-05-01 20:13:52 UTC (rev 3375)
+@@ -106,6 +106,7 @@
+             DOMElement* dataDocumentContent = doc-&gt;getDocumentElement();
+             
+ 			CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
++			CoreSubsystem::getSingleton().setPaused(true);
+             
+             LOG_MESSAGE(Logger::RULES, &quot;Processing nodes&quot;);
+             
+@@ -118,6 +119,7 @@
+             doc-&gt;release();
+ 
+ 			CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
++			CoreSubsystem::getSingleton().setPaused(false);
+         }
+         else
+         {
+@@ -140,14 +142,8 @@
+ 
+         for (DOMNode* cur = nodesElem-&gt;getFirstChild(); 
+             cur != NULL; 
+-            cur = cur-&gt;getNextSibling(), count += 1)
++            cur = cur-&gt;getNextSibling())
+         {
+-            if (count % 250 == 0)
+-            {
+-                setLoadingPercentage(count/numChildren, 
+-                    Ogre::StringConverter::toString(count/numChildren*100.0f, 0) + &quot;%&quot;);
+-            }
+-
+             if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+             {
+                 DOMElement* curElem = static_cast&lt;DOMElement*&gt;(cur);
+@@ -164,6 +160,13 @@
+                         &quot;Node &quot; + XmlHelper::transcodeToString(curElem-&gt;getNodeName()) + &quot; could not be processed.&quot;);
+                 }
+             }
++
++			count += 1;
++            if (count % 250 == 0)
++            {
++                setLoadingPercentage(count/numChildren, 
++                    Ogre::StringConverter::toString(count/numChildren*100.0f, 0) + &quot;%&quot;);
++            }
+         }
+     }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000445.html">[Dsa-hl-svn] r3374 - in rl/trunk/engine: ai/include ai/src	common/include common/src core/include core/src	dialog/include dialog/src rules/include rules/src	script/include script/src ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="000447.html">[Dsa-hl-svn] r3376 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#446">[ date ]</a>
+              <a href="thread.html#446">[ thread ]</a>
+              <a href="subject.html#446">[ subject ]</a>
+              <a href="author.html#446">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

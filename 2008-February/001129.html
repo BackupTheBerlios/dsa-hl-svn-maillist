@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4058 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4058%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200802052215.m15MFsd2011909%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001128.html">
+   <LINK REL="Next"  HREF="001130.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4058 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4058%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200802052215.m15MFsd2011909%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4058 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Feb  5 23:15:54 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001128.html">[Dsa-hl-svn] r4057 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/rules	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig
+</A></li>
+        <LI>Next message: <A HREF="001130.html">[Dsa-hl-svn] r4059 - rl/trunk/m4
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1129">[ date ]</a>
+              <a href="thread.html#1129">[ thread ]</a>
+              <a href="subject.html#1129">[ subject ]</a>
+              <a href="author.html#1129">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-02-05 23:15:52 +0100 (Tue, 05 Feb 2008)
+New Revision: 4058
+
+Modified:
+   rl/trunk/engine/core/include/ConfigurationManager.h
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+Log:
+* Move Ogre plugin name mangling into ConfigurationManager
+
+Modified: rl/trunk/engine/core/include/ConfigurationManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ConfigurationManager.h	2008-02-05 22:12:32 UTC (rev 4057)
++++ rl/trunk/engine/core/include/ConfigurationManager.h	2008-02-05 22:15:52 UTC (rev 4058)
+@@ -241,6 +241,15 @@
+             void addToCfgPath(const std::string&amp; cfg_dir);
+ 
+             /**
++             * Adds a plugin to the plugin list, correctly adds _d for Windows if compiled
++             * in debug mode
++             *
++             * @param plugin the plugin to add (name without _d or file extension)
++             * @param pluginDir the directory in which the plugin dll is located
++             */
++            void addPlugin(const Ogre::String&amp; plugin, const Ogre::String&amp; pluginDir);
++
++            /**
+              * Check if a specified file exists.
+              *
+              * @param filename File being checked for existence
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-02-05 22:12:32 UTC (rev 4057)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-02-05 22:15:52 UTC (rev 4058)
+@@ -273,14 +273,11 @@
+ 
+         // Plugin list for OGRE specific to operating system
+ #       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-        Ogre::String dirSeparator = &quot;\\&quot;;
+-        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;RenderSystem_Direct3D9&quot;);
+-#       else
+-        Ogre::String dirSeparator = &quot;/&quot;;
++        addPlugin(&quot;RenderSystem_Direct3D9&quot;, mOgrePluginDirectory);
+ #       endif
+-        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;RenderSystem_GL&quot;);
+-        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;Plugin_ParticleFX&quot;);
+-        mPluginList.push_back(mOgrePluginDirectory + dirSeparator + &quot;Plugin_OctreeSceneManager&quot;);
++        addPlugin(&quot;RenderSystem_GL&quot;, mOgrePluginDirectory);
++        addPlugin(&quot;Plugin_ParticleFX&quot;, mOgrePluginDirectory);
++        addPlugin(&quot;Plugin_OctreeSceneManager&quot;, mOgrePluginDirectory);
+ 
+         // Load the module list
+         ConfigFile* configfile = new ConfigFile();
+@@ -432,4 +429,22 @@
+ 
+         return false;
+     }
++
++    void ConfigurationManager::addPlugin(const Ogre::String&amp; plugin, const Ogre::String&amp; pluginDir)
++    {
++        // In Windows Ogre now uses a _d suffix for debug plugins. But client application is
++        // responsible for loading the proper vesion.
++        Ogre::String pluginSuffix = &quot;&quot;;
++
++#       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
++        Ogre::String dirSeparator = &quot;\\&quot;;
++#          ifdef _DEBUG
++        pluginSuffix = &quot;_d&quot;;
++#          endif
++#       else
++        Ogre::String dirSeparator = &quot;/&quot;;
++#       endif
++
++        mPluginList.push_back(pluginDir + dirSeparator + plugin + pluginSuffix);
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-02-05 22:12:32 UTC (rev 4057)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-02-05 22:15:52 UTC (rev 4058)
+@@ -175,19 +175,9 @@
+         // Load Ogre plugins
+         Ogre::StringVector pluginList = ConfigurationManager::getSingleton().getPluginList();
+ 
+-        ///\todo In Windows Ogre now uses a _d suffix for debug plugins. But client application is
+-        /// responsible for loading the proper vesion. This way to do it is kinda ugly.
+-        /// We should somehow handle this in the ConfigurationManager.
+-        Ogre::String pluginSuffix = &quot;&quot;;
+-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+-#ifdef _DEBUG
+-        pluginSuffix = &quot;_d&quot;;
+-#endif
+-#endif
+-
+         for (Ogre::StringVector::const_iterator it = pluginList.begin(); it &lt; pluginList.end(); it++)
+         {
+-            mOgreRoot-&gt;loadPlugin(*it + pluginSuffix);
++            mOgreRoot-&gt;loadPlugin(*it);
+         }
+ 
+         // Find out, what Renderer plugins are available
+@@ -227,10 +217,11 @@
+         int width = Ogre::StringConverter::parseInt(VideoMode.substr(0, temp));
+         int height = Ogre::StringConverter::parseInt(VideoMode.substr(temp + 1, VideoMode.size()));
+ 
+-        mRenderWindow = mOgreRoot-&gt;createRenderWindow(name.str(), width, height,
++        mRenderWindow = mOgreRoot-&gt;createRenderWindow(
++            name.str(), width, height,
+             ConfigurationManager::getSingleton().getBoolSetting(
+                 &quot;Video&quot;, &quot;Fullscreen&quot;),
+-                    &amp;ConfigurationManager::getSingleton().getSettings(&quot;Video&quot;));
++            &amp;ConfigurationManager::getSingleton().getSettings(&quot;Video&quot;));
+ 
+         if (!mRenderWindow)
+             return false;
+@@ -245,7 +236,7 @@
+ 
+         mScriptWrapper = new ScriptWrapper();
+         LOG_MESSAGE(Logger::CORE,&quot;Skriptwrapper erzeugt&quot;);
+-        // TODO: muss l&#246;schbar werden.
++        // TODO: muss l&#239;&#191;&#189;schbar werden.
+         mRubyInterpreter = new RubyInterpreter();
+         LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter erzeugt&quot;);
+         mRubyInterpreter-&gt;initializeInterpreter();
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001128.html">[Dsa-hl-svn] r4057 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/rules	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig
+</A></li>
+	<LI>Next message: <A HREF="001130.html">[Dsa-hl-svn] r4059 - rl/trunk/m4
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1129">[ date ]</a>
+              <a href="thread.html#1129">[ thread ]</a>
+              <a href="subject.html#1129">[ subject ]</a>
+              <a href="author.html#1129">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

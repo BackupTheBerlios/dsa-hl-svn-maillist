@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4263 - modules/common/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4263%20-%20modules/common/scripts&In-Reply-To=%3C200803081406.m28E6q9c026216%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001333.html">
+   <LINK REL="Next"  HREF="001335.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4263 - modules/common/scripts</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4263%20-%20modules/common/scripts&In-Reply-To=%3C200803081406.m28E6q9c026216%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4263 - modules/common/scripts">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 15:06:52 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001333.html">[Dsa-hl-svn] r4262 - modules/kanalisation/materials/textures
+</A></li>
+        <LI>Next message: <A HREF="001335.html">[Dsa-hl-svn] r4264 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1334">[ date ]</a>
+              <a href="thread.html#1334">[ thread ]</a>
+              <a href="subject.html#1334">[ subject ]</a>
+              <a href="author.html#1334">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-03-08 15:06:51 +0100 (Sat, 08 Mar 2008)
+New Revision: 4263
+
+Modified:
+   modules/common/scripts/torch.rb
+Log:
+Fix torch (can now be put into hand multiple times)
+
+Modified: modules/common/scripts/torch.rb
+===================================================================
+--- modules/common/scripts/torch.rb	2008-03-08 14:06:23 UTC (rev 4262)
++++ modules/common/scripts/torch.rb	2008-03-08 14:06:51 UTC (rev 4263)
+@@ -60,7 +60,7 @@
+     
+     def setLit(lit)
+         @_prop_lit = lit;
+-		updateState();
++		updateTorch();
+     end
+     
+     def lit?
+@@ -81,60 +81,81 @@
+     
+     def getProperty(name)
+ 		if (name == &quot;lit&quot;)
+-			return lit?;
++			return lit?
+ 		elsif (name == &quot;sound&quot;)
+-			return @_prop_sound;
++			return @_prop_sound
+ 		elsif (name == &quot;flames&quot;)
+-			return @_prop_flames;
++			return @_prop_flames
+ 		else
+-			return super(name, value);
++			return super(name, value)
+         end
+     end
+ 
+-    def onStateChange(oldState, newState)
+-		p &quot;New state &quot;+newState.to_s();
+-		updateState();
++    def onBeforeStateChange(oldstate, newstate)
++		if (newstate == RlScript::GOS_LOADED || newstate == RlScript::GOS_IN_POSSESSION) &amp;&amp; 
++		(oldstate == RlScript::GOS_IN_SCENE || oldstate == RlScript::GOS_HELD || oldstate == RlScript::GOS_READY)
++			if @sound != nil
++				getActor().detach(@sound)
++				$AM.destroyActor(@sound)
++				@sound = nil
++			end
++			if @light != nil
++				getActor().detach(@light)
++				$AM.destroyActor(@light)
++				@light = nil
++			end
++			if @flammen != nil
++				getActor().detach(@flammen)
++				$AM.destroyActor(@flammen)
++				@flammen = nil
++			end
++		end
+     end
+-	
+-	def updateState()
+-		
+-		if (getState() == RlScript::GOS_IN_SCENE || getState() == RlScript::GOS_HELD)
+-			if (@_prop_sound != nil &amp;&amp; @_prop_sound != &quot;&quot; &amp;&amp; @sound == nil)
++
++    def onAfterStateChange(oldstate, newstate)
++		if newstate == RlScript::GOS_IN_SCENE || newstate == RlScript::GOS_HELD || newstate == RlScript::GOS_READY
++			if @_prop_sound != nil &amp;&amp; @_prop_sound != &quot;&quot; &amp;&amp; @sound == nil
+ 				@sound = $AM.createSoundSampleActor(getId().to_s()+&quot;_sound&quot;, @_prop_sound)
+ 				@sound.getControlledObject().setVolume(1.0);
+-		        @sound.getControlledObject().setLooping(true)
+-		        @sound.getControlledObject().set3d(true)
++				@sound.getControlledObject().setLooping(true)
++				@sound.getControlledObject().set3d(true)
+ 				getActor().attachToSlot(@sound, &quot;SLOT_FAR_END&quot;)
+ 			end
+-			if (@_prop_flames != nil &amp;&amp; @_prop_flames != &quot;&quot; &amp;&amp; @flammen == nil)
+-				@flammen = $AM.createParticleSystemActor(getId().to_s()+&quot;_flames&quot;, @_prop_flames)
+-				getActor().attachToSlot(@flammen, &quot;SLOT_FAR_END&quot;)
+-			end
+-			if (@light == nil)
++
++			if @light == nil
+ 				@light = $AM.createLightActor(getId().to_s()+&quot;_light&quot;, LightObject::LT_POINT);
+ 				@light.getControlledObject().setDiffuseColour(@_prop_color);
+ 				@light.getControlledObject().setSpecularColour(@_prop_color);
+ 				@light.getControlledObject().setAttenuation(5, 1, 0, 0);
+ 				getActor().attachToSlot(@light, &quot;SLOT_FAR_END&quot;)
+ 			end
+-			
+-			@light.getControlledObject().setActive(@_prop_lit);
+-			if (@flammen != nil)
+-				@flammen.getControlledObject().setActive(@_prop_lit);
++
++			if @_prop_flames != nil &amp;&amp; @_prop_flames != &quot;&quot; &amp;&amp; @flammen == nil
++				@flammen = $AM.createParticleSystemActor(getId().to_s()+&quot;_flames&quot;, @_prop_flames)
++				getActor().attachToSlot(@flammen, &quot;SLOT_FAR_END&quot;)
+ 			end
+-			if (@sound != nil)
+-				if lit?
+-					@sound.getControlledObject().play();
+-				else
+-					@sound.getControlledObject().stop();
+-				end
++		end
++		updateTorch()
++    end
++	
++	def updateTorch()
++		if @sound != nil
++			if lit?
++				@sound.getControlledObject().play();
++			else
++				@sound.getControlledObject().stop();
+ 			end
+-			
+-			
+-		else
+ 		end
++		
++		if @light != nil
++			@light.getControlledObject().setActive(@_prop_lit);
++		end
++
++		if @flammen != nil
++			@flammen.getControlledObject().setActive(@_prop_lit);
++		end
+ 	end
+-    
++	
+     def addActions()
+         addAction(LightTorchAction.new)
+         addAction(PutoutTorchAction.new)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001333.html">[Dsa-hl-svn] r4262 - modules/kanalisation/materials/textures
+</A></li>
+	<LI>Next message: <A HREF="001335.html">[Dsa-hl-svn] r4264 - modules/common/dsa
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1334">[ date ]</a>
+              <a href="thread.html#1334">[ thread ]</a>
+              <a href="subject.html#1334">[ subject ]</a>
+              <a href="author.html#1334">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

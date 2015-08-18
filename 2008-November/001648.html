@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4591 - in rl/trunk/plugins/fmod4driver: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4591%20-%20in%20rl/trunk/plugins/fmod4driver%3A%20include%20src&In-Reply-To=%3C200811192054.mAJKskmw010984%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001647.html">
+   <LINK REL="Next"  HREF="001649.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4591 - in rl/trunk/plugins/fmod4driver: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4591%20-%20in%20rl/trunk/plugins/fmod4driver%3A%20include%20src&In-Reply-To=%3C200811192054.mAJKskmw010984%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4591 - in rl/trunk/plugins/fmod4driver: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Nov 19 21:54:46 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001647.html">[Dsa-hl-svn] r4590 - in rl/branches/persistence: core/include	core/src script/include
+</A></li>
+        <LI>Next message: <A HREF="001649.html">[Dsa-hl-svn] r4592 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1648">[ date ]</a>
+              <a href="thread.html#1648">[ thread ]</a>
+              <a href="subject.html#1648">[ subject ]</a>
+              <a href="author.html#1648">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-11-19 21:54:44 +0100 (Wed, 19 Nov 2008)
+New Revision: 4591
+
+Modified:
+   rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+   rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+Log:
+Interface changes of fmod 4.20
+
+
+Modified: rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+===================================================================
+--- rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2008-11-16 11:12:11 UTC (rev 4590)
++++ rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2008-11-19 20:54:44 UTC (rev 4591)
+@@ -137,9 +137,8 @@
+         static FMOD_RESULT F_CALLBACK channelCallback(
+             FMOD_CHANNEL* channel,
+             FMOD_CHANNEL_CALLBACKTYPE type,
+-            int command,
+-            unsigned int commanddata1,
+-            unsigned int commanddata2
++            void* commanddata1,
++            void* commanddata2
+         );
+ 
+         typedef std::map&lt;const Ogre::String, FMOD_REVERB_PROPERTIES&gt; EaxPresetMap;
+
+Modified: rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+===================================================================
+--- rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2008-11-16 11:12:11 UTC (rev 4590)
++++ rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2008-11-19 20:54:44 UTC (rev 4591)
+@@ -209,17 +209,19 @@
+ 
+         int numPlugins;
+         mFmod4System-&gt;getNumPlugins(FMOD_PLUGINTYPE_CODEC, &amp;numPlugins);
+-        for (int i = 0; i &lt; numDrivers; i++)
++        for (int i = 0; i &lt; numPlugins; i++)
+         {
+             char pluginName[128];
+             unsigned int version;
++			FMOD_PLUGINTYPE type;
+ 
+-            mFmod4System-&gt;getPluginInfo(
+-                FMOD_PLUGINTYPE_CODEC,
++            FMOD_RESULT result = mFmod4System-&gt;getPluginInfo(
+                 i,
+-                pluginName,
++                &amp;type,
++				pluginName,
+                 127,
+                 &amp;version);
++			CHECK_FMOD4_ERRORS(result);
+             LOG_MESSAGE(Logger::MULTIMEDIA,
+                 String(&quot;Fmod4Driver Plugin '&quot;)
+                 + pluginName
+@@ -407,9 +409,8 @@
+ FMOD_RESULT F_CALLBACK Fmod4Driver::channelCallback(
+     FMOD_CHANNEL *_channel,
+     FMOD_CHANNEL_CALLBACKTYPE type,
+-    int command,
+-    unsigned int commanddata1, 
+-    unsigned int commanddata2)
++    void* commanddata1, 
++    void* commanddata2)
+ {
+     /// Extract the Fmod channel and then our Sound object.
+     FMOD::Channel* channel = (FMOD::Channel*)_channel;
+@@ -444,7 +445,7 @@
+         
+                     // We get the time point of the sync point and put it in a timing event.
+                     sound-&gt;getFmodChannel()-&gt;getCurrentSound(&amp;fmodsound);
+-                    fmodsound-&gt;getSyncPoint(commanddata1, &amp;syncpoint);
++                    fmodsound-&gt;getSyncPoint(*static_cast&lt;int*&gt;(commanddata1), &amp;syncpoint);
+                     fmodsound-&gt;getSyncPointInfo(syncpoint, NULL, 0, &amp;event.mTime, FMOD_TIMEUNIT_MS);
+                     sound-&gt;dispatchEvent(&amp;event);
+                 }
+@@ -480,12 +481,8 @@
+ 
+     void Fmod4Driver::_registerChannel(FMOD::Channel* channel, Fmod4Sound* sound)
+     {
+-        FMOD_RESULT res = channel-&gt;setCallback(FMOD_CHANNEL_CALLBACKTYPE_END, channelCallback, 0);
++        FMOD_RESULT res = channel-&gt;setCallback(channelCallback);
+         CHECK_FMOD4_ERRORS(res);
+-        res = channel-&gt;setCallback(FMOD_CHANNEL_CALLBACKTYPE_SYNCPOINT, channelCallback, 0);
+-        CHECK_FMOD4_ERRORS(res);
+-        res = channel-&gt;setCallback(FMOD_CHANNEL_CALLBACKTYPE_VIRTUALVOICE, channelCallback, 0);
+-        CHECK_FMOD4_ERRORS(res);
+         mChannelSoundMap.insert(std::make_pair(channel, sound));
+     }
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001647.html">[Dsa-hl-svn] r4590 - in rl/branches/persistence: core/include	core/src script/include
+</A></li>
+	<LI>Next message: <A HREF="001649.html">[Dsa-hl-svn] r4592 - rl/trunk/plugins/fmod4driver/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1648">[ date ]</a>
+              <a href="thread.html#1648">[ thread ]</a>
+              <a href="subject.html#1648">[ subject ]</a>
+              <a href="author.html#1648">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

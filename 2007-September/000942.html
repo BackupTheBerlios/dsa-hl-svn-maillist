@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3871 - modules/common/scripts
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3871%20-%20modules/common/scripts&In-Reply-To=%3C200709241929.l8OJT3EU025293%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000941.html">
+   <LINK REL="Next"  HREF="000943.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3871 - modules/common/scripts</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3871%20-%20modules/common/scripts&In-Reply-To=%3C200709241929.l8OJT3EU025293%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3871 - modules/common/scripts">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Sep 24 21:29:03 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000941.html">[Dsa-hl-svn] r3870 - rl/trunk/engine/rules/src
+</A></li>
+        <LI>Next message: <A HREF="000943.html">[Dsa-hl-svn] r3872 - in modules: aitest combattest minidemo	regressiontest ruchin techdemo techdemo2 tutorial
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#942">[ date ]</a>
+              <a href="thread.html#942">[ thread ]</a>
+              <a href="subject.html#942">[ subject ]</a>
+              <a href="author.html#942">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-24 21:28:45 +0200 (Mon, 24 Sep 2007)
+New Revision: 3871
+
+Modified:
+   modules/common/scripts/areahelper.rb
+Log:
+-added new helper-functions for triggers (_CreateLimitedTimesTrigger, _CreateTrigger, _CreateOneTimeTrigger)
+
+Modified: modules/common/scripts/areahelper.rb
+===================================================================
+--- modules/common/scripts/areahelper.rb	2007-09-24 19:25:20 UTC (rev 3870)
++++ modules/common/scripts/areahelper.rb	2007-09-24 19:28:45 UTC (rev 3871)
+@@ -1,3 +1,118 @@
++
++# a trigger, that saves an command the appropriate zone and deletes it when finished
++class LimitedTimesTrigger &lt; Trigger
++  def initialize(name)
++    super(name);
++    @_prop_enter_command = nil;
++    @_prop_leave_command = nil;
++    @_prop_zone = &quot;&quot;;
++    @_prop_number = 0; # 0 infty, -1 once, -2 deactivated
++  end
++  def setEnterCode(&amp;code)
++    @_prop_enter_command = code
++  end
++  def setLeaveCode(&amp;code)
++    @_prop_leave_command = code
++  end
++
++  def activate()
++    if ( @_prop_number &gt; 0 )
++      @_prop_number = @_prop_number - 1;
++      if (@_prop_number == 0 )
++        @_prop_number = -1;
++      end
++    end
++    
++    if( @_prop_number &gt;= -1 )
++      unless ( @_prop_enter_command == nil )
++        begin
++          @_prop_enter_command.call
++        rescue StandardError =&gt; se
++          $SCRIPT.logError(se.to_s)
++        end
++      end
++    end
++    return false
++  end
++  def deactivate()
++    if( @_prop_number &gt;= -1 )
++      unless ( @_prop_leave_command == nil )
++        begin
++          @_prop_leave_command.call
++        rescue StandardError =&gt; se
++          $SCRIPT.logError(se.to_s)
++        end
++      end
++    end
++
++    if ( @_prop_number == -1 )
++      @_prop_number = -2
++      unless ( @_prop_zone == &quot;&quot; )
++        ZoneManager.getSingleton().destroyZone(@_prop_zone)
++      end
++      return true
++    end
++    return false
++  end
++  def setProperty(name, value)
++    if (name == &quot;number&quot;)
++      @_prop_number = value;
++    elsif (name == &quot;zone&quot;)
++      @_prop_zone = value
++    else
++      super(name, value)
++    end
++  end
++  def getProperty(name)
++    if (name == &quot;zone&quot;)
++      return @_prop_zone
++    elsif (name == &quot;number&quot;)
++      return @_prop_number
++    else
++      super(name)
++    end
++  end
++  def getAllProperties()
++    ps = super();
++    ps.setProperty(&quot;zone&quot;, @_prop_zone)
++    ps.setProperty(&quot;number&quot;, @_prop_number)
++    return ps
++  end
++end
++
++# creates a zone with a trigger, that is destroyed if actived 'times' of times
++# Example: _CreateLimitedTimesTrigger(&quot;uniquename&quot;, PhysicsManager::GT_SPHERE, [-20,0,5], [1,0,0,0], [2,2,2], 5, Proc.new{print &quot;entered&quot;}, Proc.new{print &quot;left&quot;})
++def _CreateLimitedTimesTrigger(name, geom_type, pos, orientation, size, times, enter_proc, leave_proc = nil)
++  unless ( ZoneManager.getSingleton().getZone(&quot;limitedTimesTriggerZone_&quot; + name) == nil )
++    raise ArgumentError, &quot;A limitedTimesTrigger with name &quot; + name + &quot; already exists!&quot;, caller
++  end
++
++  trigger = $SCRIPT.getTriggerFactory().createTrigger(&quot;LimitedTimesTrigger&quot;, &quot;limitedTimeTrigger_&quot; + name);
++  zone = ZoneManager.getSingleton().createZone(&quot;limitedTimesTriggerZone_&quot; + name);
++  ZoneManager.getSingleton().addAreaToZone(
++    &quot;limitedTimesTriggerZone_&quot; + name, 
++    size, geom_type, pos, [0,0,0], orientation, 0.5, RlScript::QUERYFLAG_PLAYER);
++  trigger.setProperty(&quot;number&quot;, times);
++  trigger.setEnterCode( &amp;enter_proc );
++  trigger.setLeaveCode( &amp;leave_proc );
++  trigger.setProperty(&quot;zone&quot;, &quot;limitedTimesTriggerZone_&quot; + name )
++  zone.addTrigger(trigger)
++  return trigger
++end
++
++# one time trigger
++def _CreateOneTimeTrigger(name, geom_type, pos, orientation, size, enter_proc, leave_proc = nil)
++  return _CreateLimitedTimesTrigger(name, geom_type, pos, orientation, size, 1, enter_proc, leave_proc)
++end
++
++# infinite times trigger
++def _CreateTrigger(name, geom_type, pos, orientation, size, enter_proc, leave_proc = nil)
++  return _CreateLimitedTimesTrigger(name, geom_type, pos, orientation, size, 0, enter_proc, leave_proc)
++end
++
++
++
++# CODE DEPRECATED
+ # A simple GameAreaListener which will call predefined procedures upon entering
+ # or leaving the Area.
+ class SimpleAreaListener &lt; GameAreaListener
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000941.html">[Dsa-hl-svn] r3870 - rl/trunk/engine/rules/src
+</A></li>
+	<LI>Next message: <A HREF="000943.html">[Dsa-hl-svn] r3872 - in modules: aitest combattest minidemo	regressiontest ruchin techdemo techdemo2 tutorial
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#942">[ date ]</a>
+              <a href="thread.html#942">[ thread ]</a>
+              <a href="subject.html#942">[ subject ]</a>
+              <a href="author.html#942">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

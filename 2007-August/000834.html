@@ -1,0 +1,332 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3763 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3763%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200708271848.l7RImODG021620%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000833.html">
+   <LINK REL="Next"  HREF="000835.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3763 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3763%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09ui/include%20ui/src&In-Reply-To=%3C200708271848.l7RImODG021620%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3763 - in rl/trunk/engine: rules/include rules/src	ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Aug 27 20:48:24 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000833.html">[Dsa-hl-svn] r3762 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="000835.html">[Dsa-hl-svn] r3764 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#834">[ date ]</a>
+              <a href="thread.html#834">[ thread ]</a>
+              <a href="subject.html#834">[ subject ]</a>
+              <a href="author.html#834">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-27 20:47:56 +0200 (Mon, 27 Aug 2007)
+New Revision: 3763
+
+Modified:
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/ui/include/CommandMapper.h
+   rl/trunk/engine/ui/include/ControlState.h
+   rl/trunk/engine/ui/src/CommandMapper.cpp
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+-fixed controlstates (some actions didn't work any more)
+-InventoryWindow calls globalactions (i can close the window)
+-added creature::canReachItem (tells the InventoryWindow if an item is
+near enough to take it)
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/rules/include/Creature.h	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -684,6 +684,14 @@
+              void setAlignment(Alignment);
+             Alignment getAlignment() const;
+ 
++
++
++            /**
++             * Gibt an, ob die Creature mit den H&#228;nden an den Gegenstand herankommt,
++             * ihn also ber&#252;hren kann, mit ihm interagieren etc
++            **/
++            virtual bool canReachItem(const Item* item);
++
+         protected:
+            /**
+              *  Berechnet den Basiswert von der @ref abbdea &quot;Astralenergie&quot;.
+@@ -709,6 +717,7 @@
+ 
+ 
+ 
++
+         private:
+ ///////////////////////////////////////////////////////////////////////////////
+ // Typedefs
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -24,6 +24,7 @@
+ #include &quot;EffectManager.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;Inventory.h&quot;
++#include &quot;Item.h&quot;
+ #include &quot;Kampftechnik.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;StateSet.h&quot;
+@@ -1134,4 +1135,9 @@
+ 
+         return ps;
+     }
++
++    bool Creature::canReachItem(const Item* item)
++    {
++        return (item-&gt;getPosition() - getPosition()).length() &lt;= 3.0f;
++    }
+ }
+
+Modified: rl/trunk/engine/ui/include/CommandMapper.h
+===================================================================
+--- rl/trunk/engine/ui/include/CommandMapper.h	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/include/CommandMapper.h	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -56,8 +56,8 @@
+         const MovementState getMovement(int keycode) const;
+ 
+         /// Get the action name assigned to the key.
+-        const CeGuiString&amp; getGlobalAction(int keyCodeOrMouseButton);
+-        const CeGuiString&amp; getControlStateAction(int keyCodeOrMouseButton, ControlStateType);
++        const CeGuiString&amp; getGlobalAction(int keyCodeOrMouseButton) const;
++        const CeGuiString&amp; getControlStateAction(int keyCodeOrMouseButton, ControlStateType) const;
+ 
+     private:
+ 
+
+Modified: rl/trunk/engine/ui/include/ControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/ControlState.h	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/include/ControlState.h	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -58,9 +58,12 @@
+         virtual bool keyPressed(const OIS::KeyEvent&amp; evt);
+         virtual bool keyReleased(const OIS::KeyEvent&amp; evt);
+ 
++        const CommandMapper* getCommandMapper() const {return mCommandMapper;}
++        ControlStateType getType() const { return mType;}
++
++        static bool startAction(const CeGuiString&amp; actionName, Creature* character = NULL);
++
+ 	protected:
+-		static bool startAction(const CeGuiString&amp; actionName, Creature* character = NULL);
+-
+         /// Returns true, if there is at least one window open,
+         /// that requires keyboard and/or mouse input. 
+         bool isCeguiActive() const;
+
+Modified: rl/trunk/engine/ui/src/CommandMapper.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CommandMapper.cpp	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/src/CommandMapper.cpp	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -45,7 +45,7 @@
+     {
+     }
+ 
+-    const CeGuiString&amp; CommandMapper::getGlobalAction(int keyCodeOrMouseButton)
++    const CeGuiString&amp; CommandMapper::getGlobalAction(int keyCodeOrMouseButton) const
+     {
+         KeyAndMouseCommandMap::const_iterator command =
+             mKeyGlobalActions.find(keyCodeOrMouseButton);
+@@ -60,7 +60,7 @@
+     }
+ 
+     const CeGuiString&amp; CommandMapper::getControlStateAction(int keyCodeOrMouseButton,
+-        ControlStateType type)
++        ControlStateType type) const
+     {
+         const KeyAndMouseCommandMap&amp; mapping = getControlStateMapping(type);
+ 
+
+Modified: rl/trunk/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/src/FreeflightControlState.cpp	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -219,10 +219,11 @@
+ 
+     bool FreeflightControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+ 	{
+-        if( ControlState::keyPressed(evt) )
++        // CEGUI is handled by base class, so hand it down if necessary.
++        if( sendKeyToCeGui(evt) )
+         {
+             mCurrentMovementState = MOVE_NONE;
+-            return true;
++            return ControlState::keyPressed(evt);
+         }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+@@ -238,10 +239,11 @@
+ 
+     bool FreeflightControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+ 	{
+-        if( ControlState::keyPressed(evt) )
++        // CEGUI is handled by base class, so hand it down if necessary.
++        if( sendKeyToCeGui(evt) )
+         {
+             mCurrentMovementState = MOVE_NONE;
+-            return true;
++            return ControlState::keyReleased(evt);
+         }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -29,6 +29,9 @@
+ #include &quot;Container.h&quot;
+ #include &quot;ContainerContentWindow.h&quot;
+ #include &quot;Creature.h&quot;
++#include &quot;ControlState.h&quot;
++#include &quot;CommandMapper.h&quot;
++#include &quot;InputManager.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
+ #include &quot;ItemDescriptionDragContainer.h&quot;
+@@ -162,7 +165,7 @@
+ 			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, true));
+ 		mWorldBackground-&gt;subscribeEvent(Window::EventKeyUp,
+ 			boost::bind(&amp;InventoryWindow::handleKeys, this, _1, false));
+-        //invWnd-&gt;activate();
++        invWnd-&gt;activate();
+     }
+ 
+     ItemDragContainer* InventoryWindow::getItemDragContainer(const Item* item, bool description)
+@@ -457,8 +460,8 @@
+ 			for (Selector::GameObjectVector::const_iterator it = objs.begin();
+ 				it != objs.end(); ++it)
+ 			{
+-				LOG_MESSAGE(Logger::UI,
+-					&quot;Selected &quot; + (*it)-&gt;getDescription());
++                if( !mInventory-&gt;getOwner()-&gt;canReachItem(static_cast&lt;Item*&gt;(*it)) )
++                    continue;
+ 
+                 ItemDragContainer* cont = getItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
+ 
+@@ -508,10 +511,9 @@
+ 				for (Selector::GameObjectVector::iterator
+ 					it = v.begin(); it != v.end(); ++it)
+ 				{
++                    if( !mInventory-&gt;getOwner()-&gt;canReachItem(static_cast&lt;Item*&gt;(*it)) )
++                        continue;
+ 
+-				    LOG_MESSAGE(Logger::UI,
+-					    &quot;Selected &quot; + (*it)-&gt;getDescription());
+-
+                     ItemDragContainer* cont = getItemDragContainer(static_cast&lt;Item*&gt;(*it), true);
+ 
+                     if( !cont )
+@@ -546,6 +548,26 @@
+ 
+ 			return true;
+ 		}
++        else if(!down)
++        {
++            ///@todo das hier ueberpruefen!
++            CeGuiString action = 
++                InputManager::getSingleton().getCharacterController()
++                    -&gt;getCommandMapper()-&gt;getControlStateAction(
++                    kevt.scancode,
++                    InputManager::getSingleton().getCharacterController()-&gt;getType()
++                    );
++            if( action == &quot;&quot; )
++            {
++                action = InputManager::getSingleton().getCharacterController()
++                            -&gt;getCommandMapper()-&gt;getGlobalAction(kevt.scancode);
++            }
++            InputManager::getSingleton().getCharacterController()-&gt;startAction(
++                action,
++                mInventory-&gt;getOwner()
++                );
++            return true;
++        }
+ 
+ 		return false;
+ 	}
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-27 17:05:10 UTC (rev 3762)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-08-27 18:47:56 UTC (rev 3763)
+@@ -1265,11 +1265,12 @@
+     //------------------------------------------------------------------------
+     bool MovementControlState::keyPressed(const OIS::KeyEvent&amp; evt)
+     {
+-        if( ControlState::keyPressed(evt) )
++        // CEGUI is handled by base class, so hand it down if necessary.
++        if( sendKeyToCeGui(evt) )
+         {
+             mCharacterState.mCurrentMovementState = MOVE_NONE |
+                 (mCharacterState.mCurrentMovementState &amp; MOVE_RUN_LOCK);
+-            return true;
++            return ControlState::keyPressed(evt);
+         }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+@@ -1291,11 +1292,11 @@
+     bool MovementControlState::keyReleased(const OIS::KeyEvent&amp; evt)
+     {
+         // CEGUI is handled by base class, so hand it down if necessary.
+-        if( ControlState::keyReleased(evt) )
++        if( sendKeyToCeGui(evt) )
+         {
+             mCharacterState.mCurrentMovementState = MOVE_NONE |
+                 (mCharacterState.mCurrentMovementState &amp; MOVE_RUN_LOCK);
+-            return true;
++            return ControlState::keyReleased(evt);
+         }
+ 
+         int movement = mCommandMapper-&gt;getMovement(evt.key);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000833.html">[Dsa-hl-svn] r3762 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="000835.html">[Dsa-hl-svn] r3764 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#834">[ date ]</a>
+              <a href="thread.html#834">[ thread ]</a>
+              <a href="subject.html#834">[ subject ]</a>
+              <a href="author.html#834">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

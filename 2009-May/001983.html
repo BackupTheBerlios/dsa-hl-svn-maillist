@@ -1,0 +1,509 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4927 - in rl/trunk/engine: core/include core/src	rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4927%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20ui/src&In-Reply-To=%3C200905181644.n4IGiHlh010845%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001982.html">
+   <LINK REL="Next"  HREF="001984.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4927 - in rl/trunk/engine: core/include core/src	rules/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4927%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src%20ui/src&In-Reply-To=%3C200905181644.n4IGiHlh010845%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4927 - in rl/trunk/engine: core/include core/src	rules/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon May 18 18:44:17 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001982.html">[Dsa-hl-svn] r4926 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo06_SimpleBuoyancy demos/Demo07_CustomJoints	demos/Demo08_RagdollExample inc src
+</A></li>
+        <LI>Next message: <A HREF="001984.html">[Dsa-hl-svn] r4928 - dependencies/OgreNewt/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1983">[ date ]</a>
+              <a href="thread.html#1983">[ thread ]</a>
+              <a href="subject.html#1983">[ subject ]</a>
+              <a href="author.html#1983">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-05-18 18:44:06 +0200 (Mon, 18 May 2009)
+New Revision: 4927
+
+Modified:
+   rl/trunk/engine/core/include/PhysicsCollisionFactory.h
+   rl/trunk/engine/core/src/GameAreaTypes.cpp
+   rl/trunk/engine/core/src/GameEventManager.cpp
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp
+   rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+   rl/trunk/engine/core/src/SceneQuery.cpp
+   rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+   rl/trunk/engine/rules/src/SelectionHelper.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+-updated because of changes in OgreNewt
+
+
+Modified: rl/trunk/engine/core/include/PhysicsCollisionFactory.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsCollisionFactory.h	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/include/PhysicsCollisionFactory.h	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -215,9 +215,6 @@
+         {
+             public:
+                 ConvexCollisionCacheObject() :
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-                    col(NULL),
+-#endif
+                     scale(Ogre::Vector3::ZERO),
+                     offset(Ogre::Vector3::ZERO),
+                     orientation(Ogre::Quaternion::IDENTITY),
+@@ -262,9 +259,6 @@
+         {
+             public:
+                 MeshCollisionCacheObject()
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-                    : col(NULL)
+-#endif
+                     {}
+                 OgreNewt::CollisionPtr col;
+         };
+
+Modified: rl/trunk/engine/core/src/GameAreaTypes.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameAreaTypes.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/GameAreaTypes.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -244,15 +244,8 @@
+             col);
+         mBody-&gt;setMaterialGroupID(
+             PhysicsManager::getSingleton().getMaterialID(&quot;gamearea&quot;));
+-#ifndef OGRENEWT_USE_OGRE_ANY
+-        mBody-&gt;setUserData(NULL);
+-#endif
+ 
+-#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
+         boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(col)-&gt;setAsTriggerVolume(true);
+-#else
+-        dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(col)-&gt;setAsTriggerVolume(true);
+-#endif
+     }
+ 
+     GameSimpleCollisionAreaType::GameSimpleCollisionAreaType(
+@@ -269,15 +262,8 @@
+             col);
+         mBody-&gt;setMaterialGroupID(
+             PhysicsManager::getSingleton().getMaterialID(&quot;gamearea&quot;));
+-#ifndef OGRENEWT_USE_OGRE_ANY
+-        mBody-&gt;setUserData(NULL);
+-#endif
+ 
+-#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
+         boost::dynamic_pointer_cast&lt;OgreNewt::ConvexCollision&gt;(col)-&gt;setAsTriggerVolume(true);
+-#else
+-        dynamic_cast&lt;OgreNewt::ConvexCollisionPtr&gt;(col)-&gt;setAsTriggerVolume(true);
+-#endif
+     }
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/GameEventManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameEventManager.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/GameEventManager.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -308,13 +308,9 @@
+ 
+     Actor* GameEventManager::bodyToActor(OgreNewt::Body* body)
+     {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         if( body-&gt;getUserData().getType() == typeid(Actor*) )
+             return Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
+         else
+             return NULL;
+-#else
+-        return static_cast&lt;Actor*&gt;(body-&gt;getUserData());
+-#endif
+     }
+ }
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -127,11 +127,7 @@
+ 	void PhysicalThing::setBody(OgreNewt::Body* body)
+     {
+         mBody = body;
+-#ifdef OGRENEWT_USE_OGRE_ANY
+ 		mBody-&gt;setUserData( Ogre::Any(mActor) );
+-#else
+-        mBody-&gt;setUserData( mActor );
+-#endif
+     }
+ 
+     void PhysicalThing::_update()
+@@ -159,11 +155,7 @@
+         mActor = actor;
+ 		if (mBody != NULL)
+         {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+     		mBody-&gt;setUserData( Ogre::Any(mActor) );
+-#else
+-            mBody-&gt;setUserData( mActor );
+-#endif
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/PhysicsCollisionFactory.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -118,9 +118,6 @@
+ 
+         // result value
+         ConvexCollisionPtr rval;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-#endif
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+         if (checkSize(aabb) == false )
+@@ -298,10 +295,6 @@
+         CollisionPtr rval;
+         ConvexCollisionPtr rvalAsConvexCollision; // store pointer to ConvexCollision, so we don't need to cast
+                                                   // this also indicates, that it is possible to calculate inertia/centerOfMass
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-        rvalAsConvexCollision = NULL;
+-#endif
+ 
+         // size check (if object is too small, it falls back to a box primitiv
+         if (checkSize(aabb) == false )
+@@ -647,9 +640,6 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::loadFromFile(const Ogre::String&amp; filename)
+     {
+         OgreNewt::CollisionPtr rval;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-#endif
+         Ogre::String fullfilename = mCachePathName+filename;
+         FILE* pFile = fopen(fullfilename.c_str(), &quot;r&quot; );
+         if( pFile )
+@@ -678,9 +668,6 @@
+     OgreNewt::CollisionPtr PhysicsCollisionFactory::createMesh( Ogre::Entity* entity, const Ogre::String&amp; animName, bool nocache )
+     {
+         OgreNewt::CollisionPtr rval;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-#endif
+         Ogre::String filename;
+ 
+         if( !nocache )
+
+Modified: rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/PhysicsGenericContactCallback.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -32,7 +32,6 @@
+         Actor* a1 = NULL;
+         Actor* a2 = NULL;
+ 
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         try
+         {
+             a1 = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+@@ -49,10 +48,7 @@
+         {
+             LOG_WARNING(Logger::CORE, &quot;Found collision with a OgreNewt::Body that doesn't have an Actor as UserData in PhysicsGenericContactCallback::contactsProcess&quot;);
+         }
+-#else
+-        a1 = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+-        a2 = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
+-#endif
++
+         if (a1 &amp;&amp; a1-&gt;getPhysicalThing()-&gt;getContactListener())
+         {
+             a1-&gt;getPhysicalThing()-&gt;getContactListener()-&gt;
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -335,9 +335,6 @@
+ 
+         // try one compound collision for the entity if there are several collisions
+         OgreNewt::CollisionPtr collision;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        collision = NULL;
+-#endif
+         switch( collisions.size() )
+         {
+             case 0:
+@@ -416,11 +413,7 @@
+         // apply saved forces in the PhysicalThing
+         PhysicalThing* thing;
+ 
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         thing = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
+-#else
+-        thing = static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
+-#endif
+ 
+         thing-&gt;onApplyForceAndTorque(timestep);
+     }
+@@ -429,11 +422,7 @@
+     {
+         PhysicalThing* thing;
+ 
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         thing = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
+-#else
+-        thing = static_cast&lt;Actor*&gt;(body-&gt;getUserData())-&gt;getPhysicalThing();
+-#endif
+ 
+ 
+         if (thing-&gt;getPhysicsController())
+@@ -542,9 +531,6 @@
+ 
+         // result value
+         CollisionPtr rval;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-#endif
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[collisionName]);
+@@ -591,9 +577,6 @@
+ /*
+         // result value
+         CollisionPtr rval;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        rval = NULL;
+-#endif
+ 
+         // check if there is a collision primitiv for the specified mesh object
+         CollisionInUse &amp;usedcol (mCollisionPrimitives[name]);
+
+Modified: rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -35,11 +35,7 @@
+ 	mParent = parent;
+ 	mOgreBone = ogreBone;
+ 
+-#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
+ 	OgreNewt::ConvexCollisionPtr col;
+-#else
+-	OgreNewt::ConvexCollisionPtr col = NULL;
+-#endif
+ 
+ 	// in the case of the cylindrical primitives, they need to be rotated to align the main axis with the direction vector.
+ 	Ogre::Quaternion orient = Ogre::Quaternion::IDENTITY;
+@@ -95,12 +91,7 @@
+     {
+         if( col-&gt;getNewtonCollision() == NULL )
+         {
+-#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
+             col.reset();
+-#else
+-            delete col;
+-            col = NULL;
+-#endif
+         }
+     }
+ 
+@@ -112,11 +103,7 @@
+     else
+     {
+     	mBody = new OgreNewt::Body( world, col );
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         mBody-&gt;setUserData( Ogre::Any(parentActor) );
+-#else
+-	    mBody-&gt;setUserData( parentActor );
+-#endif
+     	mBody-&gt;setStandardForceCallback();
+         const OgreNewt::MaterialID* ragdollMat = PhysicsManager::getSingleton().createMaterialID(&quot;default&quot;);
+         mBody-&gt;setMaterialGroupID(ragdollMat);
+@@ -146,11 +133,7 @@
+ 
+ void PhysicsRagDoll::RagBone::_hingeCallback( OgreNewt::BasicJoints::Hinge* me )
+ {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+     PhysicsRagDoll::RagBone* bone = Ogre::any_cast&lt;PhysicsRagDoll::RagBone*&gt;(me-&gt;getUserData());
+-#else
+-    PhysicsRagDoll::RagBone* bone = static_cast&lt;PhysicsRagDoll::RagBone*&gt;(me-&gt;getUserData());
+-#endif
+ 
+ 	Ogre::Degree angle = me-&gt;getJointAngle();
+ 	Ogre::Degree lim1( bone-&gt;getLimit1() );
+@@ -261,11 +244,7 @@
+ 	}
+ 
+ 	//////////////////////////////////////////////////////////////////////////////////
+-#ifdef OGRENEWT_COLLISION_USE_SHAREDPTR
+     OgreNewt::ConvexCollisionPtr col;
+-#else
+-    OgreNewt::ConvexCollisionPtr col = NULL;
+-#endif
+     if( numVerts &gt; 0 )
+     	col = OgreNewt::ConvexCollisionPtr(new OgreNewt::CollisionPrimitives::ConvexHull( world, verts, numVerts ));
+ 
+@@ -464,11 +443,7 @@
+ 	case PhysicsRagDoll::JT_HINGE:
+ 		joint = new OgreNewt::BasicJoints::Hinge( world, child-&gt;getBody(), parent-&gt;getBody(), pos, pin );
+ 		((OgreNewt::BasicJoints::Hinge*)joint)-&gt;setCallback( RagBone::_hingeCallback );
+-#ifdef OGRENEWT_USE_OGRE_ANY
+ 		joint-&gt;setUserData( Ogre::Any(child) );
+-#else
+-		joint-&gt;setUserData( child );
+-#endif
+ 		child-&gt;setLimits( limit1, limit2 );
+ 		break;
+ 	}
+@@ -478,11 +453,7 @@
+ 
+ void PhysicsRagDoll::_placementCallback( OgreNewt::Body* me, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, int threadindex )
+ {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+     Actor* parentActor = Ogre::any_cast&lt;Actor*&gt;(me-&gt;getUserData());
+-#else
+-    Actor* parentActor = static_cast&lt;Actor*&gt;(me-&gt;getUserData());
+-#endif
+ 	PhysicsRagDoll* doll = parentActor-&gt;getPhysicalThing()-&gt;getRagDoll();
+     PhysicsRagDoll::RagBoneMapIterator it = doll-&gt;mRagBonesMap.find(me);
+     if( it == doll-&gt;mRagBonesMap.end() )
+
+Modified: rl/trunk/engine/core/src/SceneQuery.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SceneQuery.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/core/src/SceneQuery.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -116,15 +116,11 @@
+                 if (mLevelOcclusion &amp;&amp; (body-&gt;getMaterialGroupID() == levelId)) break;
+ 
+                 // Add actor to this body to the result
+-#ifdef OGRENEWT_USE_OGRE_ANY
+                 Actor* actor = NULL;
+                 if( body-&gt;getUserData().getType() == typeid(Actor*) )
+                 {
+                     actor = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
+                 }
+-#else
+-                Actor* actor = static_cast&lt;Actor*&gt;(body-&gt;getUserData());
+-#endif
+                 if (actor != NULL) mResult.push_back(actor);
+             }
+         }
+
+Modified: rl/trunk/engine/rules/src/CreatureControllerManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/rules/src/CreatureControllerManager.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -166,13 +166,9 @@
+ 
+     void CreatureControllerManager::userProcess(OgreNewt::ContactJoint &amp;contactJoint, Real timestep, int threadid)
+     {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         Actor *actor = NULL;
+         if( contactJoint.getBody0()-&gt;getUserData().getType() == typeid(Actor*) )
+             actor = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+-#else
+-        Actor *actor = static_cast&lt;Actor*&gt;(contactJoint.getBody0()-&gt;getUserData());
+-#endif
+         if( actor != NULL )
+         {
+             ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
+@@ -184,12 +180,8 @@
+         }
+ 
+         // if the controlled body is the second body...
+-#ifdef OGRENEWT_USE_OGRE_ANY
+         if( contactJoint.getBody1()-&gt;getUserData().getType() == typeid(Actor*) )
+             actor = Ogre::any_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
+-#else
+-        actor = static_cast&lt;Actor*&gt;(contactJoint.getBody1()-&gt;getUserData());
+-#endif
+         if( actor != NULL )
+         {
+             ControllerMap::const_iterator it = mControllers.find(static_cast&lt;Creature*&gt;(actor-&gt;getGameObject()));
+
+Modified: rl/trunk/engine/rules/src/SelectionHelper.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/SelectionHelper.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/rules/src/SelectionHelper.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -84,13 +84,9 @@
+             OgreNewt::Body* body = info.mBody;
+             if (body != NULL)
+             {
+-#ifdef OGRENEWT_USE_OGRE_ANY
+                 Actor* hitActor = NULL;
+                 if( body-&gt;getUserData().getType() == typeid(Actor*) )
+                     hitActor = Ogre::any_cast&lt;Actor*&gt;(body-&gt;getUserData());
+-#else
+-                Actor* hitActor = static_cast&lt;Actor*&gt;(body-&gt;getUserData());
+-#endif
+                 isVisible = hitActor == actor2 || hitActor == actor1;
+                 if (!isVisible) break;
+             }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-05-18 16:41:56 UTC (rev 4926)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-05-18 16:44:06 UTC (rev 4927)
+@@ -87,9 +87,6 @@
+         mViewMode(VM_THIRD_PERSON),
+         mRaycast(new PhysicsMaterialRaycast()),
+         mConvexcast(new PhysicsMaterialConvexcast()),
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        mCameraCastCollision(NULL),
+-#endif
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+             QUERYFLAG_CREATURE),
+@@ -174,9 +171,6 @@
+         mSelector.setFilter(NULL);
+         delete mRaycast;
+         delete mConvexcast;
+-#ifndef OGRENEWT_COLLISION_USE_SHAREDPTR
+-        delete mCameraCastCollision;
+-#endif
+ 
+         if (DebugWindow::getSingletonPtr())
+         {
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001982.html">[Dsa-hl-svn] r4926 - in dependencies/OgreNewt:	demos/Demo01_TheBasics demos/Demo02_Joints	demos/Demo03_CollisionCallbacks demos/Demo04_Raycasting	demos/Demo06_SimpleBuoyancy demos/Demo07_CustomJoints	demos/Demo08_RagdollExample inc src
+</A></li>
+	<LI>Next message: <A HREF="001984.html">[Dsa-hl-svn] r4928 - dependencies/OgreNewt/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1983">[ date ]</a>
+              <a href="thread.html#1983">[ thread ]</a>
+              <a href="subject.html#1983">[ subject ]</a>
+              <a href="author.html#1983">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

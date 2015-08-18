@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3809 - in rl/trunk/engine/common: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3809%20-%20in%20rl/trunk/engine/common%3A%20include%20src&In-Reply-To=%3C200709041959.l84Jx8Am031389%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000879.html">
+   <LINK REL="Next"  HREF="000881.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3809 - in rl/trunk/engine/common: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3809%20-%20in%20rl/trunk/engine/common%3A%20include%20src&In-Reply-To=%3C200709041959.l84Jx8Am031389%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3809 - in rl/trunk/engine/common: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Sep  4 21:59:08 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000879.html">[Dsa-hl-svn] r3808 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000881.html">[Dsa-hl-svn] r3810 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#880">[ date ]</a>
+              <a href="thread.html#880">[ thread ]</a>
+              <a href="subject.html#880">[ subject ]</a>
+              <a href="author.html#880">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2007-09-04 21:59:02 +0200 (Tue, 04 Sep 2007)
+New Revision: 3809
+
+Modified:
+   rl/trunk/engine/common/include/Property.h
+   rl/trunk/engine/common/src/PropertyWriter.cpp
+Log:
+fixed empty type tag
+
+Modified: rl/trunk/engine/common/include/Property.h
+===================================================================
+--- rl/trunk/engine/common/include/Property.h	2007-09-04 19:08:44 UTC (rev 3808)
++++ rl/trunk/engine/common/include/Property.h	2007-09-04 19:59:02 UTC (rev 3809)
+@@ -50,6 +50,7 @@
+     void setValue(Type value) \
+     { \
+         mValue = value; \
++        mName = #Name; \
+     } \
+     \
+     Type to##Name() const \
+
+Modified: rl/trunk/engine/common/src/PropertyWriter.cpp
+===================================================================
+--- rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-04 19:08:44 UTC (rev 3808)
++++ rl/trunk/engine/common/src/PropertyWriter.cpp	2007-09-04 19:59:02 UTC (rev 3809)
+@@ -46,42 +46,45 @@
+ 
+     DOMElement* XmlPropertyWriter::processProperty(DOMElement* parent, PropertyEntry entry)
+     {
+-        DOMElement* element;
+-        if(entry.second.isArray())
++        DOMElement* element = NULL;
++        if(!entry.second.isEmpty())
+         {
+-            element = this-&gt;processPropertyArray(parent, entry.first.c_str(), entry.second.toArray());
+-        }
+-        else if(entry.second.isMap())
+-        {
+-            element = this-&gt;processPropertyMap(parent, entry.first.c_str(), entry.second.toMap());
+-        }
+-        else
+-        {
+-            element = XmlHelper::appendChildElement(mDocument, parent, &quot;property&quot;);
+-            if(entry.first != &quot;&quot;)
+-                XmlHelper::setAttribute(element, &quot;name&quot;, entry.first.c_str());
++            if(entry.second.isArray())
++            {
++                element = this-&gt;processPropertyArray(parent, entry.first.c_str(), entry.second.toArray());
++            }
++            else if(entry.second.isMap())
++            {
++                element = this-&gt;processPropertyMap(parent, entry.first.c_str(), entry.second.toMap());
++            }
++            else
++            {
++                element = XmlHelper::appendChildElement(mDocument, parent, &quot;property&quot;);
++                if(entry.first != &quot;&quot;)
++                    XmlHelper::setAttribute(element, &quot;name&quot;, entry.first.c_str());
+ 
+-            //Ogre::String typeName = entry.second.getTypeName();
+-            Ogre::String name = entry.second.getName();
+-            Ogre::StringUtil::toUpperCase(name);
+-            XmlHelper::setAttributeValueAsString(element, &quot;type&quot;, name);
++                //Ogre::String typeName = entry.second.getTypeName();
++                Ogre::String name = entry.second.getName();
++                Ogre::StringUtil::toUpperCase(name);
++                XmlHelper::setAttributeValueAsString(element, &quot;type&quot;, name);
+ 
+-            if(entry.second.isBool())
+-                XmlHelper::setAttributeValueAsBool(element, &quot;data&quot;, entry.second.toBool());
+-            else if(entry.second.isInt())
+-                XmlHelper::setAttributeValueAsInteger(element, &quot;data&quot;, entry.second.toInt());
+-            else if(entry.second.isIntPair())
+-                XmlHelper::setAttributeValueAsIntegerPair(element, &quot;data&quot;, entry.second.toIntPair());
+-            else if(entry.second.isIntPair())
+-                XmlHelper::setAttributeValueAsIntegerTriple(element, &quot;data&quot;, entry.second.toIntTriple());
+-            else if(entry.second.isQuaternion())
+-                XmlHelper::setValueAsQuaternion(element, entry.second.toQuaternion());
+-            else if(entry.second.isReal())
+-                XmlHelper::setAttributeValueAsReal(element, &quot;data&quot;, entry.second.toReal());
+-            else if(entry.second.isString())
+-                XmlHelper::setAttributeValueAsString(element, &quot;data&quot;, entry.second.toString());
+-            else if(entry.second.isVector3())
+-                XmlHelper::setValueAsVector3(element, entry.second.toVector3());
++                if(entry.second.isBool())
++                    XmlHelper::setAttributeValueAsBool(element, &quot;data&quot;, entry.second.toBool());
++                else if(entry.second.isInt())
++                    XmlHelper::setAttributeValueAsInteger(element, &quot;data&quot;, entry.second.toInt());
++                else if(entry.second.isIntPair())
++                    XmlHelper::setAttributeValueAsIntegerPair(element, &quot;data&quot;, entry.second.toIntPair());
++                else if(entry.second.isIntPair())
++                    XmlHelper::setAttributeValueAsIntegerTriple(element, &quot;data&quot;, entry.second.toIntTriple());
++                else if(entry.second.isQuaternion())
++                    XmlHelper::setValueAsQuaternion(element, entry.second.toQuaternion());
++                else if(entry.second.isReal())
++                    XmlHelper::setAttributeValueAsReal(element, &quot;data&quot;, entry.second.toReal());
++                else if(entry.second.isString())
++                    XmlHelper::setAttributeValueAsString(element, &quot;data&quot;, entry.second.toString());
++                else if(entry.second.isVector3())
++                    XmlHelper::setValueAsVector3(element, entry.second.toVector3());
++            }
+         }
+         return element;
+     }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000879.html">[Dsa-hl-svn] r3808 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000881.html">[Dsa-hl-svn] r3810 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#880">[ date ]</a>
+              <a href="thread.html#880">[ thread ]</a>
+              <a href="subject.html#880">[ subject ]</a>
+              <a href="author.html#880">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

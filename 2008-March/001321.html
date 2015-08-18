@@ -1,0 +1,227 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4250 - in rl/trunk/engine: ai/include ai/src	common/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4250%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/src&In-Reply-To=%3C200803081206.m28C6Ums007493%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001320.html">
+   <LINK REL="Next"  HREF="001322.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4250 - in rl/trunk/engine: ai/include ai/src	common/src</H1>
+    <B>iblis at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4250%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/src&In-Reply-To=%3C200803081206.m28C6Ums007493%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4250 - in rl/trunk/engine: ai/include ai/src	common/src">iblis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 13:06:30 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001320.html">[Dsa-hl-svn] r4249 - modules/common/materials
+</A></li>
+        <LI>Next message: <A HREF="001322.html">[Dsa-hl-svn] r4251 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1321">[ date ]</a>
+              <a href="thread.html#1321">[ thread ]</a>
+              <a href="subject.html#1321">[ subject ]</a>
+              <a href="author.html#1321">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: iblis
+Date: 2008-03-08 13:06:29 +0100 (Sat, 08 Mar 2008)
+New Revision: 4250
+
+Modified:
+   rl/trunk/engine/ai/include/DialogImplication.h
+   rl/trunk/engine/ai/src/DialogImplication.cpp
+   rl/trunk/engine/ai/src/DialogManager.cpp
+   rl/trunk/engine/common/src/Property.cpp
+Log:
+increase/decrease dialogvariables
+
+Modified: rl/trunk/engine/ai/include/DialogImplication.h
+===================================================================
+--- rl/trunk/engine/ai/include/DialogImplication.h	2008-03-08 11:57:09 UTC (rev 4249)
++++ rl/trunk/engine/ai/include/DialogImplication.h	2008-03-08 12:06:29 UTC (rev 4250)
+@@ -35,14 +35,34 @@
+     class DialogVariableAssignment : public DialogImplication
+     {
+     public:
+-        DialogVariableAssignment(const Ogre::String&amp; variableName, const CeGuiString&amp; value);
++        DialogVariableAssignment(const Ogre::String&amp; variableName, 
++                                 const CeGuiString&amp; value);
++
+         virtual void apply(Dialog* dialog);
+ 
+-    private:
++    protected:
+         Ogre::String mVariableName; 
+         CeGuiString mValue;
+     };
+ 
++    class DialogVariableIncrease : public DialogVariableAssignment
++    {
++    public:
++        DialogVariableIncrease(const Ogre::String&amp; variableName, 
++                               const CeGuiString&amp; value);
++
++        virtual void apply(Dialog* dialog);
++    };
++
++    class DialogVariableDecrease : public DialogVariableAssignment
++    {
++    public:
++        DialogVariableDecrease(const Ogre::String&amp; variableName, 
++                               const CeGuiString&amp; value);
++
++        virtual void apply(Dialog* dialog);
++    };
++
+     class DialogElementActivation : public DialogImplication
+     {
+     public:
+
+Modified: rl/trunk/engine/ai/src/DialogImplication.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogImplication.cpp	2008-03-08 11:57:09 UTC (rev 4249)
++++ rl/trunk/engine/ai/src/DialogImplication.cpp	2008-03-08 12:06:29 UTC (rev 4250)
+@@ -35,7 +35,8 @@
+     {
+     }
+ 
+-    DialogVariableAssignment::DialogVariableAssignment(const Ogre::String&amp; variableName, const CeGuiString&amp; value)
++    DialogVariableAssignment::DialogVariableAssignment(const Ogre::String&amp; variableName, 
++                                                       const CeGuiString&amp; value)
+         : mVariableName(variableName), mValue(value)
+     {
+     }
+@@ -47,6 +48,56 @@
+         dialog-&gt;setProperty(mVariableName, prop);
+     }
+ 
++        DialogVariableIncrease::DialogVariableIncrease(const Ogre::String&amp; variableName, 
++                                                   const CeGuiString&amp; value)
++        : DialogVariableAssignment(variableName, value)
++    {
++    }
++
++    void DialogVariableIncrease::apply(Dialog* dialog)
++    {
++        Property prop = dialog-&gt;getProperty(mVariableName);
++        if(prop.isInt() || prop.isReal())
++        {
++            Property mod = dialog-&gt;getProperty(mVariableName);
++            mod.getFromString(mValue);
++            Ogre::Real value = prop.getAsNumber() + mod.getAsNumber();
++            prop.setValue(value);
++            dialog-&gt;setProperty(mVariableName, prop);
++        }
++        else
++        {
++            LOG_ERROR(Logger::DIALOG, &quot;You can not increase the variable '&quot; 
++                                      + mVariableName
++                                      + &quot;'. The variable's type is not a number&quot;);
++        }
++    }
++
++    DialogVariableDecrease::DialogVariableDecrease(const Ogre::String&amp; variableName, 
++                                                   const CeGuiString&amp; value)
++        : DialogVariableAssignment(variableName, value)
++    {
++    }
++
++    void DialogVariableDecrease::apply(Dialog* dialog)
++    {
++        Property prop = dialog-&gt;getProperty(mVariableName);
++        if(prop.isInt() || prop.isReal())
++        {
++            Property mod = dialog-&gt;getProperty(mVariableName);
++            mod.getFromString(mValue);
++            Ogre::Real value = prop.getAsNumber() - mod.getAsNumber();
++            prop.setValue(value);
++            dialog-&gt;setProperty(mVariableName, prop);
++        }
++        else
++        {
++            LOG_ERROR(Logger::DIALOG, &quot;You can not decrease the variable '&quot; 
++                                      + mVariableName
++                                      + &quot;'. The variable's type is not a number&quot;);
++        }
++    }
++
+     DialogElementActivation::DialogElementActivation(const CeGuiString&amp; id, 
+                                                      bool value,
+                                                      bool isOption)
+
+Modified: rl/trunk/engine/ai/src/DialogManager.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-08 11:57:09 UTC (rev 4249)
++++ rl/trunk/engine/ai/src/DialogManager.cpp	2008-03-08 12:06:29 UTC (rev 4250)
+@@ -824,6 +824,18 @@
+                 CeGuiString variableValue = getAttributeValueAsString(implicationElem, &quot;value&quot;);
+                 return new DialogVariableAssignment(variableName, variableValue);
+             }
++            else if (hasNodeName(implicationElem, &quot;incvariable&quot;))
++            {
++                Ogre::String variableName = getAttributeValueAsStdString(implicationElem, &quot;name&quot;);
++                CeGuiString variableValue = getAttributeValueAsString(implicationElem, &quot;value&quot;);
++                return new DialogVariableIncrease(variableName, variableValue);
++            }
++            else if (hasNodeName(implicationElem, &quot;decvariable&quot;))
++            {
++                Ogre::String variableName = getAttributeValueAsStdString(implicationElem, &quot;name&quot;);
++                CeGuiString variableValue = getAttributeValueAsString(implicationElem, &quot;value&quot;);
++                return new DialogVariableDecrease(variableName, variableValue);
++            }
+             else if (hasNodeName(implicationElem, &quot;setoptionactive&quot;))
+             {
+                 CeGuiString id = getAttributeValueAsString(implicationElem, &quot;id&quot;);
+
+Modified: rl/trunk/engine/common/src/Property.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Property.cpp	2008-03-08 11:57:09 UTC (rev 4249)
++++ rl/trunk/engine/common/src/Property.cpp	2008-03-08 12:06:29 UTC (rev 4250)
+@@ -247,6 +247,9 @@
+   //      {
+   //          mValue = StringConverter::toString(toBool());
+   //      }
+-        mValue = str;
++        else
++        {
++            mValue = str;
++        }
+     }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001320.html">[Dsa-hl-svn] r4249 - modules/common/materials
+</A></li>
+	<LI>Next message: <A HREF="001322.html">[Dsa-hl-svn] r4251 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1321">[ date ]</a>
+              <a href="thread.html#1321">[ thread ]</a>
+              <a href="subject.html#1321">[ subject ]</a>
+              <a href="author.html#1321">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

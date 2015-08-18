@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3810 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3810%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200709051101.l85B1MqV000467%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000880.html">
+   <LINK REL="Next"  HREF="000882.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3810 - in rl/trunk/engine/core: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3810%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200709051101.l85B1MqV000467%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3810 - in rl/trunk/engine/core: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep  5 13:01:22 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000880.html">[Dsa-hl-svn] r3809 - in rl/trunk/engine/common: include src
+</A></li>
+        <LI>Next message: <A HREF="000882.html">[Dsa-hl-svn] r3811 - modules/regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#881">[ date ]</a>
+              <a href="thread.html#881">[ thread ]</a>
+              <a href="subject.html#881">[ subject ]</a>
+              <a href="author.html#881">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-09-05 13:01:15 +0200 (Wed, 05 Sep 2007)
+New Revision: 3810
+
+Modified:
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/ZoneManager.cpp
+Log:
+zones can now play sounds
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2007-09-04 19:59:02 UTC (rev 3809)
++++ rl/trunk/engine/core/include/ZoneManager.h	2007-09-05 11:01:15 UTC (rev 3810)
+@@ -23,6 +23,7 @@
+ namespace rl
+ {
+     class Zone;
++    class Sound;
+ 
+     class _RlCoreExport ZoneManager : 
+         public Ogre::Singleton&lt;ZoneManager&gt;,
+@@ -74,6 +75,8 @@
+ 		std::map&lt;const Ogre::String, Zone*&gt; mZones;
+         std::map&lt;long, Zone*&gt; mZonesIdMap;
+ 		std::list&lt;Zone*&gt; mActiveZones;
++        typedef std::map&lt;const Ogre::String, Sound*&gt; SoundMap;
++        SoundMap mActiveSounds;
+ 		Zone* mDefaultZone;
+         long mNextZoneId;
+ 
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-04 19:59:02 UTC (rev 3809)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-09-05 11:01:15 UTC (rev 3810)
+@@ -23,6 +23,8 @@
+ #include &quot;GameEventManager.h&quot;
+ #include &quot;Zone.h&quot;
+ #include &quot;World.h&quot;
++#include &quot;Sound.h&quot;
++#include &quot;SoundManager.h&quot;
+ 
+ 
+ using namespace Ogre;
+@@ -302,34 +304,36 @@
+ 	void ZoneManager::switchSounds()
+ 	{
+ 		Zone* currentZone = mActiveZones.front();
+-		std::set&lt;Ogre::String&gt; activeSounds;
++		SoundMap newActiveSounds;
+ 
++        // create all new sounds, or take existing ones
+ 		std::list&lt;Ogre::String&gt; curSounds = currentZone-&gt;getSounds();
+ 		for (std::list&lt;Ogre::String&gt;::const_iterator it = curSounds.begin(); it != curSounds.end(); it++)
+ 		{
+-			activeSounds.insert(*it);
+-			///@todo switch sound on
++            SoundMap::iterator it_ = mActiveSounds.find(*it);
++            if( it_ != mActiveSounds.end() )
++            {
++                // this sound already exists, only copy and don't destroy later
++                newActiveSounds.insert(*it_);
++                mActiveSounds.erase(it_); // remember, it_ is now invalid
++            }
++            else
++            {
++                // we need to create a new sound
++                Sound *sound = SoundManager::getSingleton().createSound(*it, ST_STREAM);
++                sound-&gt;setLooping(true);
++                sound-&gt;play(false);
++                newActiveSounds.insert(make_pair(*it, sound));
++            }
+ 		}
+ 
+-		for (std::map&lt;const Ogre::String, Zone*&gt;::const_iterator itZones = mZones.begin(); itZones != mZones.end(); itZones++)
+-		{
+-			std::list&lt;Ogre::String&gt; curSounds = (*itZones).second-&gt;getSounds();
+-			for (std::list&lt;Ogre::String&gt;::const_iterator itSounds = curSounds.begin(); itSounds != curSounds.end(); itSounds++)
+-			{
+-				if (activeSounds.find(*itSounds) == activeSounds.end())
+-				{
+-					///@todo switch sound off
+-				}
+-			}
+-		}
++        // destroy old sounds
++        for( SoundMap::iterator it = mActiveSounds.begin(); it != mActiveSounds.end(); it++ )
++        {
++            SoundManager::getSingleton().destroySound(it-&gt;second);
++        }
+ 
+-		std::list&lt;Ogre::String&gt; defSounds = mDefaultZone-&gt;getSounds();
+-		for (std::list&lt;Ogre::String&gt;::const_iterator itSounds = defSounds.begin(); itSounds != defSounds.end(); itSounds++)
+-		{
+-			if (activeSounds.find(*itSounds) == activeSounds.end())
+-			{
+-				///@todo switch sound off
+-			}
+-		}
++        // copy new active sounds
++        mActiveSounds = newActiveSounds;
+ 	}
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000880.html">[Dsa-hl-svn] r3809 - in rl/trunk/engine/common: include src
+</A></li>
+	<LI>Next message: <A HREF="000882.html">[Dsa-hl-svn] r3811 - modules/regressiontest/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#881">[ date ]</a>
+              <a href="thread.html#881">[ thread ]</a>
+              <a href="subject.html#881">[ subject ]</a>
+              <a href="author.html#881">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,1020 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3161 - in rl/trunk/engine: rules/include rules/src	script/swig ui ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3161%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui%20ui/include%20ui/src&In-Reply-To=%3C200703110039.l2B0dep7010004%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000231.html">
+   <LINK REL="Next"  HREF="000233.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3161 - in rl/trunk/engine: rules/include rules/src	script/swig ui ui/include ui/src</H1>
+    <B>vincent22 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3161%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig%20ui%20ui/include%20ui/src&In-Reply-To=%3C200703110039.l2B0dep7010004%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3161 - in rl/trunk/engine: rules/include rules/src	script/swig ui ui/include ui/src">vincent22 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 11 01:39:40 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000231.html">[Dsa-hl-svn] r3160 - in rl/trunk/engine: common/include	core/include core/src dialog/include dialog/src rules/include	script/swig ui ui/include ui/src
+</A></li>
+        <LI>Next message: <A HREF="000233.html">[Dsa-hl-svn] r3162 - in modules/common: gui/windows scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#232">[ date ]</a>
+              <a href="thread.html#232">[ thread ]</a>
+              <a href="subject.html#232">[ subject ]</a>
+              <a href="author.html#232">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: vincent22
+Date: 2007-03-11 01:39:15 +0100 (Sun, 11 Mar 2007)
+New Revision: 3161
+
+Added:
+   rl/trunk/engine/ui/include/GameObjectWindow.h
+   rl/trunk/engine/ui/src/GameObjectWindow.cpp
+Modified:
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/script/swig/RlUi.swig
+   rl/trunk/engine/ui/RlUI2005.vcproj
+   rl/trunk/engine/ui/include/WindowFactory.h
+   rl/trunk/engine/ui/src/WindowFactory.cpp
+Log:
+Added the GameObjectWindow to display debug information of a GO when you are in developer mode.
+- Added the GameObjectWindow class
+- Added the showGameObjectWindow method to the WindowFactory
+- Added the Action ShowGameObjectWindowAction to the standard actions of a GO
+- Exports to Ruby
+  . showGameObjectWindow to RlUi.swig
+  . getDeveloperMode to RlCore.swig
+ 
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/rules/include/GameObject.h	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -62,6 +62,7 @@
+         static const Ogre::String PROPERTY_MASS; 
+ 
+ 		static const CeGuiString DEFAULT_VIEW_OBJECT_ACTION;
++        static const CeGuiString DEFAULT_VIEW_OBJECT_ACTION_DEBUG;
+ 
+         GameObject(unsigned int id);
+         virtual ~GameObject();
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -24,12 +24,14 @@
+ #include &quot;Property.h&quot;
+ #include &quot;RulesSubsystem.h&quot;
+ #include &quot;GameObjectManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
+ 
+ using namespace std;
+ 
+ namespace rl
+ {
+ 	const CeGuiString GameObject::DEFAULT_VIEW_OBJECT_ACTION = &quot;viewobject&quot;;
++    const CeGuiString GameObject::DEFAULT_VIEW_OBJECT_ACTION_DEBUG = &quot;viewobjectdebug&quot;;
+ 
+     const Ogre::String GameObject::CLASS_NAME = &quot;GameObject&quot;;
+ 
+@@ -61,6 +63,17 @@
+             addAction(defaultAction);
+         }
+ 
++        // If game in developer mode, show GameObject debug window
++        // in the radial menu
++        //if( CoreSubsystem::getSingleton().getDeveloperMode() )
++        //{
++            defaultAction = ActionManager::getSingleton().getAction(DEFAULT_VIEW_OBJECT_ACTION_DEBUG);
++		    if (defaultAction != NULL)
++            {
++                addAction(defaultAction);
++            }
++        //}
++
+ 		// Eventsource erzeugen
+ 		setObject(this);
+     }
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -659,6 +659,7 @@
+     void makeScreenshot(const Ogre::String&amp; sName);
+     bool isInitialized() const;
+     void setScheme(const Ogre::String&amp; schemeName);
++    bool getDeveloperMode() const;
+ };
+ 
+ class Sound 
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -370,6 +370,7 @@
+         void doDefaultAction(rl::Creature* actor, rl::GameObject* target);
+             
+ 		static const rl::CeGuiString DEFAULT_VIEW_OBJECT_ACTION;
++		static const rl::CeGuiString DEFAULT_VIEW_OBJECT_ACTION_DEBUG;
+ 		
+ 		bool isHighlightingEnabled();
+         void setHighlightingEnabled( bool highlightenabled );
+
+Modified: rl/trunk/engine/script/swig/RlUi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlUi.swig	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/script/swig/RlUi.swig	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -108,6 +108,7 @@
+ 	void showCharacterSheet(rl::Person* chara);
+ 	void showContainerContent(rl::Container* container);
+ 	void showDescriptionWindow(rl::GameObject* obj);
++	void showGameObjectWindow(rl::GameObject* obj);
+ 	void showDialog(rl::DialogCharacter* bot);
+ 	void showExitConfirmation();
+ 	void showJournalWindow();
+
+Modified: rl/trunk/engine/ui/RlUI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ui/RlUI2005.vcproj	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/ui/RlUI2005.vcproj	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -87,7 +87,7 @@
+ 				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+ 				LinkIncremental=&quot;2&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+ 				IgnoreDefaultLibraryNames=&quot;&quot;
+ 				GenerateDebugInformation=&quot;true&quot;
+ 				AssemblyDebug=&quot;1&quot;
+@@ -194,7 +194,7 @@
+ 				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+ 				LinkIncremental=&quot;1&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll&quot;
++				AdditionalLibraryDirectories=&quot;&quot;..\core\lib\$(ConfigurationName)&quot;;&quot;..\rules\lib\$(ConfigurationName)&quot;;&quot;..\uicomponents\lib\$(ConfigurationName)&quot;;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;&quot;..\..\dependencies\OgreNewt\lib\$(ConfigurationName)&quot;;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+ 				ProgramDatabaseFile=&quot;&quot;
+ 				SubSystem=&quot;2&quot;
+ 			/&gt;
+@@ -260,7 +260,7 @@
+ 				Optimization=&quot;3&quot;
+ 				EnableIntrinsicFunctions=&quot;true&quot;
+ 				FavorSizeOrSpeed=&quot;1&quot;
+-				AdditionalIncludeDirectories=&quot;.\include;..\uicomponents\include;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include;..\..\dependencies\ois\includes&quot;
++				AdditionalIncludeDirectories=&quot;.\include;..\uicomponents\include;..\common\include;..\dialog\include;..\core\include;..\rules\include;..\..\dependencies\ogrenew\OgreMain\include;&quot;..\..\dependencies\ruby\lib\ruby\1.8\i386-mswin32&quot;;..\..\dependencies\cegui_mk2\include;..\..\dependencies\boost\include;..\..\dependencies\xerces\include;..\..\dependencies\fmod\api\inc;..\..\dependencies\OgreNewt\include\OgreNewt;..\..\dependencies\NewtonSDK\sdk\;..\..\dependencies\ogrenew\Samples\Common\CEGUIRenderer\include;..\..\dependencies\ogrenew\Dependencies\include\;..\..\dependencies\ois\includes&quot;
+ 				PreprocessorDefinitions=&quot;WITH_FMOD3;NDEBUG,_WINDOWS,WIN32,RLUI_EXPORTS;_CRT_SECURE_NO_DEPRECATE&quot;
+ 				StringPooling=&quot;false&quot;
+ 				ExceptionHandling=&quot;1&quot;
+@@ -296,7 +296,7 @@
+ 				OutputFile=&quot;$(OutDir)/RlUI.dll&quot;
+ 				LinkIncremental=&quot;1&quot;
+ 				SuppressStartupBanner=&quot;true&quot;
+-				AdditionalLibraryDirectories=&quot;..\core\lib\Release;..\rules\lib\Release;..\uicomponents\lib\Release;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\OgreNewt\lib\Release;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll&quot;
++				AdditionalLibraryDirectories=&quot;..\core\lib\Release;..\rules\lib\Release;..\uicomponents\lib\Release;..\..\dependencies\ogrenew\lib;..\..\dependencies\ruby\lib;..\..\dependencies\cegui_mk2\lib;..\..\dependencies\boost\lib;..\..\dependencies\xerces\lib;..\..\dependencies\OgreNewt\lib\Release;..\..\dependencies\NewtonSDK\sdk\dll;..\..\dependencies\ois\dll;&quot;..\..\dependencies\ogrenew\lib\$(ConfigurationName)&quot;&quot;
+ 				GenerateDebugInformation=&quot;true&quot;
+ 				ProgramDatabaseFile=&quot;$(TargetDir)$(TargetName).pdb&quot;
+ 				SubSystem=&quot;2&quot;
+@@ -457,6 +457,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\include\GameObjectWindow.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\include\InfoPopup.h&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+@@ -630,6 +634,10 @@
+ 					&gt;
+ 				&lt;/File&gt;
+ 				&lt;File
++					RelativePath=&quot;.\src\GameObjectWindow.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\src\InfoPopup.cpp&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Added: rl/trunk/engine/ui/include/GameObjectWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/GameObjectWindow.h	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/ui/include/GameObjectWindow.h	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -0,0 +1,128 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++/**
++ * \file GameObjectWindow.h
++ *
++ * Declaration of the GameObject window
++ */
++
++#ifndef __GameObjectWindow_H__
++#define __GameObjectWindow_H__
++
++#include &quot;UiPrerequisites.h&quot;
++#include &quot;CeGuiWindow.h&quot;
++
++namespace rl {
++
++	class GameObject;
++    class Property;
++
++    /**
++     * The GameObject window class
++     *
++     * This window displays all properties of a game object by looping
++     * through the property set of the given object.
++     */
++    class _RlUiExport GameObjectWindow : public AbstractWindow
++	{
++	public:
++
++        /**
++         * Constructor of the GameObject window
++         */
++		GameObjectWindow();
++		
++        /**
++         * Destructor of the GameObject window
++         */
++        virtual ~GameObjectWindow();
++
++        /**
++         * Initializes the window with the specified game object and
++         * fills the window with the properties of the GameObject.
++         *
++         * @param object The GameObject to be displayed
++         */
++		virtual void initialize(GameObject* object);
++	
++	protected:
++
++        /**
++         * Fills the header part of the window with the Name and Description
++         * property of the GameObject.
++         *
++         * @param object The GameObject to be displayed
++         */
++        virtual void fillHeader(GameObject* object);
++ 
++        /**
++         * Adds one row to the property table with the given key
++         * and the property value.
++         *
++         * @param key The key of the property key|value pair
++         * @param prop The property value
++         * @param row The current row in the property table
++         */
++        //virtual void addProperty(const Ogre::String&amp; key, const Property&amp; prop, int row); 
++
++        /**
++         * Adds an Int value to the property table.
++         *
++         * @param key The property to add.
++         */
++        virtual void addPropertyInt(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyIntPair(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyIntTriple(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyString(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyBool(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyReal(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyVector3(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyQuaternion(const Property&amp; prop, 
++            CEGUI::MultiColumnList* table,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        virtual void addPropertyArray(const Property&amp; prop,
++            const CEGUI::String&amp; key = &quot;&quot;);
++
++        
++        CEGUI::TabControl *mTabPane;        //!&lt; TabControl for the property tabs
++        CEGUI::MultiColumnList *mMainTable; //!&lt; Main table for the GameObject properties 
++	};
++}
++
++#endif
+
+Modified: rl/trunk/engine/ui/include/WindowFactory.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowFactory.h	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/ui/include/WindowFactory.h	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -49,6 +49,7 @@
+ 	class JournalWindow;
+ 	class LogWindow;
+ 	class ObjectDescriptionWindow;
++    class GameObjectWindow;
+ 	class Person;
+ 	class WindowUpdater;
+     class MainMenuWindow;
+@@ -81,6 +82,7 @@
+ 		void showCharacterSheet(Person* chara);
+ 		void showContainerContent(Container* container);
+ 		void showDescriptionWindow(GameObject* obj);
++        void showGameObjectWindow(GameObject* obj);
+ 		void showDialog(DialogCharacter* bot);
+         void showExitConfirmation();
+ 		bool showInputOptionsMenu(Creature* actionHolder);
+
+Added: rl/trunk/engine/ui/src/GameObjectWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameObjectWindow.cpp	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/ui/src/GameObjectWindow.cpp	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -0,0 +1,592 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++/**
++ * \file GameObjectWindow.cpp
++ *
++ * Implementation of the GameObject window
++ */
++
++#include &lt;boost/bind.hpp&gt;
++#include &quot;GameObjectWindow.h&quot;
++#include &quot;GameObject.h&quot;
++
++using namespace CEGUI;
++
++namespace rl {
++
++    //------------------------------------------------------- Constructor
++
++	GameObjectWindow::GameObjectWindow() :
++        CeGuiWindow(&quot;gameobjectwindow.xml&quot;, WND_MOUSE_INPUT)
++	{
++        // Get access to the tab control
++        mTabPane = getTabControl(&quot;GameObjectWindow/PropertiesTabPane&quot;);
++        RlAssert(mTabPane != NULL, &quot;GameObjectWindow/PropertiesTabPane is null&quot;);
++
++        // Get a access to the main Property table
++        mMainTable = getMultiColumnList(&quot;GameObjectWindow/PropertiesTabControl/MainTable&quot;);
++        RlAssert(mMainTable != NULL, &quot;GameObjectWindow/PropertiesTabPane is null&quot;);
++
++        mMainTable-&gt;addColumn( (utf8*)&quot;Key&quot;, 0, cegui_reldim(0.3));
++        mMainTable-&gt;addColumn( (utf8*)&quot;Type&quot;, 1, cegui_reldim(0.3));
++        mMainTable-&gt;addColumn( (utf8*)&quot;Value&quot;, 2, cegui_reldim(0.4));
++        
++        centerWindow();
++
++        bindCloseToCloseButton();
++        bindClickToCloseWindow(getWindow(&quot;GameObjectWindow/CloseButton&quot;));
++	    
++	}
++
++    //------------------------------------------------------- Destructor
++
++	GameObjectWindow::~GameObjectWindow() 
++	{        
++	}
++
++    //------------------------------------------------------- initialize
++
++	void GameObjectWindow::initialize( GameObject* object )
++	{
++        // Fill header text fields with name and description
++        fillHeader(object);    
++
++        // Get the property set of the object
++        PropertySet* props = object-&gt;getAllProperties();
++
++        int row = 0;
++        //  Iterate through all properties and add a row for
++        //  every Entry
++        for( PropertyMap::const_iterator propIter = props-&gt;begin();
++            propIter != props-&gt;end(); propIter++ )
++        {
++            CEGUI::String key = propIter-&gt;first;
++            
++            if( key == &quot;description&quot; || key == &quot;name&quot; )
++                continue;
++
++            // Check for Int
++            if( propIter-&gt;second.isInt() )
++            {
++                addPropertyInt(propIter-&gt;second, mMainTable, key );
++            }
++            // Check for IntPair
++            else if( propIter-&gt;second.isIntPair() )
++            {
++                addPropertyIntPair(propIter-&gt;second, mMainTable, key);
++                int rowCount = mMainTable-&gt;getRowCount();
++                mMainTable-&gt;addRow(rowCount);
++                mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for IntTriple
++            else if( propIter-&gt;second.isIntTriple() )
++            {
++                addPropertyIntTriple(propIter-&gt;second, mMainTable, key);
++                int rowCount = mMainTable-&gt;getRowCount();
++                mMainTable-&gt;addRow(rowCount);
++                mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for String
++            else if( propIter-&gt;second.isString() )
++            {
++                addPropertyString(propIter-&gt;second, mMainTable, key);
++            }
++            // Check for Bool
++            else if( propIter-&gt;second.isBool() )
++            {
++                addPropertyBool(propIter-&gt;second, mMainTable, key);
++            }
++            // Check for Real
++            else if( propIter-&gt;second.isReal() )
++            {
++                addPropertyReal(propIter-&gt;second, mMainTable, key);
++            }
++            // Check for Vector3
++            else if( propIter-&gt;second.isVector3() )
++            {
++                addPropertyVector3(propIter-&gt;second, mMainTable, key);
++                int rowCount = mMainTable-&gt;getRowCount();
++                mMainTable-&gt;addRow(rowCount);
++                mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for Quaternion
++            else if( propIter-&gt;second.isQuaternion() )
++            {
++                addPropertyQuaternion(propIter-&gt;second, mMainTable, key);
++                int rowCount = mMainTable-&gt;getRowCount();
++                mMainTable-&gt;addRow(rowCount);
++                mMainTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for Array
++            else if( propIter-&gt;second.isArray() )
++            {
++                addPropertyArray(propIter-&gt;second, key);
++            }
++        }
++
++        mMainTable-&gt;autoSizeColumnHeader(0);
++        mMainTable-&gt;autoSizeColumnHeader(1);
++        mMainTable-&gt;autoSizeColumnHeader(2);
++	}
++
++    //------------------------------------------------------- fillHeader
++
++    void GameObjectWindow::fillHeader(GameObject* object)
++    {
++        getWindow(&quot;GameObjectWindow/HeaderSheet/ObjectName&quot;)-&gt;setText(object-&gt;getName());
++        getWindow(&quot;GameObjectWindow/HeaderSheet/ObjectDescription&quot;)-&gt;setText(object-&gt;getDescription());
++    }
++
++    //------------------------------------------------------- addPropertyInt
++
++    void GameObjectWindow::addPropertyInt(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Int  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::intToString(prop.toInt())), 
++                2, 
++                rowCount);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;Int  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::intToString(prop.toInt())), 
++                1, 
++                rowCount);
++        }
++    }
++
++    //------------------------------------------------------- addPropertyIntPair
++
++    void GameObjectWindow::addPropertyIntPair(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        IntPair intPair = prop.toIntPair();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            // Add row for the first IntPair value
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;IntPair  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;First &quot; + PropertyHelper::intToString(intPair.first)), 
++                2, 
++                rowCount);
++
++            // Add second for the second IntPair value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Second &quot; + PropertyHelper::intToString(intPair.second)), 
++                2, 
++                rowCount + 1);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;IntPair  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;First &quot; + PropertyHelper::intToString(intPair.first)), 
++                1, 
++                rowCount);
++
++            // Add second for the second IntPair value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Second &quot; + PropertyHelper::intToString(intPair.second)), 
++                2, 
++                rowCount + 1);
++        }
++    }
++
++    //------------------------------------------------------- addPropertyIntTriple
++
++    void GameObjectWindow::addPropertyIntTriple(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        Tripel&lt;int&gt; intTriple = prop.toIntTriple();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            // Add row for the first IntTriple value
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;IntTriple  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;First &quot; + PropertyHelper::intToString(intTriple.first)), 
++                2, 
++                rowCount);
++
++            // Add second for the second IntTriple value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Second &quot; + PropertyHelper::intToString(intTriple.second)), 
++                2, 
++                rowCount + 1);
++
++            // Add third for the third IntTriple value
++            table-&gt;addRow(rowCount + 2);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Third &quot; + PropertyHelper::intToString(intTriple.third)), 
++                2, 
++                rowCount + 2);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;IntTriple  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;First &quot; + PropertyHelper::intToString(intTriple.first)), 
++                1, 
++                rowCount);
++
++            // Add second for the second IntPair value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Second &quot; + PropertyHelper::intToString(intTriple.second)), 
++                2, 
++                rowCount + 1);
++
++            // Add third for the third IntTriple value
++            table-&gt;addRow(rowCount + 2);
++            table-&gt;setItem(new ListboxTextItem(
++                &quot;Third &quot; + PropertyHelper::intToString(intTriple.third)), 
++                2, 
++                rowCount + 2);
++        } 
++    }
++
++    //------------------------------------------------------- addPropertyString
++
++    void GameObjectWindow::addPropertyString(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;String  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(prop.toString()), 
++                2, 
++                rowCount);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;String  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(prop.toString()), 
++                1, 
++                rowCount);
++        }
++    }
++
++    //------------------------------------------------------- addPropertyBool
++
++    void GameObjectWindow::addPropertyBool(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Bool  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::boolToString(prop.toBool())), 
++                2, 
++                rowCount);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;Bool  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::boolToString(prop.toBool())), 
++                1, 
++                rowCount);
++        }
++    }
++
++    //------------------------------------------------------- addPropertyReal
++
++    void GameObjectWindow::addPropertyReal(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++       // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Real  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::floatToString(prop.toReal())), 
++                2, 
++                rowCount);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;Real  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(PropertyHelper::floatToString(prop.toReal())), 
++                1, 
++                rowCount);
++        }
++    }
++
++    //------------------------------------------------------- addPropertyVector3
++
++    void GameObjectWindow::addPropertyVector3(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        Ogre::Vector3 vec = prop.toVector3();
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            // Add row for the first IntTriple value
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Vector3  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;X &quot; + PropertyHelper::floatToString(vec.x)), 
++                2, 
++                rowCount);
++
++            // Add second for the second IntTriple value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(&quot;Y &quot; + PropertyHelper::floatToString(vec.y)), 
++                2, 
++                rowCount + 1);
++
++            // Add third for the third IntTriple value
++            table-&gt;addRow(rowCount + 2);
++            table-&gt;setItem(new ListboxTextItem(&quot;Z &quot; + PropertyHelper::floatToString(vec.z)), 
++                2, 
++                rowCount + 2);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;Vector3  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;X &quot; + PropertyHelper::floatToString(vec.x)), 
++                1, 
++                rowCount);
++
++            // Add second for the second IntPair value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(&quot;Y &quot; + PropertyHelper::floatToString(vec.y)), 
++                2, 
++                rowCount + 1);
++
++            // Add third for the third IntTriple value
++            table-&gt;addRow(rowCount + 2);
++            table-&gt;setItem(new ListboxTextItem(&quot;Z &quot; + PropertyHelper::floatToString(vec.z)), 
++                2, 
++                rowCount + 2);
++        } 
++    }
++
++    //------------------------------------------------------- addPropertyQuaternion
++
++    void GameObjectWindow::addPropertyQuaternion(const Property&amp; prop, 
++        CEGUI::MultiColumnList* table, const CEGUI::String&amp; key)
++    {
++        // Check column count
++        // if count = 3 | MainTable
++        // if count = 2 | Array table
++        int colCount = table-&gt;getColumnCount();
++        int rowCount = table-&gt;getRowCount();
++
++        Ogre::Quaternion quat = prop.toQuaternion();
++        Ogre::Radian angle;
++        Ogre::Vector3 axis;
++
++        quat.ToAngleAxis( angle, axis );
++
++        // Table has the three columns Key, Type, Value
++        if ( colCount == 3 )
++        {
++            // Add row for the first IntTriple value
++            table-&gt;addRow(rowCount);
++            table-&gt;setItem(new ListboxTextItem(key + &quot;  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Quaternion  &quot;), 1, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Axis &quot; +
++                PropertyHelper::floatToString(axis.x) + &quot;, &quot; +
++                PropertyHelper::floatToString(axis.y) + &quot;, &quot; +
++                PropertyHelper::floatToString(axis.z)), 
++                2, 
++                rowCount);
++
++            // Add second for the second IntTriple value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(&quot;Radian &quot; + 
++                PropertyHelper::floatToString(angle.valueRadians())), 
++                2, 
++                rowCount + 1);
++        }
++        // Table has the two columns Type, Value
++        else if ( colCount == 2 )
++        {
++            table-&gt;setItem(new ListboxTextItem(&quot;Quaternion  &quot;), 0, rowCount);
++            table-&gt;setItem(new ListboxTextItem(&quot;Axis &quot; +
++                PropertyHelper::floatToString(axis.x) + &quot;, &quot; +
++                PropertyHelper::floatToString(axis.y) + &quot;, &quot; +
++                PropertyHelper::floatToString(axis.z)), 
++                2, 
++                rowCount);
++
++            // Add second for the second IntTriple value
++            table-&gt;addRow(rowCount + 1);
++            table-&gt;setItem(new ListboxTextItem(&quot;Radian &quot; + 
++                PropertyHelper::floatToString(angle.valueRadians())), 
++                2, 
++                rowCount + 1);
++        } 
++
++    }
++
++    //------------------------------------------------------- addPropertyArray
++
++    void GameObjectWindow::addPropertyArray(const Property&amp; prop, const CEGUI::String&amp; key)
++    {
++        // Create the new MultiColumnList with two columns
++        // Type and Value and set tab text to key
++        int tabCount = mTabPane-&gt;getTabCount();
++        CEGUI::MultiColumnList* newTable = new MultiColumnList(
++            &quot;RastullahLook/MultiColumnList&quot;,
++            &quot;GameObjectWindow/PropertiesTabControl/PropertyTab_&quot; + 
++            CEGUI::PropertyHelper::intToString(tabCount) );
++        newTable-&gt;setText(key);
++        newTable-&gt;addColumn(&quot;Type&quot;, 0, cegui_reldim(0.3));
++        newTable-&gt;addColumn(&quot;Value&quot;, 1, cegui_reldim(0.7));
++        
++        // Add the MultiColumnList to the tab pane
++        mTabPane-&gt;addTab(newTable);
++
++        // Get access to the vector
++        std::vector&lt;Property&gt; vProp = prop.toArray();
++        std::vector&lt;Property&gt;::iterator it;
++
++        // Iterate through the vector entries and add them
++        // to the table
++        for(it = vProp.begin(); it != vProp.end(); it++)
++        {
++            // Check for Int
++            if( it-&gt;isInt() )
++            {
++                addPropertyInt(*it, newTable);
++            }
++            // Check for IntPair
++            else if( it-&gt;isIntPair() )
++            {
++                addPropertyIntPair(*it, newTable);
++                int rowCount = newTable-&gt;getRowCount();
++                newTable-&gt;addRow(rowCount);
++                newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for IntTriple
++            else if( it-&gt;isIntTriple() )
++            {
++                addPropertyIntTriple(*it, newTable);
++                int rowCount = newTable-&gt;getRowCount();
++                newTable-&gt;addRow(rowCount);
++                newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for String
++            else if( it-&gt;isString() )
++            {
++                addPropertyString(*it, newTable);
++            }
++            // Check for Bool
++            else if( it-&gt;isBool() )
++            {
++                addPropertyBool(*it, newTable);
++            }
++            // Check for Real
++            else if( it-&gt;isReal() )
++            {
++                addPropertyReal(*it, newTable);
++            }
++            // Check for Vector3
++            else if( it-&gt;isVector3() )
++            {
++                addPropertyVector3(*it, newTable);
++                int rowCount = newTable-&gt;getRowCount();
++                newTable-&gt;addRow(rowCount);
++                newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++            // Check for Quaternion
++            else if( it-&gt;isQuaternion() )
++            {
++                addPropertyQuaternion(*it, newTable);
++                int rowCount = newTable-&gt;getRowCount();
++                newTable-&gt;addRow(rowCount);
++                newTable-&gt;setItem(new ListboxTextItem(&quot;&quot;), 0, rowCount);
++            }
++        }
++        newTable-&gt;autoSizeColumnHeader(0);
++        newTable-&gt;autoSizeColumnHeader(1);
++    }
++
++} // namespace rl
+
+Modified: rl/trunk/engine/ui/src/WindowFactory.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFactory.cpp	2007-03-10 21:36:02 UTC (rev 3160)
++++ rl/trunk/engine/ui/src/WindowFactory.cpp	2007-03-11 00:39:15 UTC (rev 3161)
+@@ -52,6 +52,7 @@
+ #include &quot;SubtitleWindow.h&quot;
+ #include &quot;UiSubsystem.h&quot;
+ #include &quot;WindowManager.h&quot;
++#include &quot;GameObjectWindow.h&quot;
+ 
+ #undef max
+ 
+@@ -174,6 +175,13 @@
+ 		mDebugWindow-&gt;setVisible(!mDebugWindow-&gt;isVisible());
+ 	}
+ 
++	void WindowFactory::showGameObjectWindow(GameObject* obj)
++	{
++        GameObjectWindow* wnd = new GameObjectWindow();
++        wnd-&gt;initialize(obj);
++        wnd-&gt;setVisible(true);
++	}
++
+ 	void WindowFactory::toggleGameLogWindow()
+ 	{
+ 		mGameLogger-&gt;setVisible(!mGameLogger-&gt;isVisible());
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000231.html">[Dsa-hl-svn] r3160 - in rl/trunk/engine: common/include	core/include core/src dialog/include dialog/src rules/include	script/swig ui ui/include ui/src
+</A></li>
+	<LI>Next message: <A HREF="000233.html">[Dsa-hl-svn] r3162 - in modules/common: gui/windows scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#232">[ date ]</a>
+              <a href="thread.html#232">[ thread ]</a>
+              <a href="subject.html#232">[ subject ]</a>
+              <a href="author.html#232">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,241 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3226 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3226%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200704032228.l33MSQaO022530%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000296.html">
+   <LINK REL="Next"  HREF="000298.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3226 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3226%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200704032228.l33MSQaO022530%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3226 - in rl/trunk/engine: rules/include rules/src	script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr  4 00:28:26 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000296.html">[Dsa-hl-svn] r3225 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000298.html">[Dsa-hl-svn] r3227 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#297">[ date ]</a>
+              <a href="thread.html#297">[ thread ]</a>
+              <a href="subject.html#297">[ subject ]</a>
+              <a href="author.html#297">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-04 00:28:21 +0200 (Wed, 04 Apr 2007)
+New Revision: 3226
+
+Modified:
+   rl/trunk/engine/rules/include/GameObject.h
+   rl/trunk/engine/rules/include/Item.h
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/rules/src/Item.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Changed placeIntoScene, removeFromScene, hold operations
+- public interface now uses the setState method to assure correct state changes
+- renamed old methods to doXYZ and changed visibility to protected
+
+Modified: rl/trunk/engine/rules/include/GameObject.h
+===================================================================
+--- rl/trunk/engine/rules/include/GameObject.h	2007-04-02 19:56:44 UTC (rev 3225)
++++ rl/trunk/engine/rules/include/GameObject.h	2007-04-03 22:28:21 UTC (rev 3226)
+@@ -162,6 +162,9 @@
+         Actor* createActor();
+         void destroyActor();
+ 
++		void doPlaceIntoScene();
++		void doRemoveFromScene();
++
+ 	private:
+ 		static int sNextGameObjectId;	
+ 
+
+Modified: rl/trunk/engine/rules/include/Item.h
+===================================================================
+--- rl/trunk/engine/rules/include/Item.h	2007-04-02 19:56:44 UTC (rev 3225)
++++ rl/trunk/engine/rules/include/Item.h	2007-04-03 22:28:21 UTC (rev 3226)
+@@ -100,6 +100,8 @@
+ 		CeGuiString mImageName;
+ 
+ 		std::pair&lt;int,int&gt; mSize;
++
++		void doHold();
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2007-04-02 19:56:44 UTC (rev 3225)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2007-04-03 22:28:21 UTC (rev 3226)
+@@ -58,7 +58,8 @@
+             mOrientation(Ogre::Quaternion::IDENTITY),
+             mMass(0),
+             mGeometryType(PhysicsManager::GT_NONE),
+-			mDefaultAction(DEFAULT_VIEW_OBJECT_ACTION)
++			mDefaultAction(DEFAULT_VIEW_OBJECT_ACTION),
++			mState(GOS_LOADED)
+     {
+         // Standardactions registrieren
+ 		Action* defaultAction = ActionManager::getSingleton().getAction(DEFAULT_VIEW_OBJECT_ACTION);
+@@ -541,7 +542,17 @@
+         }
+     }
+ 
+-    void GameObject::placeIntoScene()
++	void GameObject::placeIntoScene()
++	{
++		setState(GOS_IN_SCENE);
++	}
++
++	void GameObject::removeFromScene()
++	{
++		setState(GOS_LOADED);
++	}
++
++    void GameObject::doPlaceIntoScene()
+     {
+         if (mState != GOS_IN_SCENE)
+         {
+@@ -567,9 +578,9 @@
+         }
+     }
+ 
+-    void GameObject::removeFromScene()
++    void GameObject::doRemoveFromScene()
+     {
+-        if (mState != GOS_IN_SCENE)
++        if (mState == GOS_IN_SCENE)
+         {
+             Actor* actor = mActor;
+             mOrientation = actor-&gt;getWorldOrientation();
+@@ -594,13 +605,13 @@
+ 
+         if (targetstate == GOS_LOADED &amp;&amp; mState == GOS_IN_SCENE)
+         {
+-            //Statechange-Event is triggered in this function
+-            removeFromScene();
++            /// Statechange-Event is triggered in this function
++            doRemoveFromScene();
+         }
+         else if (targetstate == GOS_IN_SCENE &amp;&amp; mState == GOS_LOADED)
+         {
+             //Statechange-Event is triggered in this function
+-            placeIntoScene();
++            doPlaceIntoScene();
+         }
+     }
+ 
+
+Modified: rl/trunk/engine/rules/src/Item.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Item.cpp	2007-04-02 19:56:44 UTC (rev 3225)
++++ rl/trunk/engine/rules/src/Item.cpp	2007-04-03 22:28:21 UTC (rev 3226)
+@@ -98,7 +98,12 @@
+ 		mSize = pair&lt;int,int&gt;(widthSize,heightSize);
+ 	}
+ 
+-    void Item::hold()
++	void Item::hold()
++	{
++		setState(GOS_HELD);
++	}
++
++    void Item::doHold()
+     {
+         setActor(createActor());
+         mState = GOS_HELD;
+@@ -121,7 +126,7 @@
+             }
+             else if (mState == GOS_IN_SCENE)
+             {
+-                removeFromScene();
++                doRemoveFromScene();
+                 stateChanged = true;
+             }
+             else if (mState == GOS_HELD)
+@@ -148,7 +153,7 @@
+         {
+             if (mState == GOS_IN_POSSESSION)
+             {
+-                removeFromScene();
++                doRemoveFromScene();
+                 stateChanged = true;
+             }
+             if (mState == GOS_HELD)
+@@ -161,18 +166,18 @@
+         {
+             if (mState == GOS_LOADED)
+             {
+-                hold();
++                doHold();
+                 stateChanged = true;
+             }
+             else if (mState == GOS_IN_SCENE)
+             {
+                 mActor-&gt;removeFromScene();
+-                hold();
++                doHold();
+                 stateChanged = true;
+             }
+             else if (mState == GOS_IN_POSSESSION)
+             {
+-                hold();
++                doHold();
+                 stateChanged = true;
+             }
+         }
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-04-02 19:56:44 UTC (rev 3225)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-04-03 22:28:21 UTC (rev 3226)
+@@ -382,7 +382,7 @@
+         void removeFromScene();
+         
+         rl::GameObjectState getState() const;
+-        virtual void setState(rl::GameObjectState state);
++        void setState(rl::GameObjectState state);
+     };
+     
+     %feature(&quot;director&quot;) Item;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000296.html">[Dsa-hl-svn] r3225 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000298.html">[Dsa-hl-svn] r3227 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#297">[ date ]</a>
+              <a href="thread.html#297">[ thread ]</a>
+              <a href="subject.html#297">[ subject ]</a>
+              <a href="author.html#297">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

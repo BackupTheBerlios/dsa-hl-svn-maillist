@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4256 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4256%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200803081332.m28DWK2i021729%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001326.html">
+   <LINK REL="Next"  HREF="001328.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4256 - rl/trunk/engine/rules/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4256%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200803081332.m28DWK2i021729%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4256 - rl/trunk/engine/rules/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  8 14:32:20 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001326.html">[Dsa-hl-svn] r4255 - in rl/trunk/engine/ui: include src
+</A></li>
+        <LI>Next message: <A HREF="001328.html">[Dsa-hl-svn] r4257 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1327">[ date ]</a>
+              <a href="thread.html#1327">[ thread ]</a>
+              <a href="subject.html#1327">[ subject ]</a>
+              <a href="author.html#1327">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2008-03-08 14:32:19 +0100 (Sat, 08 Mar 2008)
+New Revision: 4256
+
+Modified:
+   rl/trunk/engine/rules/src/Combat.cpp
+Log:
+Combat: Log actions of combatants.
+
+Modified: rl/trunk/engine/rules/src/Combat.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 13:31:13 UTC (rev 4255)
++++ rl/trunk/engine/rules/src/Combat.cpp	2008-03-08 13:32:19 UTC (rev 4256)
+@@ -212,7 +212,7 @@
+         for (CombatantQueue::iterator it = mCombatantQueue.begin();
+ 			it != mCombatantQueue.end(); ++it)
+         {
+-			CeGuiString evt = it-&gt;second-&gt;getCreatureController()-&gt;getCreature()-&gt;getName();
++			CeGuiString evt = it-&gt;second-&gt;getName();
+ 			evt += &quot; - Initiative: &quot; + CeGuiString(StringConverter::toString(it-&gt;first));
+ 			GameEventLog::getSingleton().logEvent(evt, GET_COMBAT);
+         }
+@@ -260,10 +260,14 @@
+ 						}
+ 						else if (entry.aktion == BEWEGEN)
+ 						{
++							GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft nach &quot;
++								+ CeGuiString(StringConverter::toString(entry.targetPos)), GET_COMBAT);
+ 							combatant-&gt;doBewegen(jobSet, entry.targetPos);
+ 						}
+ 						else if (entry.aktion == FOLGEN)
+ 						{
++							GameEventLog::getSingleton().logEvent(combatant-&gt;getName() + &quot; l&#228;uft zu &quot;
++								+ entry.target-&gt;getName(), GET_COMBAT);
+ 							combatant-&gt;doFolgen(jobSet, entry.target);
+ 						}
+ 					}
+@@ -286,6 +290,8 @@
+ 
+ 	void Combat::doAttacke(JobSet* jobSet, Combatant* actor, Combatant* target)
+ 	{
++		GameEventLog::getSingleton().logEvent(
++			actor-&gt;getName() + &quot; attackiert &quot; + target-&gt;getName() , GET_COMBAT);
+ 		// Make an attack roll.
+ 		int aresult = actor-&gt;rollAttacke();
+ 		if (aresult &gt;= RESULT_ERFOLG)
+@@ -299,6 +305,15 @@
+ 				if (it-&gt;second == PARADE)
+ 				{
+ 					int presult = target-&gt;rollParade(aresult &gt;= RESULT_GLUECKLICH);
++					if (presult &gt;= RESULT_ERFOLG)
++					{
++						GameEventLog::getSingleton().logEvent(&quot;Erfolg, aber pariert.&quot;, GET_COMBAT);
++					}
++					else
++					{
++						GameEventLog::getSingleton().logEvent(&quot;Erfolg, nicht pariert, Treffer!&quot;,
++							GET_COMBAT);
++					}
+ 					target-&gt;doParade(jobSet, actor, presult);
+ 					actor-&gt;doAttacke(jobSet, target, aresult, true, presult);
+ 				}
+@@ -309,11 +324,13 @@
+ 			}
+ 			else
+ 			{
++				GameEventLog::getSingleton().logEvent(&quot;Treffer!&quot;, GET_COMBAT);
+ 				actor-&gt;doAttacke(jobSet, target, aresult, false);
+ 			}
+ 		}
+ 		else
+ 		{
++			GameEventLog::getSingleton().logEvent(&quot;Verfehlt!&quot;, GET_COMBAT);
+ 			actor-&gt;doAttacke(jobSet, target, aresult, false);
+ 			target-&gt;doGetroffen(jobSet);
+ 		}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001326.html">[Dsa-hl-svn] r4255 - in rl/trunk/engine/ui: include src
+</A></li>
+	<LI>Next message: <A HREF="001328.html">[Dsa-hl-svn] r4257 - rl/trunk/engine/rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1327">[ date ]</a>
+              <a href="thread.html#1327">[ thread ]</a>
+              <a href="subject.html#1327">[ subject ]</a>
+              <a href="author.html#1327">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

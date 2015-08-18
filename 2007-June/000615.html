@@ -1,0 +1,431 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3544 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3544%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/swig&In-Reply-To=%3C200706260930.l5Q9Un4C002012%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000614.html">
+   <LINK REL="Next"  HREF="000616.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3544 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3544%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/swig&In-Reply-To=%3C200706260930.l5Q9Un4C002012%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3544 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Jun 26 11:30:49 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000614.html">[Dsa-hl-svn] r3543 - modules/common/gui/windows	rl/trunk/engine/script/swig rl/trunk/engine/ui	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000616.html">[Dsa-hl-svn] r3545 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#615">[ date ]</a>
+              <a href="thread.html#615">[ thread ]</a>
+              <a href="subject.html#615">[ subject ]</a>
+              <a href="author.html#615">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-06-26 11:30:43 +0200 (Tue, 26 Jun 2007)
+New Revision: 3544
+
+Modified:
+   rl/trunk/engine/core/include/SceneQuery.h
+   rl/trunk/engine/core/src/SceneQuery.cpp
+   rl/trunk/engine/rules/include/Selector.h
+   rl/trunk/engine/rules/src/Selector.cpp
+   rl/trunk/engine/script/swig/RlRules.head.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+Added Ogre ray query to Selectors
+
+Modified: rl/trunk/engine/core/include/SceneQuery.h
+===================================================================
+--- rl/trunk/engine/core/include/SceneQuery.h	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/core/include/SceneQuery.h	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -22,6 +22,7 @@
+ #include &quot;Actor.h&quot;
+ 
+ #include &lt;OgreNewt_RayCast.h&gt;
++#include &lt;OgreSceneQuery.h&gt;
+ 
+ namespace rl
+ {
+@@ -95,6 +96,18 @@
+         bool mLevelOcclusion;
+     };
+ 
++    /// This query uses Ogre's AABB based approach.
++    class _RlCoreExport OgreRaySceneQuery : public RaySceneQuery, public Ogre::RaySceneQueryListener
++    {
++    public:
++        OgreRaySceneQuery(unsigned long mask = 0xffffffff);
++
++        virtual const ActorVector&amp; execute();
++
++		virtual bool queryResult(Ogre::MovableObject* obj, Ogre::Real distance);
++		virtual bool queryResult(Ogre::SceneQuery::WorldFragment* fragment, Ogre::Real distance);
++    };
++
+     /// This query queries for objects within a sphere.
+     class _RlCoreExport SphereSceneQuery : public SceneQuery
+     {
+
+Modified: rl/trunk/engine/core/src/SceneQuery.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SceneQuery.cpp	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/core/src/SceneQuery.cpp	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -17,6 +17,9 @@
+ #include &quot;SceneQuery.h&quot;
+ 
+ #include &quot;PhysicsManager.h&quot;
++#include &quot;CoreSubsystem.h&quot;
++#include &quot;World.h&quot;
++#include &lt;OgreSceneManager.h&gt;
+ 
+ using namespace Ogre;
+ 
+@@ -254,4 +257,41 @@
+     {
+         return mRadius;
+     }
++
++    OgreRaySceneQuery::OgreRaySceneQuery(unsigned long mask)
++        : RaySceneQuery(mask)
++    {
++    }
++
++    const ActorVector&amp; OgreRaySceneQuery::execute()
++    {
++        // Clear last results
++        mResult.clear();
++
++		Ray ray(getRayStart(), (getRayEnd() - getRayStart()).normalisedCopy());
++		
++		Ogre::RaySceneQuery* query = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()
++			-&gt;createRayQuery(ray, getQueryMask());
++
++		query-&gt;execute(this);
++
++        return mResult;
++    }
++
++	bool OgreRaySceneQuery::queryResult(
++		Ogre::MovableObject* obj, Ogre::Real distance)
++	{
++        Actor* actor = dynamic_cast&lt;Actor*&gt;(obj-&gt;getUserObject());
++        if (actor != NULL)
++		{
++			mResult.push_back(actor);
++		}
++		return true;
++	}
++	
++	bool OgreRaySceneQuery::queryResult(
++		Ogre::SceneQuery::WorldFragment* fragment, Ogre::Real distance)
++	{
++		return true;
++	}
+ }
+
+Modified: rl/trunk/engine/rules/include/Selector.h
+===================================================================
+--- rl/trunk/engine/rules/include/Selector.h	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/rules/include/Selector.h	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -78,6 +78,7 @@
+ 
+         GameObject* getFirstSelectedObject() const;
+         const GameObjectVector&amp; getAllSelectedObjects() const;
++		unsigned int getSelectionCount() const;
+ 
+     protected:
+         GameObjectVector mSelection;
+@@ -94,7 +95,8 @@
+     class _RlRulesExport RaySelector : public Selector
+     {
+     public:
+-        RaySelector(unsigned long mask = 0xffffffff);
++        RaySelector(unsigned long mask = 0xffffffff, bool useOgreQuery = false);
++		~RaySelector();
+ 
+         void setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end);
+ 
+@@ -104,7 +106,7 @@
+         virtual void updatePrimitive();
+ 
+     protected:
+-        RaySceneQuery mQuery;
++        RaySceneQuery* mQuery;
+ 
+         virtual const ActorVector&amp; doExecuteQuery();
+         virtual void doCreatePrimitive();
+@@ -116,6 +118,7 @@
+     {
+     public:
+         HalfSphereSelector(Ogre::SceneManager* smgr, unsigned long mask = 0xffffffff);
++		HalfSphereSelector(unsigned long mask = 0xffffffff);
+ 
+         virtual void updateSelection();
+ 
+
+Modified: rl/trunk/engine/rules/src/Selector.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Selector.cpp	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/rules/src/Selector.cpp	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -16,7 +16,9 @@
+ #include &quot;Selector.h&quot;
+ #include &quot;SelectionHelper.h&quot;
+ 
++#include &quot;CoreSubsystem.h&quot;
+ #include &quot;PhysicsManager.h&quot;
++#include &quot;World.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -57,7 +59,8 @@
+         return false;
+     }
+ 
+-    Selector::Selector(unsigned long mask) : mSelection(), mSelectionMask(mask), mFilter(NULL)
++    Selector::Selector(unsigned long mask) 
++		: DebugVisualisable(), mSelection(), mSelectionMask(mask), mFilter(NULL)
+     {
+     }
+ 
+@@ -95,6 +98,11 @@
+         return mSelection;
+     }
+ 
++	unsigned int Selector::getSelectionCount() const
++	{
++		return mSelection.size();
++	}
++
+     void Selector::updateSelection()
+     {
+         // Remove old selection
+@@ -123,14 +131,22 @@
+ 
+     //------------------------------------------------------------------------
+ 
+-    RaySelector::RaySelector(unsigned long mask)
+-        : Selector(mask), mQuery(mask)
++    RaySelector::RaySelector(unsigned long mask, bool useOgreQuery)
++        : Selector(mask)
+     {
++		if (useOgreQuery)
++		{
++			mQuery = new OgreRaySceneQuery(mask);
++		}
++		else
++		{
++			mQuery = new RaySceneQuery(mask);
++		}
+     }
+ 
+     void RaySelector::setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end)
+     {
+-        mQuery.setRay(start, end);
++        mQuery-&gt;setRay(start, end);
+     }
+ 
+     // Overrides from DebugVisualisable
+@@ -143,12 +159,12 @@
+     {
+         LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+         lineSet-&gt;clear();
+-        lineSet-&gt;addLine(mQuery.getRayStart(), mQuery.getRayEnd(), ColourValue::Red);
++        lineSet-&gt;addLine(mQuery-&gt;getRayStart(), mQuery-&gt;getRayEnd(), ColourValue::Red);
+     }
+ 
+     const ActorVector&amp; RaySelector::doExecuteQuery()
+     {
+-        return mQuery.execute();
++        return mQuery-&gt;execute();
+     }
+ 
+     void RaySelector::doCreatePrimitive()
+@@ -156,6 +172,11 @@
+         mPrimitive = new LineSetPrimitive();
+     }
+ 
++	RaySelector::~RaySelector()
++	{
++		delete mQuery;
++	}
++
+     //////////////////////////////////////////////////////////////////////////
+ 
+     HalfSphereSelector::HalfSphereSelector(Ogre::SceneManager* smgr,
+@@ -163,10 +184,20 @@
+         : Selector(mask),
+           mQuery(smgr, mask),
+           mCheckVisibility(false),
+-          mLoSReferenceGo(NULL)
++          mLoSReferenceGo(NULL),
++		  mTrackedGo(NULL)
+     {
+     }
+ 
++    HalfSphereSelector::HalfSphereSelector(unsigned long mask)
++        : Selector(mask),
++		  mQuery(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(), mask),
++          mCheckVisibility(false),
++          mLoSReferenceGo(NULL),
++		  mTrackedGo(NULL)
++    {
++    }
++
+     void HalfSphereSelector::updateSelection()
+     {
+         // Remove old selection
+
+Modified: rl/trunk/engine/script/swig/RlRules.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.head.swig	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/script/swig/RlRules.head.swig	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -42,6 +42,7 @@
+ #include &quot;QuestEvent.h&quot;
+ #include &quot;QuestListener.h&quot;
+ #include &quot;RulesSubsystem.h&quot;
++#include &quot;Selector.h&quot;
+ #include &quot;SonderfertigkeitenStateSet.h&quot;
+ #include &quot;StateSet.h&quot;
+ #include &quot;Talent.h&quot;
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-06-26 09:27:53 UTC (rev 3543)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-06-26 09:30:43 UTC (rev 3544)
+@@ -14,11 +14,13 @@
+  *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+  */
+ 
++// %template(GameObjectVector) std::vector&lt; rl::GameObject* &gt;;         
++
+ namespace rl {
+ 
+     // Before first use of GameObject or subclasses!
+     %apply SWIGTYPE *DYNAMIC { rl::GameObject * };
+-        
++
+                     
+    template&lt;typename T&gt;
+    class Tripel {
+@@ -579,9 +581,9 @@
+         virtual Status getStatus();
+         virtual int getMod(rl::CeGuiString target, ModType type, ModTag tag);
+ 
+-        virtual const rl::Property getProperty(const Ogre::String&amp; key) const = 0;
+-        virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value) = 0;
+-        virtual rl::PropertySet* getAllProperties() const = 0;
++        virtual const rl::Property getProperty(const Ogre::String&amp; key) const = 0;
++        virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value) = 0;
++        virtual rl::PropertySet* getAllProperties() const = 0;
+     };
+ 
+     class EffectFactory
+@@ -786,9 +788,68 @@
+                           unsigned int timesToPlay = 0, 
+                           const Ogre::String &amp;collisionName = &quot;&quot;);
+     };
++
++	// Before first use of Selector or subclasses!
++    %apply SWIGTYPE *DYNAMIC { rl::Selector* };
++
++	class Selector : public DebugVisualisable
++    {
++    public:
++        Selector(unsigned long mask = 0xffffffff);
++        virtual void updateSelection();
++
++        void setSelectionMask(unsigned long mask);
++        unsigned long getSelectionMask() const;
++
++        GameObject* getFirstSelectedObject() const;
++		const std::vector&lt;GameObject*&gt;&amp; getAllSelectedObjects() const;
++		unsigned int getSelectionCount() const;
++
++		virtual void updatePrimitive() = 0;
++    };
++
++
++    /// A Selector that selects all unoccluded GameObject the ray hits.
++    class RaySelector : public Selector
++    {
++    public:
++        RaySelector(unsigned long mask = 0xffffffff, bool useOgreQuery = false);
++        void setRay(const Ogre::Vector3&amp; start, const Ogre::Vector3&amp; end);
++		virtual void updatePrimitive();
++    };
++
++    /// Selects this GameObject within a half sphere pointing to -Z,
++    /// that has the smallest angle difference to the -Z-Axis.
++    class HalfSphereSelector : public Selector
++    {
++    public:
++        HalfSphereSelector(unsigned long mask = 0xffffffff);
++	    void setRadius(Ogre::Real radius);
++        void setPosition(const Ogre::Vector3&amp; pos);
++        void setOrientation(const Ogre::Quaternion&amp; ori);
++		virtual void updatePrimitive();
++	};
++
+ } // Namespace
+ 
+ %{
++static swig_type_info *Selector_dynamic_cast(void **ptr)
++{
++	rl::Selector **ppSelector = reinterpret_cast&lt;rl::Selector**&gt;(ptr);
++	rl::HalfSphereSelector *pHalfSphereSel = dynamic_cast&lt;rl::HalfSphereSelector*&gt;(*ppSelector);
++	if (pHalfSphereSel)
++	{
++		*ptr = pHalfSphereSel;
++		return SWIGTYPE_p_rl__HalfSphereSelector;
++	}
++	rl::RaySelector *pRaySel = dynamic_cast&lt;rl::RaySelector*&gt;(*ppSelector);
++	if (pRaySel)
++	{
++		*ptr = pRaySel;
++		return SWIGTYPE_p_rl__RaySelector;
++	}
++}
++	
+ static swig_type_info *GameObject_dynamic_cast(void **ptr)
+ {
+     rl::GameObject **ppGameObject = reinterpret_cast&lt;rl::GameObject**&gt;(ptr);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000614.html">[Dsa-hl-svn] r3543 - modules/common/gui/windows	rl/trunk/engine/script/swig rl/trunk/engine/ui	rl/trunk/engine/ui/include rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000616.html">[Dsa-hl-svn] r3545 - modules/common/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#615">[ date ]</a>
+              <a href="thread.html#615">[ thread ]</a>
+              <a href="subject.html#615">[ subject ]</a>
+              <a href="author.html#615">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,269 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4912 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4912%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200905011108.n41B84Hf026330%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="001970.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4912 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4912%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200905011108.n41B84Hf026330%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4912 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Fri May  1 13:08:04 CEST 2009</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="001970.html">[Dsa-hl-svn] r4913 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1969">[ date ]</a>
+              <a href="thread.html#1969">[ thread ]</a>
+              <a href="subject.html#1969">[ subject ]</a>
+              <a href="author.html#1969">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-05-01 13:08:01 +0200 (Fri, 01 May 2009)
+New Revision: 4912
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+   rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+   rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+Log:
+- its possible now to delete zone/triggers and lights from the module explorer
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-04-26 11:48:49 UTC (rev 4911)
++++ rl/trunk/editors/Lockenwickler/src/ModuleExplorer.py	2009-05-01 11:08:01 UTC (rev 4912)
+@@ -22,6 +22,7 @@
+ from PyQt4.QtGui import *
+ import ogre.renderer.OGRE as og
+ 
++from ZoneManager import *
+ 
+ # get the light out of a light node
+ def extractLight(node):
+@@ -127,7 +128,7 @@
+         drag.start(Qt.CopyAction)
+ 
+     def dragEnterEvent(self, event):
+-        print &quot;enter&quot;
++#        print &quot;enter&quot;
+         if event.mimeData().hasFormat(&quot;application/light&quot;):
+             event.accept()
+             
+@@ -160,7 +161,7 @@
+         
+             relMousePos = self.mapFromGlobal(QPoint(QCursor.pos().x(), QCursor.pos().y() - self.header().height()))
+             item = self.itemAt(relMousePos)
+-            str(item.data(0, Qt.UserRole).toString())
++            #str(item.data(0, Qt.UserRole).toString())
+             
+             items = self.findItems(&quot;Lights&quot;, Qt.MatchFixedString | Qt.MatchRecursive)
+             for iitem in items:
+@@ -178,8 +179,6 @@
+                     child.setText(0, text)
+                     child.setData(0, Qt.UserRole, QVariant(ModuleExplorer.LIGHT_IN_ZONE))
+ 
+-
+-
+ class ModuleExplorer(QWidget):
+     LIGHT_IN_ZONE = 99
+     TRIGGER_IN_ZONE = 100
+@@ -438,13 +437,34 @@
+             self.updateView()
+     
+     def onDelete(self):
+-        print &quot;delete&quot;
++        item = self.sceneTreeView.itemAt(self.onMenuPoint)
++        
++        if item.data(0, Qt.UserRole).toString() == str(ModuleExplorer.LIGHT_IN_ZONE):
++            zoneName = str(item.parent().parent().text(0)).replace(&quot;Zone: &quot;,  &quot;&quot;)
++            lightName = str(item.text(0))
++            if self.sceneTreeView.zoneManager.removeLightFromZone(zoneName, lightName):
++                item.parent().removeChild(item)     
++        elif item.data(0, Qt.UserRole).toString() == str(ModuleExplorer.TRIGGER_IN_ZONE):
++            zoneName = str(item.parent().parent().text(0)).replace(&quot;Zone: &quot;,  &quot;&quot;)
++            triggerNameName = str(item.text(0))
++            if self.sceneTreeView.zoneManager.removeTriggerFromZone(zoneName, triggerNameName):
++                item.parent().removeChild(item)
++        elif str(item.text(0)).startswith(&quot;Zone: &quot;):
++            zoneName = str(item.text(0)).replace(&quot;Zone: &quot;,  &quot;&quot;)
++            reply = QMessageBox.warning(QApplication.focusWidget(), &quot;Undoable Action!&quot;, &quot;Delete zone &quot; +  zoneName + &quot;?&quot;, QMessageBox.Yes|QMessageBox.Cancel)
++            if reply == QMessageBox.Cancel:
++                return
++            elif reply == QMessageBox.Yes:
++                if self.sceneTreeView.zoneManager.deleteZone(zoneName):
++                    item.parent().removeChild(item)
++                    
++#        print &quot;delete &quot; + str(item.data(0, Qt.UserRole).toString())
+ 
+     def keyPressEvent(self, event):
+         print &quot;key!!!!!!!!!!!!!!&quot;
+     
+     def paintLastSelectedMapBlue(self):
+-        print self.lastSelectedMap
++#        print self.lastSelectedMap
+         for item in self.mapItems:
+             if str(item.text(0)) == self.lastSelectedMap:
+                 brush = item.foreground(0)
+
+Modified: rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-04-26 11:48:49 UTC (rev 4911)
++++ rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-05-01 11:08:01 UTC (rev 4912)
+@@ -281,7 +281,11 @@
+                     so.setSelected(True)
+                     items.append(so)
+             elif key.startswith(&quot;Zone: &quot;):
+-                parentNode = self.zoneManager.getZone(key.replace(&quot;Zone: &quot;, &quot;&quot;)).zoneNode
++                zone = self.zoneManager.getZone(key.replace(&quot;Zone: &quot;, &quot;&quot;))
++                if zone is None:
++                    continue
++                    
++                parentNode = zone.zoneNode
+                 for nodeName in itemNodes[key]:
+                     obj = parentNode.getChild(nodeName).getAttachedObject(0)
+                     so = SelectionObject(obj)
+
+Modified: rl/trunk/editors/Lockenwickler/src/ZoneManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-04-26 11:48:49 UTC (rev 4911)
++++ rl/trunk/editors/Lockenwickler/src/ZoneManager.py	2009-05-01 11:08:01 UTC (rev 4912)
+@@ -101,7 +101,8 @@
+         self.areaNode.detachAllObjects()
+         self.areaNode.getParent().removeAndDestroyChild(self.areaNode.getName())
+         self.sceneManager.destroyEntity(self.areaEntity.getName())
+-    
++        print &quot;area&quot; + str(self.id) + &quot; deleted&quot;
++        
+     def getsubtract(self):
+         return self.__subtract
+         
+@@ -128,22 +129,32 @@
+         self.isHidden = False
+         
+         self.zoneNode =  self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;zone_&quot; + name + &quot;_node&quot;)
++    
++    def __del__(self):
++        print &quot;Zone &quot; + self.name + &quot; is garbage collected&quot;
+         
+     def addArea(self, type, position, orientation, scale, meshFile = None):
+         area = Area(self.sceneManager, type, self, self.areaCounter, position, orientation, scale, meshFile)
+         if area is not None:
+             self.areaList.append(area)
+             self.areaCounter = self.areaCounter + 1
+-    
++            
++    def addTrigger(self, trigger):
++        if trigger is not None:
++            self.triggerList.append(trigger)
++        
++    def deleteSelf(self):    
++        del self.areaList[:]
++        
++        self.zoneNode.detachAllObjects()
++        parent = self.zoneNode.getParent()
++        parent.removeAndDestroyChild(self.zoneNode.getName())
++        
+     def deleteArea(self, area):
+         for a in self.areaList:
+             if a.id == area.id:
+                 self.areaList.remove(a)
+                 del a
+-    
+-    def addTrigger(self, trigger):
+-        if trigger is not None:
+-            self.triggerList.append(trigger)
+             
+     def manualAddTrigger(self):
+         trigger = TriggerManager.instance.manualCreateTrigger()
+@@ -185,6 +196,15 @@
+         self.currentMap.zoneList.append(z)
+         return z
+         
++    def deleteZone(self, zoneName):
++        for zone in self.zoneList:
++            if zone.name == zoneName:
++                self.zoneList.remove(zone)
++                zone.deleteSelf()
++                del zone
++                return True
++        return False
++        
+     def parseZonesFromXml(self, zoneXmlNode, map):
+         if zoneXmlNode is None:
+             return
+@@ -258,7 +278,24 @@
+             for sound in soundNodes:
+                 name = sound.attrib[&quot;name&quot;]
+                 z.soundList.append(name)
+-            
++    
++    def removeLightFromZone(self, zoneName, lightName):
++        for zone in self.zoneList:
++            if zone.name == zoneName:
++                for light in zone.lightList:
++                    if light == lightName:
++                        zone.lightList.remove(light)
++                        return True
++        return False
++        
++    def removeTriggerFromZone(self, zoneName, triggerName):
++        for zone in self.zoneList:
++            if zone.name == zoneName:
++                for trigger in zone.triggerList:
++                    if trigger.name == triggerName:
++                        zone.triggerList.remove(trigger)
++                        return True
++        return False
+ 
+     def saveZonesToXml(self, root, map):
+         if len(map.zoneList) == 0:
+@@ -321,7 +358,7 @@
+             for a in z.areaList:
+                 if a.id == area.id:
+                     z.deleteArea(area)
+-    
++
+     def getZoneMenu(self):
+         self.menuList = []
+         menu = QMenu(&quot;Add Area&quot;)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="001970.html">[Dsa-hl-svn] r4913 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1969">[ date ]</a>
+              <a href="thread.html#1969">[ thread ]</a>
+              <a href="subject.html#1969">[ subject ]</a>
+              <a href="author.html#1969">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

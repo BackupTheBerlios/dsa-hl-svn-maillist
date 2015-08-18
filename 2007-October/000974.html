@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3903 - in modules: . common/scripts	kanalisation/scripts kanalisation/scripts/maps
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3903%20-%20in%20modules%3A%20.%20common/scripts%0A%09kanalisation/scripts%20kanalisation/scripts/maps&In-Reply-To=%3C200710112154.l9BLs188013470%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000973.html">
+   <LINK REL="Next"  HREF="000975.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3903 - in modules: . common/scripts	kanalisation/scripts kanalisation/scripts/maps</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3903%20-%20in%20modules%3A%20.%20common/scripts%0A%09kanalisation/scripts%20kanalisation/scripts/maps&In-Reply-To=%3C200710112154.l9BLs188013470%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3903 - in modules: . common/scripts	kanalisation/scripts kanalisation/scripts/maps">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Oct 11 23:54:01 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000973.html">[Dsa-hl-svn] r3902 - modules/kanalisation/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000975.html">[Dsa-hl-svn] r3904 - modules/kanalisation/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#974">[ date ]</a>
+              <a href="thread.html#974">[ thread ]</a>
+              <a href="subject.html#974">[ subject ]</a>
+              <a href="author.html#974">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-10-11 23:53:42 +0200 (Thu, 11 Oct 2007)
+New Revision: 3903
+
+Modified:
+   modules/common/scripts/torch.rb
+   modules/kanalisation/scripts/equip.rb
+   modules/kanalisation/scripts/maps/kanalisation.rb
+   modules/modules.cfg
+Log:
+started repairing outdated torch for kanalisation module
+
+Modified: modules/common/scripts/torch.rb
+===================================================================
+--- modules/common/scripts/torch.rb	2007-10-11 21:21:16 UTC (rev 3902)
++++ modules/common/scripts/torch.rb	2007-10-11 21:53:42 UTC (rev 3903)
+@@ -92,7 +92,7 @@
+ 
+ # TODO Physikalische Attribute etc..
+ # TODO Persistenz *schreck*
+-class Torch &lt; GameObject
++class Torch &lt; Item
+     include GameObjectProperties
+     attr_reader :flammen
+     
+@@ -101,6 +101,7 @@
+         @flammen = $AM.createParticleSystemActor(&quot;torch&quot; + id.to_s, &quot;flammen&quot;)
+         @flammen.getControlledObject().setActive(false)
+         setLit(false)
++		addActions()
+     end
+     
+     def setLit(lit)
+@@ -127,14 +128,16 @@
+         end
+     end
+     
+-    def placeIntoScene()
+-        super()
+-        sound = $SM.createSound(&quot;feuer_knisternd_01.ogg&quot;)
+-        sound.setLooping(true)
+-        sound.set3d(true)
+-        @_prop_Sound = SoundObject.new(sound, getId().to_s())
+-        getActor().attachToSlot(@flammen, &quot;SLOT_FAR_END&quot;)
+-        addActions()
++    def onStateChange(oldState, newState)
++		p &quot;New state&quot;+newState.to_s()
++		if (newState == RlScript::GOS_IN_SCENE || newState == RlScript::GOS_HELD)
++			sound = $SM.createSound(&quot;feuer_knisternd_01.ogg&quot;)
++	        sound.setLooping(true)
++	        sound.set3d(true)
++	        @_prop_Sound = SoundObject.new(sound, getId().to_s())
++	        getActor().attachToSlot(@flammen, &quot;SLOT_FAR_END&quot;)
++			doAction(&quot;lighttorch&quot;) if @_prop_Lit
++		end
+     end
+     
+     def addActions()
+@@ -146,8 +149,7 @@
+         else
+             addAction(@mLightAction, Action::ACT_DISABLED)
+             addAction(@mPutoutAction, Action::ACT_DISABLED)
+-        end
+-        doAction(&quot;putouttorch&quot;) if @_prop_Lit
++        end        
+     end
+     
+     def getDefaultAction(actor)
+
+Modified: modules/kanalisation/scripts/equip.rb
+===================================================================
+--- modules/kanalisation/scripts/equip.rb	2007-10-11 21:21:16 UTC (rev 3902)
++++ modules/kanalisation/scripts/equip.rb	2007-10-11 21:53:42 UTC (rev 3903)
+@@ -1,4 +1,5 @@
+ require 'npc.rb'
++require 'torch.rb'
+ 	
+ 	$SCRIPT.log(&quot;aktiven hero geten&quot;);
+ 	hero = $UI.getActiveCharacter();
+@@ -20,4 +21,7 @@
+     #hero.getInventory().getItem(&quot;Back&quot;).addItem(itemToAdd);
+     itemToAdd = $GOM.createGameObject(&quot;men_human_female_feet_boots_01&quot;);
+     hero.getInventory().hold(itemToAdd, &quot;Boots&quot;);
+-   # hero.getInventory().getItem(&quot;Back&quot;).addItem(itemToAdd);
+\ No newline at end of file
++   # hero.getInventory().getItem(&quot;Back&quot;).addItem(itemToAdd);
++   
++    itemToAdd = $GOM.createGameObject(&quot;torch&quot;);
++    hero.getInventory().hold(itemToAdd, &quot;Right Hand&quot;);
+
+Modified: modules/kanalisation/scripts/maps/kanalisation.rb
+===================================================================
+--- modules/kanalisation/scripts/maps/kanalisation.rb	2007-10-11 21:21:16 UTC (rev 3902)
++++ modules/kanalisation/scripts/maps/kanalisation.rb	2007-10-11 21:53:42 UTC (rev 3903)
+@@ -75,5 +75,5 @@
+ 
+ ##########################
+ 
+-load &quot;particle.rb&quot;
++#load &quot;particle.rb&quot;
+ load &quot;equip.rb&quot;
+\ No newline at end of file
+
+Modified: modules/modules.cfg
+===================================================================
+--- modules/modules.cfg	2007-10-11 21:21:16 UTC (rev 3902)
++++ modules/modules.cfg	2007-10-11 21:53:42 UTC (rev 3903)
+@@ -13,5 +13,5 @@
+ module=minidemo
+ module=tutorial
+ module=ruchin
++module=kanalisation
+ 
+-
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000973.html">[Dsa-hl-svn] r3902 - modules/kanalisation/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000975.html">[Dsa-hl-svn] r3904 - modules/kanalisation/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#974">[ date ]</a>
+              <a href="thread.html#974">[ thread ]</a>
+              <a href="subject.html#974">[ subject ]</a>
+              <a href="author.html#974">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

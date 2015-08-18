@@ -1,0 +1,341 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4074 - in rl/trunk/engine: core/include core/src	rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4074%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200802202357.m1KNvZPA009003%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001144.html">
+   <LINK REL="Next"  HREF="001146.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4074 - in rl/trunk/engine: core/include core/src	rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4074%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/src&In-Reply-To=%3C200802202357.m1KNvZPA009003%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4074 - in rl/trunk/engine: core/include core/src	rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Feb 21 00:57:35 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001144.html">[Dsa-hl-svn] r4073 - in modules/common: gui/windows scripts
+</A></li>
+        <LI>Next message: <A HREF="001146.html">[Dsa-hl-svn] r4075 - in rl/trunk/engine: core/include core/src	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1145">[ date ]</a>
+              <a href="thread.html#1145">[ thread ]</a>
+              <a href="subject.html#1145">[ subject ]</a>
+              <a href="author.html#1145">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-02-21 00:57:22 +0100 (Thu, 21 Feb 2008)
+New Revision: 4074
+
+Modified:
+   rl/trunk/engine/core/include/TimeSource.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/PlayAnimationJob.cpp
+   rl/trunk/engine/core/src/PlaySoundJob.cpp
+   rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+   rl/trunk/engine/core/src/TimeSource.cpp
+   rl/trunk/engine/rules/src/GameObjectManager.cpp
+Log:
+saving/loading TimeSources
+
+Modified: rl/trunk/engine/core/include/TimeSource.h
+===================================================================
+--- rl/trunk/engine/core/include/TimeSource.h	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/include/TimeSource.h	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -23,6 +23,8 @@
+ 
+ #include &quot;GameTask.h&quot;
+ 
++#include &quot;SaveGameManager.h&quot;
++
+ namespace rl
+ {
+     class _RlCoreExport TimeSource : public GameTask
+@@ -82,14 +84,20 @@
+     };
+ 
+     class _RlCoreExport TimeSourceManager 
+-        : public Ogre::Singleton&lt;TimeSourceManager&gt;
++        : public Ogre::Singleton&lt;TimeSourceManager&gt;, public SaveGameData
+     {
+     public:
+         TimeSourceManager();
++		virtual ~TimeSourceManager();
+ 
+         void registerTimeSource(TimeSource* ts);
+         TimeSource* getTimeSource(const TimeSource::TimeSourceType&amp; type) const;
+ 
++		virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual void writeData(SaveGameFileWriter* writer);
++        virtual void readData(SaveGameFileReader* reader);
++        /// defines the loading/saving order higher priority are saved last and loaded first
++        virtual int getPriority() const;
+     private:
+         std::map&lt;TimeSource::TimeSourceType, TimeSource*&gt; mTimeSources;
+     };
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -92,7 +92,6 @@
+         delete mGameLoop;
+         delete mMessagePump;
+         delete mJobScheduler;
+-        delete mSaveGameManager;
+         delete mAnimationManager;
+         delete mActorManager;
+         delete mPhysicsManager;
+@@ -104,6 +103,7 @@
+         delete mOgreRoot;
+         delete mRubyInterpreter;
+         delete mTimeSourceManager;
++		delete mSaveGameManager;
+     }
+ 
+     void CoreSubsystem::startCore()
+@@ -229,7 +229,10 @@
+         mGameLoop = new GameLoop();
+         LOG_MESSAGE(Logger::CORE,&quot;GameLoopmanager erzeugt&quot;);
+ 
+-        mTimeSourceManager = new TimeSourceManager();
++        mSaveGameManager = new SaveGameManager();
++        LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
++		
++		mTimeSourceManager = new TimeSourceManager();
+         mTimeSourceManager-&gt;registerTimeSource(new RealTimeContinuous());
+         mTimeSourceManager-&gt;registerTimeSource(new RealTimeInterruptable());
+         LOG_MESSAGE(Logger::CORE,&quot;Time sources (realtime) created&quot;);
+@@ -283,9 +286,6 @@
+         GameLoop::getSingleton().addTask(mDebugVisualsManager, GameLoop::TG_GRAPHICS);
+         LOG_MESSAGE(Logger::CORE,&quot;DebugVisualsManager erzeugt&quot;);
+ 
+-        mSaveGameManager = new SaveGameManager();
+-        LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
+-
+         mJobScheduler = new JobScheduler();
+         GameLoop::getSingleton().addTask(mJobScheduler, GameLoop::TG_GRAPHICS);
+         LOG_MESSAGE(Logger::CORE,&quot;JobScheduler erzeugt&quot;);
+
+Modified: rl/trunk/engine/core/src/PlayAnimationJob.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PlayAnimationJob.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/src/PlayAnimationJob.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -23,7 +23,7 @@
+ namespace rl
+ {
+ 
+-    PlayAnimationJob::PlayAnimationJob(Actor* actor, const String&amp; anim, bool doLoop,
++	PlayAnimationJob::PlayAnimationJob(Actor* actor, const Ogre::String&amp; anim, bool doLoop,
+         bool replaceAllAnims)
+         : Job(false, true),
+           mActor(actor),
+
+Modified: rl/trunk/engine/core/src/PlaySoundJob.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PlaySoundJob.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/src/PlaySoundJob.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -25,7 +25,7 @@
+ namespace rl
+ {
+ 
+-    PlaySound2dJob::PlaySound2dJob(const String&amp; sound, Real volume, int priority)
++	PlaySound2dJob::PlaySound2dJob(const Ogre::String&amp; sound, Real volume, int priority)
+         : Job(false, true), mSound(NULL), mExecuted(false)
+     {
+         mSound = SoundManager::getSingleton().createSound(sound, ST_SAMPLE);
+@@ -52,7 +52,7 @@
+         return true;
+     }
+ 
+-    PlaySound3dJob::PlaySound3dJob(const String&amp; sound, const Ogre::Vector3&amp; pos, Real volume, int priority)
++	PlaySound3dJob::PlaySound3dJob(const Ogre::String&amp; sound, const Ogre::Vector3&amp; pos, Real volume, int priority)
+         : Job(false, true), mSound(NULL), mExecuted(false)
+     {
+         mSound = SoundManager::getSingleton().createSound(sound, ST_SAMPLE);
+
+Modified: rl/trunk/engine/core/src/SaveGameFileWriter.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/src/SaveGameFileWriter.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -71,11 +71,11 @@
+             this-&gt;processProperty(header, PropertyEntry(it_header-&gt;first.c_str(), it_header-&gt;second));
+         }
+ 
+-        //Write globals
+-        DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
+-        DOMElement* gameTime = appendChildElement(mDocument, globals, &quot;gametime&quot;);
+-        TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
+-        setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
++        ////Write globals
++        //DOMElement* globals = appendChildElement(mDocument, mDocument-&gt;getDocumentElement(), &quot;globals&quot;);
++        //DOMElement* gameTime = appendChildElement(mDocument, globals, &quot;gametime&quot;);
++        //TimeSource* gameTimeSource = TimeSourceManager::getSingleton().getTimeSource(TimeSource::GAMETIME);
++        //setAttributeValueAsInteger(gameTime, &quot;milliseconds&quot;, gameTimeSource-&gt;getClock());
+ 
+         for(SaveGameDataOrderMap::const_iterator data_iter = map.begin(); data_iter != map.end(); data_iter++)
+         {
+
+Modified: rl/trunk/engine/core/src/TimeSource.cpp
+===================================================================
+--- rl/trunk/engine/core/src/TimeSource.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/core/src/TimeSource.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -120,8 +120,14 @@
+ 
+     TimeSourceManager::TimeSourceManager()
+     {
++		SaveGameManager::getSingleton().registerSaveGameData(this);
+     }
+ 
++	TimeSourceManager::~TimeSourceManager()
++	{
++		SaveGameManager::getSingleton().unregisterSaveGameData(this);
++	}
++
+     void TimeSourceManager::registerTimeSource(TimeSource* ts)
+     {
+         mTimeSources[ts-&gt;getType()] = ts;
+@@ -141,4 +147,65 @@
+         return it-&gt;second;
+     }
+ 
++
++	CeGuiString TimeSourceManager::getXmlNodeIdentifier() const
++	{
++		return &quot;time_sources&quot;;
++	}
++
++	using namespace XERCES_CPP_NAMESPACE;
++
++    void TimeSourceManager::writeData(SaveGameFileWriter* writer)
++	{
++		DOMElement* timesources = writer-&gt;appendChildElement(writer-&gt;getDocument(), 
++			writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++
++		for(std::map&lt;TimeSource::TimeSourceType, TimeSource*&gt;::const_iterator it_time_sources = mTimeSources.begin(); 
++			it_time_sources != mTimeSources.end(); it_time_sources++)
++        {
++            DOMElement* timesource = writer-&gt;appendChildElement(writer-&gt;getDocument(), timesources, &quot;time_source&quot;);
++			writer-&gt;setAttributeValueAsInteger(timesource, &quot;ID&quot;, it_time_sources-&gt;first);
++			Property time((int)it_time_sources-&gt;second-&gt;getClock());
++
++            PropertyMap map;
++			map[&quot;time&quot;] = time;
++            writer-&gt;writeEachPropertyToElem(timesource, map);
++        } 
++	}
++
++	void TimeSourceManager::readData(SaveGameFileReader* reader)
++	{
++		reader-&gt;initializeXml();
++
++		DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++
++		if(rootNodeList-&gt;getLength())
++        {
++			DOMNodeList* xmlTimeSources = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;gameobject&quot;).data()); //there should be only one &quot;gameobjects&quot; node
++            if(xmlTimeSources-&gt;getLength())
++            {
++				for(XMLSize_t childIdx = 0; childIdx &lt; xmlTimeSources-&gt;getLength(); childIdx++)
++				{
++					DOMNode* xmlTimeSource = xmlTimeSources-&gt;item(childIdx);
++					if(xmlTimeSource-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++						TimeSource::TimeSourceType ID = (TimeSource::TimeSourceType)reader-&gt;getAttributeValueAsInteger(
++							static_cast&lt;DOMElement*&gt;(xmlTimeSource), &quot;ID&quot;);
++                        PropertyRecord properties = reader-&gt;getPropertiesAsRecord(static_cast&lt;DOMElement*&gt;(xmlTimeSource));
++	
++						std::map&lt;TimeSource::TimeSourceType, TimeSource*&gt;::const_iterator it_time_sources = mTimeSources.find(ID);
++						if(it_time_sources != mTimeSources.end())
++							it_time_sources-&gt;second-&gt;setClock(properties.toPropertyMap()[&quot;time&quot;].toInt());
++                    }
++				}
++			}
++		}
++
++		reader-&gt;shutdownXml();
++	}
++    
++    int TimeSourceManager::getPriority() const
++	{
++		return 10000;
++	}
+ }
+
+Modified: rl/trunk/engine/rules/src/GameObjectManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-02-20 21:35:25 UTC (rev 4073)
++++ rl/trunk/engine/rules/src/GameObjectManager.cpp	2008-02-20 23:57:22 UTC (rev 4074)
+@@ -333,9 +333,9 @@
+             DOMNodeList* xmlGameObjects = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;gameobject&quot;).data()); //there should be only one &quot;gameobjects&quot; node
+             if(xmlGameObjects-&gt;getLength())
+             {
+-                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlGameObjects-&gt;getLength(); childIdx1++)
++                for(XMLSize_t childIdx = 0; childIdx &lt; xmlGameObjects-&gt;getLength(); childIdx++)
+                 {
+-                    DOMNode* xmlGameObject = xmlGameObjects-&gt;item(childIdx1);
++                    DOMNode* xmlGameObject = xmlGameObjects-&gt;item(childIdx);
+                     if(xmlGameObject-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+                     {
+                         int ID = reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;ID&quot;);
+@@ -343,17 +343,17 @@
+                         GameObjectState state = (GameObjectState)reader-&gt;getAttributeValueAsInteger(static_cast&lt;DOMElement*&gt;(xmlGameObject), &quot;State&quot;);
+                         PropertyRecord properties = reader-&gt;getPropertiesAsRecord(static_cast&lt;DOMElement*&gt;(xmlGameObject));
+ 
+-						GameObject* object = NULL;
+-						if(getGameObject(ID) == NULL)
+-							object = createGameObject(classID, ID);
+-						else
+-							object = getGameObject(ID);
++                        GameObject* object = NULL;
++                        if(getGameObject(ID) == NULL)
++                            object = createGameObject(classID, ID);
++                        else
++                            object = getGameObject(ID);
+                         
+                         applyProperties(object, &amp;properties);
+                         // Placing the actor a a little bit higher in the scene. The actor will fall onto ground.
+                         // Avoiding problems with the physics, because the character the creature is transfixed to ground
+                         object-&gt;setProperty(GameObject::PROPERTY_POSITION, 
+-                            Property(object-&gt;getProperty(GameObject::PROPERTY_POSITION).toVector3() + Ogre::Vector3(0.0f,0.01f,0.0f)));
++	                        Property(object-&gt;getProperty(GameObject::PROPERTY_POSITION).toVector3() + Ogre::Vector3(0.0f,0.01f,0.0f)));
+                         object-&gt;setState(state);
+                     }
+                 }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001144.html">[Dsa-hl-svn] r4073 - in modules/common: gui/windows scripts
+</A></li>
+	<LI>Next message: <A HREF="001146.html">[Dsa-hl-svn] r4075 - in rl/trunk/engine: core/include core/src	ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1145">[ date ]</a>
+              <a href="thread.html#1145">[ thread ]</a>
+              <a href="subject.html#1145">[ subject ]</a>
+              <a href="author.html#1145">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

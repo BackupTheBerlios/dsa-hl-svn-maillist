@@ -1,0 +1,588 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4510 - rl/trunk/engine/script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4510%20-%20rl/trunk/engine/script/src&In-Reply-To=%3C200809162019.m8GKJj57000036%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001566.html">
+   <LINK REL="Next"  HREF="001568.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4510 - rl/trunk/engine/script/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4510%20-%20rl/trunk/engine/script/src&In-Reply-To=%3C200809162019.m8GKJj57000036%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4510 - rl/trunk/engine/script/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Sep 16 22:19:45 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001566.html">[Dsa-hl-svn] r4509 - rl/trunk/Mac
+</A></li>
+        <LI>Next message: <A HREF="001568.html">[Dsa-hl-svn] r4511 - in rl/trunk/engine: rules/include rules/src	script/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1567">[ date ]</a>
+              <a href="thread.html#1567">[ thread ]</a>
+              <a href="subject.html#1567">[ subject ]</a>
+              <a href="author.html#1567">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-09-16 22:19:44 +0200 (Tue, 16 Sep 2008)
+New Revision: 4510
+
+Modified:
+   rl/trunk/engine/script/src/EnvironmentProcessor.cpp
+   rl/trunk/engine/script/src/ZoneProcessor.cpp
+Log:
+
+
+Modified: rl/trunk/engine/script/src/EnvironmentProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/EnvironmentProcessor.cpp	2008-09-15 19:31:04 UTC (rev 4509)
++++ rl/trunk/engine/script/src/EnvironmentProcessor.cpp	2008-09-16 20:19:44 UTC (rev 4510)
+@@ -102,7 +102,7 @@
+ 	{
+         if (fogElem)
+         {
+-		    if (!hasAttribute(fogElem, &quot;material&quot;))
++		    if (!hasAttribute(fogElem, &quot;type&quot;))
+ 		    {
+ 			    LOG_ERROR(
+ 				    Logger::RULES,
+
+Modified: rl/trunk/engine/script/src/ZoneProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/ZoneProcessor.cpp	2008-09-15 19:31:04 UTC (rev 4509)
++++ rl/trunk/engine/script/src/ZoneProcessor.cpp	2008-09-16 20:19:44 UTC (rev 4510)
+@@ -1,230 +1,267 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;ZoneProcessor.h&quot;
+-
+-#include &quot;ActorManager.h&quot;
+-#include &quot;RulesConstants.h&quot;
+-#include &quot;ScriptSubsystem.h&quot;
+-#include &quot;Trigger.h&quot;
+-#include &quot;TriggerFactory.h&quot;
+-#include &quot;Zone.h&quot;
+-#include &quot;ZoneManager.h&quot;
+-
+-using namespace XERCES_CPP_NAMESPACE;
+-using namespace Ogre;
+-
+-namespace rl
+-{
+-
+-	bool ZoneProcessor::processNode(DOMElement* zonesElem, bool loadGameObjects)
+-	{
+-		if (zonesElem == NULL)
+-		{
+-			return false; // no zones
+-		}
+-
+-        for (DOMNode* cur = zonesElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
+-        {
+-            if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE
+-				&amp;&amp; hasNodeName(cur, &quot;zone&quot;))
+-            {
+-				DOMElement* curZoneElem = static_cast&lt;DOMElement*&gt;(cur);
+-				if (hasAttribute(curZoneElem, &quot;name&quot;))
+-				{
+-					Ogre::String name = getAttributeValueAsStdString(curZoneElem, &quot;name&quot;);
+-                    Zone* zone = NULL;
+-                    if( name == &quot;default&quot; )
+-                        zone = ZoneManager::getSingleton().getDefaultZone();
+-                    else
+-                    {
+-                        // get the zone with that name or create one
+-                        zone = ZoneManager::getSingleton().getZone(name);
+-                        if( !zone )
+-                            zone = ZoneManager::getSingleton().createZone(name, false);
+-
+-                        // multiple areas
+-                        for(DOMNode* curArea = cur-&gt;getFirstChild(); curArea != NULL; curArea = curArea-&gt;getNextSibling())
+-                        {
+-                            if( curArea-&gt;getNodeType() == DOMNode::ELEMENT_NODE
+-                                &amp;&amp; hasNodeName(curArea, &quot;area&quot;) )
+-                            {
+-                                DOMElement *curAreaElem = static_cast&lt;DOMElement*&gt;(curArea);
+-                                if( hasAttribute(curAreaElem, &quot;type&quot;) )
+-                                {
+-                                    // type
+-                                    Ogre::String type;
+-                                    type = getAttributeValueAsStdString(curAreaElem, &quot;type&quot;);
+-
+-                                    // add or subtract?
+-                                    bool subtract = false;
+-                                    if( hasAttribute(curAreaElem, &quot;subtract&quot;) )
+-                                        subtract = getAttributeValueAsBool(curAreaElem, &quot;subtract&quot;);
+-
+-                                    // position
+-                                    Vector3 position = Vector3::ZERO;
+-                                    DOMElement* positionElem = getChildNamed(curAreaElem, &quot;position&quot;);
+-                                    if( positionElem != NULL )
+-                                        position = getValueAsVector3(positionElem);
+-
+-                                    //scale, rotation, offset
+-                                    Vector3 scale = Vector3::UNIT_SCALE;
+-                                    DOMElement* scaleElem = getChildNamed(curAreaElem, &quot;scale&quot;);
+-                                    if( scaleElem != NULL )
+-                                        scale = getValueAsVector3(scaleElem);
+-
+-                                    Vector3 offset = Vector3::ZERO;
+-                                    DOMElement* offsetElem = getChildNamed(curAreaElem, &quot;offset&quot;);
+-                                    if( offsetElem != NULL )
+-                                        offset = getValueAsVector3(offsetElem);
+-
+-                                    Quaternion rotation = Quaternion::IDENTITY;
+-                                    DOMElement* rotationElem = getChildNamed(curAreaElem, &quot;rotation&quot;);
+-                                    if( rotationElem != NULL )
+-                                        rotation = getValueAsQuaternion(rotationElem);
+-
+-                                    //transition distance
+-                                    Real transitionDistance = 0;
+-                                    DOMElement* transitionElem = getChildNamed(curAreaElem, &quot;transition_distance&quot;);
+-                                    if( transitionElem != NULL )
+-                                        transitionDistance = getValueAsReal(transitionElem);
+-
+-					            
+-                                    if (type == &quot;mesh&quot;)
+-    					            {
+-                                        Ogre::String meshName;
+-                                        if( hasAttribute(curAreaElem, &quot;meshfile&quot;) )
+-                                        {
+-                                            meshName = getAttributeValueAsStdString(curAreaElem, &quot;meshfile&quot;);
+-                                            if( subtract )
+-                                                ZoneManager::getSingleton().subtractMeshAreaFromZone(name,
+-                                                    meshName, GT_CONVEXHULL, position, scale, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
+-                                            else
+-                                                ZoneManager::getSingleton().addMeshAreaToZone(name,
+-                                                    meshName, GT_CONVEXHULL, position, scale, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
+-                                        }
+-                                        else
+-                                            LOG_ERROR(Logger::SCRIPT, &quot;an &lt;area&gt; element with type=\&quot;mesh\&quot; must have attribute 'meshfile'&quot;);
+-                                    }
+-    					            else
+-                                    {
+-                                        GeometryType geom = GT_NONE;
+-                                        if (type == &quot;sphere&quot; )
+-                                            geom = GT_SPHERE;
+-                                        else if (type == &quot;box&quot; )
+-                                            geom = GT_BOX;
+-                                        else if (type == &quot;ellipsoid&quot; )
+-                                            geom = GT_ELLIPSOID;
+-                                        else if (type == &quot;pyramid&quot; )
+-                                            geom = GT_PYRAMID;
+-                                        else if (type == &quot;capsule&quot; )
+-                                            geom = GT_CAPSULE;
+-                                        else
+-                                        {
+-                                            LOG_ERROR(Logger::SCRIPT, &quot;Unknown area type '&quot; + type + &quot;' !&quot;);
+-                                        }
+-                                        if ( geom != GT_NONE )
+-                                        {
+-                                            Ogre::AxisAlignedBox aabb;
+-                                            aabb.setMinimum( - scale / 2.0f);
+-                                            aabb.setMaximum( + scale / 2.0f);
+-
+-                                            if( subtract )
+-                                                ZoneManager::getSingleton().subtractAreaFromZone(name,
+-                                                    aabb, geom, position, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
+-                                            else
+-                                                ZoneManager::getSingleton().addAreaToZone(name,
+-                                                    aabb, geom, position, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
+-                                        }
+-                                    }
+-                                }
+-                                else
+-                                {
+-                                    LOG_ERROR(Logger::SCRIPT, &quot;&lt;area&gt; elemt must have attribute 'type'&quot;);
+-                                }
+-                            }
+-                        }
+-                    }
+-
+-					if (zone != NULL)
+-					{
+-						for (DOMNode* cur = curZoneElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
+-						{
+-							if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-							{
+-								DOMElement* curElem = static_cast&lt;DOMElement*&gt;(cur);
+-								if (hasNodeName(curElem, &quot;light&quot;))
+-								{
+-									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-									zone-&gt;addLight(ActorManager::getSingleton().getActor(name));
+-								}
+-								else if (hasNodeName(curElem, &quot;sound&quot;))
+-								{
+-									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-									zone-&gt;addSound(name);
+-								}
+-								else if (hasNodeName(curElem, &quot;trigger&quot;))
+-								{
+-									Ogre::String classname =
+-										getAttributeValueAsStdString(curElem, &quot;classname&quot;);
+-
+-									Ogre::String name =
+-										getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-
+-									Trigger* trigger = ScriptSubsystem::getSingleton().getTriggerFactory()
+-										-&gt;createTrigger(classname, name);
+-
+-                                    // add trigger properties
+-                                    for( DOMNode* curProperty = cur-&gt;getFirstChild(); curProperty != NULL; curProperty = curProperty-&gt;getNextSibling() )
+-                                    {
+-                                        if( hasNodeName(curProperty, &quot;property&quot;) )
+-                                        {
+-                                            PropertyEntry propEntry = processProperty(static_cast&lt;DOMElement*&gt;(curProperty));
+-                                            if (propEntry.first != &quot;&quot;)
+-                                            {
+-                                                trigger-&gt;setProperty(propEntry.first, propEntry.second);
+-                                            }
+-                                        }
+-                                    }
+-
+-                                    zone-&gt;addTrigger(trigger);
+-								}
+-                                else if (hasNodeName(curElem, &quot;eaxpreset&quot;))
+-                                {
+-									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-                                    zone-&gt;setEaxPreset(name);
+-                                }
+-							}
+-						}
+-					}
+-					else
+-					{
+-						LOG_ERROR(Logger::SCRIPT, &quot;Zone named '&quot;+name+&quot;' could not be processes.&quot;);
+-					}
+-				}
+-				else
+-				{
+-					LOG_ERROR(Logger::SCRIPT, &quot;&lt;zone&gt; element must have attribute 'name'.&quot;);
+-				}
+-			}
+-		}
+-
+-        ZoneManager::getSingleton().update();
+-		return true;
+-	}
+-
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;ZoneProcessor.h&quot;
++
++#include &quot;ActorManager.h&quot;
++#include &quot;RulesConstants.h&quot;
++#include &quot;ScriptSubsystem.h&quot;
++#include &quot;Trigger.h&quot;
++#include &quot;TriggerFactory.h&quot;
++#include &quot;Zone.h&quot;
++#include &quot;ZoneManager.h&quot;
++
++using namespace XERCES_CPP_NAMESPACE;
++using namespace Ogre;
++
++namespace rl
++{
++
++	bool ZoneProcessor::processNode(DOMElement* zonesElem, bool loadGameObjects)
++	{
++		if (zonesElem == NULL)
++		{
++			return false; // no zones
++		}
++
++        for (DOMNode* cur = zonesElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
++        {
++            if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE
++				&amp;&amp; hasNodeName(cur, &quot;zone&quot;))
++            {
++				DOMElement* curZoneElem = static_cast&lt;DOMElement*&gt;(cur);
++				if (hasAttribute(curZoneElem, &quot;name&quot;))
++				{
++					Ogre::String name = getAttributeValueAsStdString(curZoneElem, &quot;name&quot;);
++                    Zone* zone = NULL;
++                    if (name == &quot;default&quot;)
++                    {
++                        zone = ZoneManager::getSingleton().getDefaultZone();
++                    }
++                    else
++                    {
++                        // get the zone with that name or create one
++                        zone = ZoneManager::getSingleton().getZone(name);
++                        if (!zone)
++                        {
++                            zone = ZoneManager::getSingleton().createZone(name, false);
++                        }
++
++                        // multiple areas
++                        for(DOMNode* curArea = cur-&gt;getFirstChild(); curArea != NULL; curArea = curArea-&gt;getNextSibling())
++                        {
++                            if (curArea-&gt;getNodeType() == DOMNode::ELEMENT_NODE
++                                &amp;&amp; hasNodeName(curArea, &quot;area&quot;))
++                            {
++                                DOMElement *curAreaElem = static_cast&lt;DOMElement*&gt;(curArea);
++                                if (hasAttribute(curAreaElem, &quot;type&quot;))
++                                {
++                                    // type
++                                    Ogre::String type;
++                                    type = getAttributeValueAsStdString(curAreaElem, &quot;type&quot;);
++
++                                    // add or subtract?
++                                    bool subtract = false;
++                                    if (hasAttribute(curAreaElem, &quot;subtract&quot;))
++                                    {
++                                        subtract = getAttributeValueAsBool(curAreaElem, &quot;subtract&quot;);
++                                    }
++
++                                    // position
++                                    Vector3 position = Vector3::ZERO;
++                                    DOMElement* positionElem = getChildNamed(curAreaElem, &quot;position&quot;);
++                                    if (positionElem)
++                                    {
++                                        position = getValueAsVector3(positionElem);
++                                    }
++
++                                    //scale, rotation, offset
++                                    Vector3 scale = Vector3::UNIT_SCALE;
++                                    DOMElement* scaleElem = getChildNamed(curAreaElem, &quot;scale&quot;);
++                                    if (!scaleElem)
++                                    {
++                                        scaleElem = getChildNamed(curAreaElem, &quot;size&quot;);
++                                    }
++                                    
++                                    if (scaleElem)
++                                    {
++                                        scale = getValueAsVector3(scaleElem);
++                                    }
++
++                                    Vector3 offset = Vector3::ZERO;
++                                    DOMElement* offsetElem = getChildNamed(curAreaElem, &quot;offset&quot;);
++                                    if (offsetElem)
++                                    {
++                                        offset = getValueAsVector3(offsetElem);
++                                    }
++
++                                    Quaternion rotation = Quaternion::IDENTITY;
++                                    DOMElement* rotationElem = getChildNamed(curAreaElem, &quot;rotation&quot;);
++                                    if (rotationElem)
++                                    {
++                                        rotation = getValueAsQuaternion(rotationElem);
++                                    }
++
++                                    //transition distance
++                                    Real transitionDistance = 0;
++                                    DOMElement* transitionElem = getChildNamed(curAreaElem, &quot;transition_distance&quot;);
++                                    if (transitionElem)
++                                    {
++                                        transitionDistance = getValueAsReal(transitionElem);
++                                    }
++					            
++                                    if (type == &quot;mesh&quot;)
++    					            {
++                                        Ogre::String meshName;
++                                        if (hasAttribute(curAreaElem, &quot;meshfile&quot;))
++                                        {
++                                            meshName = getAttributeValueAsStdString(curAreaElem, &quot;meshfile&quot;);
++                                            if (subtract)
++                                            {
++                                                ZoneManager::getSingleton().subtractMeshAreaFromZone(name,
++                                                    meshName, GT_CONVEXHULL, position, scale, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
++                                            }
++                                            else
++                                            {
++                                                ZoneManager::getSingleton().addMeshAreaToZone(name,
++                                                    meshName, GT_CONVEXHULL, position, scale, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
++                                            }
++                                        }
++                                        else
++                                        {
++                                            LOG_ERROR(Logger::SCRIPT, &quot;an &lt;area&gt; element with type=\&quot;mesh\&quot; must have attribute 'meshfile'&quot;);
++                                        }
++                                    }
++    					            else
++                                    {
++                                        GeometryType geom = GT_NONE;
++                                        if (type == &quot;sphere&quot;)
++                                        {
++                                            geom = GT_SPHERE;
++                                        }
++                                        else if (type == &quot;box&quot;)
++                                        {
++                                            geom = GT_BOX;
++                                        }
++                                        else if (type == &quot;ellipsoid&quot;)
++                                        {
++                                            geom = GT_ELLIPSOID;
++                                        }
++                                        else if (type == &quot;pyramid&quot;)
++                                        {
++                                            geom = GT_PYRAMID;
++                                        }
++                                        else if (type == &quot;capsule&quot;)
++                                        {
++                                            geom = GT_CAPSULE;
++                                        }
++                                        else
++                                        {
++                                            LOG_ERROR(Logger::SCRIPT, &quot;Unknown area type '&quot; + type + &quot;' !&quot;);
++                                        }
++                                        
++                                        if ( geom != GT_NONE)
++                                        {
++                                            Ogre::AxisAlignedBox aabb;
++                                            aabb.setMinimum( - scale / 2.0f);
++                                            aabb.setMaximum( + scale / 2.0f);
++
++                                            if (subtract)
++                                                ZoneManager::getSingleton().subtractAreaFromZone(name,
++                                                    aabb, geom, position, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
++                                            else
++                                                ZoneManager::getSingleton().addAreaToZone(name,
++                                                    aabb, geom, position, offset, rotation, transitionDistance, QUERYFLAG_PLAYER);
++                                        }
++                                    }
++                                }
++                                else
++                                {
++                                    LOG_ERROR(Logger::SCRIPT, &quot;&lt;area&gt; elemt must have attribute 'type'&quot;);
++                                }
++                            }
++                        }
++                    }
++
++					if (zone)
++					{
++						for (DOMNode* cur = curZoneElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
++						{
++							if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++							{
++								DOMElement* curElem = static_cast&lt;DOMElement*&gt;(cur);
++								if (hasNodeName(curElem, &quot;light&quot;))
++								{
++									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
++									zone-&gt;addLight(ActorManager::getSingleton().getActor(name));
++								}
++								else if (hasNodeName(curElem, &quot;sound&quot;))
++								{
++									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
++									zone-&gt;addSound(name);
++								}
++								else if (hasNodeName(curElem, &quot;trigger&quot;))
++								{
++									Ogre::String classname =
++										getAttributeValueAsStdString(curElem, &quot;classname&quot;);
++
++									Ogre::String name =
++										getAttributeValueAsStdString(curElem, &quot;name&quot;);
++
++									Trigger* trigger = ScriptSubsystem::getSingleton().getTriggerFactory()
++										-&gt;createTrigger(classname, name);
++
++                                    // add trigger properties
++                                    for( DOMNode* curProperty = cur-&gt;getFirstChild(); curProperty != NULL; curProperty = curProperty-&gt;getNextSibling())
++                                    {
++                                        if (hasNodeName(curProperty, &quot;property&quot;))
++                                        {
++                                            PropertyEntry propEntry = processProperty(static_cast&lt;DOMElement*&gt;(curProperty));
++                                            if (propEntry.first != &quot;&quot;)
++                                            {
++                                                trigger-&gt;setProperty(propEntry.first, propEntry.second);
++                                            }
++                                        }
++                                    }
++
++                                    zone-&gt;addTrigger(trigger);
++								}
++                                else if (hasNodeName(curElem, &quot;eaxpreset&quot;))
++                                {
++									Ogre::String name = getAttributeValueAsStdString(curElem, &quot;name&quot;);
++                                    zone-&gt;setEaxPreset(name);
++                                }
++							}
++						}
++					}
++					else
++					{
++						LOG_ERROR(Logger::SCRIPT, &quot;Zone named '&quot;+name+&quot;' could not be processes.&quot;);
++					}
++				}
++				else
++				{
++					LOG_ERROR(Logger::SCRIPT, &quot;&lt;zone&gt; element must have attribute 'name'.&quot;);
++				}
++			}
++		}
++
++        ZoneManager::getSingleton().update();
++		return true;
++	}
++
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001566.html">[Dsa-hl-svn] r4509 - rl/trunk/Mac
+</A></li>
+	<LI>Next message: <A HREF="001568.html">[Dsa-hl-svn] r4511 - in rl/trunk/engine: rules/include rules/src	script/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1567">[ date ]</a>
+              <a href="thread.html#1567">[ thread ]</a>
+              <a href="subject.html#1567">[ subject ]</a>
+              <a href="author.html#1567">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

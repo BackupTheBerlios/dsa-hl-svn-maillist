@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4430 - in rl/trunk/engine: core/src rules/src	script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4430%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%0A%09script/src&In-Reply-To=%3C200807030716.m637Gtao010501%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001500.html">
+   <LINK REL="Next"  HREF="001502.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4430 - in rl/trunk/engine: core/src rules/src	script/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4430%20-%20in%20rl/trunk/engine%3A%20core/src%20rules/src%0A%09script/src&In-Reply-To=%3C200807030716.m637Gtao010501%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4430 - in rl/trunk/engine: core/src rules/src	script/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Thu Jul  3 09:16:55 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001500.html">[Dsa-hl-svn] r4429 - in modules/kanalisation: maps materials models	scripts sound
+</A></li>
+        <LI>Next message: <A HREF="001502.html">[Dsa-hl-svn] r4431 - in modules/kanalisation: maps materials scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1501">[ date ]</a>
+              <a href="thread.html#1501">[ thread ]</a>
+              <a href="subject.html#1501">[ subject ]</a>
+              <a href="author.html#1501">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-07-03 09:16:51 +0200 (Thu, 03 Jul 2008)
+New Revision: 4430
+
+Modified:
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/rules/src/GameObject.cpp
+   rl/trunk/engine/script/src/Scene.cpp
+Log:
+- fixed a crash when returning to scene
+- started with caching the state of scenes
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2008-07-02 21:39:21 UTC (rev 4429)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2008-07-03 07:16:51 UTC (rev 4430)
+@@ -136,9 +136,12 @@
+     {
+         for(ZoneMap::iterator it = mZones.begin(); it != mZones.end(); )
+         {
++            if( isZoneActive(it-&gt;second) )
++                mActiveZones.remove(it-&gt;second);
+             destroyZone((it++)-&gt;first);
+         }
+         mZones.clear();
++        mZonesIdMap.clear();
+ 
+         std::list&lt;Zone*&gt;::iterator it = mZonesToDelete.begin();
+         for( ; it != mZonesToDelete.end(); it++)
+
+Modified: rl/trunk/engine/rules/src/GameObject.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GameObject.cpp	2008-07-02 21:39:21 UTC (rev 4429)
++++ rl/trunk/engine/rules/src/GameObject.cpp	2008-07-03 07:16:51 UTC (rev 4430)
+@@ -42,6 +42,7 @@
+     const Ogre::String GameObject::CLASS_NAME = &quot;GameObject&quot;;
+ 
+     const Ogre::String GameObject::PROPERTY_CLASS_ID = &quot;classid&quot;;
++    const Ogre::String GameObject::PROPERTY_OBJECT_ID = &quot;id&quot;;
+     const Ogre::String GameObject::PROPERTY_BASE_CLASS = &quot;baseclass&quot;;
+     const Ogre::String GameObject::PROPERTY_POSITION = &quot;position&quot;;
+     const Ogre::String GameObject::PROPERTY_SCENE = &quot;scene&quot;;
+
+Modified: rl/trunk/engine/script/src/Scene.cpp
+===================================================================
+--- rl/trunk/engine/script/src/Scene.cpp	2008-07-02 21:39:21 UTC (rev 4429)
++++ rl/trunk/engine/script/src/Scene.cpp	2008-07-03 07:16:51 UTC (rev 4430)
+@@ -70,7 +70,12 @@
+             GameObject* cur = *it;
+             if (cur-&gt;getState() == GOS_LOADED || cur-&gt;getState() == GOS_IN_SCENE)
+             {
+-                goProps.push_back(cur-&gt;getAllProperties()-&gt;toPropertyMap());
++                //Todo....
++                PropertyMap map;
++                map[GameObject::PROPERTY_CLASS_ID] = cur-&gt;getClassId();
++                map[GameObject::PROPERTY_OBJECT_ID] = cur-&gt;getId();
++                goProps.push_back(map);
++                //goProps.push_back(cur-&gt;getAllProperties()-&gt;toPropertyMap());
+             }
+         }
+ 
+@@ -96,8 +101,8 @@
+             {
+                 PropertyRecord cur(it-&gt;toMap());
+                 GameObject* go = GameObjectManager::getSingleton().createGameObject(
+-                    cur.getProperty(GameObject::PROPERTY_BASE_CLASS).toString(),
+-                    cur.getProperty(GameObject::PROPERTY_CLASS_ID).toInt());
++                    cur.getProperty(GameObject::PROPERTY_CLASS_ID).toString(),
++                    cur.getProperty(GameObject::PROPERTY_OBJECT_ID).toInt());
+             }
+         }
+         else
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001500.html">[Dsa-hl-svn] r4429 - in modules/kanalisation: maps materials models	scripts sound
+</A></li>
+	<LI>Next message: <A HREF="001502.html">[Dsa-hl-svn] r4431 - in modules/kanalisation: maps materials scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1501">[ date ]</a>
+              <a href="thread.html#1501">[ thread ]</a>
+              <a href="subject.html#1501">[ subject ]</a>
+              <a href="author.html#1501">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

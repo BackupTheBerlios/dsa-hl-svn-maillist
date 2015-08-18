@@ -1,0 +1,300 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3747 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3747%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708261012.l7QACDgW016165%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000817.html">
+   <LINK REL="Next"  HREF="000819.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3747 - in rl/trunk/engine/ui: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3747%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200708261012.l7QACDgW016165%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3747 - in rl/trunk/engine/ui: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Aug 26 12:12:13 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000817.html">[Dsa-hl-svn] r3746 - in modules: common/dsa common/scripts	regressiontest/dsa
+</A></li>
+        <LI>Next message: <A HREF="000819.html">[Dsa-hl-svn] r3748 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#818">[ date ]</a>
+              <a href="thread.html#818">[ thread ]</a>
+              <a href="subject.html#818">[ subject ]</a>
+              <a href="author.html#818">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-26 12:12:02 +0200 (Sun, 26 Aug 2007)
+New Revision: 3747
+
+Modified:
+   rl/trunk/engine/ui/include/AbstractWindow.h
+   rl/trunk/engine/ui/include/ContainerContentWindow.h
+   rl/trunk/engine/ui/include/InventoryWindow.h
+   rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+   rl/trunk/engine/ui/src/InventoryWindow.cpp
+   rl/trunk/engine/ui/src/WindowFactory.cpp
+Log:
+improved behaviour of InventoryWindow and ContainerContentWindow
+
+Modified: rl/trunk/engine/ui/include/AbstractWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/AbstractWindow.h	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/include/AbstractWindow.h	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -105,7 +105,7 @@
+ 		const CeGuiString&amp; getNamePrefix() const;
+ 		
+ 		void centerWindow();
+-		bool destroyWindow();		
++		virtual bool destroyWindow();		
+ 		bool hideWindow();
+ 
+ 		void bindDestroyWindowToClick(CEGUI::Window* button);
+
+Modified: rl/trunk/engine/ui/include/ContainerContentWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/include/ContainerContentWindow.h	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -19,21 +19,28 @@
+ 
+ #include &quot;UiPrerequisites.h&quot;
+ #include &quot;AbstractWindow.h&quot;
++#include &quot;InventoryWindow.h&quot;
+ 
+ namespace rl {
+ 
+ 	class Container;
+ 	class Item;
+ 	
++    /// this class is intended to be used with a inventorywindow
+ 	class _RlUiExport ContainerContentWindow :
+ 		public AbstractWindow
+ 	{
+ 	public:
+-		ContainerContentWindow(Container* container);
++		ContainerContentWindow(Container* container, InventoryWindow* parent);
++        void doDestroyWindow();
+ 
++    protected:
++        bool destroyWindow();
++
+ 	private:
+ 		CEGUI::Window* mContentWindow;
+ 		Container* mContainer;
++        InventoryWindow* mInventoryWindow;
+ 
+ 		static int sItemCount;
+ 
+
+Modified: rl/trunk/engine/ui/include/InventoryWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/include/InventoryWindow.h	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -26,6 +26,8 @@
+ namespace rl {
+ 
+ 	class CameraObject;
++    class Container;
++    class ContainerContentWindow;
+     class Inventory;
+ 	class Item;
+ 	class ItemDragContainer;
+@@ -39,6 +41,12 @@
+ 		InventoryWindow(const Ogre::String&amp; inventoryWindow, Inventory* inventory);
+ 		~InventoryWindow();
+ 
++        void showContainerContent(Container* container);
++        void notifyContainerContentWindowClosed(Container* container); // no error if not found!
++
++    protected:
++        bool destroyWindow();
++
+     private:
+ 		typedef std::map&lt;CeGuiString, ItemDragContainer*&gt; DndContainerMap;
+ 
+@@ -64,6 +72,8 @@
+ 		Ogre::Rectangle getCeGuiRectFromWorldAABB(
+ 			CameraObject* camera,
+ 			const Ogre::AxisAlignedBox&amp; aabb) const;
++        typedef std::map&lt;Container*, ContainerContentWindow*&gt; ContainerMap;
++        ContainerMap mOpenContainerMap;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/ui/src/ContainerContentWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/src/ContainerContentWindow.cpp	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -25,6 +25,7 @@
+ 
+ #include &quot;Container.h&quot;
+ #include &quot;Inventory.h&quot;
++#include &quot;InventoryWindow.h&quot;
+ #include &quot;ItemIconDragContainer.h&quot;
+ #include &quot;WindowFactory.h&quot;
+ 
+@@ -34,9 +35,10 @@
+ 
+ 	int ContainerContentWindow::sItemCount = 0;
+ 
+-	ContainerContentWindow::ContainerContentWindow(Container* container)
++	ContainerContentWindow::ContainerContentWindow(Container* container, InventoryWindow* parent)
+ 		: AbstractWindow(&quot;containercontentwindow.xml&quot;, WIT_MOUSE_INPUT),
+-		mContainer(container)
++		mContainer(container),
++        mInventoryWindow(parent)
+ 	{
+ 		mContentWindow = getWindow(&quot;ContainerContentWindow/Content&quot;);
+ 		mContentWindow-&gt;setUserData(container);
+@@ -56,9 +58,21 @@
+ 		initializeContent();
+ 
+ 		bindDestroyWindowToXButton();
+-		centerWindow();
+ 	}
+ 
++    bool ContainerContentWindow::destroyWindow()
++    {
++        if( mInventoryWindow )
++            mInventoryWindow-&gt;notifyContainerContentWindowClosed(mContainer);
++
++        return AbstractWindow::destroyWindow();
++    }
++
++    void ContainerContentWindow::doDestroyWindow()
++    {
++        destroyWindow();
++    }
++
+ 	void ContainerContentWindow::initializeContent()
+ 	{
+ 		ItemSet items = mContainer-&gt;getItems();
+
+Modified: rl/trunk/engine/ui/src/InventoryWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/src/InventoryWindow.cpp	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -27,6 +27,7 @@
+ #include &quot;ActorManager.h&quot;
+ #include &quot;CameraObject.h&quot;
+ #include &quot;Container.h&quot;
++#include &quot;ContainerContentWindow.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;Inventory.h&quot;
+ #include &quot;Item.h&quot;
+@@ -52,7 +53,7 @@
+ 		mWorldBackground = getWindow(&quot;InventoryWindow/Background&quot;);
+         getWindow(&quot;InventoryWindow&quot;)-&gt;subscribeEvent(FrameWindow::EventCloseClicked,
+ 			boost::bind(&amp;InventoryWindow::destroyWindow, this));
+-        mWorldBackground-&gt;setZOrderingEnabled(false);
++        //mWorldBackground-&gt;setZOrderingEnabled(false);
+ 
+         createSlotWindows(inventory);
+         initInventoryWindow(inventory);
+@@ -451,4 +452,43 @@
+         Ogre::Rectangle rval = {left,top, right, bottom};
+         return rval;
+     }
++
++    void InventoryWindow::showContainerContent(Container* container)
++    {
++        ContainerMap::iterator iter = mOpenContainerMap.find(container);
++        if( iter == mOpenContainerMap.end() )
++        {
++            ContainerContentWindow* wnd = new ContainerContentWindow(container, this);
++            mOpenContainerMap.insert(make_pair(container, wnd));
++            mWorldBackground-&gt;addChildWindow(wnd-&gt;getWindow());
++            wnd-&gt;setVisible(true);
++        }
++        else
++        {
++            iter-&gt;second-&gt;setVisible(true);
++            iter-&gt;second-&gt;getWindow()-&gt;moveToFront();
++        }
++    }
++
++    bool InventoryWindow::destroyWindow()
++    {
++        ContainerMap::iterator iter = mOpenContainerMap.begin();
++        for( ; iter != mOpenContainerMap.end(); iter++)
++        {
++            if( iter-&gt;second != NULL )
++                iter-&gt;second-&gt;doDestroyWindow();
++        }
++        mOpenContainerMap.erase(mOpenContainerMap.begin(), mOpenContainerMap.end());
++
++        return AbstractWindow::destroyWindow();
++    }
++
++    void InventoryWindow::notifyContainerContentWindowClosed(Container* container)
++    {
++        ContainerMap::iterator iter = mOpenContainerMap.find(container);
++        if( iter != mOpenContainerMap.end() )
++        {
++            mOpenContainerMap.erase(iter);
++        }
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/WindowFactory.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFactory.cpp	2007-08-25 21:40:21 UTC (rev 3746)
++++ rl/trunk/engine/ui/src/WindowFactory.cpp	2007-08-26 10:12:02 UTC (rev 3747)
+@@ -25,7 +25,6 @@
+ #include &quot;CloseConfirmationWindow.h&quot;
+ #include &quot;CombatWindow.h&quot;
+ #include &quot;Console.h&quot;
+-#include &quot;ContainerContentWindow.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;DebugWindow.h&quot;
+ #include &quot;DialogCharacter.h&quot;
+@@ -137,7 +136,10 @@
+ 
+     void WindowFactory::showContainerContent(Container* container)
+     {
+-        (new ContainerContentWindow(container))-&gt;setVisible(true);
++        if( !mInventoryWindow )
++            toggleInventoryWindow();
++
++        mInventoryWindow-&gt;showContainerContent(container);
+     }
+ 
+     void WindowFactory::showMessageWindow(const CeGuiString&amp; message)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000817.html">[Dsa-hl-svn] r3746 - in modules: common/dsa common/scripts	regressiontest/dsa
+</A></li>
+	<LI>Next message: <A HREF="000819.html">[Dsa-hl-svn] r3748 - modules/common/gui/windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#818">[ date ]</a>
+              <a href="thread.html#818">[ thread ]</a>
+              <a href="subject.html#818">[ subject ]</a>
+              <a href="author.html#818">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

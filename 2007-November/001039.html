@@ -1,0 +1,298 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3968 - in modules/common/scripts: . triggers
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3968%20-%20in%20modules/common/scripts%3A%20.%20triggers&In-Reply-To=%3C200711052300.lA5N0Tpu006852%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001038.html">
+   <LINK REL="Next"  HREF="001040.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3968 - in modules/common/scripts: . triggers</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3968%20-%20in%20modules/common/scripts%3A%20.%20triggers&In-Reply-To=%3C200711052300.lA5N0Tpu006852%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3968 - in modules/common/scripts: . triggers">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Nov  6 00:00:29 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001038.html">[Dsa-hl-svn] r3967 - in rl/trunk/engine: core/include core/src	script script/include script/src script/swig
+</A></li>
+        <LI>Next message: <A HREF="001040.html">[Dsa-hl-svn] r3969 - rl/trunk/engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1039">[ date ]</a>
+              <a href="thread.html#1039">[ thread ]</a>
+              <a href="subject.html#1039">[ subject ]</a>
+              <a href="author.html#1039">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-11-06 00:00:17 +0100 (Tue, 06 Nov 2007)
+New Revision: 3968
+
+Added:
+   modules/common/scripts/triggers/limitedtimestrigger.rb
+Modified:
+   modules/common/scripts/areahelper.rb
+   modules/common/scripts/initialize_factories.rb
+   modules/common/scripts/triggers/test.rb
+Log:
+-adapted scripts for saving/restoring triggers
+
+Modified: modules/common/scripts/areahelper.rb
+===================================================================
+--- modules/common/scripts/areahelper.rb	2007-11-05 22:58:53 UTC (rev 3967)
++++ modules/common/scripts/areahelper.rb	2007-11-05 23:00:17 UTC (rev 3968)
+@@ -1,85 +1,5 @@
++require &quot;triggers/limitedtimestrigger.rb&quot;
+ 
+-# a trigger, that saves an command the appropriate zone and deletes it when finished
+-class LimitedTimesTrigger &lt; Trigger
+-  def initialize(name)
+-    super(name);
+-    @_prop_enter_command = nil;
+-    @_prop_leave_command = nil;
+-    @_prop_zone = &quot;&quot;;
+-    @_prop_number = 0; # 0 infty, -1 once, -2 deactivated
+-  end
+-  def setEnterCode(&amp;code)
+-    @_prop_enter_command = code
+-  end
+-  def setLeaveCode(&amp;code)
+-    @_prop_leave_command = code
+-  end
+-
+-  def activate()
+-    if ( @_prop_number &gt; 0 )
+-      @_prop_number = @_prop_number - 1;
+-      if (@_prop_number == 0 )
+-        @_prop_number = -1;
+-      end
+-    end
+-    
+-    if( @_prop_number &gt;= -1 )
+-      unless ( @_prop_enter_command == nil )
+-        begin
+-          @_prop_enter_command.call
+-        rescue StandardError =&gt; se
+-          $SCRIPT.logError(se.to_s)
+-        end
+-      end
+-    end
+-    return false
+-  end
+-  def deactivate()
+-    if( @_prop_number &gt;= -1 )
+-      unless ( @_prop_leave_command == nil )
+-        begin
+-          @_prop_leave_command.call
+-        rescue StandardError =&gt; se
+-          $SCRIPT.logError(se.to_s)
+-        end
+-      end
+-    end
+-
+-    if ( @_prop_number == -1 )
+-      @_prop_number = -2
+-      unless ( @_prop_zone == &quot;&quot; )
+-        ZoneManager.getSingleton().destroyZone(@_prop_zone)
+-      end
+-      return true
+-    end
+-    return false
+-  end
+-  def setProperty(name, value)
+-    if (name == &quot;number&quot;)
+-      @_prop_number = value;
+-    elsif (name == &quot;zone&quot;)
+-      @_prop_zone = value
+-    else
+-      super(name, value)
+-    end
+-  end
+-  def getProperty(name)
+-    if (name == &quot;zone&quot;)
+-      return @_prop_zone
+-    elsif (name == &quot;number&quot;)
+-      return @_prop_number
+-    else
+-      super(name)
+-    end
+-  end
+-  def getAllProperties()
+-    ps = super();
+-    ps.setProperty(&quot;zone&quot;, @_prop_zone)
+-    ps.setProperty(&quot;number&quot;, @_prop_number)
+-    return ps
+-  end
+-end
+-
+ # creates a zone with a trigger, that is destroyed if actived 'times' of times
+ # Example: _CreateLimitedTimesTrigger(&quot;uniquename&quot;, PhysicsManager::GT_SPHERE, [-20,0,5], [1,0,0,0], [2,2,2], 5, Proc.new{print &quot;entered&quot;}, Proc.new{print &quot;left&quot;})
+ def _CreateLimitedTimesTrigger(name, geom_type, pos, orientation, size, times, enter_proc, leave_proc = nil)
+@@ -88,7 +8,7 @@
+   end
+ 
+   trigger = $SCRIPT.getTriggerFactory().createTrigger(&quot;LimitedTimesTrigger&quot;, &quot;limitedTimeTrigger_&quot; + name);
+-  zone = ZoneManager.getSingleton().createZone(&quot;limitedTimesTriggerZone_&quot; + name);
++  zone = ZoneManager.getSingleton().createZone(&quot;limitedTimesTriggerZone_&quot; + name, true);
+   ZoneManager.getSingleton().addAreaToZone(
+     &quot;limitedTimesTriggerZone_&quot; + name, 
+     size, geom_type, pos, [0,0,0], orientation, 0.2, RlScript::QUERYFLAG_PLAYER);
+
+Modified: modules/common/scripts/initialize_factories.rb
+===================================================================
+--- modules/common/scripts/initialize_factories.rb	2007-11-05 22:58:53 UTC (rev 3967)
++++ modules/common/scripts/initialize_factories.rb	2007-11-05 23:00:17 UTC (rev 3968)
+@@ -1,5 +1,6 @@
+ load &quot;effects/ruestung.rb&quot;
+ load &quot;triggers/test.rb&quot;
++load &quot;triggers/limitedtimestrigger.rb&quot;
+ 
+ class RubyClassFactory &lt; UnifiedFactory
+   def initialize()
+@@ -15,7 +16,7 @@
+   end
+ 
+   def createTrigger(classname, name)
+-    return Module.const_get(classname).new(name);
++    return Module.const_get(classname).new(classname, name);
+   end
+ 
+   def createEffect(classname, stufe)
+
+Added: modules/common/scripts/triggers/limitedtimestrigger.rb
+===================================================================
+--- modules/common/scripts/triggers/limitedtimestrigger.rb	2007-11-05 22:58:53 UTC (rev 3967)
++++ modules/common/scripts/triggers/limitedtimestrigger.rb	2007-11-05 23:00:17 UTC (rev 3968)
+@@ -0,0 +1,82 @@
++# this trigger is intended to be used by areahelper
++# a trigger, that saves an command the appropriate zone and deletes it when finished
++class LimitedTimesTrigger &lt; Trigger
++  def initialize(classname, name)
++    super(classname, name, true);
++    @_prop_enter_command = nil;
++    @_prop_leave_command = nil;
++    @_prop_zone = &quot;&quot;;
++    @_prop_number = 0; # 0 infty, -1 once, -2 deactivated
++  end
++  def setEnterCode(&amp;code)
++    @_prop_enter_command = code
++  end
++  def setLeaveCode(&amp;code)
++    @_prop_leave_command = code
++  end
++
++  def activate()
++    if ( @_prop_number &gt; 0 )
++      @_prop_number = @_prop_number - 1;
++      if (@_prop_number == 0 )
++        @_prop_number = -1;
++      end
++    end
++    
++    if( @_prop_number &gt;= -1 )
++      unless ( @_prop_enter_command == nil )
++        begin
++          @_prop_enter_command.call
++        rescue StandardError =&gt; se
++          $SCRIPT.logError(se.to_s)
++        end
++      end
++    end
++    return false
++  end
++  def deactivate()
++    if( @_prop_number &gt;= -1 )
++      unless ( @_prop_leave_command == nil )
++        begin
++          @_prop_leave_command.call
++        rescue StandardError =&gt; se
++          $SCRIPT.logError(se.to_s)
++        end
++      end
++    end
++
++    if ( @_prop_number == -1 )
++      @_prop_number = -2
++      unless ( @_prop_zone == &quot;&quot; )
++        ZoneManager.getSingleton().destroyZone(@_prop_zone)
++      end
++      return true
++    end
++    return false
++  end
++  def setProperty(name, value)
++    if (name == &quot;number&quot;)
++      @_prop_number = value;
++    elsif (name == &quot;zone&quot;)
++      @_prop_zone = value
++    else
++      super(name, value)
++    end
++  end
++  def getProperty(name)
++    if (name == &quot;zone&quot;)
++      return @_prop_zone
++    elsif (name == &quot;number&quot;)
++      return @_prop_number
++    else
++      super(name)
++    end
++  end
++  def getAllProperties()
++    ps = super();
++    ps.setProperty(&quot;zone&quot;, @_prop_zone)
++    ps.setProperty(&quot;number&quot;, @_prop_number)
++    return ps
++  end
++end
++
+
+Modified: modules/common/scripts/triggers/test.rb
+===================================================================
+--- modules/common/scripts/triggers/test.rb	2007-11-05 22:58:53 UTC (rev 3967)
++++ modules/common/scripts/triggers/test.rb	2007-11-05 23:00:17 UTC (rev 3968)
+@@ -1,6 +1,6 @@
+ class TestTrigger &lt; Trigger
+-  def initialize(name)
+-    super(name);
++  def initialize(classname, name)
++    super(classname, name, false);
+     @_prop_text = &quot;&lt;See your ad here!&gt;&quot;;
+   end
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001038.html">[Dsa-hl-svn] r3967 - in rl/trunk/engine: core/include core/src	script script/include script/src script/swig
+</A></li>
+	<LI>Next message: <A HREF="001040.html">[Dsa-hl-svn] r3969 - rl/trunk/engine/script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1039">[ date ]</a>
+              <a href="thread.html#1039">[ thread ]</a>
+              <a href="subject.html#1039">[ subject ]</a>
+              <a href="author.html#1039">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

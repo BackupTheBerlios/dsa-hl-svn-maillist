@@ -1,0 +1,179 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4034 - in rl/trunk/engine: rules/src ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4034%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/src&In-Reply-To=%3C200712192147.lBJLlmPK024658%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001104.html">
+   <LINK REL="Next"  HREF="001106.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4034 - in rl/trunk/engine: rules/src ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4034%20-%20in%20rl/trunk/engine%3A%20rules/src%20ui/src&In-Reply-To=%3C200712192147.lBJLlmPK024658%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4034 - in rl/trunk/engine: rules/src ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Dec 19 22:47:48 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001104.html">[Dsa-hl-svn] r4033 - in modules/common/scripts: . triggers
+</A></li>
+        <LI>Next message: <A HREF="001106.html">[Dsa-hl-svn] r4035 - in rl/trunk/engine: common/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1105">[ date ]</a>
+              <a href="thread.html#1105">[ thread ]</a>
+              <a href="subject.html#1105">[ subject ]</a>
+              <a href="author.html#1105">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-12-19 22:47:41 +0100 (Wed, 19 Dec 2007)
+New Revision: 4034
+
+Modified:
+   rl/trunk/engine/rules/src/CreatureController.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+enable char to move forward/backward while jumping (Hochsprung)
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-12-19 19:31:48 UTC (rev 4033)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-12-19 21:47:41 UTC (rev 4034)
+@@ -753,7 +753,7 @@
+     class Hochsprung : public AbstractMovement
+     {
+     public:
+-        Hochsprung(CreatureController *creature) : AbstractMovement(creature), mState(DOWN), mHeight(0), mJumpNow(false), mTimer(0) {}
++        Hochsprung(CreatureController *creature) : AbstractMovement(creature), mState(DOWN), mHeight(0), mJumpNow(false), mTimer(0), mMoveForward(0) {}
+         virtual CreatureController::MovementType getId() const {return CreatureController::MT_HOCHSPRUNG;}
+         virtual CreatureController::MovementType getFallBackMovement() const {return CreatureController::MT_STEHEN;}
+         virtual void activate()
+@@ -843,12 +843,34 @@
+                     0);
+                 mMovingCreature-&gt;setAbstractLocation( CreatureController::AL_AIRBORNE );
+             }
++            else if (mState == UP &amp;&amp; mMoveForward != 0) // try to move forward, if wanted
++            {
++                // low velocity towards this direction
++                if(mMoveForward &gt; 0)
++                    mMoveForward = 1.0;
++                else
++                    mMoveForward = -1.0;
+ 
++
++
++                Real mass;
++                Vector3 inertia;
++                OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
++                body-&gt;getMassMatrix(mass, inertia);
++
++                Vector3 vel = mMovingCreature-&gt;getVelocity();
++                Real delay = 0.05;//(2 * PhysicsManager::getSingleton().getMaxTimestep());
++                Real diff = (mMoveForward - vel.z);
++                force.z += mass * diff / delay;
++            }
++
+             Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
+             torque = -omega / PhysicsManager::getSingleton().getMaxTimestep() * 2 * mass;
+         }
+         virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
++            mMoveForward = direction.z;
++
+             if( mState == DOWN )
+             {
+                 mMovingCreature-&gt;setMovement(CreatureController::MT_STEHEN, direction, rotation);
+@@ -892,10 +914,10 @@
+         virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+         {
+             Vector3 oldDirection(direction);
+-            direction.z = direction.x = 0;
++            direction.x = 0;
+             if(direction.y &lt; 0)
+                 direction.y = 0;
+-            return oldDirection.x == 0 &amp;&amp; oldDirection.z == 0 &amp;&amp; oldDirection.y &gt; 0;
++            return oldDirection.x == 0 &amp;&amp; oldDirection.y &gt; 0;
+         }
+         virtual bool isRotationPossible(Ogre::Vector3 &amp;rotation) const
+         {
+@@ -911,6 +933,7 @@
+         Ogre::Real mHeight;
+         bool mJumpNow;
+         Ogre::Real mTimer;
++        Ogre::Real mMoveForward;
+     };
+ 
+ 
+@@ -1088,7 +1111,7 @@
+             if( mState == UP )
+             {
+                 mTimer += elapsedTime;
+-                if( mTimer &lt; 0.5f )
++                if( mTimer &lt; 0.1f )
+                 {
+                     mMovingCreature-&gt;setAbstractLocation( CreatureController::AL_AIRBORNE );
+                 }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2007-12-19 19:31:48 UTC (rev 4033)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2007-12-19 21:47:41 UTC (rev 4034)
+@@ -369,8 +369,22 @@
+ 
+             if( mViewMode != VM_PNYX_MODE )
+             {
+-                if( movement &amp; MOVE_SNEAK )
++                if( mController-&gt;getMovementId() == CreatureController::MT_HOCHSPRUNG )
+                 {
++                    // move forward or backward if wanted
++                    Vector3 direction = Vector3::UNIT_Y;
++                    if( movement &amp; MOVE_FORWARD )
++                        direction += Vector3::NEGATIVE_UNIT_Z;
++                    else if( movement &amp; MOVE_BACKWARD )
++                        direction += Vector3::UNIT_Z;
++
++                    mController-&gt;setMovement(
++                        CreatureController::MT_HOCHSPRUNG,
++                        direction,
++                        Vector3(0, rotation.valueRadians(), 0) );
++                }
++                else if( movement &amp; MOVE_SNEAK )
++                {
+                     Vector3 direction(Vector3::ZERO);
+                     if (movement &amp; MOVE_FORWARD)
+                         direction.z = -1;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001104.html">[Dsa-hl-svn] r4033 - in modules/common/scripts: . triggers
+</A></li>
+	<LI>Next message: <A HREF="001106.html">[Dsa-hl-svn] r4035 - in rl/trunk/engine: common/src ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1105">[ date ]</a>
+              <a href="thread.html#1105">[ thread ]</a>
+              <a href="subject.html#1105">[ subject ]</a>
+              <a href="author.html#1105">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

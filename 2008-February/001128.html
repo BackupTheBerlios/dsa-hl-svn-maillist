@@ -1,0 +1,585 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4057 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/rules	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4057%20-%20modules/common/scripts/jobs%0A%09modules/regressiontest/scripts%20rl/trunk/engine/rules%0A%09rl/trunk/engine/rules/include%20rl/trunk/engine/rules/src%0A%09rl/trunk/engine/script/swig&In-Reply-To=%3C200802052212.m15MCbEq011682%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001127.html">
+   <LINK REL="Next"  HREF="001129.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4057 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/rules	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4057%20-%20modules/common/scripts/jobs%0A%09modules/regressiontest/scripts%20rl/trunk/engine/rules%0A%09rl/trunk/engine/rules/include%20rl/trunk/engine/rules/src%0A%09rl/trunk/engine/script/swig&In-Reply-To=%3C200802052212.m15MCbEq011682%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4057 - modules/common/scripts/jobs	modules/regressiontest/scripts rl/trunk/engine/rules	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Tue Feb  5 23:12:37 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001127.html">[Dsa-hl-svn] r4056 - rl/trunk/engine/core/src
+</A></li>
+        <LI>Next message: <A HREF="001129.html">[Dsa-hl-svn] r4058 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1128">[ date ]</a>
+              <a href="thread.html#1128">[ thread ]</a>
+              <a href="subject.html#1128">[ subject ]</a>
+              <a href="author.html#1128">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-02-05 23:12:32 +0100 (Tue, 05 Feb 2008)
+New Revision: 4057
+
+Added:
+   rl/trunk/engine/rules/include/WaitJob.h
+   rl/trunk/engine/rules/src/WaitJob.cpp
+Modified:
+   modules/common/scripts/jobs/jobsequence.rb
+   modules/regressiontest/scripts/JobSequenceTest.rb
+   rl/trunk/engine/rules/RlRules2005.vcproj
+   rl/trunk/engine/rules/include/Date.h
+   rl/trunk/engine/rules/include/Makefile.am
+   rl/trunk/engine/rules/src/Date.cpp
+   rl/trunk/engine/rules/src/DsaManager.cpp
+   rl/trunk/engine/rules/src/Makefile.am
+   rl/trunk/engine/script/swig/RlRules.head.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+* Added conversion Date &lt;-&gt; Real 
+* Added WaitJob (for both game and real time) 
+    - plus ruby convenience functions and test case
+
+Modified: modules/common/scripts/jobs/jobsequence.rb
+===================================================================
+--- modules/common/scripts/jobs/jobsequence.rb	2008-02-05 22:09:03 UTC (rev 4056)
++++ modules/common/scripts/jobs/jobsequence.rb	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -33,14 +33,12 @@
+ 				set.add(y) 
+ 			}
+ 			queue.add(set)
+-#       elsif x.is_a? Numeric:
+-#            # This is a time, we add it to the start time, of jobs
+-#            # later in the queue
+-#            start += x
+-#            p &quot;starttime #start&quot;
++		elsif x.is_a? Numeric:
++			queue.add(WaitJob.new(x));
+         elsif x.is_a? Job
+             queue.add(x)
+-            p &quot;job added&quot;
++		elsif x.is_a? Date
++			queue.add(WaitJob.new(x))
+         end
+     }
+ 	$JS.addJob(queue, 20)
+
+Modified: modules/regressiontest/scripts/JobSequenceTest.rb
+===================================================================
+--- modules/regressiontest/scripts/JobSequenceTest.rb	2008-02-05 22:09:03 UTC (rev 4056)
++++ modules/regressiontest/scripts/JobSequenceTest.rb	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -60,6 +60,37 @@
+   end
+ end
+ 
++class GameTimeJobQueueTestAction &lt; Action
++  def initialize
++    super(&quot;gametqueue&quot;, &quot;Test game time job queue&quot;);
++  end
++  
++  def canDo(go, user)
++    true
++  end
++  
++  def doAction(go, user, target)
++    jobQueue(
++            [
++                [
++					_PlayAnimation(go.getActor(), &quot;auf&quot;), 
++					_PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())
++				],
++				Date.new(Date::ONE_KAMPFRUNDE),
++				_PlaySound3d(&quot;lachen.ogg&quot;, go.getPosition()),
++				[
++					_PlayAnimation(go.getActor(), &quot;zu&quot;), 
++					_PlaySound3d(&quot;doorcreak.ogg&quot;, go.getPosition())
++				],
++				Date.new(Date::ONE_SPIELRUNDE),
++				_PlaySound3d(&quot;lachen.ogg&quot;, go.getPosition()),
++				_Execute {provokeEror},
++				_Execute {p &quot;FOO&quot;}
++            ]
++    )
++  end
++end
++
+ class JobSequenceTest &lt; TestCase
+     def execute()
+         # Define a base box to place everything else on.
+@@ -73,8 +104,9 @@
+         chest = $GOM.createGameObject(
+             &quot;JobSequenceTestChest&quot;);
+         chest.addAction(JobSequenceTestAction.new());
+-        chest.addAction(JobQueueTestAction.new());
+-        chest.placeIntoScene();
++        chest.addAction(JobQueueTestAction.new()); 
++        chest.addAction(GameTimeJobQueueTestAction.new());
++		chest.placeIntoScene();
+         chest.setPosition(rel_pos([0.0, height, 0.0]));
+ 
+         $SCRIPT.log(&quot;JobSequenceTest initialisiert&quot;);
+
+Modified: rl/trunk/engine/rules/RlRules2005.vcproj
+===================================================================
+--- rl/trunk/engine/rules/RlRules2005.vcproj	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/RlRules2005.vcproj	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -463,6 +463,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\WaitJob.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\ZauberStateSet.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -669,6 +673,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\WaitJob.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\ZauberStateSet.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/rules/include/Date.h
+===================================================================
+--- rl/trunk/engine/rules/include/Date.h	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/include/Date.h	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -21,64 +21,56 @@
+ 
+ namespace rl
+ {
+-    /** Die Datumsklasse fuer den Aventurischen Kalender.
+-     *  Das Datum wird auf Basis des in der Geographia Aventurica 
+-     *  beschriebenen Kalenders verwaltet. Das Format basiert auf
+-     *  die Millisekunden seit 00:00:00,000 1. Praios 0 BF.
+-     *  Dieser Wert wird als 64Bit Timestamp gespeichert, alle
+-     *  anderen Komponenten(Tag, Stunde etc.) werden daraus
+-     *  berechnet.
++    /** 
++     * The date class for the Aventurian calendar
++     * The date is managed according to the calendar described
++     * in the Geographia Aventurica (see p. XXX)
++     * The format is based on milliseconds since
++     * 00:00:00,000 1. Praios 0 BF, this value is stored as a
++     * 64 bit timestamp, all other data (day, hour etc.) is
++     * calculated.
+      *  @todo CReal-Umrechnung, Komfortfunktionen
++     *
++     * Caution: all Real parameters or return values mean seconds, NOT milliseconds
+      */
+     class _RlRulesExport Date
+     {
+         friend Date _RlRulesExport operator+(const RL_LONGLONG&amp;, const Date&amp;);
++        friend Date _RlRulesExport operator+(const Ogre::Real&amp;, const Date&amp;);
+         friend Date _RlRulesExport operator-(const RL_LONGLONG&amp;, const Date&amp;);
+-    private:
++        friend Date _RlRulesExport operator-(const Ogre::Real&amp;, const Date&amp;);
+ 
+-        int mMilli;
+-        int mSecond;
+-        int mMinute;
+-        int mHour;
+-        int mDayOfMonth;
+-        int mDayOfYear;
+-        int mMonth;
+-        int mYear;
+-
+-        RL_LONGLONG mTimestamp;
+-
+-        /** Berechnet den Inhalt der Felder in Abhaengigkeit von
+-         *  mTimestamp neu.
+-         */
+-        void calculateFields();
+     public:
+-        /// Eine Sekunde in Millisekunden
++        /// One second in milliseconds
+         static const unsigned RL_LONGLONG ONE_SECOND;
+-        /// Eine Minute in Millisekunden
++        /// One minute in milliseconds
+         static const unsigned RL_LONGLONG ONE_MINUTE;
+-        /// Eine Stunde in Millisekunden
++        /// One hour in milliseconds
+         static const unsigned RL_LONGLONG ONE_HOUR;
+-        /// Ein Tag in Millisekunden
++        /// One day in milliseconds
+         static const unsigned RL_LONGLONG ONE_DAY;
+-        /// Eine Woche in Millisekunden
++        /// One week in milliseconds
+         static const unsigned RL_LONGLONG ONE_WEEK;
+-        /// Ein Monat in Millisekunden
++        /// One (dark eye) month in milliseconds
+         static const unsigned RL_LONGLONG ONE_MONTH;
+-        /// Ein Jahr in Millisekunden
++        /// One (dark eye) year in milliseconds
+         static const unsigned RL_LONGLONG ONE_YEAR;
+ 
+-        /// Ein Kampfrunde in Millisekunden
++        /// One combat round (Kampfrunde) in milliseconds
+         static const unsigned RL_LONGLONG ONE_KAMPFRUNDE;
+-        /// Ein Spielrunde in Millisekunden
++        /// One game round (Spielrunde) in milliseconds
+         static const unsigned RL_LONGLONG ONE_SPIELRUNDE;
+ 
+-        /// Standardkonstruktor erzeugt Datum mit timestamp 0
++        /** 
++         * Default constructor creates date with timestamp 0
++         * (00:00:00,000 1. Praios 0 BF)
++         */
+         Date();
+ 
+-        /// Konstruktor erzeugt Datum an uebergebener Timestamp
++        /// Create a date with given timestamp
+         Date(const RL_LONGLONG&amp; timestamp);
+ 
+-        /// Kopierkonstruktor
++        /// Copy constructor
+         Date(const Date&amp; rhs);
+ 
+         Date&amp; operator=(const Date&amp; rhs);
+@@ -92,14 +84,16 @@
+ 		Date operator+(const Date&amp; rhs);
+ 		Date operator-(const RL_LONGLONG&amp; rhs);
+         RL_LONGLONG operator-(const Date&amp; rhs);
++        Date operator*(const Ogre::Real&amp; rhs);
++        Date operator/(const Ogre::Real&amp; rhs);
+ 
+         RL_LONGLONG getTimestamp() const;
+ 
+-        /// Millisekunden seit 00:00:00,000 des instantiierten Tages.
++        /// Milliseconds since 00:00:00,000 of the Date's day
+         int getTimeFraction() const;
+         int getYear() const;
+         int getMonth() const;
+-        /// Name des instantiierten Monats
++        /// Get the name of the Date's month
+         std::string getMonthName() const;
+         int getDayOfYear() const;
+         int getDayOfMonth() const;
+@@ -110,12 +104,35 @@
+         int getSecond() const;
+         int getMilliSecond() const;
+ 
+-        /** Gibt ein Datum in der Form {Wochentag},
+-         *  der {Tag}. {Monat} im Jahre {Jahr}, {Stunde}:{Minute}.
+-         *  zurueck.
+-         * @return Datum in ausgabefaehiger Textform.
++        /** 
++         * Get a nicely formated string representation of the date
++         * Format is 
++         * &quot;{Day of Week}, der {Day}. {Month} im Jahre {Year}, {Hour}:{Minute}.
++         *
++         * @return The date as a printable text
+          */
+-        std::string toString() const;
++        const std::string toString() const;
++
++        static const Date fromReal(const Ogre::Real&amp; time);
++        const Ogre::Real toReal() const;
++
++    private:
++
++        int mMilli;
++        int mSecond;
++        int mMinute;
++        int mHour;
++        int mDayOfMonth;
++        int mDayOfYear;
++        int mMonth;
++        int mYear;
++
++        RL_LONGLONG mTimestamp;
++
++        /** Berechnet den Inhalt der Felder in Abhaengigkeit von
++         *  mTimestamp neu.
++         */
++        void calculateFields();
+     };
+ 
+     Date _RlRulesExport operator+(const RL_LONGLONG&amp;, const Date&amp;);
+
+Modified: rl/trunk/engine/rules/include/Makefile.am
+===================================================================
+--- rl/trunk/engine/rules/include/Makefile.am	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/include/Makefile.am	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -43,5 +43,6 @@
+ 	Talentgruppe.h \
+ 	TalentInputIterator.h \
+ 	TalentStateSet.h \
++	WaitJob.h \
+ 	Weapon.h \
+ 	ZauberStateSet.h
+
+Added: rl/trunk/engine/rules/include/WaitJob.h
+===================================================================
+--- rl/trunk/engine/rules/include/WaitJob.h	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/include/WaitJob.h	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -0,0 +1,44 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#ifndef __WaitJob_H__
++#define __WaitJob_H__
++
++#include &quot;RulesPrerequisites.h&quot;
++
++#include &quot;Date.h&quot;
++#include &quot;Job.h&quot;
++
++namespace rl
++{
++    class Date;
++
++    class _RlRulesExport WaitJob :
++        public Job
++    {
++    public:
++        WaitJob(const Date&amp; dsatime);
++        WaitJob(const Ogre::Real&amp; realtime);
++        ~WaitJob();
++
++        virtual bool execute(Ogre::Real time);
++
++    private:
++        Ogre::Real mTime;
++    };
++
++}
++
++#endif // __WaitJob_H__
+
+Modified: rl/trunk/engine/rules/src/Date.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Date.cpp	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/src/Date.cpp	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -140,9 +140,19 @@
+         return mTimestamp - rhs.mTimestamp;
+     }
+ 
++    Date Date::operator*(const Ogre::Real&amp; rhs)
++    {
++        return Date(mTimestamp * rhs);
++    }
++
++    Date Date::operator/(const Ogre::Real&amp; rhs)
++    {
++        return Date(mTimestamp / rhs); ///@todo throw exception if rhs == 0?
++    }
++
+     void Date::calculateFields()
+     {
+-        //!\todo aufr?umen!
++        ///@todo aufraeumen!
+         mYear = mTimestamp / ONE_YEAR;
+         RL_LONGLONG timeInYear = mTimestamp % ONE_YEAR;
+         mMonth = timeInYear / ONE_MONTH;
+@@ -195,8 +205,7 @@
+ 
+     int Date::getDayOfWeek() const
+     {
+-        int wd = ((getYear() - 993) + getDayOfMonth() + MONTH_MODIFIER[mMonth]) %
+-                 7;
++        int wd = ((getYear() - 993) + getDayOfMonth() + MONTH_MODIFIER[mMonth]) % 7;
+ 
+         if (wd &lt; 0)
+         {
+@@ -231,7 +240,7 @@
+         return mMilli;
+     }
+ 
+-    std::string Date::toString() const
++    const std::string Date::toString() const
+     {
+         char date[256];
+         _snprintf(date,
+@@ -246,6 +255,16 @@
+         return std::string(date);
+     }
+ 
++    const Date Date::fromReal(const Ogre::Real&amp; time)
++    {
++        return Date(time / 1000.0);
++    }
++
++    const Ogre::Real Date::toReal() const
++    {
++        return static_cast&lt;Ogre::Real&gt;(mTimestamp) / 1000.0;
++    }
++
+     Date operator+(const RL_LONGLONG&amp; lhs, const Date&amp; rhs)
+     {
+         return Date(rhs.mTimestamp + lhs);
+
+Modified: rl/trunk/engine/rules/src/DsaManager.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/DsaManager.cpp	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/src/DsaManager.cpp	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -157,7 +157,7 @@
+         }
+         else
+         {
+-            return Date(0); ///@todo better throw exception?
++            return Date(); ///@todo better throw exception?
+         }
+ 	}
+ 
+
+Modified: rl/trunk/engine/rules/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/rules/src/Makefile.am	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/src/Makefile.am	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -45,5 +45,6 @@
+ 	Talent.cpp \
+ 	Talentgruppe.cpp \
+ 	TalentStateSet.cpp \
++	WaitJob.cpp \
+ 	Weapon.cpp \
+ 	ZauberStateSet.cpp
+
+Added: rl/trunk/engine/rules/src/WaitJob.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/WaitJob.cpp	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/rules/src/WaitJob.cpp	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -0,0 +1,51 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot;
++#include &quot;WaitJob.h&quot;
++
++#include &quot;Date.h&quot;
++
++namespace rl
++{
++
++    WaitJob::WaitJob(const Date&amp; dsatime)
++        : Job(false, true, TimeSource::GAMETIME, Job::PERSISTENT),
++        mTime(dsatime.toReal())
++    {
++    }
++
++    WaitJob::WaitJob(const Ogre::Real&amp; realtime)
++        : Job(false, true, TimeSource::REALTIME_INTERRUPTABLE, Job::PERSISTENT),
++        mTime(realtime)
++    {
++    }
++
++    WaitJob::~WaitJob()
++    {
++    }
++
++    bool WaitJob::execute(Ogre::Real time)
++    {
++        mTime -= time;
++        if (mTime &lt;= 0)
++        {
++            return true;
++        }
++        
++        return false;
++    }
++
++}
+
+Modified: rl/trunk/engine/script/swig/RlRules.head.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.head.swig	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/script/swig/RlRules.head.swig	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -51,5 +51,6 @@
+ #include &quot;Talent.h&quot;
+ #include &quot;TalentStateSet.h&quot;
+ #include &quot;Tripel.h&quot;
++#include &quot;WaitJob.h&quot;
+ #include &quot;Weapon.h&quot;
+ %}
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2008-02-05 22:09:03 UTC (rev 4056)
++++ rl/trunk/engine/script/swig/RlRules.swig	2008-02-05 22:12:32 UTC (rev 4057)
+@@ -404,6 +404,13 @@
+         virtual void onStateChange(GameObjectState oldState, GameObjectState newState);
+     };
+     
++    class WaitJob : public rl::Job
++    {
++    public:
++        WaitJob(const rl::Date&amp; dsatime);
++        WaitJob(const Ogre::Real&amp; realtime);
++    };
++    
+     %feature(&quot;director&quot;) Item;
+     class Item : public rl::GameObject {
+     public:
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001127.html">[Dsa-hl-svn] r4056 - rl/trunk/engine/core/src
+</A></li>
+	<LI>Next message: <A HREF="001129.html">[Dsa-hl-svn] r4058 - in rl/trunk/engine/core: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1128">[ date ]</a>
+              <a href="thread.html#1128">[ thread ]</a>
+              <a href="subject.html#1128">[ subject ]</a>
+              <a href="author.html#1128">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

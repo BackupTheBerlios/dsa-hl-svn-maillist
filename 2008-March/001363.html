@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4292 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4292%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803161918.m2GJIOWo025797%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001362.html">
+   <LINK REL="Next"  HREF="001364.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4292 - in rl/trunk/engine/core: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4292%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200803161918.m2GJIOWo025797%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4292 - in rl/trunk/engine/core: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 16 20:18:24 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001362.html">[Dsa-hl-svn] r4291 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+        <LI>Next message: <A HREF="001364.html">[Dsa-hl-svn] r4293 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1363">[ date ]</a>
+              <a href="thread.html#1363">[ thread ]</a>
+              <a href="subject.html#1363">[ subject ]</a>
+              <a href="author.html#1363">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-16 20:18:20 +0100 (Sun, 16 Mar 2008)
+New Revision: 4292
+
+Modified:
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+Log:
+unload zones when clear scene
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2008-03-14 13:35:41 UTC (rev 4291)
++++ rl/trunk/engine/core/include/ZoneManager.h	2008-03-16 19:18:20 UTC (rev 4292)
+@@ -40,6 +40,7 @@
+         Zone* createZone(const Ogre::String&amp; name, bool needsToBeSaved);
+         /// only marks the zone for deferred deletion
+         void destroyZone(const Ogre::String&amp; name);
++        void destroyAllZones();
+         /// Adds a new area to the zone
+         void addAreaToZone(const Ogre::String&amp; name, 
+             Ogre::AxisAlignedBox aabb, GeometryType geom,
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-14 13:35:41 UTC (rev 4291)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-03-16 19:18:20 UTC (rev 4292)
+@@ -81,9 +81,9 @@
+     CoreSubsystem::~CoreSubsystem()
+     {
+ 		delete meshmagick::OgreEnvironment::getSingletonPtr();
++		delete mWorld;
+         delete mZoneManager;
+         delete mGameEventManager;
+-		delete mWorld;
+         delete mGameLoop;
+         delete mMessagePump;
+         delete mJobScheduler;
+
+Modified: rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+===================================================================
+--- rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2008-03-14 13:35:41 UTC (rev 4291)
++++ rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2008-03-16 19:18:20 UTC (rev 4292)
+@@ -27,6 +27,7 @@
+ #include &quot;Actor.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+ #include &quot;DotSceneLoader.h&quot;
++#include &quot;ZoneManager.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -111,6 +112,7 @@
+ 
+         // This is necessary to destroy cameras too.
+         CoreSubsystem::getSingleton().getRenderWindow()-&gt;removeAllViewports();
++        ZoneManager::getSingleton().destroyAllZones();
+         ActorManager::getSingleton().destroyAllActors();
+         mSceneMgr-&gt;clearScene();
+         PhysicsManager::getSingleton().clearLevelGeometry();
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2008-03-14 13:35:41 UTC (rev 4291)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2008-03-16 19:18:20 UTC (rev 4292)
+@@ -127,6 +127,24 @@
+         mZonesToDelete.push_back(zone);
+     }
+ 
++    void ZoneManager::destroyAllZones()
++    {
++        for(ZoneMap::iterator it = mZones.begin(); it != mZones.end();)
++        {
++            // remove from active zones
++            if( isZoneActive(it-&gt;second) )
++                mActiveZones.remove(it-&gt;second);
++
++            std::map&lt;long, Zone*&gt;::iterator it_ = mZonesIdMap.find(it-&gt;second-&gt;getId());
++            if( it_ != mZonesIdMap.end() )
++                mZonesIdMap.erase(it_);
++
++
++            mZonesToDelete.push_back(it-&gt;second);
++            mZones.erase(it++);
++        }
++    }
++
+     void ZoneManager::doDestroyZone(Zone *zone)
+     {
+         //destroy all areas
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001362.html">[Dsa-hl-svn] r4291 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+	<LI>Next message: <A HREF="001364.html">[Dsa-hl-svn] r4293 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1363">[ date ]</a>
+              <a href="thread.html#1363">[ thread ]</a>
+              <a href="subject.html#1363">[ subject ]</a>
+              <a href="author.html#1363">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,228 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4930 - in rl/trunk/engine: rules/include rules/src	script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4930%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200905192257.n4JMvltr020479%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001985.html">
+   <LINK REL="Next"  HREF="001987.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4930 - in rl/trunk/engine: rules/include rules/src	script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4930%20-%20in%20rl/trunk/engine%3A%20rules/include%20rules/src%0A%09script/swig&In-Reply-To=%3C200905192257.n4JMvltr020479%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4930 - in rl/trunk/engine: rules/include rules/src	script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed May 20 00:57:47 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001985.html">[Dsa-hl-svn] r4929 - dependencies/OgreNewt/src
+</A></li>
+        <LI>Next message: <A HREF="001987.html">[Dsa-hl-svn] r4931 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1986">[ date ]</a>
+              <a href="thread.html#1986">[ thread ]</a>
+              <a href="subject.html#1986">[ subject ]</a>
+              <a href="author.html#1986">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-05-20 00:57:43 +0200 (Wed, 20 May 2009)
+New Revision: 4930
+
+Modified:
+   rl/trunk/engine/rules/include/GoToJob.h
+   rl/trunk/engine/rules/src/GoToJob.cpp
+   rl/trunk/engine/script/swig/RlAi.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+improved GoToJob and fixed some errors in swig
+
+
+Modified: rl/trunk/engine/rules/include/GoToJob.h
+===================================================================
+--- rl/trunk/engine/rules/include/GoToJob.h	2009-05-19 13:59:25 UTC (rev 4929)
++++ rl/trunk/engine/rules/include/GoToJob.h	2009-05-19 22:57:43 UTC (rev 4930)
+@@ -37,6 +37,7 @@
+             CreatureController::MovementType movementType_moving = CreatureController::MT_RENNEN,
+             CreatureController::MovementType movementType_idle = CreatureController::MT_STEHEN);
+ 		GoToJob(Creature* actor, GameObject* target, Ogre::Real maxDistance, Ogre::Real duration,
++            bool followTarget = false,
+             CreatureController::MovementType movementType_moving = CreatureController::MT_RENNEN,
+             CreatureController::MovementType movementType_idle = CreatureController::MT_STEHEN);
+         virtual ~GoToJob();
+@@ -46,6 +47,7 @@
+     private:
+ 		CreatureController* mActor;
+ 		GameObject* mTarget;
++        bool mFollowTarget;
+ 		Ogre::Vector3 mTargetPos;
+ 		Ogre::Real mMaxDistance;
+ 		Ogre::Real mTimeLeft;
+
+Modified: rl/trunk/engine/rules/src/GoToJob.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/GoToJob.cpp	2009-05-19 13:59:25 UTC (rev 4929)
++++ rl/trunk/engine/rules/src/GoToJob.cpp	2009-05-19 22:57:43 UTC (rev 4930)
+@@ -26,11 +26,12 @@
+ 
+ namespace rl
+ {
+-	GoToJob::GoToJob(Creature* actor, const Vector3&amp; targetPos, Real maxDistance, Real duration, CreatureController::MovementType movementType_moving,
+-            CreatureController::MovementType movementType_idle)
++	GoToJob::GoToJob(Creature* actor, const Vector3&amp; targetPos, Real maxDistance, Real duration,
++            CreatureController::MovementType movementType_moving, CreatureController::MovementType movementType_idle)
+ 		: Job(false, true, TimeSource::REALTIME_INTERRUPTABLE),
+ 		  mActor(NULL),
+ 		  mTarget(NULL),
++          mFollowTarget(false),
+ 		  mTargetPos(targetPos),
+ 		  mMaxDistance(maxDistance),
+ 		  mTimeLeft(duration),
+@@ -40,11 +41,12 @@
+ 		mActor = CreatureControllerManager::getSingleton().getCreatureController(actor);
+ 	}
+ 
+-	GoToJob::GoToJob(Creature* actor, GameObject* target, Real maxDistance, Real duration, CreatureController::MovementType movementType_moving,
+-            CreatureController::MovementType movementType_idle)
++	GoToJob::GoToJob(Creature* actor, GameObject* target, Real maxDistance, Real duration, bool followTarget,
++            CreatureController::MovementType movementType_moving, CreatureController::MovementType movementType_idle)
+ 		: Job(false, true, TimeSource::REALTIME_INTERRUPTABLE),
+ 		  mActor(NULL),
+ 		  mTarget(target),
++          mFollowTarget(followTarget),
+ 		  mTargetPos(Vector3::ZERO),
+ 		  mMaxDistance(maxDistance),
+ 		  mTimeLeft(duration),
+@@ -83,34 +85,43 @@
+         }
+         
+ 		// Are we there now?
+-		if (distance &lt; mMaxDistance)
+-		{
+-			// Stay put where ever we are.
+-			mActor-&gt;setMovement(mMovementType_idle, Vector3::ZERO, Vector3::ZERO);
+-			return true;
+-		}
+-
+-
+-		Vector3 pos = mActor-&gt;getCreature()-&gt;getPosition();
+-		pos.y = 0;
+-		Vector3 targetPos = mTargetPos;
+-		targetPos.y = 0;
++        Vector3 pos = mActor-&gt;getCreature()-&gt;getPosition();
++        pos.y = 0;
++        Vector3 targetPos = mTargetPos;
++        targetPos.y = 0;
+         Degree realYawDiff = (mActor-&gt;getCreature()-&gt;getOrientation()*Vector3::NEGATIVE_UNIT_Z).getRotationTo(targetPos - pos).getYaw();
+         Vector3 rotation = Vector3::ZERO;
+         Quaternion currentOri(mActor-&gt;getYaw(), Vector3::UNIT_Y);
+         rotation.y = (currentOri*Vector3::NEGATIVE_UNIT_Z).getRotationTo(targetPos - pos).getYaw().valueRadians();
+ 
+         // old code for rotation:
+-		//mActor-&gt;getCreature()-&gt;setOrientation(Vector3::NEGATIVE_UNIT_Z.getRotationTo(targetPos - pos));
+-        
+-        // first rotate, then move, is this the &quot;desired&quot; behaviour?
+-        if( realYawDiff &gt; Degree(5) || realYawDiff &lt; Degree(-5) )
++        //mActor-&gt;getCreature()-&gt;setOrientation(Vector3::NEGATIVE_UNIT_Z.getRotationTo(targetPos - pos));
++
++        // in order to prevent fast switching between moving and idle, use a larger maxDistance if idle
++        Real maxDistance = mMaxDistance;
++        if( mFollowTarget &amp;&amp; mActor-&gt;getMovementId() == mMovementType_idle)
++            maxDistance += 0.5;
++
++        if( distance &lt; maxDistance )
++        {
++            // turn to object
+             mActor-&gt;setMovement(mMovementType_idle, Vector3::ZERO, rotation);
++        }
+         else
+-    		mActor-&gt;setMovement(mMovementType_moving, Vector3::NEGATIVE_UNIT_Z, rotation);
++        {
++            // first rotate, then move, is this the &quot;desired&quot; behaviour?
++            if( realYawDiff &gt; Degree(5) || realYawDiff &lt; Degree(-5) )
++                mActor-&gt;setMovement(mMovementType_idle, Vector3::ZERO, rotation);
++            else
++                mActor-&gt;setMovement(mMovementType_moving, Vector3::NEGATIVE_UNIT_Z, rotation);
++        }
+ 
+-		mTimeLeft  -= time;
+-		return false;
++        mTimeLeft  -= time;
++
++        if( !mFollowTarget &amp;&amp; distance &lt; mMaxDistance )
++            return true;
++        else
++            return false;
+ 	}
+ }
+ 
+
+Modified: rl/trunk/engine/script/swig/RlAi.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlAi.swig	2009-05-19 13:59:25 UTC (rev 4929)
++++ rl/trunk/engine/script/swig/RlAi.swig	2009-05-19 22:57:43 UTC (rev 4930)
+@@ -302,7 +302,7 @@
+     public:
+         static rl::DialogManager&amp; getSingleton();
+         rl::Dialog* createDialog(const Ogre::String&amp; name, rl::Creature* npc);
+-        rl::Dialog* createDialog(const Ogre::String&amp; name, rl::CreatureList&amp; npcs);
++        rl::Dialog* createDialog(const Ogre::String&amp; name, const std::list&lt;rl::Creature*&gt;&amp; npcs);
+     private:
+         DialogManager();
+     };
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2009-05-19 13:59:25 UTC (rev 4929)
++++ rl/trunk/engine/script/swig/RlRules.swig	2009-05-19 22:57:43 UTC (rev 4930)
+@@ -451,9 +451,12 @@
+     public:
+ 
+ 		GoToJob(rl::Creature* actor, const Ogre::Vector3&amp; targetPos,
+-			Ogre::Real maxDistance, Ogre::Real duration);
+-		// Unclear what version is called from ruby, so uncomment second ctor.
+-		//GoToJob(rl::Creature* actor, rl::GameObject* target, Ogre::Real maxDistance, Ogre::Real duration);
++			Ogre::Real maxDistance, Ogre::Real duration,
++            rl::CreatureController::MovementType movementType_moving = rl::CreatureController::MT_RENNEN,
++            rl::CreatureController::MovementType movementType_idle = rl::CreatureController::MT_STEHEN);
++		GoToJob(rl::Creature* actor, rl::GameObject* target, Ogre::Real maxDistance, Ogre::Real duration, bool followTarget = false,
++            rl::CreatureController::MovementType movementType_moving = rl::CreatureController::MT_RENNEN,
++            rl::CreatureController::MovementType movementType_idle = rl::CreatureController::MT_STEHEN);
+     };
+     
+     /// A rl#Job to fetch an item
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001985.html">[Dsa-hl-svn] r4929 - dependencies/OgreNewt/src
+</A></li>
+	<LI>Next message: <A HREF="001987.html">[Dsa-hl-svn] r4931 - in modules/regressiontest: maps scripts	scripts/maps
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1986">[ date ]</a>
+              <a href="thread.html#1986">[ thread ]</a>
+              <a href="subject.html#1986">[ subject ]</a>
+              <a href="author.html#1986">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

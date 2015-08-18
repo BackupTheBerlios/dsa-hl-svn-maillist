@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3114 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3114%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703032010.l23KANm9015778%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000184.html">
+   <LINK REL="Next"  HREF="000186.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3114 - in rl/trunk/engine/core: include src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3114%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200703032010.l23KANm9015778%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3114 - in rl/trunk/engine/core: include src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Sat Mar  3 21:10:23 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000184.html">[Dsa-hl-svn] r3113 - in rl/trunk/engine: ai/include ai/src	common/include
+</A></li>
+        <LI>Next message: <A HREF="000186.html">[Dsa-hl-svn] r3115 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-03-03 21:10:15 +0100 (Sat, 03 Mar 2007)
+New Revision: 3114
+
+Modified:
+   rl/trunk/engine/core/include/GameLoop.h
+   rl/trunk/engine/core/src/GameLoop.cpp
+Log:
+Fixed bug in GameLoop, that caused deleted tasks to sometimes still being called.
+
+Modified: rl/trunk/engine/core/include/GameLoop.h
+===================================================================
+--- rl/trunk/engine/core/include/GameLoop.h	2007-03-03 01:10:20 UTC (rev 3113)
++++ rl/trunk/engine/core/include/GameLoop.h	2007-03-03 20:10:15 UTC (rev 3114)
+@@ -70,9 +70,33 @@
+ 	static GameLoop * getSingletonPtr(void);
+ 
+ private:
+-    typedef std::list&lt;GameTask*&gt; GameTaskList;
+-    typedef std::list&lt;std::pair&lt;TaskGroup, GameTask*&gt; &gt; GroupTaskList;
++    /// Internal struct for storing the tasks in the queue.
++    /// Contains additional meta-information useful for scheduling.
++    struct GameTaskEntry
++    {
++        bool operator==(const GameTaskEntry&amp; rhs) const
++        {
++            return task == rhs.task &amp;&amp; valid == rhs.valid;
++        }
+ 
++        /// The task to be executed
++        GameTask* task;
++        /// Flag whether this task is valid, e.g. removeTask not called for it.
++        bool valid;
++    };
++
++    /// Functor for finding an entry by the task it holds.
++    struct FindEntryByTask : public std::binary_function&lt;GameTaskEntry, GameTask*, bool&gt;
++    {
++        bool operator()(const GameTaskEntry&amp; entry, GameTask* task) const
++        {
++            return entry.task == task;
++        }
++    };
++
++    typedef std::list&lt;GameTaskEntry&gt; GameTaskList;
++    typedef std::list&lt;std::pair&lt;TaskGroup, GameTaskEntry&gt; &gt; GroupTaskList;
++
+     std::vector&lt;GameTaskList*&gt; mTaskLists;
+     GroupTaskList mAddedTasks;
+     GameTaskList mRemovedTasks;
+
+Modified: rl/trunk/engine/core/src/GameLoop.cpp
+===================================================================
+--- rl/trunk/engine/core/src/GameLoop.cpp	2007-03-03 01:10:20 UTC (rev 3113)
++++ rl/trunk/engine/core/src/GameLoop.cpp	2007-03-03 20:10:15 UTC (rev 3114)
+@@ -73,12 +73,27 @@
+     void GameLoop::addTask(GameTask* task, TaskGroup group)
+     {
+         RlAssert1(task != NULL);
+-        mAddedTasks.push_back(std::make_pair(group, task));
++        GameTaskEntry entry = {task, true};
++        mAddedTasks.push_back(std::make_pair(group, entry));
+     }
+ 
+     void GameLoop::removeTask(GameTask* task)
+     {
+-        mRemovedTasks.push_back(task);
++        // find the removed task entry, and set it to invalid.
++        for (size_t i = 0; i &lt; mTaskLists.size(); ++i)
++        {
++            GameTaskList* tasks = mTaskLists[i];
++            GameTaskList::iterator find_it = std::find_if(tasks-&gt;begin(), tasks-&gt;end(),
++                std::bind2nd(FindEntryByTask(), task));
++            if (find_it != tasks-&gt;end())
++            {
++                find_it-&gt;valid = false;
++                break;
++            }
++        }
++        // Add it to the removed list, so we can find it faster in updateTaskList().
++        GameTaskEntry entry = {task, false};
++        mRemovedTasks.push_back(entry);
+     }
+ 
+     void GameLoop::quitGame()
+@@ -112,9 +127,9 @@
+                 GameTaskList* tasks = mTaskLists[i];
+                 for (GameTaskList::iterator it = tasks-&gt;begin(); it != tasks-&gt;end(); ++it)
+                 {
+-                    if (!(*it)-&gt;isPaused())
++                    if (it-&gt;valid &amp;&amp; !(it-&gt;task-&gt;isPaused()))
+                     {
+-                        (*it)-&gt;run(frameTime);
++                        it-&gt;task-&gt;run(frameTime);
+                     }
+                 }
+             }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000184.html">[Dsa-hl-svn] r3113 - in rl/trunk/engine: ai/include ai/src	common/include
+</A></li>
+	<LI>Next message: <A HREF="000186.html">[Dsa-hl-svn] r3115 - rl/trunk/engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

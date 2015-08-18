@@ -1,0 +1,553 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3967 - in rl/trunk/engine: core/include core/src	script script/include script/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3967%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script%20script/include%20script/src%20script/swig&In-Reply-To=%3C200711052259.lA5Mx7I4006693%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001037.html">
+   <LINK REL="Next"  HREF="001039.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3967 - in rl/trunk/engine: core/include core/src	script script/include script/src script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3967%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09script%20script/include%20script/src%20script/swig&In-Reply-To=%3C200711052259.lA5Mx7I4006693%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3967 - in rl/trunk/engine: core/include core/src	script script/include script/src script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Nov  5 23:59:07 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001037.html">[Dsa-hl-svn] r3966 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001039.html">[Dsa-hl-svn] r3968 - in modules/common/scripts: . triggers
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1038">[ date ]</a>
+              <a href="thread.html#1038">[ thread ]</a>
+              <a href="subject.html#1038">[ subject ]</a>
+              <a href="author.html#1038">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-11-05 23:58:53 +0100 (Mon, 05 Nov 2007)
+New Revision: 3967
+
+Added:
+   rl/trunk/engine/script/src/TriggerFactory.cpp
+Modified:
+   rl/trunk/engine/core/include/Trigger.h
+   rl/trunk/engine/core/include/Zone.h
+   rl/trunk/engine/core/include/ZoneManager.h
+   rl/trunk/engine/core/src/Trigger.cpp
+   rl/trunk/engine/core/src/Zone.cpp
+   rl/trunk/engine/core/src/ZoneManager.cpp
+   rl/trunk/engine/script/RlScript2005.vcproj
+   rl/trunk/engine/script/include/TriggerFactory.h
+   rl/trunk/engine/script/src/Makefile.am
+   rl/trunk/engine/script/src/ZoneProcessor.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+Log:
+-the triggerfactory now saves and loads triggers
+-(zones are not yet saved and loaded, so this can cause errors because of triggers that should be linked to a zone, that doesn't exist)
+
+Modified: rl/trunk/engine/core/include/Trigger.h
+===================================================================
+--- rl/trunk/engine/core/include/Trigger.h	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/include/Trigger.h	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -25,7 +25,7 @@
+ 	class _RlCoreExport Trigger : public PropertyHolder
+ 	{
+ 	public:
+-        Trigger(const Ogre::String &amp;name);
++        Trigger(const Ogre::String&amp; classname, const Ogre::String &amp;name, bool needsToBeSaved);
+         virtual ~Trigger() {}
+         /**
+          * return true, if the trigger can be deleted after execution. 
+@@ -46,12 +46,18 @@
+         virtual bool deleteIfZoneDestroyed() const {return true;}
+ 
+         const Ogre::String&amp; getName() const {return mName;}
++        const Ogre::String&amp; getClassName() const {return mClassName;}
+ 
++        bool needsToBeSaved() const {return mNeedsToBeSaved;}
++
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertyRecord* getAllProperties() const;
+     protected:
+         Ogre::String mName;
++        Ogre::String mClassName;
++	private:
++        const bool mNeedsToBeSaved;
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/Zone.h
+===================================================================
+--- rl/trunk/engine/core/include/Zone.h	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/include/Zone.h	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -19,7 +19,6 @@
+ #include &quot;CorePrerequisites.h&quot;
+ #include &quot;GameEventManager.h&quot;  /* wegen GameAreaEventSourceList */
+ 
+-
+ namespace rl {
+ 
+ 	class Actor;
+@@ -51,13 +50,17 @@
+         void removeSound(const Ogre::String&amp; name);
+         void removeTrigger(Trigger* trigger);
+         long getId() const {return mId;}
++        
++        bool needsToBeSaved() const {return mNeedsToBeSaved;}
++
+     protected:
+         friend class ZoneManager;
+-        Zone(long id);
++        Zone(long id, bool needsToBeSaved);
+         void addEventSource(GameAreaEventSource* gam);
+         void removeEventSource(GameAreaEventSource* gam);
+         GameAreaEventSourceList&amp; getEventSources();
+ 	private:
++        bool mNeedsToBeSaved;
+         long mId;
+         Zone();
+ 		std::list&lt;Actor*&gt; mLights;
+
+Modified: rl/trunk/engine/core/include/ZoneManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ZoneManager.h	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/include/ZoneManager.h	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -35,7 +35,7 @@
+ 		ZoneManager();
+ 		~ZoneManager();
+ 
+-        Zone* createZone(const Ogre::String&amp; name);
++        Zone* createZone(const Ogre::String&amp; name, bool needsToBeSaved);
+         /// only marks the zone for deferred deletion
+         void destroyZone(const Ogre::String&amp; name);
+         /// Adds a new area to the zone
+@@ -101,8 +101,12 @@
+         void run(Ogre::Real elapsedTime);
+         /// inherited from gametask
+         const Ogre::String&amp; getName() const;
++
++        typedef std::map&lt;const Ogre::String, Zone*&gt; ZoneMap;
++        const ZoneMap &amp;getAllZones() const {return mZones;}
++
+ 	private:
+-		std::map&lt;const Ogre::String, Zone*&gt; mZones;
++		ZoneMap mZones;
+         std::map&lt;long, Zone*&gt; mZonesIdMap;
+ 		std::list&lt;Zone*&gt; mActiveZones;
+         typedef std::map&lt;const Ogre::String, Sound*&gt; SoundMap;
+
+Modified: rl/trunk/engine/core/src/Trigger.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Trigger.cpp	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/src/Trigger.cpp	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -19,7 +19,10 @@
+ 
+ namespace rl
+ {
+-    Trigger::Trigger(const Ogre::String &amp;name) : mName(name)
++    Trigger::Trigger(const Ogre::String&amp; classname, const Ogre::String &amp;name, bool needsToBeSaved) :
++        mName(name),
++        mClassName(classname),
++        mNeedsToBeSaved(needsToBeSaved)
+     {
+     }
+ 
+@@ -28,6 +31,8 @@
+         Property prop;
+         if( key == &quot;name&quot; )
+             prop.setValue(mName);
++        else if( key == &quot;classname&quot; )
++            prop.setValue(mClassName);
+         else
+         {
+             Throw(IllegalArgumentException, key + &quot; is not a property of this Trigger (&quot; + mName +&quot;).&quot;);
+@@ -42,6 +47,8 @@
+         {
+             if( key == &quot;name&quot; )
+                 mName = value.toString().c_str();
++            else if( key == &quot;classname&quot; )
++                mClassName = value.toString().c_str();
+             else
+             {
+                 LOG_WARNING(
+@@ -61,6 +68,7 @@
+     {
+         PropertyRecord* ps = new PropertyRecord();
+         ps-&gt;setProperty(&quot;name&quot;, Property(mName));
++        ps-&gt;setProperty(&quot;classname&quot;, Property(mClassName));
+ 
+         return ps;
+     }
+
+Modified: rl/trunk/engine/core/src/Zone.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Zone.cpp	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/src/Zone.cpp	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -27,7 +27,7 @@
+ {
+ 
+ 
+-    Zone::Zone(long id) : mId(id), mEaxPreset(&quot;&quot;)
++    Zone::Zone(long id, bool needsToBeSaved) : mId(id), mEaxPreset(&quot;&quot;), mNeedsToBeSaved(needsToBeSaved)
+     {
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/ZoneManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ZoneManager.cpp	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/core/src/ZoneManager.cpp	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -41,7 +41,7 @@
+         GameTask(false)
+ 	{
+ 		// the default zone is active when no other Zone is active
+-		mDefaultZone = new Zone(0);
++		mDefaultZone = new Zone(0,false);
+         mNextZoneId = 1;
+ 		mActiveZones.push_front(mDefaultZone);
+ 	}
+@@ -50,7 +50,7 @@
+ 	{
+         GameEventManager::getSingleton().removeAreaListener(this);
+         GameEventManager::getSingleton().removeQueuedDeletionSources();
+-		for (std::map&lt;const Ogre::String, Zone*&gt;::iterator it = mZones.begin(); it != mZones.end(); ++it)
++		for (ZoneMap::iterator it = mZones.begin(); it != mZones.end(); ++it)
+ 		{
+ 			Zone* curZone = (*it).second;
+             delete curZone;
+@@ -65,7 +65,7 @@
+ 
+ 	Zone* ZoneManager::getZone(const Ogre::String&amp; name)
+ 	{
+-		std::map&lt;const Ogre::String, Zone*&gt;::const_iterator it = mZones.find(name);
++		ZoneMap::const_iterator it = mZones.find(name);
+ 		if (it == mZones.end())
+ 		{
+ 			return NULL;
+@@ -89,9 +89,9 @@
+ 		}
+ 	}
+ 
+-    Zone* ZoneManager::createZone(const Ogre::String&amp; name)
++    Zone* ZoneManager::createZone(const Ogre::String&amp; name, bool needsToBeSaved)
+ 	{
+-        Zone* zone = new Zone(mNextZoneId);
++        Zone* zone = new Zone(mNextZoneId, needsToBeSaved);
+         mZonesIdMap[mNextZoneId] = zone;
+         mZones[name] = zone;
+         mNextZoneId++;
+@@ -109,7 +109,7 @@
+         if( isZoneActive(zone) )
+             mActiveZones.remove(zone);
+ 
+-        std::map&lt;const Ogre::String, Zone*&gt;::iterator it = mZones.find(name);
++        ZoneMap::iterator it = mZones.find(name);
+         if( it != mZones.end() )
+             mZones.erase(it);
+ 
+@@ -366,7 +366,7 @@
+ 			(*it)-&gt;setVisible(true);
+ 		}
+ 
+-		for (std::map&lt;const Ogre::String, Zone*&gt;::const_iterator itZones = mZones.begin(); itZones != mZones.end(); itZones++)
++		for (ZoneMap::const_iterator itZones = mZones.begin(); itZones != mZones.end(); itZones++)
+ 		{
+ 			std::list&lt;Actor*&gt; curLights = (*itZones).second-&gt;getLights();
+ 			for (std::list&lt;Actor*&gt;::const_iterator itLights = curLights.begin(); itLights != curLights.end(); itLights++)
+
+Modified: rl/trunk/engine/script/RlScript2005.vcproj
+===================================================================
+--- rl/trunk/engine/script/RlScript2005.vcproj	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/RlScript2005.vcproj	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -319,6 +319,10 @@
+ 					/&gt;
+ 				&lt;/FileConfiguration&gt;
+ 			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\src\TriggerFactory.cpp&quot;
++				&gt;
++			&lt;/File&gt;
+ 			&lt;Filter
+ 				Name=&quot;map loading&quot;
+ 				&gt;
+
+Modified: rl/trunk/engine/script/include/TriggerFactory.h
+===================================================================
+--- rl/trunk/engine/script/include/TriggerFactory.h	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/include/TriggerFactory.h	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -16,17 +16,29 @@
+ #ifndef __TriggerFactory_H__
+ #define __TriggerFactory_H__
+ 
++#include &quot;SaveGameManager.h&quot;
+ #include &quot;ScriptPrerequisites.h&quot;
+ 
+ namespace rl 
+ {
+ 	class Trigger;
+ 
+-	class _RlScriptExport TriggerFactory
++    class _RlScriptExport TriggerFactory :
++        public SaveGameData // in order to save and restore trigger
+ 	{
+ 	public:
+-		virtual ~TriggerFactory() {}
++        TriggerFactory();
++		virtual ~TriggerFactory();
+         virtual Trigger* createTrigger(const Ogre::String&amp; classname, const Ogre::String&amp; triggername) = 0;
++
++
++        /// Override from SaveGameData
++        /// Manages saving and loading from the SaveGameFile
++
++        virtual CeGuiString getXmlNodeIdentifier() const;
++        virtual void writeData(SaveGameFileWriter* writer);
++        virtual void readData(SaveGameFileReader* reader);
++        virtual int getPriority() const;  // triggers must be loaded AFTER zones
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/script/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/script/src/Makefile.am	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/src/Makefile.am	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -23,6 +23,7 @@
+ 	ScriptSubsystem.cpp \
+ 	ScriptObjectMarker.cpp \
+ 	SoundNodeProcessor.cpp \
++	TriggerFactory.cpp \
+ 	WaypointProcessor.cpp \
+ 	ZoneProcessor.cpp \
+ 	../swig/RlExports.cxx 
+
+Added: rl/trunk/engine/script/src/TriggerFactory.cpp
+===================================================================
+--- rl/trunk/engine/script/src/TriggerFactory.cpp	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/src/TriggerFactory.cpp	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -0,0 +1,148 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;ScriptWrapper.h&quot;
++#include &quot;TriggerFactory.h&quot;
++#include &quot;Trigger.h&quot;
++#include &quot;ZoneManager.h&quot;
++#include &quot;Zone.h&quot;
++
++
++namespace rl
++{
++    TriggerFactory::TriggerFactory()
++    {
++        SaveGameManager::getSingleton().registerSaveGameData(this);
++    }
++
++    TriggerFactory::~TriggerFactory()
++    {
++        SaveGameManager::getSingleton().unregisterSaveGameData(this);
++    }
++
++    CeGuiString TriggerFactory::getXmlNodeIdentifier() const
++    {
++        return &quot;triggerfactory&quot;;
++    }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void TriggerFactory::writeData(SaveGameFileWriter* writer)
++    {
++        DOMElement* triggerParentNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++
++        const ZoneManager::ZoneMap &amp;zoneMap(ZoneManager::getSingleton().getAllZones());
++        ZoneManager::ZoneMap::const_iterator zone;
++        
++        // look in all zones if there is a trigger
++        for(zone = zoneMap.begin(); zone != zoneMap.end(); zone++)
++        {
++            std::list&lt;Trigger*&gt; allTriggers(zone-&gt;second-&gt;getTriggers());
++            // search for triggers in a zone
++            for(std::list&lt;Trigger*&gt;::iterator trigger = allTriggers.begin(); trigger != allTriggers.end(); trigger++)
++            {
++                if((*trigger)-&gt;needsToBeSaved())
++                {
++                    DOMElement* triggerNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), triggerParentNode, &quot;trigger&quot;);
++                    writer-&gt;setAttributeValueAsStdString(triggerNode, &quot;name&quot;, (*trigger)-&gt;getName());
++                    writer-&gt;setAttributeValueAsStdString(triggerNode, &quot;classname&quot;, (*trigger)-&gt;getClassName());
++                    writer-&gt;setAttributeValueAsStdString(triggerNode, &quot;zone&quot;, zone-&gt;first);
++                    
++                    PropertyMap map = (*trigger)-&gt;getAllProperties()-&gt;toPropertyMap();
++                    writer-&gt;writeEachProperty(triggerNode, map);
++                }
++            }
++        }
++    }
++
++    void TriggerFactory::readData(SaveGameFileReader* reader)
++    {
++        // delete all triggers, that say that they are saved.
++        const ZoneManager::ZoneMap &amp;zoneMap(ZoneManager::getSingleton().getAllZones());
++        ZoneManager::ZoneMap::const_iterator zone;
++        // look in all zones if there is a trigger
++        for(zone = zoneMap.begin(); zone != zoneMap.end(); zone++)
++        {
++            std::list&lt;Trigger*&gt; allTriggers(zone-&gt;second-&gt;getTriggers());
++            // search for triggers in a zone
++            for(std::list&lt;Trigger*&gt;::iterator trigger = allTriggers.begin(); trigger != allTriggers.end(); trigger++)
++            {
++                if((*trigger)-&gt;needsToBeSaved())
++                {
++                    zone-&gt;second-&gt;removeTrigger((*trigger));
++                    if((*trigger)-&gt;deleteIfZoneDestroyed())
++                    {
++                        //ScriptWrapper::getSingleton().owned((*trigger));
++                        delete (*trigger);
++                        ScriptWrapper::getSingleton().deleted((*trigger));
++                    }
++                }
++            }
++        }
++
++
++
++
++        // initialize xmlreader
++        reader-&gt;initializeXml();
++
++        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++
++        if(rootNodeList-&gt;getLength())
++        {
++            DOMNodeList* xmlTriggerFactory = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;trigger&quot;).data());
++            if(xmlTriggerFactory-&gt;getLength())
++            {
++                for(XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlTriggerFactory-&gt;getLength(); childIdx1++)
++                {
++                    DOMNode* xmlTrigger = xmlTriggerFactory-&gt;item(childIdx1);
++                    if(xmlTrigger-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++                        Ogre::String classname = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlTrigger), &quot;classname&quot;);
++                        Ogre::String name = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlTrigger), &quot;name&quot;);
++                        Ogre::String zoneName = reader-&gt;getAttributeValueAsStdString(static_cast&lt;DOMElement*&gt;(xmlTrigger), &quot;zone&quot;);
++
++                        PropertyRecord properties = reader-&gt;getPropertiesAsSet(static_cast&lt;DOMElement*&gt;(xmlTrigger));
++
++
++// doesn't work yet, i suppose, it's because the classname is not known to ruby in this part
++                        Trigger *trigger = createTrigger(classname, name);
++                        trigger-&gt;setProperties(&amp;properties);
++                        Zone *zone = ZoneManager::getSingleton().getZone(zoneName);
++                        if(zone == NULL)
++                        {
++                            LOG_ERROR(Logger::SCRIPT, &quot;Tried to load trigger for zone '&quot;+zoneName+&quot;', but the zone could not be found!&quot;);
++                            delete trigger;
++                        }
++                        else
++                            zone-&gt;addTrigger(trigger);
++
++                    }
++                }
++            }
++        }
++
++        // close xmlreader
++        reader-&gt;shutdownXml();
++    }
++
++    int TriggerFactory::getPriority() const
++    {
++        return 25; // wants to be loaded after zonemanager
++    }
++
++}
+\ No newline at end of file
+
+Modified: rl/trunk/engine/script/src/ZoneProcessor.cpp
+===================================================================
+--- rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/src/ZoneProcessor.cpp	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -55,7 +55,7 @@
+                         // get the zone with that name or create one
+                         zone = ZoneManager::getSingleton().getZone(name);
+                         if( !zone )
+-                            zone = ZoneManager::getSingleton().createZone(name);
++                            zone = ZoneManager::getSingleton().createZone(name, false);
+ 
+                         // multiple areas
+                         for(DOMNode* curArea = cur-&gt;getFirstChild(); curArea != NULL; curArea = curArea-&gt;getNextSibling())
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2007-11-05 22:56:25 UTC (rev 3966)
++++ rl/trunk/engine/script/swig/RlCore.swig	2007-11-05 22:58:53 UTC (rev 3967)
+@@ -911,7 +911,7 @@
+ {
+ public:
+ 	static const ZoneManager&amp; getSingleton();
+-    rl::Zone* createZone(const Ogre::String&amp; name);
++    rl::Zone* createZone(const Ogre::String&amp; name, bool needsToBeSaved);
+     void destroyZone(const Ogre::String&amp; name);
+ 
+     void addAreaToZone(const Ogre::String&amp; name, 
+@@ -950,7 +950,7 @@
+ class  Trigger
+ {
+ public:
+-    Trigger(const Ogre::String &amp;name);
++    Trigger(const Ogre::String &amp;classname, const Ogre::String &amp;name, bool needsToBeSaved);
+     virtual ~Trigger();
+ 	virtual bool activate() = 0;
+ 	virtual bool deactivate() = 0;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001037.html">[Dsa-hl-svn] r3966 - in rl/trunk/engine: rules/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001039.html">[Dsa-hl-svn] r3968 - in modules/common/scripts: . triggers
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1038">[ date ]</a>
+              <a href="thread.html#1038">[ thread ]</a>
+              <a href="subject.html#1038">[ subject ]</a>
+              <a href="author.html#1038">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

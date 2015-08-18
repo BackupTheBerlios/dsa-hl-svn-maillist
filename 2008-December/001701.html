@@ -1,0 +1,494 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4644 - in rl/branches/persistence: common/include	common/src core core/include core/src rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-December/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4644%20-%20in%20rl/branches/persistence%3A%20common/include%0A%09common/src%20core%20core/include%20core/src%20rules/include%20rules/src&In-Reply-To=%3C200812072022.mB7KMRPV001489%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001700.html">
+   <LINK REL="Next"  HREF="001702.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4644 - in rl/branches/persistence: common/include	common/src core core/include core/src rules/include rules/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4644%20-%20in%20rl/branches/persistence%3A%20common/include%0A%09common/src%20core%20core/include%20core/src%20rules/include%20rules/src&In-Reply-To=%3C200812072022.mB7KMRPV001489%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4644 - in rl/branches/persistence: common/include	common/src core core/include core/src rules/include rules/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Dec  7 21:22:27 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001700.html">[Dsa-hl-svn] r4643 - in rl/branches/persistence: common/include	core/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001702.html">[Dsa-hl-svn] r4645 - modules/ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1701">[ date ]</a>
+              <a href="thread.html#1701">[ thread ]</a>
+              <a href="subject.html#1701">[ subject ]</a>
+              <a href="author.html#1701">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-12-07 21:22:18 +0100 (Sun, 07 Dec 2008)
+New Revision: 4644
+
+Added:
+   rl/branches/persistence/core/include/GlobalData.h
+   rl/branches/persistence/core/src/GlobalData.cpp
+Modified:
+   rl/branches/persistence/common/include/WriteableDataStreamFormatTarget.h
+   rl/branches/persistence/common/src/WriteableDataStreamFormatTarget.cpp
+   rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp
+   rl/branches/persistence/core/RlCore2005.vcproj
+   rl/branches/persistence/core/include/SaveAbleCollection.h
+   rl/branches/persistence/core/include/SaveAbleFactory.h
+   rl/branches/persistence/core/include/SaveAbleManager.h
+   rl/branches/persistence/core/src/SaveAbleCollection.cpp
+   rl/branches/persistence/core/src/SaveAbleFactory.cpp
+   rl/branches/persistence/core/src/SaveAbleManager.cpp
+   rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+   rl/branches/persistence/rules/include/QuestBook.h
+   rl/branches/persistence/rules/src/QuestBook.cpp
+Log:
+- working on SaveAbleCollection, SaveAbleFactory and SaveAbleManager
+- tried to fix WriteableDataStreamFormatTarget
+- introducing GlobalData
+
+Modified: rl/branches/persistence/common/include/WriteableDataStreamFormatTarget.h
+===================================================================
+--- rl/branches/persistence/common/include/WriteableDataStreamFormatTarget.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/common/include/WriteableDataStreamFormatTarget.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -24,8 +24,8 @@
+     {
+     public:
+         WriteableDataStreamFormatTarget(WriteableDataStreamPtr stream);
+-        void writeChars (const XMLByte *const toWrite, const unsigned int count, XERCES_CPP_NAMESPACE::XMLFormatter *const formatter);
+-        void flush ();
++        virtual void writeChars (const XMLByte *const toWrite, const unsigned int count, XERCES_CPP_NAMESPACE::XMLFormatter *const formatter);
++        virtual void flush ();
+     protected:
+         WriteableDataStreamPtr mStream;
+     };
+
+Modified: rl/branches/persistence/common/src/WriteableDataStreamFormatTarget.cpp
+===================================================================
+--- rl/branches/persistence/common/src/WriteableDataStreamFormatTarget.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/common/src/WriteableDataStreamFormatTarget.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -27,12 +27,22 @@
+ 
+     void WriteableDataStreamFormatTarget::writeChars (const XMLByte *const toWrite, const unsigned int count, XERCES_CPP_NAMESPACE::XMLFormatter *const formatter)
+     {
+-        mStream-&gt;write((char*)toWrite, count);
++        if(static_cast&lt;WriteableDataStream*&gt;(mStream.get()))
++        {
++            mStream-&gt;write((char*)toWrite, count);
++        }
++        else
++            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);
+     }
+ 
+     void WriteableDataStreamFormatTarget::flush ()
+     {
+-        mStream-&gt;flush();
++        if(static_cast&lt;WriteableDataStream*&gt;(mStream.get()))
++        {
++            mStream-&gt;flush();
++        }
++        else
++            LOG_ERROR(Logger::COMMON, &quot;WriteableDataStreamFormatTarget: Stream &quot; + mStream-&gt;getName() + &quot; is not writeable&quot;);
+     }
+ }
+ 
+
+Modified: rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp
+===================================================================
+--- rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/common/src/WriteableFileSystemArchiv.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -72,6 +72,7 @@
+ 
+     DataStreamPtr WriteableFileSystemArchive::open(const String&amp; filename) const
+     {
++        LOG_MESSAGE(Logger::COMMON, &quot;Opening WriteableFileStreamDataStream: &quot; + filename);
+         String full_path = concatenate_path(mName, filename);
+ 
+         // Always open in binary mode
+
+Modified: rl/branches/persistence/core/RlCore2005.vcproj
+===================================================================
+--- rl/branches/persistence/core/RlCore2005.vcproj	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/RlCore2005.vcproj	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -663,6 +663,10 @@
+ 				Name=&quot;SaveGame&quot;
+ 				&gt;
+ 				&lt;File
++					RelativePath=&quot;.\include\GlobalData.h&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\include\SaveAble.h&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+@@ -1012,6 +1016,10 @@
+ 				Name=&quot;SaveGame&quot;
+ 				&gt;
+ 				&lt;File
++					RelativePath=&quot;.\src\GlobalData.cpp&quot;
++					&gt;
++				&lt;/File&gt;
++				&lt;File
+ 					RelativePath=&quot;.\src\SaveAble.cpp&quot;
+ 					&gt;
+ 				&lt;/File&gt;
+
+Added: rl/branches/persistence/core/include/GlobalData.h
+===================================================================
+--- rl/branches/persistence/core/include/GlobalData.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/include/GlobalData.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -0,0 +1,37 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++#ifndef __GLOBALDATA_H__
++#define __GLOBALDATA_H__
++
++#include &quot;SaveAbleCollection.h&quot;
++
++namespace rl
++{
++    class GlobalData : public SaveAbleCollection
++    {
++    public:
++        GlobalData(const CeGuiString &amp;id);
++        virtual ~GlobalData();
++        virtual void attachSaveAble(SaveAblePtr saveAble);
++		virtual void deattachSaveAble(SaveAblePtr saveAble);
++		virtual void deattachSaveAble(const CeGuiString &amp;id);
++		virtual void deattachAllSaveAbles();
++    };
++}
++
++
++#endif
+\ No newline at end of file
+
+Modified: rl/branches/persistence/core/include/SaveAbleCollection.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleCollection.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/include/SaveAbleCollection.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -23,14 +23,17 @@
+ 	class _RlCoreExport SaveAbleCollection
+ 	{
+ 	public:
++        typedef std::map&lt;CeGuiString, SaveAblePtr&gt; SaveAbleMap;
++
+ 		SaveAbleCollection(const CeGuiString &amp;id);
+ 		virtual void attachSaveAble(SaveAblePtr saveAble) = 0;
+ 		virtual void deattachSaveAble(SaveAblePtr saveAble) = 0;
+ 		virtual void deattachSaveAble(const CeGuiString &amp;id) = 0;
+ 		virtual void deattachAllSaveAbles() = 0;
+ 		CeGuiString getId() const;
++        SaveAbleMap getSaveAbles() const;
+ 	protected:
+-		std::map&lt;int, SaveAblePtr&gt; mSaveAbles;
++		SaveAbleMap mSaveAbles;
+ 		CeGuiString mId;
+ 	};
+ 
+
+Modified: rl/branches/persistence/core/include/SaveAbleFactory.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleFactory.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/include/SaveAbleFactory.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -27,6 +27,7 @@
+ 	public:
+ 		virtual SaveAblePtr createSaveAble(const CeGuiString &amp;id, PropertyRecordPtr params) = 0;
+ 		virtual void removeSaveAble(const CeGuiString &amp;id) = 0;
++        virtual PropertyRecordPtr getCreationParams(const CeGuiString &amp;id) const = 0;
+ 	};
+ 
+ 	class _RlCoreExport SaveAbleFactoryPool : public Ogre::Singleton&lt;SaveAbleFactoryPool&gt;
+
+Modified: rl/branches/persistence/core/include/SaveAbleManager.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleManager.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/include/SaveAbleManager.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -29,7 +29,6 @@
+ 	protected:
+ 		typedef std::map&lt;CeGuiString, SaveAbleCollection*&gt; SaveAbleCollectionMap;
+ 	public:
+-		typedef std::map&lt;CeGuiString, SaveAblePtr&gt; SaveAbleMap;
+ 		typedef std::map&lt;CeGuiString, PropertyRecordPtr&gt; SaveAbleStateMap;
+ 		void saveState();
+ 		void loadState();
+@@ -39,8 +38,6 @@
+ 		void removeSaveAble(SaveAblePtr save);
+ 		void removeSaveAble(const CeGuiString &amp;id);
+ 		void removeAllSaveAbles();
+-		//void attachSaveAbleToCollection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId);
+-		//void deattachSaveAbleFromColltection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId);
+ 		
+ 		SaveAbleCollectionMap getCollections();
+ 		SaveAbleStateMap getSaveAbleStates();
+@@ -49,7 +46,7 @@
+ 		SaveAbleFactory* getFactory(const CeGuiString &amp;id);
+ 	protected:
+ 		SaveAbleStateMap mSaveAbleStates;
+-		SaveAbleMap mSaveAbles;
++		//SaveAbleMap mSaveAbles;
+ 		SaveAbleCollectionMap mSaveAbleCollections;
+ 
+ 		void storeSaveAbleStates();
+
+Added: rl/branches/persistence/core/src/GlobalData.cpp
+===================================================================
+--- rl/branches/persistence/core/src/GlobalData.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/src/GlobalData.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -0,0 +1,61 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++#include &quot;stdinc.h&quot;
++
++#include &quot;GlobalData.h&quot;
++
++namespace rl
++{
++    GlobalData::GlobalData(const CeGuiString &amp;id) : SaveAbleCollection(id)
++    {
++    }
++
++    GlobalData::~GlobalData()
++    {
++        deattachAllSaveAbles();
++    }
++
++    void GlobalData::attachSaveAble(SaveAblePtr saveAble)
++    {
++        SaveAbleMap::const_iterator iter;
++        for(iter = mSaveAbles.begin(); iter != mSaveAbles.end(); iter++)
++        {
++            if(iter-&gt;second == saveAble || iter-&gt;first == saveAble-&gt;getId())
++                return;
++        }
++        mSaveAbles[saveAble-&gt;getId()] = saveAble;
++    }
++
++    void GlobalData::deattachSaveAble(SaveAblePtr saveAble)
++    {
++        SaveAbleMap::iterator iter = mSaveAbles.find(saveAble-&gt;getId());
++        if(iter-&gt;second == saveAble &amp;&amp; iter != mSaveAbles.end())
++            mSaveAbles.erase(iter);
++    }
++
++    void GlobalData::deattachSaveAble(const CeGuiString &amp;id)
++    {
++        SaveAbleMap::iterator iter = mSaveAbles.find(id);
++        if(iter != mSaveAbles.end())
++            mSaveAbles.erase(iter);
++    }
++
++    void GlobalData::deattachAllSaveAbles()
++    {
++        mSaveAbles.clear();
++    }
++}
+\ No newline at end of file
+
+Modified: rl/branches/persistence/core/src/SaveAbleCollection.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleCollection.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/src/SaveAbleCollection.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -29,4 +29,9 @@
+ 	{
+ 		return mId;
+ 	}
++
++    SaveAbleCollection::SaveAbleMap SaveAbleCollection::getSaveAbles() const
++    {
++        return mSaveAbles;
++    }
+ }
+\ No newline at end of file
+
+Modified: rl/branches/persistence/core/src/SaveAbleFactory.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleFactory.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/src/SaveAbleFactory.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -28,13 +28,17 @@
+ 	{
+ 		if(mFactories.find(key) != mFactories.end())
+ 			LOG_ERROR(&quot;CORE&quot;, &quot;SaveAbleFactory already registered!&quot;);
+-		mFactories[key] = fac;
++        else
++            mFactories[key] = fac;
+ 	}
+ 
+ 	void SaveAbleFactoryPool::unregisterFactory(const Ogre::String &amp;key)
+ 	{
+ 		std::map&lt;Ogre::String,SaveAbleFactory*&gt;::iterator it = mFactories.find(key);
+-		mFactories.erase(it);
++        if(it != mFactories.end())            
++            mFactories.erase(it);
++        else
++            LOG_ERROR(Logger::CORE, &quot;SaveAbleFactory is not registered!&quot;);
+ 	}
+ 
+ 	void SaveAbleFactoryPool::unregisterFactory(rl::SaveAbleFactory *fac)
+
+Modified: rl/branches/persistence/core/src/SaveAbleManager.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleManager.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/src/SaveAbleManager.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -41,15 +41,7 @@
+ 	void SaveAbleManager::removeAllSaveAbles()
+ 	{
+ 	}
+-		
+-	/*void SaveAbleManager::attachSaveAbleToCollection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId)
+-	{
+-	}*/
+-		
+-	/*void SaveAbleManager::deattachSaveAbleFromColltection(const CeGuiString &amp;saveAbleId, const CeGuiString &amp;collectionId)
+-	{
+-	}*/
+-		
++
+ 	void SaveAbleManager::restoreSaveAblesFromStates()
+ 	{
+ 	}
+@@ -62,16 +54,23 @@
+ 	{
+ 		mSaveAbleStates.clear();
+ 
+-		SaveAbleMap::const_iterator it;
+-		for(it = mSaveAbles.begin(); it != mSaveAbles.end(); it++)
+-		{
+-			PropertyRecordPtr Properties;
+-			Properties-&gt;setProperty(&quot;Properties&quot;, it-&gt;second-&gt;getAllProperties()-&gt;toPropertyMap());
++        SaveAbleCollectionMap::const_iterator iter_collection;
++        for(iter_collection = mSaveAbleCollections.begin(); iter_collection != mSaveAbleCollections.end(); iter_collection++)
++        {
++            SaveAbleCollection::SaveAbleMap saveAbles = iter_collection-&gt;second-&gt;getSaveAbles();
++            
++            SaveAbleCollection::SaveAbleMap::const_iterator iter_saveAbles;
++            for(iter_saveAbles = saveAbles.begin(); iter_saveAbles != saveAbles.end(); iter_saveAbles++)
++            {
++                PropertyRecordPtr properties;
++                properties-&gt;setProperty(&quot;Properties&quot;, iter_saveAbles-&gt;second-&gt;getAllProperties()-&gt;toPropertyMap());
+ 
+-			// Ein dickes TODO ------
+-			Properties-&gt;setProperty(&quot;CreationProperties&quot;, Property());
+-			Properties-&gt;setProperty(&quot;Factory&quot;, Property(&quot;ID der Factory&quot;));
+-			mSaveAbleStates[it-&gt;first] = Properties;
+-		}
++                //Hier fehlt noch einiges!!!!
++                properties-&gt;setProperty(&quot;Collection&quot;, iter_collection-&gt;second-&gt;getId());
++                properties-&gt;setProperty(&quot;Factory&quot;, Property(&quot;ID der Factory&quot;));
++                properties-&gt;setProperty(&quot;CreationParams&quot;, Property());
++                mSaveAbleStates[iter_saveAbles-&gt;first] = properties;
++            }
++        }
+ 	}
+ }
+
+Modified: rl/branches/persistence/core/src/SaveAbleSerializer.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/core/src/SaveAbleSerializer.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -65,7 +65,7 @@
+ 	void SaveAbleSerializer::parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName)
+ 	{
+ 		LOG_MESSAGE(Logger::CORE, &quot;Parsing headers of save game file: &quot; + stream-&gt;getName() + &quot; Resource group: &quot; + groupName);
+-		SaveGameFile* file = new SaveGameFile(Ogre::StringConverter::parseInt(stream-&gt;getName()),(WriteableDataStreamPtr)(WriteableDataStream*)stream.get());
++		SaveGameFile* file = new SaveGameFile(Ogre::StringConverter::parseInt(stream-&gt;getName()),(WriteableDataStreamPtr)static_cast&lt;WriteableFileStreamDataStream*&gt;(stream.get()));
+ 		mReader.parseSaveGameFileHeader(file);
+ 		mHighestSaveGameNumber = Ogre::StringConverter::parseInt(stream-&gt;getName()) &gt; mHighestSaveGameNumber ? Ogre::StringConverter::parseInt(stream-&gt;getName()) : mHighestSaveGameNumber;
+ 		mSaveGameFiles[Ogre::StringConverter::parseInt(stream-&gt;getName())] = file;
+
+Modified: rl/branches/persistence/rules/include/QuestBook.h
+===================================================================
+--- rl/branches/persistence/rules/include/QuestBook.h	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/rules/include/QuestBook.h	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -69,6 +69,7 @@
+ 	 */
+ 	SaveAblePtr createSaveAble(const CeGuiString &amp;id, PropertyRecordPtr params);
+ 	virtual void removeSaveAble(const CeGuiString &amp;id);
++    virtual PropertyRecordPtr getCreationParams(const CeGuiString &amp;id) const;
+ 
+     /**
+      *  Adds a journal entry to the quest book.
+
+Modified: rl/branches/persistence/rules/src/QuestBook.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/QuestBook.cpp	2008-12-06 19:41:11 UTC (rev 4643)
++++ rl/branches/persistence/rules/src/QuestBook.cpp	2008-12-07 20:22:18 UTC (rev 4644)
+@@ -96,6 +96,11 @@
+ 	{
+ 	}
+ 
++    PropertyRecordPtr QuestBook::getCreationParams(const CeGuiString &amp;id) const
++    {
++        return PropertyRecordPtr();
++    }
++
+     void QuestBook::_fireQuestBookChanged(Quest *quest, int reason)
+     {
+ 	    QuestEvent* evt = new QuestEvent(this, reason);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001700.html">[Dsa-hl-svn] r4643 - in rl/branches/persistence: common/include	core/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001702.html">[Dsa-hl-svn] r4645 - modules/ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1701">[ date ]</a>
+              <a href="thread.html#1701">[ thread ]</a>
+              <a href="subject.html#1701">[ subject ]</a>
+              <a href="author.html#1701">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

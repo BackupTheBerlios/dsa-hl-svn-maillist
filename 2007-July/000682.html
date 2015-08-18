@@ -1,0 +1,695 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3611 - in rl/trunk/engine: common/include common/src	rules/include rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3611%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200707182331.l6INVkYm023881%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000681.html">
+   <LINK REL="Next"  HREF="000683.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3611 - in rl/trunk/engine: common/include common/src	rules/include rules/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3611%20-%20in%20rl/trunk/engine%3A%20common/include%20common/src%0A%09rules/include%20rules/src&In-Reply-To=%3C200707182331.l6INVkYm023881%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3611 - in rl/trunk/engine: common/include common/src	rules/include rules/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Jul 19 01:31:46 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000681.html">[Dsa-hl-svn] r3610 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="000683.html">[Dsa-hl-svn] r3612 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#682">[ date ]</a>
+              <a href="thread.html#682">[ thread ]</a>
+              <a href="subject.html#682">[ subject ]</a>
+              <a href="author.html#682">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-07-19 01:31:40 +0200 (Thu, 19 Jul 2007)
+New Revision: 3611
+
+Modified:
+   rl/trunk/engine/common/include/Properties.h
+   rl/trunk/engine/common/src/Properties.cpp
+   rl/trunk/engine/rules/include/Quest.h
+   rl/trunk/engine/rules/include/QuestBook.h
+   rl/trunk/engine/rules/src/Quest.cpp
+   rl/trunk/engine/rules/src/QuestBook.cpp
+Log:
+Added property support for quest book
+
+Modified: rl/trunk/engine/common/include/Properties.h
+===================================================================
+--- rl/trunk/engine/common/include/Properties.h	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/common/include/Properties.h	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -32,7 +32,8 @@
+         virtual const Property getProperty(const Ogre::String&amp; key) const = 0;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value) = 0;
+         virtual PropertySet* getAllProperties() const = 0;
+-        virtual void setProperties(const PropertySet* props);
++        void setProperties(const PropertySet* props);
++        void setProperties(const PropertyMap&amp; propmap);
+     };
+ 
+     class _RlCommonExport PropertySet : public PropertyHolder
+@@ -40,12 +41,14 @@
+ 	public:
+         PropertySet();
+         PropertySet(const PropertySet* ps);
++        PropertySet(const PropertyMap&amp; propmap);
+ 
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertySet* getAllProperties() const;
+         const PropertySetMap::const_iterator begin() const;
+         const PropertySetMap::const_iterator end() const;
++        PropertyMap toPropertyMap() const;
+         
+     private:
+         PropertySetMap mProperties;
+
+Modified: rl/trunk/engine/common/src/Properties.cpp
+===================================================================
+--- rl/trunk/engine/common/src/Properties.cpp	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/common/src/Properties.cpp	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -34,6 +34,15 @@
+         }
+     }
+ 
++    void PropertyHolder::setProperties(const PropertyMap&amp; propmap)
++    {
++        for (PropertyMap::const_iterator it = propmap.begin();
++            it != propmap.end(); it++)
++        {
++            setProperty((*it).first.c_str(), (*it).second);
++        }
++    }
++
+     PropertySet::PropertySet()
+         : PropertyHolder()
+     {
+@@ -47,6 +56,13 @@
+         setProperties(ps);
+     }
+ 
++    PropertySet::PropertySet(const PropertyMap&amp; propmap)
++        : PropertyHolder()
++    {
++        mProperties.clear();
++        convertToMap(propmap, mProperties);
++    }
++
+     const Property PropertySet::getProperty(const Ogre::String&amp; key) const
+     {
+         PropertySetMap::const_iterator it = mProperties.find(key);
+@@ -77,4 +93,9 @@
+     {
+         return mProperties.end();
+     }
++
++    PropertyMap PropertySet::toPropertyMap() const
++    {
++        return convertToPropertyMap(mProperties);
++    }
+ }
+
+Modified: rl/trunk/engine/rules/include/Quest.h
+===================================================================
+--- rl/trunk/engine/rules/include/Quest.h	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/rules/include/Quest.h	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -29,11 +29,11 @@
+ 
+     typedef std::vector&lt;Quest*&gt; QuestVector;
+ 
+-#undef SUCCEEDED
++    #undef SUCCEEDED
+     /**
+     * @brief Verwaltet einen Quest oder Subquest
+     */
+-    class _RlRulesExport Quest : public PropertySet
++    class _RlRulesExport Quest : public PropertyHolder
+     {
+     public:
+         enum State
+@@ -48,16 +48,19 @@
+         static const CeGuiString STATE_NAMES[5];
+         static const CeGuiString KNOWN_NAMES[2];
+ 
+-        static const Ogre::String PROP_NAME;
+-        static const Ogre::String PROP_DESCRIPTION;
+-        static const Ogre::String PROP_KNOWN;
++        static const Ogre::String PROPERTY_ID;
++        static const Ogre::String PROPERTY_NAME;
++        static const Ogre::String PROPERTY_DESCRIPTION;
++        static const Ogre::String PROPERTY_KNOWN;
+ 
+         /**
+         * @param id eine einzigartige ID, um den Quest wiederzufinden
+         * @param name Titel des Quests
+         * @param description Lange Beschreibung, die im Tagebuch angezeigt wird
+         */
+-        Quest(const CeGuiString id, const CeGuiString name, const CeGuiString description);
++        Quest(const CeGuiString&amp; id, const CeGuiString&amp; name = &quot;&quot;, 
++            const CeGuiString&amp; description = &quot;&quot;);
++
+         virtual ~Quest();
+ 
+         /**
+@@ -176,6 +179,7 @@
+         State mState;
+         Quest* mParent;
+         QuestBook* mQuestBook;
++		PropertySet* mAdditionalProperties;
+ 
+         void checkDone();
+         void setParent(Quest* parentQuest);
+
+Modified: rl/trunk/engine/rules/include/QuestBook.h
+===================================================================
+--- rl/trunk/engine/rules/include/QuestBook.h	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/rules/include/QuestBook.h	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -33,20 +33,22 @@
+ namespace rl {
+ 
+ ///@todo Rename this class to reflect scope changes.
+-class _RlRulesExport QuestBook : public EventSource
++class _RlRulesExport QuestBook : public EventSource, public PropertyHolder
+ {
+ public:
++    static const Ogre::String PROPERTY_QUESTS;
++    static const Ogre::String PROPERTY_JOURNAL;
++
+ 	QuestBook();
+ 	~QuestBook();
+ 
+-
+ 	/**
+ 	 * Sucht einen Quest anhand einer ID
+ 	 * @return der Quest
+ 	 */
+-	Quest* getQuest(const CeGuiString id);
++	Quest* getQuest(const CeGuiString id) const;
+ 
+-	QuestVector getTopLevelQuests();
++	QuestVector getTopLevelQuests() const;
+ 
+ 	/**
+ 	 * Fuegt einen Quest hinzu
+@@ -69,8 +71,16 @@
+ 
+     void _fireQuestBookChanged(Quest* quest, int reason);
+ 
++    virtual const Property getProperty(const Ogre::String&amp; key) const;
++    virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
++    virtual PropertySet* getAllProperties() const;
++
+ private:
+-	Quest* getQuest(Quest* parent, const CeGuiString id);
++	Quest* getQuest(Quest* parent, const CeGuiString id) const;
++    void clear();
++    void createRoot();
++    QuestVector getAllQuests() const;
++
+ 	Quest* mRootQuest;
+     std::vector&lt;JournalEntry*&gt; mJournalEntries;
+ 	EventCaster&lt;QuestEvent&gt; mQuestEventCaster;
+
+Modified: rl/trunk/engine/rules/src/Quest.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Quest.cpp	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/rules/src/Quest.cpp	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -41,13 +41,13 @@
+ 		{	&quot;UNKNOWN&quot;,
+             &quot;KNOWN&quot;};
+ 
+-const Ogre::String Quest::PROP_NAME = &quot;str_name&quot;;
+-const Ogre::String Quest::PROP_DESCRIPTION = &quot;str_description&quot;;
+-const Ogre::String Quest::PROP_KNOWN = &quot;bool_known&quot;;
++const Ogre::String Quest::PROPERTY_ID = &quot;id&quot;;
++const Ogre::String Quest::PROPERTY_NAME = &quot;name&quot;;
++const Ogre::String Quest::PROPERTY_DESCRIPTION = &quot;description&quot;;
++const Ogre::String Quest::PROPERTY_KNOWN = &quot;known&quot;;
+ 
+-Quest::Quest(const CeGuiString id, const CeGuiString name, const CeGuiString description)
+-:	PropertySet(),
+-    mId(id),
++Quest::Quest(const CeGuiString&amp; id, const CeGuiString&amp; name, const CeGuiString&amp; description)
++:	mId(id),
+ 	mName(name),
+ 	mDescription(description),
+ 	mPartsToDo(1),
+@@ -58,13 +58,17 @@
+ 	mQuestBook(NULL),
+     mSubquests()
+ {
++	mAdditionalProperties = new PropertySet();
+ }
+ 
+ Quest::~Quest()
+ {
+-    for( QuestVector::iterator it = mSubquests.begin();
+-        it != mSubquests.end(); it++ )
+-           ScriptWrapper::getSingleton().disowned( (*it) );
++    for (QuestVector::iterator it = mSubquests.begin();
++        it != mSubquests.end(); ++it)
++    {
++       ScriptWrapper::getSingleton().disowned(*it);
++       delete *it;
++    }
+     mSubquests.clear();
+ }
+ 
+@@ -293,51 +297,61 @@
+ 
+ const Property Quest::getProperty(const Ogre::String&amp; key) const
+ {
+-    if (key == PROP_KNOWN)
++    if (key == PROPERTY_KNOWN)
+     {
+         return Property(mKnown);
+     }
+-    else if (key == PROP_NAME)
++    else if (key == PROPERTY_NAME)
+     {
++        return Property(mId);
++    }
++    else if (key == PROPERTY_NAME)
++    {
+         return Property(mName);
+     }
+-    else if (key == PROP_DESCRIPTION)
++    else if (key == PROPERTY_DESCRIPTION)
+     {
+         return Property(mDescription);
+     }
+     else
+     {
+-        return PropertySet::getProperty(key);
++        return mAdditionalProperties-&gt;getProperty(key);
+     }
+ }
+ 
+ void Quest::setProperty(const Ogre::String&amp; key, const Property&amp; value)
+ {
+-    if (key == PROP_KNOWN)
++    if (key == PROPERTY_KNOWN)
+     {
+         mKnown = value.toBool();
+     }
+-    else if (key == PROP_NAME)
++    else if (key == PROPERTY_ID)
+     {
++        mId = value.toString();
++    }
++    else if (key == PROPERTY_NAME)
++    {
+         mName = value.toString();
+     }
+-    else if (key == PROP_DESCRIPTION)
++    else if (key == PROPERTY_DESCRIPTION)
+     {
+         mDescription = value.toString();
+     }
+     else
+     {
+-        PropertySet::setProperty(key, value);
++        mAdditionalProperties-&gt;setProperty(key, value);
+     }
+ }
+ 
+ PropertySet* Quest::getAllProperties() const
+ {
+-    PropertySet* ps = PropertySet::getAllProperties();
++    PropertySet* ps = new PropertySet();
+ 
+-    ps-&gt;setProperty(PROP_NAME, Property(mName));
+-    ps-&gt;setProperty(PROP_DESCRIPTION, Property(mDescription));
+-    ps-&gt;setProperty(PROP_KNOWN, Property(mKnown));
++    ps-&gt;setProperty(PROPERTY_ID, Property(mId));
++    ps-&gt;setProperty(PROPERTY_NAME, Property(mName));
++    ps-&gt;setProperty(PROPERTY_DESCRIPTION, Property(mDescription));
++    ps-&gt;setProperty(PROPERTY_KNOWN, Property(mKnown));
++    ps-&gt;setProperties(mAdditionalProperties);
+ 
+     return ps;
+ }
+
+Modified: rl/trunk/engine/rules/src/QuestBook.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/QuestBook.cpp	2007-07-18 23:30:53 UTC (rev 3610)
++++ rl/trunk/engine/rules/src/QuestBook.cpp	2007-07-18 23:31:40 UTC (rev 3611)
+@@ -23,130 +23,222 @@
+ using namespace std;
+ 
+ namespace rl {
++    const Ogre::String QuestBook::PROPERTY_QUESTS = &quot;quests&quot;;
++    const Ogre::String QuestBook::PROPERTY_JOURNAL = &quot;journal&quot;;
+ 
+-QuestBook::QuestBook()
+-	: mRootQuest(new Quest(&quot;&lt;root&gt;&quot;, &quot;&lt;root&gt;&quot;, &quot;&lt;root&gt;&quot;)) ,
+-    mJournalEntries(),
+-	mQuestEventCaster(),
+-	mJournalEventCaster()
+-{
+-	mRootQuest-&gt;setQuestBook(this);
+-	mRootQuest-&gt;setState(Quest::OPEN);
+-}
++    QuestBook::QuestBook()
++	    : mJournalEntries(),
++	    mQuestEventCaster(),
++	    mJournalEventCaster()
++    {
++        createRoot();
++    }
+ 
+-QuestBook::~QuestBook()
+-{
+-	delete mRootQuest;
+-    for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
+-        it != mJournalEntries.end(); it++ )
+-        delete (*it);
+-    mJournalEntries.clear();
++    QuestBook::~QuestBook()
++    {
++	    delete mRootQuest;
++        for( vector&lt;JournalEntry*&gt;::iterator it = mJournalEntries.begin();
++            it != mJournalEntries.end(); it++ )
++        {
++            delete *it;
++        }
++        mJournalEntries.clear();
++    }
+ 
+-}
++    void QuestBook::createRoot()
++    {
++        mRootQuest = new Quest(&quot;&lt;root&gt;&quot;, &quot;&lt;root&gt;&quot;, &quot;&lt;root&gt;&quot;); 
++	    mRootQuest-&gt;setQuestBook(this);
++	    mRootQuest-&gt;setState(Quest::OPEN);
++    }
+ 
+-Quest* QuestBook::getQuest(const CeGuiString id)
+-{
+-	return getQuest(mRootQuest, id);
+-}
++    Quest* QuestBook::getQuest(const CeGuiString id) const
++    {
++	    return getQuest(mRootQuest, id);
++    }
+ 
+-Quest* QuestBook::getQuest(Quest* parent, const CeGuiString id)
+-{
+-	if (parent-&gt;getId().compare(id) == 0)
+-		return parent;
++    Quest* QuestBook::getQuest(Quest* parent, const CeGuiString id) const
++    {
++	    if (parent-&gt;getId().compare(id) == 0)
++		    return parent;
+ 
+-	QuestVector children = parent-&gt;getSubquests();
+-	for(QuestVector::iterator it = children.begin(); it != children.end(); it++)
+-	{
+-		Quest* subquest = getQuest(*it, id);
+-		if (subquest != NULL)
+-			return subquest;
+-	}
++	    QuestVector children = parent-&gt;getSubquests();
++	    for(QuestVector::iterator it = children.begin(); it != children.end(); it++)
++	    {
++		    Quest* subquest = getQuest(*it, id);
++		    if (subquest)
++		    {
++			    return subquest;
++		    }
++	    }
+ 
+-	return NULL;
+-}
++	    return NULL;
++    }
+ 
+-void QuestBook::addQuest(Quest* quest)
+-{
+-	mRootQuest-&gt;addSubquest(quest);
+-}
++    void QuestBook::addQuest(Quest* quest)
++    {
++	    mRootQuest-&gt;addSubquest(quest);
++    }
+ 
+-void QuestBook::_fireQuestBookChanged(Quest *quest, int reason )
+-{
+-	QuestEvent* evt = new QuestEvent( this, reason );
+-	evt-&gt;setQuest(quest);
+-	mQuestEventCaster.dispatchEvent(evt);
+-	delete evt;
+-}
++    void QuestBook::_fireQuestBookChanged(Quest *quest, int reason)
++    {
++	    QuestEvent* evt = new QuestEvent(this, reason);
++	    evt-&gt;setQuest(quest);
++	    mQuestEventCaster.dispatchEvent(evt);
++	    delete evt;
++    }
+ 
+-void QuestBook::fireJournalChanged(JournalEntry* entry, int reason)
+-{
+-	JournalEvent evt = JournalEvent(this, reason, entry);
+-	mJournalEventCaster.dispatchEvent(&amp;evt);
+-}
++    void QuestBook::fireJournalChanged(JournalEntry* entry, int reason)
++    {
++	    JournalEvent evt = JournalEvent(this, reason, entry);
++	    mJournalEventCaster.dispatchEvent(&amp;evt);
++    }
+ 
+-void QuestBook::addQuestListener(QuestListener* listener)
+-{
+-	if (mQuestEventCaster.containsListener(listener) !=
+-        mJournalEventCaster.containsListener(listener))
++    void QuestBook::addQuestListener(QuestListener* listener)
+     {
+-        Throw(AssertionFailedError, &quot;listener registration inconsistent&quot;);
++	    if (mQuestEventCaster.containsListener(listener) !=
++            mJournalEventCaster.containsListener(listener))
++        {
++            Throw(AssertionFailedError, &quot;listener registration inconsistent&quot;);
++        }
++	    else if (!mJournalEventCaster.containsListener(listener))
++        {
++		    mJournalEventCaster.addEventListener(listener);
++		    mQuestEventCaster.addEventListener(listener);
++            ScriptWrapper::getSingleton().owned( listener );
++        }
+     }
+-	else if (!mJournalEventCaster.containsListener(listener))
++
++    void QuestBook::removeQuestListener(QuestListener* listener)
+     {
+-		mJournalEventCaster.addEventListener(listener);
+-		mQuestEventCaster.addEventListener(listener);
+-        ScriptWrapper::getSingleton().owned( listener );
++	    if (mQuestEventCaster.containsListener(listener) !=
++            mJournalEventCaster.containsListener(listener))
++        {
++            Throw(AssertionFailedError, &quot;listener registration inconsistent&quot;);
++        }
++	    else if (mJournalEventCaster.containsListener( listener ))
++        {
++	        mJournalEventCaster.removeEventListener(listener);
++	        mQuestEventCaster.removeEventListener(listener);
++            ScriptWrapper::getSingleton().disowned( listener );
++        }
+     }
+-}
+ 
+-void QuestBook::removeQuestListener(QuestListener* listener)
+-{
+-	if (mQuestEventCaster.containsListener(listener) !=
+-        mJournalEventCaster.containsListener(listener))
++    QuestVector QuestBook::getTopLevelQuests() const
+     {
+-        Throw(AssertionFailedError, &quot;listener registration inconsistent&quot;);
++	    return mRootQuest-&gt;getSubquests();
+     }
+-	else if (mJournalEventCaster.containsListener( listener ))
++
++    void QuestBook::addJournalEntry(JournalEntry* entry)
+     {
+-	    mJournalEventCaster.removeEventListener(listener);
+-	    mQuestEventCaster.removeEventListener(listener);
+-        ScriptWrapper::getSingleton().disowned( listener );
++        mJournalEntries.push_back(entry);
++
++        LOG_MESSAGE(
++            Logger::RULES,
++            Ogre::String(&quot;Journal entry added: &quot;) + entry-&gt;getCaption());
++
++        fireJournalChanged(entry, JournalEvent::JOURNAL_ENTRY_ADDED);
+     }
+-}
+ 
+-QuestVector QuestBook::getTopLevelQuests()
+-{
+-	return mRootQuest-&gt;getSubquests();
+-}
++    void QuestBook::addJournalEntry(CeGuiString caption, CeGuiString text)
++    {
++        addJournalEntry(new JournalEntry(caption, text));
++    }
+ 
+-void QuestBook::addJournalEntry(JournalEntry* entry)
+-{
+-    mJournalEntries.push_back(entry);
++    unsigned int QuestBook::getNumJournalEntries() const
++    {
++        return mJournalEntries.size();
++    }
+ 
+-    LOG_MESSAGE(
+-        Logger::RULES,
+-        Ogre::String(&quot;Journal entry added: &quot;) + entry-&gt;getCaption());
++    JournalEntry* QuestBook::getJournalEntry(unsigned int index) const
++    {
++        if (mJournalEntries.size() &lt;= index)
++        {
++            Throw(IllegalArgumentException, &quot;No such JournalEntry.&quot;);
++        }
++        return mJournalEntries[index];
++    }
+ 
+-    fireJournalChanged(entry, JournalEvent::JOURNAL_ENTRY_ADDED);
+-}
++    const Property QuestBook::getProperty(const Ogre::String&amp; key) const
++    {
++        if (key == PROPERTY_QUESTS)
++        {
++            PropertyVector quests;
++            QuestVector allQuests = getAllQuests();
++            for (QuestVector::const_iterator it = allQuests.begin();
++                it != allQuests.end(); ++it)
++            {
++                PropertySet* questProps = (*it)-&gt;getAllProperties();
++                quests.push_back(Property(questProps-&gt;toPropertyMap()));
++                delete questProps;
++            }
+ 
+-void QuestBook::addJournalEntry(CeGuiString caption, CeGuiString text)
+-{
+-    addJournalEntry(new JournalEntry(caption, text));
+-}
++            return Property(quests);
++        }
++        else if (key == PROPERTY_JOURNAL)
++        {
++            ///@todo implement journal properties
++            return Property();
++        }
++        else
++        {
++            Throw(IllegalArgumentException, key + &quot; is not a property of QuestBook&quot;);
++        }
++    }
+ 
+-unsigned int QuestBook::getNumJournalEntries() const
+-{
+-    return mJournalEntries.size();
+-}
++    void QuestBook::setProperty(const Ogre::String&amp; key, const Property&amp; value)
++    {
++        if (key == PROPERTY_QUESTS)
++        {
++            PropertyVector quests = value.toArray();
++            for (PropertyVector::const_iterator it = quests.begin(); 
++                it != quests.end(); ++it)
++            {
++                PropertyMap curVal = it-&gt;toMap();
++                CeGuiString id = curVal[Quest::PROPERTY_ID];
++                Quest* quest = getQuest(id);
++                if (!quest)
++                {
++                    quest = new Quest(id);
++                }
++               
++                quest-&gt;setProperties(curVal);
++            }
++            ///@todo implement
++        }
++        else if (key == PROPERTY_JOURNAL)
++        {
++            ///@todo implement journal properties
++        }
++        else
++        {
++            Throw(IllegalArgumentException, key + &quot; is not a property of QuestBook&quot;);
++        }
++    }
+ 
+-JournalEntry* QuestBook::getJournalEntry(unsigned int index) const
+-{
+-    if (mJournalEntries.size() &lt;= index)
++    PropertySet* QuestBook::getAllProperties() const
+     {
+-        Throw(IllegalArgumentException, &quot;No such JournalEntry.&quot;);
++        PropertySet* props = new PropertySet();
++        props-&gt;setProperty(PROPERTY_QUESTS, getProperty(PROPERTY_QUESTS));
++        props-&gt;setProperty(PROPERTY_JOURNAL, getProperty(PROPERTY_JOURNAL));
++        return props;
+     }
+-    return mJournalEntries[index];
+-}
+ 
++    QuestVector QuestBook::getAllQuests() const
++    {
++        QuestVector quests = getTopLevelQuests();
++        unsigned int lastPos = 0;
++        while (lastPos &lt; quests.size())
++        {
++            QuestVector sub = quests[lastPos]-&gt;getSubquests();
++
++            for (QuestVector::const_iterator it = sub.begin(); it != sub.end(); ++it)
++            {
++                quests.push_back(*it);
++            }
++
++            ++lastPos;
++        }
++        return quests;
++    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000681.html">[Dsa-hl-svn] r3610 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="000683.html">[Dsa-hl-svn] r3612 - modules/regressiontest/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#682">[ date ]</a>
+              <a href="thread.html#682">[ thread ]</a>
+              <a href="subject.html#682">[ subject ]</a>
+              <a href="author.html#682">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

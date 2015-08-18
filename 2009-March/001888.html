@@ -1,0 +1,2517 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4831 - in rl/trunk/editors/Lockenwickler/src: . media
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4831%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200903151635.n2FGZM9S002071%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001887.html">
+   <LINK REL="Next"  HREF="001889.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4831 - in rl/trunk/editors/Lockenwickler/src: . media</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4831%20-%20in%20rl/trunk/editors/Lockenwickler/src%3A%20.%20media&In-Reply-To=%3C200903151635.n2FGZM9S002071%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4831 - in rl/trunk/editors/Lockenwickler/src: . media">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Sun Mar 15 17:35:22 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001887.html">[Dsa-hl-svn] r4830 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	modules/regressiontest/scripts	modules/regressiontest/scripts/maps rl/trunk	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig rl/trunk/tests	rl/trunk/tests/dialogtests
+</A></li>
+        <LI>Next message: <A HREF="001889.html">[Dsa-hl-svn] r4832 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1888">[ date ]</a>
+              <a href="thread.html#1888">[ thread ]</a>
+              <a href="subject.html#1888">[ subject ]</a>
+              <a href="author.html#1888">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-15 17:35:16 +0100 (Sun, 15 Mar 2009)
+New Revision: 4831
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/MyRaySceneQueryListener.py
+   rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py
+   rl/trunk/editors/Lockenwickler/src/media/PlainColorVP.glsl
+   rl/trunk/editors/Lockenwickler/src/media/depthmap.frag
+Log:
+- selected lights are properly deleted now
+- its possible to add Point and Spotlights to the map through the context menu
+
+Modified: rl/trunk/editors/Lockenwickler/src/Lockenwickler.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/Lockenwickler.py	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -1,541 +1,545 @@
+- #################################################
+- #################################################
+- # Copyright (C) 2008  Stefan Stammberger
+- #
+- # This library is free software; you can redistribute it and/or
+- # modify it under the terms of the GNU Lesser General Public
+- # License as published by the Free Software Foundation; either
+- # version 2.1 of the License, or (at your option) any later version.
+- #
+- # This library is distributed in the hope that it will be useful,
+- # but WITHOUT ANY WARRANTY; without even the implied warranty of
+- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- # Lesser General Public License for more details.
+- #
+- # You should have received a copy of the GNU Lesser General Public
+- # License along with this library; if not, write to the Free Software
+- # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- #################################################
+-
+-import os
+-import sys
+-import platform
+-import subprocess
+-
+-sys.path.insert(0,'..')
+-import PythonOgreConfig
+-
+-from random import randint
+-
+-from PyQt4 import QtGui, QtCore
+-from PreferencesDialog import *
+-from ObjectPropertyWin import *
+-from ModelSelectionDialog import *
+-from MaterialSelectionDialog import *
+-from GameObjectClassView import *
+-from ConsoleWindow import *
+-from ModuleManager import *
+-from ModuleExplorer import *
+-from NewModuleWizard import *
+-from PivotRenderQueueListener import *
+-
+-import OgreMainWindow
+-import ogre.renderer.OGRE as og
+-
+-class Lockenwickler(QtGui.QMainWindow):
+-    def __init__(self, parent=None):
+-        QtGui.QWidget.__init__(self, parent)
+-
+-#        pixmap = QPixmap(&quot;media/icons/lockenwickler_provisorium.png&quot;)
+-#        splash = QSplashScreen(pixmap, Qt.WindowStaysOnTopHint)
+-#        splash.setMask(pixmap.mask())
+-#        splash.showMessage(&quot;Starting...&quot;)
+-#        splash.show() 
+-
+-        self.setupUi()
+-
+-        self.consoleWindow = ConsoleWindow(False,  self)
+-
+-        self.setupOgre()
+-
+-        self.prefDialog = PreferencesDialog(self)
+-        self.objectPropertyWin = ObjectPropertyWin(self.OgreMainWinSceneMgr, self.gocManager, self)
+-        self.moduleExplorerWin = ModuleExplorer(self)
+-        self.modelSelectionDialog = ModelSelectionDialog(self.ogreRoot, self)
+-        self.materialSelectionDialog = MaterialSelectionDialog(self.ogreRoot, self)
+-        self.moduleManager.modelSelectionDialog = self.modelSelectionDialog
+-        self.moduleManager.materialSelectionDialog = self.materialSelectionDialog
+-
+-        self.gameObjectClassView = GameObjectClassView(self.moduleManager.gocManager)
+-
+-        self.createDockWindows()
+-
+-        self.mainTimer = QtCore.QTimer(self)
+-        self.mainTimer.connect(self.mainTimer, QtCore.SIGNAL(&quot;timeout()&quot;), self.update)
+-        self.mainTimer.start(5)
+-
+-        settings = QtCore.QSettings()
+-        self.restoreGeometry(settings.value(&quot;MainWindow/Geometry&quot;).toByteArray())
+-        self.restoreState(settings.value(&quot;MainWindow/DockWindows&quot;).toByteArray())
+-        if not self.prefDialog.setCfgPath(settings.value(&quot;Preferences/moduleCfgPath&quot;).toString()):
+-            self.prefDialog.show()
+-            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
+-        else:
+-            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
+-        
+-        self.moduleManager.setModuleExplorer(self.moduleExplorerWin)
+-        self.moduleManager.setPropertyWindow(self.objectPropertyWin)
+-        self.moduleManager.setContextMenuCallback(self.onContextMenuCallback)
+-        
+-        self.setWindowIcon(QIcon(&quot;media/icons/lockenwickler_provisorium_small.png&quot;))
+-        self.setWindowTitle(&quot;Rastullahs Lockenwickler&quot;)
+-        
+-        self.editorSetupFinished = False
+-        
+-#        splash.finish(self)
+-
+-    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
+-        action = QtGui.QAction(text, self)
+-        if icon is not None:
+-            action.setIcon(QtGui.QIcon(&quot;media/icons/%s&quot; % icon))
+-        if shortcut is not None:
+-            action.setShortcut(shortcut)
+-        if tip is not None:
+-            action.setToolTip(tip)
+-            action.setStatusTip(tip)
+-        if slot is not None:
+-            self.connect(action, QtCore.SIGNAL(signal), slot)
+-
+-        action.setCheckable(checkable)
+-
+-        return action
+-
+-    def addActions(self, target, actions):
+-        for act in actions:
+-            if act is None:
+-               target.addSeparator()
+-            else:
+-                target.addAction(act)
+-
+-    def setupUi(self):
+-        self.setObjectName(&quot;MainWindow&quot;)
+-
+-        self.centralwidget = QtGui.QWidget(self)
+-        self.centralwidget.setObjectName(&quot;centralwidget&quot;)
+-
+-        self.hboxlayout = QtGui.QHBoxLayout(self.centralwidget)
+-        self.hboxlayout.setContentsMargins(0, 0, 0, 0)
+-        self.hboxlayout.setObjectName(&quot;hboxlayout&quot;)
+-
+-        self.gridlayout = QtGui.QGridLayout()
+-        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
+-        self.gridlayout.setContentsMargins(0, 0, 0, 0)
+-        
+-        self.menubar = QtGui.QMenuBar(self)
+-        self.menubar.setObjectName(&quot;menubar&quot;)
+-
+-        self.menuFile = QtGui.QMenu(self.menubar)
+-        self.menuFile.setObjectName(&quot;menuFile&quot;)
+-
+-        self.menuEdit = QtGui.QMenu(self.menubar)
+-        self.menuEdit.setObjectName(&quot;menuEdit&quot;)
+-
+-        self.menuView = QtGui.QMenu(self.menubar)
+-        self.menuView.setObjectName(&quot;menuView&quot;)
+-        self.setMenuBar(self.menubar)
+-
+-
+-        self.statusbar = QtGui.QStatusBar(self)
+-        self.statusbar.setObjectName(&quot;statusbar&quot;)
+-        self.setStatusBar(self.statusbar)
+-
+-#####################################
+-        self.actionNeu =self.createAction(&quot;&amp;New Module&quot;,  self.actionNewSlot,  QKeySequence.New,  &quot;filenew.png&quot;,  &quot;New Module&quot;)
+-        self.actionNeu.setObjectName(&quot;actionNeu&quot;)
+-
+-        self.actionOpen = self.createAction(&quot;&amp;Open Module&quot;,  self.actionOpenSlot,  QKeySequence.Open,  &quot;fileopen.png&quot;,  &quot;Open Module&quot;)
+-        self.actionOpen.setObjectName(&quot;actionOpen&quot;)
+-        
+-        self.actionSave = self.createAction(&quot;&amp;Save&quot;,  self.actionSaveSlot,  QKeySequence.Save,  &quot;filesave.png&quot;,  &quot;Save Module&quot;)
+-        self.actionSave.setObjectName(&quot;actionSave&quot;)
+-        
+-        self.actionRunModule = self.createAction(&quot;&amp;Save and Run&quot;,  self.actionRunModuleSlot,  &quot;Alt+R&quot;,  &quot;fileexport.png&quot;,  &quot;Save And Run Module&quot;)
+-        self.actionRunModule.setObjectName(&quot;actionRunModule&quot;)
+-
+-        self.actionClose = self.createAction(&quot;Quit&quot;,  self.actionQuitSlot,  &quot;Alt+Q&quot;,  &quot;exit.png&quot;,  &quot;Quit&quot;)
+-        self.actionClose.setObjectName(&quot;actionQuit&quot;)
+-#####################################
+-
+-
+-#####################################
+-        self.actionDelete = self.createAction(&quot;Delete&quot;,  self.actionDeleteSlot,  QKeySequence.Delete,  &quot;editdelete.png&quot;,  &quot;Delete&quot;)
+-        self.actionDelete.setObjectName(&quot;actionDelete&quot;)
+-
+-        self.actionCopy = self.createAction(&quot;Copy&quot;,  self.actionCopySlot,  QKeySequence.Copy,  &quot;editcopy.png&quot;,  &quot;Copy&quot;)
+-        self.actionCopy.setObjectName(&quot;actionCopy&quot;)
+-
+-        self.actionCut = self.createAction(&quot;Cut&quot;,  self.actionCutSlot,  QKeySequence.Cut,  &quot;editcut.png&quot;,  &quot;Cut&quot;)
+-        self.actionCut.setObjectName(&quot;actionCut&quot;)
+-
+-        self.actionPaste = self.createAction(&quot;Paste&quot;,  self.actionPasteSlot,  QKeySequence.Paste,  &quot;editpaste.png&quot;,  &quot;Paste&quot;)
+-        self.actionPaste.setObjectName(&quot;actionPaste&quot;)
+-
+-        self.actionSelect = self.createAction(&quot;&amp;Select&quot;,  self.actionSelectSlot,  &quot;Space&quot;,  &quot;cursor.png&quot;,  &quot;Move selected object&quot;)
+-        self.actionSelect.setObjectName(&quot;actionSelect&quot;)
+-
+-        self.actionMove = self.createAction(&quot;&amp;Move&quot;,  self.actionMoveSlot,  &quot;g&quot;,  &quot;move.png&quot;,  &quot;Move selected object&quot;)
+-        self.actionMove.setObjectName(&quot;actionMove&quot;)
+-
+-        self.actionRotate = self.createAction(&quot;&amp;Rotate&quot;,  self.actionRotateSlot,  &quot;r&quot;,  &quot;rotate.png&quot;,  &quot;Rotate selected object&quot;)
+-        self.actionRotate.setObjectName(&quot;actionRotate&quot;)
+-
+-        self.actionScale = self.createAction(&quot;&amp;Scale&quot;,  self.actionScaleSlot,  &quot;x&quot;,  &quot;resizecol.png&quot;,  &quot;Scale selected object&quot;)
+-        self.actionScale.setObjectName(&quot;actionScale&quot;)
+-
+-        self.actionOneClickEntityPlacement = self.createAction(&quot;&amp;OneClickEntityPlacement&quot;,  self.actionOneClickEntityPlacementSlot,  &quot;&quot;,  &quot;resizecol.png&quot;,  &quot;Add an Entity just by a click&quot;)
+-        self.actionOneClickEntityPlacement.setObjectName(&quot;actionOneClickEntityPlacement&quot;)
+-        self.actionOneClickEntityPlacement.setCheckable(True)
+-
+-#####################################
+-#####################################
+-        self.actionSceneExplorer = self.createAction(&quot;&amp;Scene Exlporer&quot;,  self.toggleModuleExplorer,  &quot;Alt+E&quot;,  &quot;view_tree.png&quot;,  &quot;Module Explorer&quot;,  False)
+-        self.actionSceneExplorer.setObjectName(&quot;actionSceneExplorer&quot;)
+-        
+-        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  &quot;Alt+P&quot;,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
+-        self.actionPreferences.setObjectName(&quot;actionPreferences&quot;)
+-
+-        self.actionProperty_Window = self.createAction(&quot;Pr&amp;operty Window&quot;,  self.togglePropertyWindow,  &quot;Alt+P&quot;,  &quot;unsortedlist1.png&quot;,  &quot;Property Window&quot;)
+-        self.actionProperty_Window.setObjectName(&quot;actionProperty_Window&quot;)
+-
+-        self.actionObject_Selection = self.createAction(&quot;&amp;Model Preview Window&quot;,  self.toggleModelPreviewWindow,  &quot;Alt+O&quot;,  &quot;tux.png&quot;,  &quot;Model Preview&quot;)
+-        self.actionObject_Selection.setObjectName(&quot;actionObject_Selection&quot;)
+-        
+-        self.actionMaterial_Selection = self.createAction(&quot;Material &amp;Preview Window&quot;,  self.toggleMaterialPreviewWindow,  &quot;Alt+M&quot;,  &quot;colors.png&quot;,  &quot;Material Preview&quot;)
+-        self.actionMaterial_Selection.setObjectName(&quot;actionMaterial_Selection&quot;)
+-
+-        self.actionGameObjectClass_Selection = self.createAction(&quot;&amp;Game Object Class Preview Window&quot;,  self.toggleGameObjectViewWindow,  &quot;Alt+G&quot;,  &quot;multirow.png&quot;,  &quot;GameObjectClass Preview&quot;)
+-        self.actionGameObjectClass_Selection.setObjectName(&quot;actionObject_Selection&quot;)
+-
+-        self.actionConsole_Window = self.createAction(&quot;&amp;Console Window&quot;,  self.toggleConsoleWindow,  &quot;Alt+C&quot;,  &quot;console.png&quot;,  &quot;Console Window&quot;)
+-        self.actionConsole_Window.setObjectName(&quot;actionConsole_Window&quot;)
+-        
+-        self.actionToggleViewportGrid = self.createAction(&quot;&amp;Toggle Grid&quot;,  self.toggleViewportGrid,  &quot;Alt+G&quot;,  &quot;console.png&quot;,  &quot;Toggle Viewport Grid&quot;)
+-        self.actionToggleViewportGrid.setObjectName(&quot;actionToggleViewportGrid&quot;)
+-
+-#####################################
+-#####################################
+-
+-
+-        self.menuFile.addAction(self.actionNeu)
+-        self.menuFile.addAction(self.actionOpen)
+-        self.menuFile.addAction(self.actionSave)
+-        self.menuFile.addAction(self.actionRunModule)
+-        self.menuFile.addAction(self.actionClose)
+-
+-        self.menuEdit.addAction(self.actionSelect)
+-        self.menuEdit.addAction(self.actionMove)
+-        self.menuEdit.addAction(self.actionRotate)
+-        self.menuEdit.addAction(self.actionScale)
+-        self.menuEdit.addSeparator()
+-        self.menuEdit.addAction(self.actionDelete)
+-        self.menuEdit.addAction(self.actionCopy)
+-        self.menuEdit.addAction(self.actionCut)
+-        self.menuEdit.addAction(self.actionPaste)
+-        self.menuEdit.addSeparator()
+-        self.menuEdit.addAction(self.actionOneClickEntityPlacement)
+-        
+-
+-        self.menuView.addAction(self.actionSceneExplorer)
+-        self.menuView.addAction(self.actionPreferences)
+-        self.menuView.addAction(self.actionProperty_Window)
+-        self.menuView.addAction(self.actionObject_Selection)
+-        self.menuView.addAction(self.actionMaterial_Selection)
+-        self.menuView.addAction(self.actionGameObjectClass_Selection)
+-        self.menuView.addAction(self.actionConsole_Window)
+-        self.menuView.addAction(self.actionToggleViewportGrid)
+-        
+-        self.menubar.addAction(self.menuFile.menuAction())
+-        self.menubar.addAction(self.menuEdit.menuAction())
+-        self.menubar.addAction(self.menuView.menuAction())
+-
+-        self.retranslateUi()
+-        QtCore.QMetaObject.connectSlotsByName(self)
+-
+-    def retranslateUi(self):
+-        self.setWindowTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;MainWindow&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuFile.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;File&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuEdit.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Edit&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.menuView.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;View&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionNeu.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;New Module&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionMove.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Move&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionRotate.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Rotate&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionSceneExplorer.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Module Explorer&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionPreferences.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Preferences&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionProperty_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Property Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionObject_Selection.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Object Selection&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionClose.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Quit&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-        self.actionConsole_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Console Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
+-
+-    def setupOgre(self, pluginCfgPath=&quot;./Plugins.cfg&quot;, ogreCfgPath=&quot;./ogre.cfg&quot;, logPath=&quot;./ogre.log&quot;):
+-        if platform.system() == &quot;Windows&quot;:
+-            pluginCfgPath=&quot;./Plugins-windows.cfg&quot;
+-        else:
+-            pluginCfgPath=&quot;./Plugins-linux.cfg&quot;
+-
+-        root = og.Root(pluginCfgPath, ogreCfgPath, logPath)
+-        self.ogreRoot = root
+-
+-        if  not self.ogreRoot.restoreConfig() and not self.ogreRoot.showConfigDialog():
+-            sys.exit('Quit from Config Dialog')
+-
+-        root.initialise(False)
+-
+-        self.pivotRenderQueueListener = PivotRenderQueueListener()
+-        self.OgreMainWinSceneMgr = self.ogreRoot.createSceneManager(og.ST_GENERIC, &quot;OgreMainWinSceneMgr&quot;)
+-        self.OgreMainWinSceneMgr.ambientLight = og.ColourValue(4, 4, 4)
+-        self.OgreMainWinSceneMgr.addRenderQueueListener(self.pivotRenderQueueListener)
+-        
+-        self.moduleName = &quot;&quot;
+-        self.moduleManager = ModuleManager(self.ogreRoot,  self.OgreMainWinSceneMgr)
+-        self.gocManager = self.moduleManager.gocManager
+-        
+-        self.ogreMainWindow = OgreMainWindow.OgreMainWindow(self.moduleManager,  root,  self.OgreMainWinSceneMgr,  self)
+-        self.gridlayout.addWidget(self.ogreMainWindow,0,0,1,1)
+-        self.hboxlayout.addLayout(self.gridlayout)
+-        self.setCentralWidget(self.centralwidget)
+-        
+-        oglog = og.LogManager.getSingleton().getDefaultLog()
+-        oglog.addListener(self.consoleWindow.lockenLog)
+-
+-    def finishEditorSetup(self):
+-        if not self.editorSetupFinished:
+-            og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
+-            og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
+-
+-            self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
+-            self.moduleManager.pivot.hide()
+-            self.editorSetupFinished = True
+-        
+-    def update(self):
+-        self.ogreRoot.renderOneFrame()
+-        if platform.system() == &quot;Linux&quot;:
+-            self.ogreMainWindow.updateRenderWindow()
+-            self.modelSelectionDialog.updateRenderWindow()
+-            self.materialSelectionDialog.updateRenderWindow()
+-
+-    def actionOpenSlot(self):
+-        self.finishEditorSetup()
+-        self.moduleManager.openLoadModuleDialog()
+-
+-    def actionNewSlot(self):
+-        newModuleWiz = NewModuleWizard(self.moduleManager, self)
+-        newModuleWiz.exec_()
+-        return
+-        
+-    def actionSaveSlot(self):
+-        self.moduleManager.save()
+-        
+-    def actionRunModuleSlot(self):
+-        self.moduleManager.save()
+-        if platform.system() == &quot;Windows&quot;:
+-            workingDir = self.prefDialog.moduleCfgPath.replace(&quot;/modules/modules.cfg&quot;, &quot;&quot;)
+-            executable = os.path.join(workingDir, &quot;Rastullah.exe&quot;)
+-            executable = executable.replace(&quot;/&quot;,  &quot;\\&quot;)
+-            if os.path.isfile(executable):
+-                subprocess.Popen([executable, &quot;--module&quot;, self.moduleManager.mainModule.name], 0, None, None, None, None, None, False, False, workingDir)
+-
+-        
+-    def actionQuitSlot(self):
+-        self.close()
+-
+-    def actionDeleteSlot(self):
+-        self.moduleManager.deleteObjects()
+-
+-    def actionCopySlot(self):
+-        self.moduleManager.copyObjects()
+-
+-    def actionCutSlot(self):
+-        self.moduleManager.cutObjects()
+-
+-    def actionPasteSlot(self):
+-        self.moduleManager.pasteObjects(self.ogreMainWindow.getCameraToViewportRay())
+-
+-    def actionSelectSlot(self):
+-        self.moduleManager.pivot.hide()
+-
+-    def actionMoveSlot(self):
+-        self.moduleManager.pivot.setMoveMode()
+-
+-    def actionRotateSlot(self):
+-        self.moduleManager.pivot.setRotateMode()
+-
+-    def actionScaleSlot(self):
+-        self.moduleManager.pivot.setScaleMode()
+-
+-    def actionOneClickEntityPlacementSlot(self):
+-        self.moduleManager.setOneClickEntityPlacement(self.actionOneClickEntityPlacement.isChecked())
+-
+-    def togglePreferencesWindow(self):
+-        if self.prefDialog.isHidden():
+-            self.prefDialog.show()
+-        else:
+-            self.prefDialog.hide()
+-
+-    def toggleModelPreviewWindow(self):
+-        if self.modelSelectionDock.isHidden():
+-            self.modelSelectionDock.show()
+-        else:
+-            self.modelSelectionDock.hide()
+-    
+-    def toggleMaterialPreviewWindow(self):
+-        if self.materialSelectionDock.isHidden():
+-            self.materialSelectionDock.show()
+-        else:
+-            self.materialSelectionDock.hide()
+-
+-    def toggleGameObjectViewWindow(self):
+-        if self.gameObjectClassViewDock.isHidden():
+-            self.gameObjectClassViewDock.show()
+-        else:
+-            self.gameObjectClassViewDock.hide()
+-
+-    def toggleModuleExplorer(self):
+-        if self.moduleExplorerDock.isHidden():
+-            self.moduleExplorerDock.show()
+-        else:
+-            self.moduleExplorerDock.hide()
+-
+-    def togglePropertyWindow(self):
+-        if self.propertyDock.isHidden():
+-            self.propertyDock.show()
+-        else:
+-            self.propertyDock.hide()
+-
+-    def toggleConsoleWindow(self):
+-        if self.consoleDock.isHidden():
+-            self.consoleDock.show()
+-        else:
+-            self.consoleDock.hide()
+-
+-    def toggleViewportGrid(self):
+-        self.ogreMainWindow.toggleViewportGrid()
+-
+-    def createDockWindows(self):
+-        self.propertyDock = QtGui.QDockWidget(self.tr(&quot;Properties&quot;), self)
+-        self.propertyDock.setObjectName(&quot;PropertyDockWindow&quot;)
+-        self.propertyDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.propertyDock.setWidget(self.objectPropertyWin)
+-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.propertyDock)
+-
+-        self.modelSelectionDock = QtGui.QDockWidget(self.tr(&quot;Models&quot;), self)
+-        self.modelSelectionDock.setObjectName(&quot;ModelSelectionDockWindow&quot;)
+-        self.modelSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.modelSelectionDock.setWidget(self.modelSelectionDialog)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.modelSelectionDock)
+-        
+-        self.materialSelectionDock = QtGui.QDockWidget(self.tr(&quot;Materials&quot;), self)
+-        self.materialSelectionDock.setObjectName(&quot;MaterialSelectionDockWindow&quot;)
+-        self.materialSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.materialSelectionDock.setWidget(self.materialSelectionDialog)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.materialSelectionDock)
+-
+-        self.gameObjectClassViewDock = QtGui.QDockWidget(self.tr(&quot;GameObjectClasses&quot;), self)
+-        self.gameObjectClassViewDock.setObjectName(&quot;GameObjectClassView&quot;)
+-        self.gameObjectClassViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.gameObjectClassViewDock.setWidget(self.gameObjectClassView)
+-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.gameObjectClassViewDock)
+-
+-        self.moduleExplorerDock = QtGui.QDockWidget(self.tr(&quot;Module Explorer&quot;), self)
+-        self.moduleExplorerDock.setObjectName(&quot;ModuleExplorerDockWindow&quot;)
+-        self.moduleExplorerDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+-        self.moduleExplorerDock.setWidget(self.moduleExplorerWin)
+-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleExplorerDock)
+-
+-        self.consoleDock = QtGui.QDockWidget(self.tr(&quot;Console&quot;), self)
+-        self.consoleDock.setObjectName(&quot;ConsoleDockWindow&quot;)
+-        self.consoleDock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea | QtCore.Qt.TopDockWidgetArea)
+-        self.consoleDock.setWidget(self.consoleWindow)
+-        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.consoleDock)
+-
+-        self.fileToolBar = self.addToolBar(&quot;File Toolbar&quot;)
+-        self.fileToolBar.setObjectName(&quot;FileToolBar&quot;)
+-        self.fileToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
+-        self.fileToolBar.addAction(self.actionNeu)
+-        self.fileToolBar.addAction(self.actionOpen)
+-        self.fileToolBar.addAction(self.actionSave)
+-        self.fileToolBar.addAction(self.actionRunModule)
+-        self.fileToolBar.addAction(self.actionClose)
+-        self.addToolBar(QtCore.Qt.TopToolBarArea, self.fileToolBar)
+-
+-        self.moveToolBar = self.addToolBar(&quot;Transformation Bar&quot;)
+-        self.moveToolBar.setObjectName(&quot;TransformationBar&quot;)
+-        self.moveToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
+-        self.moveToolBar.addAction(self.actionSelect)
+-        self.moveToolBar.addAction(self.actionMove)
+-        self.moveToolBar.addAction(self.actionRotate)
+-        self.moveToolBar.addAction(self.actionScale)
+-        self.addToolBar(QtCore.Qt.TopToolBarArea, self.moveToolBar)
+-
+-    def keyPressEvent(self,  event):
+-        if not event.isAutoRepeat():
+-            self.ogreMainWindow.keyPressEvent(event)
+-
+-    def keyReleaseEvent(self,  event):
+-        if not event.isAutoRepeat():
+-            self.ogreMainWindow.keyReleaseEvent(event)
+-        pass
+-
+-    def onContextMenuCallback(self, actions):
+-        menu = QMenu(&quot;My Menu!!&quot;)
+-        menu.addAction(self.actionDelete)
+-        menu.addAction(self.actionCopy)
+-        menu.addAction(self.actionCut)
+-        menu.addAction(self.actionPaste)
+-        menu.addSeparator()
+-        for a in actions:
+-            menu.addAction(a)
+-            
+-        menu.exec_(QCursor.pos())
+-        
+-
+-    def connectActionButtons(self):
+-        pass
+-
+-    def saveOnClose(self):
+-        reply = QtGui.QMessageBox.question(self,  &quot;Rastullahs Lockenwickler - Unsaved Chages&quot;,  &quot;Save unsaved changes?&quot;,  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No|QtGui.QMessageBox.Cancel)
+-        if reply == QtGui.QMessageBox.Cancel:
+-            return False
+-        if reply == QtGui.QMessageBox.Yes:
+-            print&quot;&quot;
+-            #TODO: implement save here
+-        return True
+-
+-    def closeEvent(self,  event):
+-        if self.saveOnClose():
+-            settings = QtCore.QSettings()
+-            settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
+-            settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
+-            settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
+-        else:
+-            event.ignore()
+-
+-if __name__ == &quot;__main__&quot;:
+-#    # Import Psyco if available
+-#    try:
+-##        import psyco
+-##        psyco.full(0.02)
+-#        #psyco.log()
+-#        #psyco.profile()
+-#    except ImportError:
+-#        pass
+-    
+-    app = QtGui.QApplication(sys.argv)
+-    app.setOrganizationName(&quot;Team Pantheon&quot;)
+-    app.setOrganizationDomain(&quot;rastullahs-lockenpracht.de/team&quot;)
+-    app.setApplicationName(&quot;Lockenwickler&quot;)
+-
+-    form = Lockenwickler()
+-    form.show()
+-
+-    sys.exit(app.exec_())
+-
++ #################################################
++ #################################################
++ # Copyright (C) 2008  Stefan Stammberger
++ #
++ # This library is free software; you can redistribute it and/or
++ # modify it under the terms of the GNU Lesser General Public
++ # License as published by the Free Software Foundation; either
++ # version 2.1 of the License, or (at your option) any later version.
++ #
++ # This library is distributed in the hope that it will be useful,
++ # but WITHOUT ANY WARRANTY; without even the implied warranty of
++ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ # Lesser General Public License for more details.
++ #
++ # You should have received a copy of the GNU Lesser General Public
++ # License along with this library; if not, write to the Free Software
++ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ #################################################
++
++import os
++import sys
++import platform
++import subprocess
++
++sys.path.insert(0,'..')
++import PythonOgreConfig
++
++from random import randint
++
++from PyQt4 import QtGui, QtCore
++from PreferencesDialog import *
++from ObjectPropertyWin import *
++from ModelSelectionDialog import *
++from MaterialSelectionDialog import *
++from GameObjectClassView import *
++from ConsoleWindow import *
++from ModuleManager import *
++from ModuleExplorer import *
++from NewModuleWizard import *
++from PivotRenderQueueListener import *
++
++import OgreMainWindow
++import ogre.renderer.OGRE as og
++
++class Lockenwickler(QtGui.QMainWindow):
++    def __init__(self, parent=None):
++        QtGui.QWidget.__init__(self, parent)
++
++#        pixmap = QPixmap(&quot;media/icons/lockenwickler_provisorium.png&quot;)
++#        splash = QSplashScreen(pixmap, Qt.WindowStaysOnTopHint)
++#        splash.setMask(pixmap.mask())
++#        splash.showMessage(&quot;Starting...&quot;)
++#        splash.show() 
++
++        self.setupUi()
++
++        self.consoleWindow = ConsoleWindow(False,  self)
++
++        self.setupOgre()
++
++        self.prefDialog = PreferencesDialog(self)
++        self.objectPropertyWin = ObjectPropertyWin(self.OgreMainWinSceneMgr, self.gocManager, self)
++        self.moduleExplorerWin = ModuleExplorer(self)
++        self.modelSelectionDialog = ModelSelectionDialog(self.ogreRoot, self)
++        self.materialSelectionDialog = MaterialSelectionDialog(self.ogreRoot, self)
++        self.moduleManager.modelSelectionDialog = self.modelSelectionDialog
++        self.moduleManager.materialSelectionDialog = self.materialSelectionDialog
++
++        self.gameObjectClassView = GameObjectClassView(self.moduleManager.gocManager)
++
++        self.createDockWindows()
++
++        self.mainTimer = QtCore.QTimer(self)
++        self.mainTimer.connect(self.mainTimer, QtCore.SIGNAL(&quot;timeout()&quot;), self.update)
++        self.mainTimer.start(5)
++
++        settings = QtCore.QSettings()
++        self.restoreGeometry(settings.value(&quot;MainWindow/Geometry&quot;).toByteArray())
++        self.restoreState(settings.value(&quot;MainWindow/DockWindows&quot;).toByteArray())
++        if not self.prefDialog.setCfgPath(settings.value(&quot;Preferences/moduleCfgPath&quot;).toString()):
++            self.prefDialog.show()
++            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
++        else:
++            self.moduleManager.moduleCfgPath = self.prefDialog.moduleCfgPath
++        
++        self.moduleManager.setModuleExplorer(self.moduleExplorerWin)
++        self.moduleManager.setPropertyWindow(self.objectPropertyWin)
++        self.moduleManager.setContextMenuCallback(self.onContextMenuCallback)
++        
++        self.setWindowIcon(QIcon(&quot;media/icons/lockenwickler_provisorium_small.png&quot;))
++        self.setWindowTitle(&quot;Rastullahs Lockenwickler&quot;)
++        
++        self.editorSetupFinished = False
++        
++#        splash.finish(self)
++
++    def createAction(self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False, signal=&quot;triggered()&quot;):
++        action = QtGui.QAction(text, self)
++        if icon is not None:
++            action.setIcon(QtGui.QIcon(&quot;media/icons/%s&quot; % icon))
++        if shortcut is not None:
++            action.setShortcut(shortcut)
++        if tip is not None:
++            action.setToolTip(tip)
++            action.setStatusTip(tip)
++        if slot is not None:
++            self.connect(action, QtCore.SIGNAL(signal), slot)
++
++        action.setCheckable(checkable)
++
++        return action
++
++    def addActions(self, target, actions):
++        for act in actions:
++            if act is None:
++               target.addSeparator()
++            else:
++                target.addAction(act)
++
++    def setupUi(self):
++        self.setObjectName(&quot;MainWindow&quot;)
++
++        self.centralwidget = QtGui.QWidget(self)
++        self.centralwidget.setObjectName(&quot;centralwidget&quot;)
++
++        self.hboxlayout = QtGui.QHBoxLayout(self.centralwidget)
++        self.hboxlayout.setContentsMargins(0, 0, 0, 0)
++        self.hboxlayout.setObjectName(&quot;hboxlayout&quot;)
++
++        self.gridlayout = QtGui.QGridLayout()
++        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
++        self.gridlayout.setContentsMargins(0, 0, 0, 0)
++        
++        self.menubar = QtGui.QMenuBar(self)
++        self.menubar.setObjectName(&quot;menubar&quot;)
++
++        self.menuFile = QtGui.QMenu(self.menubar)
++        self.menuFile.setObjectName(&quot;menuFile&quot;)
++
++        self.menuEdit = QtGui.QMenu(self.menubar)
++        self.menuEdit.setObjectName(&quot;menuEdit&quot;)
++
++        self.menuView = QtGui.QMenu(self.menubar)
++        self.menuView.setObjectName(&quot;menuView&quot;)
++        self.setMenuBar(self.menubar)
++
++
++        self.statusbar = QtGui.QStatusBar(self)
++        self.statusbar.setObjectName(&quot;statusbar&quot;)
++        self.setStatusBar(self.statusbar)
++
++#####################################
++        self.actionNeu =self.createAction(&quot;&amp;New Module&quot;,  self.actionNewSlot,  QKeySequence.New,  &quot;filenew.png&quot;,  &quot;New Module&quot;)
++        self.actionNeu.setObjectName(&quot;actionNeu&quot;)
++
++        self.actionOpen = self.createAction(&quot;&amp;Open Module&quot;,  self.actionOpenSlot,  QKeySequence.Open,  &quot;fileopen.png&quot;,  &quot;Open Module&quot;)
++        self.actionOpen.setObjectName(&quot;actionOpen&quot;)
++        
++        self.actionSave = self.createAction(&quot;&amp;Save&quot;,  self.actionSaveSlot,  QKeySequence.Save,  &quot;filesave.png&quot;,  &quot;Save Module&quot;)
++        self.actionSave.setObjectName(&quot;actionSave&quot;)
++        
++        self.actionRunModule = self.createAction(&quot;&amp;Save and Run&quot;,  self.actionRunModuleSlot,  &quot;Alt+R&quot;,  &quot;fileexport.png&quot;,  &quot;Save And Run Module&quot;)
++        self.actionRunModule.setObjectName(&quot;actionRunModule&quot;)
++
++        self.actionClose = self.createAction(&quot;Quit&quot;,  self.actionQuitSlot,  &quot;Alt+Q&quot;,  &quot;exit.png&quot;,  &quot;Quit&quot;)
++        self.actionClose.setObjectName(&quot;actionQuit&quot;)
++#####################################
++
++
++#####################################
++        self.actionDelete = self.createAction(&quot;Delete&quot;,  self.actionDeleteSlot,  QKeySequence.Delete,  &quot;editdelete.png&quot;,  &quot;Delete&quot;)
++        self.actionDelete.setObjectName(&quot;actionDelete&quot;)
++
++        self.actionCopy = self.createAction(&quot;Copy&quot;,  self.actionCopySlot,  QKeySequence.Copy,  &quot;editcopy.png&quot;,  &quot;Copy&quot;)
++        self.actionCopy.setObjectName(&quot;actionCopy&quot;)
++
++        self.actionCut = self.createAction(&quot;Cut&quot;,  self.actionCutSlot,  QKeySequence.Cut,  &quot;editcut.png&quot;,  &quot;Cut&quot;)
++        self.actionCut.setObjectName(&quot;actionCut&quot;)
++
++        self.actionPaste = self.createAction(&quot;Paste&quot;,  self.actionPasteSlot,  QKeySequence.Paste,  &quot;editpaste.png&quot;,  &quot;Paste&quot;)
++        self.actionPaste.setObjectName(&quot;actionPaste&quot;)
++
++        self.actionSelect = self.createAction(&quot;&amp;Select&quot;,  self.actionSelectSlot,  &quot;Space&quot;,  &quot;cursor.png&quot;,  &quot;Move selected object&quot;)
++        self.actionSelect.setObjectName(&quot;actionSelect&quot;)
++
++        self.actionMove = self.createAction(&quot;&amp;Move&quot;,  self.actionMoveSlot,  &quot;g&quot;,  &quot;move.png&quot;,  &quot;Move selected object&quot;)
++        self.actionMove.setObjectName(&quot;actionMove&quot;)
++
++        self.actionRotate = self.createAction(&quot;&amp;Rotate&quot;,  self.actionRotateSlot,  &quot;r&quot;,  &quot;rotate.png&quot;,  &quot;Rotate selected object&quot;)
++        self.actionRotate.setObjectName(&quot;actionRotate&quot;)
++
++        self.actionScale = self.createAction(&quot;&amp;Scale&quot;,  self.actionScaleSlot,  &quot;x&quot;,  &quot;resizecol.png&quot;,  &quot;Scale selected object&quot;)
++        self.actionScale.setObjectName(&quot;actionScale&quot;)
++
++        self.actionOneClickEntityPlacement = self.createAction(&quot;&amp;OneClickEntityPlacement&quot;,  self.actionOneClickEntityPlacementSlot,  &quot;&quot;,  &quot;resizecol.png&quot;,  &quot;Add an Entity just by a click&quot;)
++        self.actionOneClickEntityPlacement.setObjectName(&quot;actionOneClickEntityPlacement&quot;)
++        self.actionOneClickEntityPlacement.setCheckable(True)
++
++#####################################
++#####################################
++        self.actionSceneExplorer = self.createAction(&quot;&amp;Scene Exlporer&quot;,  self.toggleModuleExplorer,  &quot;Alt+E&quot;,  &quot;view_tree.png&quot;,  &quot;Module Explorer&quot;,  False)
++        self.actionSceneExplorer.setObjectName(&quot;actionSceneExplorer&quot;)
++        
++        self.actionPreferences = self.createAction(&quot;&amp;Preferences&quot;,  self.togglePreferencesWindow,  &quot;Alt+P&quot;,  &quot;configure.png&quot;,  &quot;Lockenwickler Preferences&quot;,  False)
++        self.actionPreferences.setObjectName(&quot;actionPreferences&quot;)
++
++        self.actionProperty_Window = self.createAction(&quot;Pr&amp;operty Window&quot;,  self.togglePropertyWindow,  &quot;Alt+P&quot;,  &quot;unsortedlist1.png&quot;,  &quot;Property Window&quot;)
++        self.actionProperty_Window.setObjectName(&quot;actionProperty_Window&quot;)
++
++        self.actionObject_Selection = self.createAction(&quot;&amp;Model Preview Window&quot;,  self.toggleModelPreviewWindow,  &quot;Alt+O&quot;,  &quot;tux.png&quot;,  &quot;Model Preview&quot;)
++        self.actionObject_Selection.setObjectName(&quot;actionObject_Selection&quot;)
++        
++        self.actionMaterial_Selection = self.createAction(&quot;Material &amp;Preview Window&quot;,  self.toggleMaterialPreviewWindow,  &quot;Alt+M&quot;,  &quot;colors.png&quot;,  &quot;Material Preview&quot;)
++        self.actionMaterial_Selection.setObjectName(&quot;actionMaterial_Selection&quot;)
++
++        self.actionGameObjectClass_Selection = self.createAction(&quot;&amp;Game Object Class Preview Window&quot;,  self.toggleGameObjectViewWindow,  &quot;Alt+G&quot;,  &quot;multirow.png&quot;,  &quot;GameObjectClass Preview&quot;)
++        self.actionGameObjectClass_Selection.setObjectName(&quot;actionObject_Selection&quot;)
++
++        self.actionConsole_Window = self.createAction(&quot;&amp;Console Window&quot;,  self.toggleConsoleWindow,  &quot;Alt+C&quot;,  &quot;console.png&quot;,  &quot;Console Window&quot;)
++        self.actionConsole_Window.setObjectName(&quot;actionConsole_Window&quot;)
++        
++        self.actionToggleViewportGrid = self.createAction(&quot;&amp;Toggle Grid&quot;,  self.toggleViewportGrid,  &quot;Alt+G&quot;,  &quot;console.png&quot;,  &quot;Toggle Viewport Grid&quot;)
++        self.actionToggleViewportGrid.setObjectName(&quot;actionToggleViewportGrid&quot;)
++
++#####################################
++#####################################
++
++
++        self.menuFile.addAction(self.actionNeu)
++        self.menuFile.addAction(self.actionOpen)
++        self.menuFile.addAction(self.actionSave)
++        self.menuFile.addAction(self.actionRunModule)
++        self.menuFile.addAction(self.actionClose)
++
++        self.menuEdit.addAction(self.actionSelect)
++        self.menuEdit.addAction(self.actionMove)
++        self.menuEdit.addAction(self.actionRotate)
++        self.menuEdit.addAction(self.actionScale)
++        self.menuEdit.addSeparator()
++        self.menuEdit.addAction(self.actionDelete)
++        self.menuEdit.addAction(self.actionCopy)
++        self.menuEdit.addAction(self.actionCut)
++        self.menuEdit.addAction(self.actionPaste)
++        self.menuEdit.addSeparator()
++        self.menuEdit.addAction(self.actionOneClickEntityPlacement)
++        
++
++        self.menuView.addAction(self.actionSceneExplorer)
++        self.menuView.addAction(self.actionPreferences)
++        self.menuView.addAction(self.actionProperty_Window)
++        self.menuView.addAction(self.actionObject_Selection)
++        self.menuView.addAction(self.actionMaterial_Selection)
++        self.menuView.addAction(self.actionGameObjectClass_Selection)
++        self.menuView.addAction(self.actionConsole_Window)
++        self.menuView.addAction(self.actionToggleViewportGrid)
++        
++        self.menubar.addAction(self.menuFile.menuAction())
++        self.menubar.addAction(self.menuEdit.menuAction())
++        self.menubar.addAction(self.menuView.menuAction())
++
++        self.retranslateUi()
++        QtCore.QMetaObject.connectSlotsByName(self)
++
++    def retranslateUi(self):
++        self.setWindowTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;MainWindow&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuFile.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;File&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuEdit.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Edit&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.menuView.setTitle(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;View&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionNeu.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;New Module&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionMove.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Move&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionRotate.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Rotate&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionSceneExplorer.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Module Explorer&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionPreferences.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Preferences&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionProperty_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Property Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionObject_Selection.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Object Selection&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionClose.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Quit&quot;, None, QtGui.QApplication.UnicodeUTF8))
++        self.actionConsole_Window.setText(QtGui.QApplication.translate(&quot;MainWindow&quot;, &quot;Console Window&quot;, None, QtGui.QApplication.UnicodeUTF8))
++
++    def setupOgre(self, pluginCfgPath=&quot;./Plugins.cfg&quot;, ogreCfgPath=&quot;./ogre.cfg&quot;, logPath=&quot;./ogre.log&quot;):
++        if platform.system() == &quot;Windows&quot;:
++            pluginCfgPath=&quot;./Plugins-windows.cfg&quot;
++        else:
++            pluginCfgPath=&quot;./Plugins-linux.cfg&quot;
++
++        root = og.Root(pluginCfgPath, ogreCfgPath, logPath)
++        self.ogreRoot = root
++
++        if  not self.ogreRoot.restoreConfig() and not self.ogreRoot.showConfigDialog():
++            sys.exit('Quit from Config Dialog')
++
++        root.initialise(False)
++
++        self.pivotRenderQueueListener = PivotRenderQueueListener()
++        self.OgreMainWinSceneMgr = self.ogreRoot.createSceneManager(og.ST_GENERIC, &quot;OgreMainWinSceneMgr&quot;)
++        self.OgreMainWinSceneMgr.ambientLight = og.ColourValue(4, 4, 4)
++        self.OgreMainWinSceneMgr.addRenderQueueListener(self.pivotRenderQueueListener)
++        
++        self.moduleName = &quot;&quot;
++        self.moduleManager = ModuleManager(self.ogreRoot,  self.OgreMainWinSceneMgr)
++        self.gocManager = self.moduleManager.gocManager
++        
++        self.ogreMainWindow = OgreMainWindow.OgreMainWindow(self.moduleManager,  root,  self.OgreMainWinSceneMgr,  self)
++        self.gridlayout.addWidget(self.ogreMainWindow,0,0,1,1)
++        self.hboxlayout.addLayout(self.gridlayout)
++        self.setCentralWidget(self.centralwidget)
++        
++        oglog = og.LogManager.getSingleton().getDefaultLog()
++        oglog.addListener(self.consoleWindow.lockenLog)
++
++    def finishEditorSetup(self):
++        if not self.editorSetupFinished:
++            og.ResourceGroupManager.getSingleton().addResourceLocation(&quot;./media&quot;, &quot;FileSystem&quot;, &quot;General&quot;, False)
++            og.ResourceGroupManager.getSingleton().initialiseAllResourceGroups()
++
++            self.moduleManager.pivot = Pivot(self.OgreMainWinSceneMgr)
++            self.moduleManager.pivot.hide()
++            self.editorSetupFinished = True
++        
++    def update(self):
++        self.ogreRoot.renderOneFrame()
++        if platform.system() == &quot;Linux&quot;:
++            self.ogreMainWindow.updateRenderWindow()
++            self.modelSelectionDialog.updateRenderWindow()
++            self.materialSelectionDialog.updateRenderWindow()
++
++    def actionOpenSlot(self):
++        self.finishEditorSetup()
++        self.moduleManager.openLoadModuleDialog()
++
++    def actionNewSlot(self):
++        newModuleWiz = NewModuleWizard(self.moduleManager, self)
++        newModuleWiz.exec_()
++        return
++        
++    def actionSaveSlot(self):
++        self.moduleManager.save()
++        
++    def actionRunModuleSlot(self):
++        self.moduleManager.save()
++        if platform.system() == &quot;Windows&quot;:
++            workingDir = self.prefDialog.moduleCfgPath.replace(&quot;/modules/modules.cfg&quot;, &quot;&quot;)
++            executable = os.path.join(workingDir, &quot;Rastullah.exe&quot;)
++            executable = executable.replace(&quot;/&quot;,  &quot;\\&quot;)
++            if os.path.isfile(executable):
++                subprocess.Popen([executable, &quot;--module&quot;, self.moduleManager.mainModule.name], 0, None, None, None, None, None, False, False, workingDir)
++
++        
++    def actionQuitSlot(self):
++        self.close()
++
++    def actionDeleteSlot(self):
++        self.moduleManager.deleteObjects()
++
++    def actionCopySlot(self):
++        self.moduleManager.copyObjects()
++
++    def actionCutSlot(self):
++        self.moduleManager.cutObjects()
++
++    def actionPasteSlot(self):
++        self.moduleManager.pasteObjects(self.ogreMainWindow.getCameraToViewportRay())
++
++    def actionSelectSlot(self):
++        self.moduleManager.pivot.hide()
++
++    def actionMoveSlot(self):
++        self.moduleManager.pivot.setMoveMode()
++
++    def actionRotateSlot(self):
++        self.moduleManager.pivot.setRotateMode()
++
++    def actionScaleSlot(self):
++        self.moduleManager.pivot.setScaleMode()
++
++    def actionOneClickEntityPlacementSlot(self):
++        self.moduleManager.setOneClickEntityPlacement(self.actionOneClickEntityPlacement.isChecked())
++
++    def togglePreferencesWindow(self):
++        if self.prefDialog.isHidden():
++            self.prefDialog.show()
++        else:
++            self.prefDialog.hide()
++
++    def toggleModelPreviewWindow(self):
++        if self.modelSelectionDock.isHidden():
++            self.modelSelectionDock.show()
++        else:
++            self.modelSelectionDock.hide()
++    
++    def toggleMaterialPreviewWindow(self):
++        if self.materialSelectionDock.isHidden():
++            self.materialSelectionDock.show()
++        else:
++            self.materialSelectionDock.hide()
++
++    def toggleGameObjectViewWindow(self):
++        if self.gameObjectClassViewDock.isHidden():
++            self.gameObjectClassViewDock.show()
++        else:
++            self.gameObjectClassViewDock.hide()
++
++    def toggleModuleExplorer(self):
++        if self.moduleExplorerDock.isHidden():
++            self.moduleExplorerDock.show()
++        else:
++            self.moduleExplorerDock.hide()
++
++    def togglePropertyWindow(self):
++        if self.propertyDock.isHidden():
++            self.propertyDock.show()
++        else:
++            self.propertyDock.hide()
++
++    def toggleConsoleWindow(self):
++        if self.consoleDock.isHidden():
++            self.consoleDock.show()
++        else:
++            self.consoleDock.hide()
++
++    def toggleViewportGrid(self):
++        self.ogreMainWindow.toggleViewportGrid()
++
++    def createDockWindows(self):
++        self.propertyDock = QtGui.QDockWidget(self.tr(&quot;Properties&quot;), self)
++        self.propertyDock.setObjectName(&quot;PropertyDockWindow&quot;)
++        self.propertyDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.propertyDock.setWidget(self.objectPropertyWin)
++        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.propertyDock)
++
++        self.modelSelectionDock = QtGui.QDockWidget(self.tr(&quot;Models&quot;), self)
++        self.modelSelectionDock.setObjectName(&quot;ModelSelectionDockWindow&quot;)
++        self.modelSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.modelSelectionDock.setWidget(self.modelSelectionDialog)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.modelSelectionDock)
++        
++        self.materialSelectionDock = QtGui.QDockWidget(self.tr(&quot;Materials&quot;), self)
++        self.materialSelectionDock.setObjectName(&quot;MaterialSelectionDockWindow&quot;)
++        self.materialSelectionDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.materialSelectionDock.setWidget(self.materialSelectionDialog)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.materialSelectionDock)
++
++        self.gameObjectClassViewDock = QtGui.QDockWidget(self.tr(&quot;GameObjectClasses&quot;), self)
++        self.gameObjectClassViewDock.setObjectName(&quot;GameObjectClassView&quot;)
++        self.gameObjectClassViewDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.gameObjectClassViewDock.setWidget(self.gameObjectClassView)
++        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.gameObjectClassViewDock)
++
++        self.moduleExplorerDock = QtGui.QDockWidget(self.tr(&quot;Module Explorer&quot;), self)
++        self.moduleExplorerDock.setObjectName(&quot;ModuleExplorerDockWindow&quot;)
++        self.moduleExplorerDock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
++        self.moduleExplorerDock.setWidget(self.moduleExplorerWin)
++        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.moduleExplorerDock)
++
++        self.consoleDock = QtGui.QDockWidget(self.tr(&quot;Console&quot;), self)
++        self.consoleDock.setObjectName(&quot;ConsoleDockWindow&quot;)
++        self.consoleDock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea | QtCore.Qt.TopDockWidgetArea)
++        self.consoleDock.setWidget(self.consoleWindow)
++        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.consoleDock)
++
++        self.fileToolBar = self.addToolBar(&quot;File Toolbar&quot;)
++        self.fileToolBar.setObjectName(&quot;FileToolBar&quot;)
++        self.fileToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
++        self.fileToolBar.addAction(self.actionNeu)
++        self.fileToolBar.addAction(self.actionOpen)
++        self.fileToolBar.addAction(self.actionSave)
++        self.fileToolBar.addAction(self.actionRunModule)
++        self.fileToolBar.addAction(self.actionClose)
++        self.addToolBar(QtCore.Qt.TopToolBarArea, self.fileToolBar)
++
++        self.moveToolBar = self.addToolBar(&quot;Transformation Bar&quot;)
++        self.moveToolBar.setObjectName(&quot;TransformationBar&quot;)
++        self.moveToolBar.setAllowedAreas(QtCore.Qt.TopToolBarArea | QtCore.Qt.BottomToolBarArea)
++        self.moveToolBar.addAction(self.actionSelect)
++        self.moveToolBar.addAction(self.actionMove)
++        self.moveToolBar.addAction(self.actionRotate)
++        self.moveToolBar.addAction(self.actionScale)
++        self.addToolBar(QtCore.Qt.TopToolBarArea, self.moveToolBar)
++
++    def keyPressEvent(self,  event):
++        if not event.isAutoRepeat():
++            self.ogreMainWindow.keyPressEvent(event)
++
++    def keyReleaseEvent(self,  event):
++        if not event.isAutoRepeat():
++            self.ogreMainWindow.keyReleaseEvent(event)
++        pass
++
++    def onContextMenuCallback(self, actions, menus):
++        menu = QMenu(&quot;My Menu!!&quot;)
++        menu.addAction(self.actionDelete)
++        menu.addAction(self.actionCopy)
++        menu.addAction(self.actionCut)
++        menu.addAction(self.actionPaste)
++        menu.addSeparator()
++        
++        for m in menus:
++            menu.addMenu(m)
++        for a in actions:
++            menu.addAction(a)
++
++            
++        menu.exec_(QCursor.pos())
++        
++
++    def connectActionButtons(self):
++        pass
++
++    def saveOnClose(self):
++        reply = QtGui.QMessageBox.question(self,  &quot;Rastullahs Lockenwickler - Unsaved Chages&quot;,  &quot;Save unsaved changes?&quot;,  QtGui.QMessageBox.Yes|QtGui.QMessageBox.No|QtGui.QMessageBox.Cancel)
++        if reply == QtGui.QMessageBox.Cancel:
++            return False
++        if reply == QtGui.QMessageBox.Yes:
++            print&quot;&quot;
++            #TODO: implement save here
++        return True
++
++    def closeEvent(self,  event):
++        if self.saveOnClose():
++            settings = QtCore.QSettings()
++            settings.setValue(&quot;Preferences/moduleCfgPath&quot;, QtCore.QVariant(self.prefDialog.lineEdit.text()))
++            settings.setValue(&quot;MainWindow/Geometry&quot;,  QtCore.QVariant(self.saveGeometry()))
++            settings.setValue(&quot;MainWIndow/DockWindows&quot;,  QtCore.QVariant(self.saveState()))
++        else:
++            event.ignore()
++
++if __name__ == &quot;__main__&quot;:
++#    # Import Psyco if available
++#    try:
++#        import psyco
++#        psyco.full(0.02)
++#        #psyco.log()
++#        #psyco.profile()
++#    except ImportError:
++#        pass
++    
++    app = QtGui.QApplication(sys.argv)
++    app.setOrganizationName(&quot;Team Pantheon&quot;)
++    app.setOrganizationDomain(&quot;rastullahs-lockenpracht.de/team&quot;)
++    app.setApplicationName(&quot;Lockenwickler&quot;)
++
++    form = Lockenwickler()
++    form.show()
++
++    sys.exit(app.exec_())
++
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -34,6 +34,7 @@
+ from DepthBuffer import *
+ from MovePivot import *
+ from GameObjectClassManager import *
++from MyRaySceneQueryListener import *
+ 
+ 
+ #                &lt;zone name=&quot;Testzone&quot;&gt;
+@@ -101,7 +102,9 @@
+         
+     return n
+         
+-        
++def printVector3(vec):
++    print str(vec.x) + &quot;;&quot; + str(vec.y) + &quot;;&quot; + str(vec.z)
++    
+ class EntityCustomOptions(og.UserDefinedObject):
+     def __init__(self, receivesShadow = True, staticgeometrygroup = 0, physicsproxytype = &quot;none&quot;, renderingdistance = &quot;20000&quot;):
+         og.UserDefinedObject.__init__(self)
+@@ -301,7 +304,7 @@
+             if lightType == &quot;point&quot;:
+                 light.setType(og.Light.LT_POINT)            
+             elif lightType == &quot;spot&quot;:
+-                light.setType(og.Light.LT_SPOT)
++                light.setType(og.Light.LT_SPOTLIGHT)
+             elif lightType == &quot;directional&quot;:
+                 light.setType(og.Light.LT_DIRECTIONAL)
+                 
+@@ -464,9 +467,9 @@
+                     
+                     if lightType == &quot;point&quot; or lightType == &quot;spot&quot;:
+                         posElem = xml.SubElement(lightElem, &quot;position&quot;)
+-                        posElem.attrib[&quot;x&quot;] = str(light.getPosition().x)
+-                        posElem.attrib[&quot;y&quot;] = str(light.getPosition().y)
+-                        posElem.attrib[&quot;z&quot;] = str(light.getPosition().z)
++                        posElem.attrib[&quot;x&quot;] = str(n.getPosition().x)
++                        posElem.attrib[&quot;y&quot;] = str(n.getPosition().y)
++                        posElem.attrib[&quot;z&quot;] = str(n.getPosition().z)
+                     
+                     colDiffuseElem = xml.SubElement(lightElem, &quot;colourDiffuse&quot;)
+                     colDiffuseElem.attrib[&quot;r&quot;] = str(light.getDiffuseColour().r)
+@@ -766,11 +769,15 @@
+         self.oneClickEntityPlacement = False
+         
+         self.onContextMenuCallback = None
+-    
++        self.contextMenuClickPosition = None
++        self.contextMenuRay = None
++        
+         self.playerStartGameObjectId = None
+         
+         self.entityCustomOptionsDict = []
+-    
++        
++        self.raySceneQueryListener = MyRaySceneQueryListener()
++        
+     def resetParsedModuleConfig(self):
+         self.moduleConfigIsParsed = False
+         self.moduleList = []
+@@ -932,26 +939,26 @@
+             if self.pivot is not None:
+                 self.pivot.hide()
+ 
+-#        if self.rayLine == None:
+-#            self.rayLine = self.sceneManager.createManualObject(&quot;rayLine&quot;)
+-#            self.rayLine.setDynamic(True)
+-#            self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;raynode&quot;).attachObject(self.rayLine)
+-#
+-#            self.rayLine.begin(&quot;BaseWhiteNoLighting&quot;, og.RenderOperation.OT_LINE_STRIP)
+-#
+-#            self.rayLine.position(ray.getOrigin())
+-#            self.rayLine.position( ray.getPoint(10000))
+-#
+-#            self.rayLine.end()
+-#
+-#        else:
+-#            self.rayLine.beginUpdate(0)
+-#
+-#            self.rayLine.position(ray.getOrigin())
+-#            self.rayLine.position( ray.getPoint(10000))
+-#
+-#            self.rayLine.end()
++        if self.rayLine == None:
++            self.rayLine = self.sceneManager.createManualObject(&quot;rayLine&quot;)
++            self.rayLine.setDynamic(True)
++            self.sceneManager.getRootSceneNode().createChildSceneNode(&quot;raynode&quot;).attachObject(self.rayLine)
+ 
++            self.rayLine.begin(&quot;BaseWhiteNoLighting&quot;, og.RenderOperation.OT_LINE_STRIP)
++
++            self.rayLine.position(ray.getOrigin())
++            self.rayLine.position( ray.getPoint(10000))
++
++            self.rayLine.end()
++
++        else:
++            self.rayLine.beginUpdate(0)
++
++            self.rayLine.position(ray.getOrigin())
++            self.rayLine.position( ray.getPoint(10000))
++
++            self.rayLine.end()
++
+     def deleteObjects(self):
+         if len(self.userSelectionList) &lt; 1:
+             return
+@@ -960,6 +967,11 @@
+ 
+         for so in self.userSelectionList:
+             node = so.entity.getParentNode()
++
++            if node.getName().startswith(&quot;light_&quot;):
++                light = extractLight(node)
++                self.sceneManager.destroyLight(light)
++                
+             node.detachAllObjects()
+             self.sceneManager.destroySceneNode(node)
+             self.sceneManager.destroyEntity(so.entity)
+@@ -1145,7 +1157,6 @@
+         
+         eco = EntityCustomOptions()
+         self.dropEntity.setUserObject(eco)
+-        #ModuleManager.entityCustomOptionsDict.append(eco)
+         
+         self.dropNode = self.currentMap.mapNode.createChild(&quot;entity_dropNode&quot; + str(ModuleManager.dropCount))
+         self.dropNode.attachObject(self.dropEntity)
+@@ -1200,10 +1211,78 @@
+         
+     def setOneClickEntityPlacement(self, state):
+         self.oneClickEntityPlacement = state
++    
++    def createLight(self, name):
++        pos = og.Vector3()
+         
+-    def createLight(self):
+-        print &quot;creating light here...&quot;
+-    
++        query = self.sceneManager.createRayQuery(self.contextMenuRay)
++        query.ray = self.contextMenuRay
++        query.setSortByDistance(True)
++        query.execute(self.raySceneQueryListener)
++        if self.raySceneQueryListener.dist &lt; 100000:
++            pos = self.contextMenuRay.getPoint(self.raySceneQueryListener.dist)
++            self.raySceneQueryListener.dist = 100000
++            
++#        so = self.selectionBuffer.onSelectionClick(int(self.contextMenuClickPosition.x), int(self.contextMenuClickPosition.y))
++#        if so is not None:
++#            result = og.Math.intersects(self.contextMenuRay, so.entity.getBoundingBox())
++#            
++#            if result.first:
++#                pos = self.contextMenuRay.getPoint(result.second)
++#                pos += so.entity.getParentNode().getPosition()
++        
++        light = None
++        if not self.sceneManager.hasLight(name):
++            light = self.sceneManager.createLight(name)
++            
++        return light,  pos
++        
++    def addPointLight(self):
++        if self.currentMap is None:
++            print &quot;No map selected!&quot;
++            return
++            
++        lightName = &quot;pointLight&quot; + str(ModuleManager.dropCount)
++        ModuleManager.dropCount += 1
++        
++        light, pos = self.createLight(lightName)
++        printVector3(pos)
++        
++        if not light:
++            print &quot;Error while creating light&quot;
++            return
++            
++        light.setType(og.Light.LT_POINT)
++        
++        e = self.sceneManager.createEntity(lightName + &quot;_ent&quot;, &quot;lightbulp.mesh&quot;)
++        n = self.currentMap.mapNode.createChild(&quot;light_&quot; + lightName + &quot;_node&quot;)
++        n.attachObject(light)
++        n.attachObject(e)
++        n.setPosition(pos)
++        
++    def addSpotLight(self):
++        if self.currentMap is None:
++            print &quot;No map selected!&quot;
++            return
++            
++        lightName = &quot;spotLight&quot; + str(ModuleManager.dropCount)
++        ModuleManager.dropCount += 1
++        
++        light, pos = self.createLight(lightName)
++        printVector3(pos)
++        
++        if not light:
++            print &quot;Error while creating light&quot;
++            return
++            
++        light.setType(og.Light.LT_SPOTLIGHT)
++        
++        e = self.sceneManager.createEntity(lightName + &quot;_ent&quot;, &quot;lightbulp.mesh&quot;)
++        n = self.currentMap.mapNode.createChild(&quot;light_&quot; + lightName + &quot;_node&quot;)
++        n.attachObject(light)
++        n.attachObject(e)
++        n.setPosition(pos)
++        
+     def createZone(self):
+         print &quot;creating zone here...&quot;
+     
+@@ -1211,18 +1290,28 @@
+         self.mainModule.playerStart = str(self.playerStartGameObjectId)
+         print &quot;setting Player Start to &quot; + str(self.playerStartGameObjectId)
+     
+-    def onContextMenu(self, screenX, screenY):
++    def onContextMenu(self, screenX, screenY, ray):
++        menus = []
+         actions = []
+-        actions.append(self.createAction(&quot;Create Light here&quot;, self.createLight))
+         actions.append(self.createAction(&quot;Create Zone here&quot;, self.createZone))
++        pla = self.createAction(&quot;Pointlight&quot;, self.addPointLight, None, &quot;idea.png&quot;)
++        pls = self.createAction(&quot;Spotlight&quot;, self.addSpotLight, None, &quot;idea.png&quot;)
+         
++        lightMenu = QMenu(&quot;Add Light&quot;)
++        lightMenu.addAction(pla)
++        lightMenu.addAction(pls)
++        menus.append(lightMenu)
++        
+         so = self.selectionBuffer.onSelectionClick(screenX, screenY)
++        self.contextMenuClickPosition = og.Vector2(screenX, screenY)
++        self.contextMenuRay = ray
++        
+         if so is not None and so.entity.getParentNode().getName().startswith(&quot;gameobject_&quot;):
+             actions.append(self.createAction(&quot;Set Player Starterpoint&quot;, self.setPlayerStart))
+             self.playerStartGameObjectId = so.entity.getUserObject().inWorldId
+         
+         if self.onContextMenuCallback is not None:
+-            self.onContextMenuCallback(actions)
++            self.onContextMenuCallback(actions,  menus)
+ 
+     def setContextMenuCallback(self, callback):
+         self.onContextMenuCallback = callback
+
+Modified: rl/trunk/editors/Lockenwickler/src/MyRaySceneQueryListener.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/MyRaySceneQueryListener.py	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/MyRaySceneQueryListener.py	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -1,319 +1,43 @@
+-#################################################
+- # Copyright (C) 2008  Stefan Stammberger
+- #
+- # This library is free software; you can redistribute it and/or
+- # modify it under the terms of the GNU Lesser General Public
+- # License as published by the Free Software Foundation; either
+- # version 2.1 of the License, or (at your option) any later version.
+- #
+- # This library is distributed in the hope that it will be useful,
+- # but WITHOUT ANY WARRANTY; without even the implied warranty of
+- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- # Lesser General Public License for more details.
+- #
+- # You should have received a copy of the GNU Lesser General Public
+- # License along with this library; if not, write to the Free Software
+- # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- #################################################
+-
+-import ctypes
+-import ogre.renderer.OGRE as og
+-
+-# a class to store information about a object that got selected
+-class SelectionObject():
+-    def __init__(self,  entity,  distance):
+-        self.entityName = entity.getName()
+-        self.entity = entity #the selected entity
+-        self.distance = distance # the distance from camera at the time of selection
+-        self.isPivot = False
+-
+-#        if self.entity.getUserObject() is not None:
+-#            self.isGameObject = True
+-#        else:
+-#            self.isGameObject = False
+-
+-    #if True this instance will show its bounding box else it will hide it
+-    def setSelected(self,  selected):
+-        if selected == True:
+-            self.entity.getParentNode().showBoundingBox(True)
+-        else:
+-            self.entity.getParentNode().showBoundingBox(False)
+-
+-    def __eq__(self, other):
+-        return self.entity.getName() == other.entity.getName()
+-
+-    def __ne__(self, other):
+-        return self.entity.getName() != other.entity.getName()
+-
+-class MyRaySceneQueryListener ( og.RaySceneQueryListener ):
+-    def __init__( self ):
+-        super ( MyRaySceneQueryListener, self ).__init__()
+-        self.previouseSelection = None
+-        self.selectionList = []
+-        self.previousSelected = -1
+-        self.currentSelected = -1
+-
+-        self.mNormalList = []
+-        self.mVertexList = []
+-        self.mIndexList = []
+-
+-        self.currentRay = None
+-        self.lastRay = None
+-
+-    #def __del__(self):
+-        #del self.World
+-
+-    # sort algorithm for the selection list
+-    def sortCompareImp(self,  x,  y):
+-        if x.distance &gt; y.distance:
+-            return 1
+-        elif x.distance == y.distance:
+-            return 0
+-        else: # x&lt;y
+-            return -1
+-
+-    def queryResult ( self, entity, distance ):
+-        #print &quot;dbg: &quot; + entity.getName()
+-        if distance == 0.0: #camera is in the bounding box, ignore this selection
+-            return True
+-        elif entity.getName() == &quot;OgreMainWin::0::ViewportGrid&quot;:
+-            return True
+-        elif entity.getName() == &quot;rayLine&quot;:
+-            return True
+-        elif entity.isVisible() and entity.getName() == &quot;EditorXArrow&quot;:
+-            so = SelectionObject(entity,  distance)
+-            so.isPivot = True
+-            self.selectionList.append(so)
+-            return False
+-        elif entity.isVisible() and entity.getName() == &quot;EditorYArrow&quot;:
+-            so = SelectionObject(entity,  distance)
+-            so.isPivot = True
+-            self.selectionList.append(so)
+-            return False
+-        elif entity.isVisible() and entity.getName() == &quot;EditorZArrow&quot;:
+-            so = SelectionObject(entity,  distance)
+-            so.isPivot = True
+-            self.selectionList.append(so)
+-            return False
+-        elif entity.isVisible() and entity.getName() == &quot;EditorFreeMover&quot;:
+-            return True
+-        elif entity.getName() == &quot;EditorXRotator&quot; or entity.getName() == &quot;EditorYRotator&quot; or entity.getName() == &quot;EditorZRotator&quot;:
+-            if entity.isVisible() and self.rayCastToPolygonLevelOnSingleMesh(self.currentRay,  entity):
+-                so = SelectionObject(entity,  distance)
+-                so.isPivot = True
+-                self.selectionList.append(so)
+-                return False
+-            else:
+-                return True
+-        else:
+-            so = SelectionObject(entity,  distance)
+-            self.selectionList.append(so)
+-
+-        self.selectionList.sort(self.sortCompareImp)
+-
+-        return True
+-
+-    def reset(self):
+-        self.previousSelected = -1
+-        self.currentSelected = -1
+-        del self.selectionList[:]
+-        #self.selectionList = []
+-
+-    def rayCastToPolygonLevel(self,  ray):
+-        self.lastRay = ray
+-
+-        for so in self.selectionList:
+-            if so.isPivot:
+-                return so
+-
+-        if len(self.selectionList) &gt;= 1:
+-            for so in self.selectionList:
+-                if self.rayCastToPolygonLevelOnSingleMesh(ray,  so.entity):
+-                    return so
+-
+-
+-    def rayCastToPolygonLevelOnSingleMesh(self,  ray,  entity):
+-        return
+-        
+-        
+-
+-#    def iterateEntityUnderMouse(self):
+-#        self.previousSelected = self.currentSelected
+-#        if len(self.selectionList) &gt;= self.currentSelected: # would mean we are out of bounds
+-#            self.selectionList[self.currentSelected].setSelected(False)
+-#
+-#        self.currentSelected += 1
+-#
+-#        if len(self.selectionList) == self.currentSelected: # means we are out of bounds and reached the end of the list, reset it to zero
+-#            self.currentSelected = 0
+-#
+-#        if len(self.selectionList) &gt;= self.currentSelected: # would mean we are out of bounds
+-#            #print str(self.selectionList[self.currentSelected].distance) + &quot; &quot;  + self.selectionList[self.currentSelected].entity.getName()
+-#            if self.rayCastToPolygonLevelOnCurrentSelection():
+-#                self.selectionList[self.currentSelected].setSelected(True)
+-#                return self.selectionList[self.currentSelected]
+-
+-
+-#    def getMeshInformation(self,  entity):
+-#        numVertices = 0
+-#        numIndices = 0
+-#        useSharedVertices = False
+-#
+-#        if not entity:
+-#            return False
+-#
+-#        pMesh = entity.getMesh()
+-#
+-#        position =    entity.getParentNode()._getDerivedPosition()
+-#        orient = entity.getParentNode()._getDerivedOrientation()
+-#        scale =  entity.getParentNode().getScale()
+-#
+-#        for i in range ( pMesh.getNumSubMeshes() ):
+-#            pSubMesh = pMesh.getSubMesh(i)
+-#            if pSubMesh.useSharedVertices:
+-#                useSharedVertices = True
+-#            else:
+-#                numVertices += pSubMesh.vertexData.vertexCount
+-#            numIndices += pSubMesh.indexData.indexCount
+-#
+-#        if useSharedVertices:
+-#            numVertices += pMesh.sharedVertexData.vertexCount
+-#
+-#            storageclass = ctypes.c_float * 3
+-#            test=storageclass(0.0,  0.0,  0.0)
+-##         mVertexList = new Point[numVertices];
+-##         mIndexList = new unsigned int[numIndices];
+-#
+-#        self.mVertexList = []
+-#        self.mIndexList = []
+-#
+-#        ## Count the number of vertices and incides so we can Set them
+-#        indexCount = 0
+-#        vertListCount = 0
+-#
+-#        if useSharedVertices:
+-#            ## Real* pVertices (x, y, z order x numVertices)
+-#            elem = pMesh.sharedVertexData.vertexDeclaration.findElementBySemantic(og.VES_POSITION)
+-#
+-#            if not elem:
+-#                ogre.Except(Exception.ERR_ITEM_NOT_FOUND, &quot;Can't find position elements in the &quot;
+-#                    &quot;mesh to be written!&quot;, &quot;MeshSerializerImpl.writeGeometry&quot;)
+-#
+-#            vbuf = pMesh.sharedVertexData.vertexBufferBinding.getBuffer(elem.getSource())
+-#
+-#            ## need space for the 3 verticies
+-#            storageclass = ctypes.c_float * 3
+-#            test=storageclass(0.0,  0.0,  0.0)
+-#
+-#            for j in range ( pMesh.sharedVertexData.vertexCount ):
+-#                vbuf.readData(j * vbuf.getVertexSize(), 3 * ctype.sizeof(ctype.c_float), ctype.addressof(test))
+-#                pt = og.Vector3(test[0], test[1], test[2])
+-#                self.mVertexList.append( (orient * (pt * scale)) + position )
+-#                vertListCount+=1
+-#
+-#        for i in range ( pMesh.getNumSubMeshes() ):
+-#            pSubMesh = pMesh.getSubMesh(i)
+-#            if not pSubMesh.useSharedVertices:
+-#                ## Real* pVertices (x, y, z order x numVertices)
+-#                elem = pSubMesh.vertexData.vertexDeclaration.findElementBySemantic(og.VES_POSITION)
+-#
+-#                if not elem:
+-#                    og.Except(Exception.ERR_ITEM_NOT_FOUND, &quot;Can't find position elements in the &quot;
+-#                        &quot;mesh to be written!&quot;, &quot;MeshSerializerImpl.writeGeometry&quot;)
+-#
+-#                vbuf = pSubMesh.vertexData.vertexBufferBinding.getBuffer(elem.getSource())
+-#
+-#                ## need space for the verticies
+-#                storageclass = ctypes.c_float * (pSubMesh.vertexData.vertexCount * 6)
+-#                test=storageclass(0.0)
+-#
+-#                vbuf.readData(0, pSubMesh.vertexData.vertexCount * 6 * ctypes.sizeof(ctypes.c_float), ctypes.addressof(test))
+-#
+-#                for j in range ( 0,  pSubMesh.vertexData.vertexCount * 6,  6):
+-#                    #print j
+-#                    pt = og.Vector3(test[j], test[j+1], test[j+2])
+-#                    self.mVertexList.append( (orient * (pt * scale)) + position )
+-#                    vertListCount += 1
+-#
+-#            ibuf = pSubMesh.indexData.indexBuffer
+-#            ## need space for the verticies
+-#            storageclass = ctypes.c_ushort * pSubMesh.indexData.indexCount
+-#            test2=storageclass()
+-#
+-#
+-#            ibuf.readData(0, ibuf.getSizeInBytes(), ctypes.addressof(test2))
+-#            for j in range ( pSubMesh.indexData.indexCount ):
+-#                self.mIndexList.append (test2[j])   # unsigned short
+-#                indexCount += 1
+-#
+-#            ih = 0
+-#            for blah in self.mVertexList:
+-#                #print str(ih) + &quot;: &quot;  +  str(blah)
+-#                ih += 1
+-#
+-#    def rayCastToPolygonLevel(self,  ray):
+-#        self.lastRay = ray
+-#
+-#        for so in self.selectionList:
+-#            if so.isPivot:
+-#                return so
+-#
+-#        if len(self.selectionList) &gt;= 1:
+-#            for so in self.selectionList:
+-#                if self.rayCastToPolygonLevelOnSingleMesh(ray,  so.entity):
+-#                    return so
+-#
+-#
+-#    def rayCastToPolygonLevelOnSingleMesh(self,  ray,  entity):
+-#        self.getMeshInformation(entity)
+-#        name = entity.getName()
+-#        print &quot;dbg: &quot; + name
+-#
+-#        temp = []
+-#        for vec in self.mVertexList:
+-#            temp.append(vec.x)
+-#            temp.append(vec.y)
+-#            temp.append(vec.z)
+-#
+-#        globalPosition = entity.getParentNode()._getDerivedPosition()
+-#        globalOrientation = entity.getParentNode()._getDerivedOrientation()
+-#
+-#
+-#        i = 0
+-#        while i &lt;= (len(self.mIndexList) - 3):
+-#            verta = globalPosition + self.mVertexList[self.mIndexList[i]]
+-#            vertb = globalPosition + self.mVertexList[self.mIndexList[i+1]]
+-#            vertc = globalPosition + self.mVertexList[self.mIndexList[i+2]]
+-#
+-#            verta = globalOrientation * verta
+-#            vertb = globalOrientation * vertb
+-#            vertc = globalOrientation * vertc
+-#            normal = og.Math.calculateBasicFaceNormal(verta, vertb, vertc)
+-#
+-#            result = og.Math.intersects(ray, verta, vertb, vertc, True, True)
+-#            #result = og.Math.intersects(ray, globalPosition + self.mVertexList[self.mIndexList[i]], globalPosition + self.mVertexList[self.mIndexList[i+1]],
+-#            #                                                                                                                                              globalPosition + self.mVertexList[self.mIndexList[i+2]], normal,  True, True)
+-#
+-#            if result.first:
+-#                #print &quot;dbg: Treffer!!!!!!!!!&quot;
+-#                return True
+-#
+-#            i += 3
+-#
+-#        return False
+-#
+-#    def rayCastToPolygonLevelOnCurrentSelection(self):
+-#        if len(self.selectionList) &gt;= 1:
+-#            self.getMeshInformation(self.selectionList[self.currentSelected].entity)
+-#
+-#            i = 0
+-#            while i &lt;= (len(self.mIndexList) - 3):
+-#                globalPosition = self.selectionList[self.currentSelected].entity.getParentNode().getPosition()
+-#                result = og.Math.intersects(self.lastRay, globalPosition + self.mVertexList[self.mIndexList[i]], globalPosition + self.mVertexList[self.mIndexList[i+1]],
+-#                                                                                                                                                          globalPosition + self.mVertexList[self.mIndexList[i+2]], True, True)
+-#
+-#                if result.first:
+-#                   return True
+-#
+-#                i += 3
+-#            return False
++#################################################
++ # Copyright (C) 2008  Stefan Stammberger
++ #
++ # This library is free software; you can redistribute it and/or
++ # modify it under the terms of the GNU Lesser General Public
++ # License as published by the Free Software Foundation; either
++ # version 2.1 of the License, or (at your option) any later version.
++ #
++ # This library is distributed in the hope that it will be useful,
++ # but WITHOUT ANY WARRANTY; without even the implied warranty of
++ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ # Lesser General Public License for more details.
++ #
++ # You should have received a copy of the GNU Lesser General Public
++ # License along with this library; if not, write to the Free Software
++ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ #################################################
++
++import ctypes
++import ogre.renderer.OGRE as og
++
++class MyRaySceneQueryListener ( og.RaySceneQueryListener ):
++    def __init__( self ):
++        super ( MyRaySceneQueryListener, self ).__init__()
++        self.dist = 100000
++        
++    # sort algorithm for the selection list
++    def sortCompareImp(self,  x,  y):
++        if x.distance &gt; y.distance:
++            return 1
++        elif x.distance == y.distance:
++            return 0
++        else: # x&lt;y
++            return -1
++
++    def queryResult ( self, entity, distance ):
++#        if distance == 0.0: #camera is in the bounding box, ignore this selection
++#            return True
++        
++        if self.dist &gt; distance:
++            self.dist = distance
++
++        return True
+
+Modified: rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/OgreMainWindow.py	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -1,345 +1,350 @@
+-#################################################
+- # Copyright (C) 2008  Stefan Stammberger
+- #
+- # This library is free software; you can redistribute it and/or
+- # modify it under the terms of the GNU Lesser General Public
+- # License as published by the Free Software Foundation; either
+- # version 2.1 of the License, or (at your option) any later version.
+- #
+- # This library is distributed in the hope that it will be useful,
+- # but WITHOUT ANY WARRANTY; without even the implied warranty of
+- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- # Lesser General Public License for more details.
+- #
+- # You should have received a copy of the GNU Lesser General Public
+- # License along with this library; if not, write to the Free Software
+- # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- #################################################
+-
+-
+-import os
+-import sys
+-import platform
+-
+-from PyQt4.QtGui import *
+-from PyQt4.QtCore import *
+-
+-from ViewportGrid import *
+-
+-import OgreWidget
+-import ogre.renderer.OGRE as og
+-
+-# this class is the heart of the 3d part
+-# it manages the two ogre render windows and recieves events from the windows through the event filter
+-class OgreMainWindow(QWidget):
+-    def __init__(self, moduleManager,  ogreRoot, OgreMainWinSceneMgr,  parent):
+-        QWidget.__init__(self, parent)
+-        self.moduleManager = moduleManager
+-        self.ogreRoot = ogreRoot
+-        self.OgreMainWinSceneMgr = OgreMainWinSceneMgr
+-
+-        self.ogreWidget = None
+-
+-        self.leftMouseDown = False
+-        self.middleMouseDown = False
+-        self.rightMouseDown = False
+-
+-        self.mDollyCamera = False
+-
+-        self.moveCamForward = False
+-        self.moveCamBackward = False
+-        self.strafeCamLeft = False
+-        self.strafeCamRight = False
+-
+-        self.camUpdateTimer = QTimer(self)
+-        self.camUpdateTimer.connect(self.camUpdateTimer, SIGNAL(&quot;timeout()&quot;), self.updateCamera)
+-
+-        self.lastSelectionClick = None # Qpoint wich saves the last selection click mouse position
+-        
+-        self.setupUi(self)
+-
+-    def setupUi(self, Form):
+-        Form.setObjectName(&quot;Form&quot;)
+-        Form.resize(QSize(QRect(0,0,935,843).size()).expandedTo(Form.minimumSizeHint()))
+-
+-        self.gridlayout = QGridLayout(Form)
+-        self.gridlayout.setContentsMargins(0, 2, 0, 0)
+-        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
+-
+-        # create the vertical splitter ( contains the preferences buttons and the horizontal splitter with the two render windows )
+-        self.splitterV = QSplitter(Form)
+-
+-        sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding,QSizePolicy.MinimumExpanding)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.splitterV.sizePolicy().hasHeightForWidth())
+-        self.splitterV.setSizePolicy(sizePolicy)
+-        self.splitterV.setOrientation(Qt.Vertical)
+-        self.splitterV.setObjectName(&quot;splitter&quot;)
+-
+-        # create the horizontal splitter wich contains the two ogre render windows and add it to the vertical splitter
+-
+-        ##################################
+-        self.ogreWidget = OgreWidget.OgreWidget(&quot;OgreMainWin&quot;, self.ogreRoot, self.OgreMainWinSceneMgr, &quot;MainCam&quot;, self.splitterV,  0)
+-        self.ogreWidget.setMinimumSize(QSize(250,250))
+-
+-        sizePolicy = QSizePolicy(QSizePolicy.Maximum,QSizePolicy.Maximum)
+-        sizePolicy.setHorizontalStretch(0)
+-        sizePolicy.setVerticalStretch(0)
+-        sizePolicy.setHeightForWidth(self.ogreWidget.sizePolicy().hasHeightForWidth())
+-        self.ogreWidget.setSizePolicy(sizePolicy)
+-        self.ogreWidget.setObjectName(&quot;ogreWidget&quot;)
+-        self.splitterV.addWidget(self.ogreWidget)
+-        self.ogreWidget.setBackgroundColor(og.ColourValue(0, 1, 1))
+-        ####################################
+-
+-        self.gridlayout.addWidget(self.splitterV,0,0,1,1)
+-
+-        # register the eventfilters for the render windows
+-        # this is needed to catch mouse enter and mouse leave events for these windows
+-        self.ogreWidget.installEventFilter(self)
+-        self.ogreWidget.setAcceptDrops(True)
+-        self.lastMousePosX = 0
+-        self.lastMousePosY = 0
+-
+-        self.retranslateUi(Form)
+-        QMetaObject.connectSlotsByName(Form)
+-        
+-        self.ogreWidget.setOgreViewportCreatedCallback(self.ogreViewportCreatedCallback)
+-        
+-    def ogreViewportCreatedCallback(self):
+-        self.viewportGrid = ViewportGrid(self.OgreMainWinSceneMgr, self.ogreWidget.viewport)
+-        self.viewportGrid.enable()
+-        
+-    def retranslateUi(self, Form):
+-        Form.setWindowTitle(QApplication.translate(&quot;Form&quot;, &quot;Form&quot;, None, QApplication.UnicodeUTF8))
+-
+-    def keyPressEvent(self,  event):
+-        if event.key() == Qt.Key_W:
+-            self.moveCamForward = True
+-        elif event.key() == Qt.Key_S:
+-            self.moveCamBackward = True
+-        elif event.key() == Qt.Key_A:
+-            self.strafeCamLeft = True
+-        elif event.key() == Qt.Key_D:
+-            self.strafeCamRight= True
+-
+-    def keyReleaseEvent(self,  event):
+-        if event.key() == Qt.Key_W:
+-            self.moveCamForward = False
+-        elif event.key() == Qt.Key_S:
+-            self.moveCamBackward = False
+-        elif event.key() == Qt.Key_A:
+-            self.strafeCamLeft = False
+-        elif event.key() == Qt.Key_D:
+-            self.strafeCamRight= False
+-
+-    def eventFilter(self, obj, event):
+-        if event.type() == 2:
+-            self.ogreWidget.setFocus()
+-            if event.button() == 1: # left mouse button is pressed
+-                self.leftMouseDown = True
+-                self.moduleManager.leftMouseDown = True
+-
+-                if self.rightMouseDown: #if right mouse button is already pressed dolly the camera
+-                    self.mDollyCamera = True
+-                else:
+-                    self.calculateSelectionRay(event)
+-
+-            elif event.button() == 2: # right mouse button is pressed
+-                self.rightMouseDown = True
+-                self.moduleManager.rightMouseDown = True
+-                QTimer.singleShot(50, self.onContextMenuTimer)
+-
+-            elif event.button() == 4: # middle mouse button is pressed
+-                self.middleMouseDown = True
+-                self.moduleManager.middleMouseDown = True
+-
+-            self.camUpdateTimer.start(15)
+-
+-        elif event.type() == 3:
+-            if event.button() == 1: # left mouse button is released
+-                self.leftMouseDown = False
+-                self.moduleManager.leftMouseDown = False
+-                self.moduleManager.leftMouseUp()
+-
+-                if self.mDollyCamera == True: #if we dolly the camera set it to false
+-                    self.mDollyCamera = False
+-
+-            elif event.button() == 2: # right mouse button is released
+-                self.rightMouseDown = False
+-                self.moduleManager.rightMouseDown = False
+-                
+-            elif event.button() == 4: # middle mouse button is released
+-                self.middleMouseDown = False
+-                self.moduleManager.middleMouseDown = False
+-
+-            if not self.rightMouseDown:
+-                self.mDollyCamera = False
+-                self.camUpdateTimer.stop()
+-
+-            self.lastMousePosX = 0
+-            self.lastMousePosY = 0
+-
+-        elif event.type() == 5: #mouse moved while button down
+-            if self.lastMousePosX == 0: # check to avoid to huge values which may happen when the user clicks and lastMousePosX/Y is zero
+-                self.lastMousePosX = event.globalX()
+-            if self.lastMousePosY == 0:# check to avoid to huge values which may happen when the user clicks and lastMousePosX/Y is zero
+-                self.lastMousePosY = event.globalY()
+-
+-            incX =  (event.globalX() - self.lastMousePosX)
+-            incY =  (event.globalY() - self.lastMousePosY)
+-
+-            if self.moduleManager.pivot is not None and  self.leftMouseDown and not self.middleMouseDown and not self.rightMouseDown:
+-                self.moduleManager.pivot.onMouseMoved(event.globalX,  event.globalY,  incX,  incY)
+-
+-            rotX = incX * 0.01
+-            rotY = incY * 0.01
+-
+-            if self.mDollyCamera:
+-                obj.dollyCamera(og.Vector3(rotX, -rotY,  0) * 3)
+-            elif self.rightMouseDown:
+-                obj.orbitCamera(-rotX,  rotY)
+-
+-            self.lastMousePosX = event.globalX()
+-            self.lastMousePosY = event.globalY()
+-
+-        if event.type() == 60: #drag enter
+-            self.dragEnterEvent(event)
+-        if event.type() == 61: #drag move
+-            self.dragMoveEvent(event)
+-#        if event.type() == 62:
+-#            self.finishDropEvent(event)
+-        if event.type() == 63:
+-            self.finishDropEvent(event)
+-
+-        return False
+-
+-    def dragEnterEvent(self, event):
+-        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
+-            data = event.mimeData().data(&quot;application/x-static_model&quot;)
+-            stream = QDataStream(data, QIODevice.ReadOnly)
+-            text = QString()
+-            stream &gt;&gt; text
+-
+-            self.moduleManager.startDropModelAction(str(text), self.getCameraToViewportRay()) #start the model draging
+-
+-            event.setDropAction(Qt.CopyAction)
+-            event.accept()
+-
+-        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
+-            data = event.mimeData().data(&quot;application/x-game_object&quot;)
+-            stream = QDataStream(data, QIODevice.ReadOnly)
+-            text = QString()
+-            stream &gt;&gt; text
+-
+-            self.moduleManager.startDropGameObjectAction(str(text), self.getCameraToViewportRay()) #start the model draging
+-
+-            event.setDropAction(Qt.CopyAction)
+-            event.accept()
+-        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
+-            data = event.mimeData().data(&quot;application/x-material&quot;)
+-            stream = QDataStream(data, QIODevice.ReadOnly)
+-            text = QString()
+-            stream &gt;&gt; text
+-
+-            self.moduleManager.startDropMaterialAction(str(text)) #start the material draging
+-
+-            event.setDropAction(Qt.CopyAction)
+-            event.accept()
+-        else:
+-            event.ignore()
+-
+-
+-    def dragMoveEvent(self, event):
+-        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
+-            self.moduleManager.moveDropModelAction(self.getCameraToViewportRay()) #move it with the mouse
+-            event.accept()
+-        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
+-            self.moduleManager.moveDropGameObjectAction(self.getCameraToViewportRay()) #move it with the mouse
+-            event.accept()
+-        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
+-            self.moduleManager.moveDropMaterialAction(event) #move it with the mouse
+-            event.accept()
+-        else:
+-            event.ignore()
+-
+-    def finishDropEvent(self, event):
+-        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
+-            self.moduleManager.finishDropModelAction(self.getCameraToViewportRay())
+-            event.accept()
+-        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
+-            self.moduleManager.finishDropGameObjectAction(self.getCameraToViewportRay()) 
+-            event.accept()
+-        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
+-            relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos())
+-            self.moduleManager.finishDropMaterialAction(relMousePos.x(), relMousePos.y()) 
+-            event.accept()
+-        else:
+-            event.ignore()
+-
+-    def getCameraToViewportRay(self):
+-        relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos())
+-
+-        screenX = relMousePos.x()/float(self.ogreWidget.viewport.getActualWidth())
+-        screenY = relMousePos.y()/float(self.ogreWidget.viewport.getActualHeight())
+-
+-        return self.ogreWidget.getCamera().getCameraToViewportRay(screenX, screenY)
+-
+-    #calculates the the selection ray and notifies the ModuleManager that something is about to be selected
+-    def calculateSelectionRay(self,  event):
+-        relMousePos = self.ogreWidget.mapFromGlobal(QPoint(event.globalX(),  event.globalY())) # get the mose position relative to the ogre window
+-
+-#        if self.lastSelectionClick != None:
+-#            if self.lastSelectionClick.x() == relMousePos.x() and self.lastSelectionClick.y() == relMousePos.y(): # mouse didn't move
+-#                # we don't initiate a new selection based on bounding boxes here, we just iterate through the list generated last time a selection was made
+-#                # this is based on how far the distance of the object is from the camera (as returned by ogre)
+-#                self.moduleManager.iterateEntityUnderMouse() # don't select something new, switch through the currently selected models
+-#                return
+-
+-        self.lastSelectionClick = relMousePos
+-        screenX = relMousePos.x()/float(self.ogreWidget.viewport.getActualWidth())
+-        screenY = relMousePos.y()/float(self.ogreWidget.viewport.getActualHeight())
+-
+-        mouseRay = self.ogreWidget.getCamera().getCameraToViewportRay(screenX, screenY)
+-
+-        if event.modifiers() == Qt.ControlModifier:
+-            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay,  True,  False)
+-        elif event.modifiers() == Qt.ShiftModifier:
+-            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay,  False,  True)
+-        else:
+-            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay)
+-
+-    def getWidth():
+-        return self.ogreWidget.getWidth()
+-        
+-    def getHeight():
+-        return self.ogreWidget.getHeight()
+-
+-    def updateCamera(self):        
+-        if self.moveCamForward:
+-            self.ogreWidget.dollyCamera(og.Vector3( 0, 0,-0.2))
+-        if self.moveCamBackward:
+-            self.ogreWidget.dollyCamera(og.Vector3( 0, 0, 0.2))
+-        if self.strafeCamLeft:
+-            self.ogreWidget.dollyCamera(og.Vector3(-0.2, 0 , 0))
+-        if self.strafeCamRight:
+-            self.ogreWidget.dollyCamera(og.Vector3( 0.2, 0, 0))
+-        
+-        if self.moduleManager.pivot:
+-            self.moduleManager.pivot.update()
+-            
+-    def updateRenderWindow(self):
+-        self.ogreWidget.update()
+-        
+-    def onContextMenuTimer(self):
+-        if not self.rightMouseDown:
+-            relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos()) # get the mose position relative to the ogre window
+-            self.moduleManager.onContextMenu(relMousePos.x(), relMousePos.y())
+-    
+-    def toggleViewportGrid(self):
+-        if self.viewportGrid.isEnabled():
+-            self.viewportGrid.disable()
+-        else:
+-            self.viewportGrid.enable()
+-        
++#################################################
++ # Copyright (C) 2008  Stefan Stammberger
++ #
++ # This library is free software; you can redistribute it and/or
++ # modify it under the terms of the GNU Lesser General Public
++ # License as published by the Free Software Foundation; either
++ # version 2.1 of the License, or (at your option) any later version.
++ #
++ # This library is distributed in the hope that it will be useful,
++ # but WITHOUT ANY WARRANTY; without even the implied warranty of
++ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ # Lesser General Public License for more details.
++ #
++ # You should have received a copy of the GNU Lesser General Public
++ # License along with this library; if not, write to the Free Software
++ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ #################################################
++
++
++import os
++import sys
++import platform
++
++from PyQt4.QtGui import *
++from PyQt4.QtCore import *
++
++from ViewportGrid import *
++
++import OgreWidget
++import ogre.renderer.OGRE as og
++
++# this class is the heart of the 3d part
++# it manages the two ogre render windows and recieves events from the windows through the event filter
++class OgreMainWindow(QWidget):
++    def __init__(self, moduleManager,  ogreRoot, OgreMainWinSceneMgr,  parent):
++        QWidget.__init__(self, parent)
++        self.moduleManager = moduleManager
++        self.ogreRoot = ogreRoot
++        self.OgreMainWinSceneMgr = OgreMainWinSceneMgr
++
++        self.ogreWidget = None
++
++        self.leftMouseDown = False
++        self.middleMouseDown = False
++        self.rightMouseDown = False
++
++        self.mDollyCamera = False
++
++        self.moveCamForward = False
++        self.moveCamBackward = False
++        self.strafeCamLeft = False
++        self.strafeCamRight = False
++
++        self.camUpdateTimer = QTimer(self)
++        self.camUpdateTimer.connect(self.camUpdateTimer, SIGNAL(&quot;timeout()&quot;), self.updateCamera)
++
++        self.lastSelectionClick = None # Qpoint wich saves the last selection click mouse position
++        
++        self.setupUi(self)
++
++    def setupUi(self, Form):
++        Form.setObjectName(&quot;Form&quot;)
++        Form.resize(QSize(QRect(0,0,935,843).size()).expandedTo(Form.minimumSizeHint()))
++
++        self.gridlayout = QGridLayout(Form)
++        self.gridlayout.setContentsMargins(0, 2, 0, 0)
++        self.gridlayout.setObjectName(&quot;gridlayout&quot;)
++
++        # create the vertical splitter ( contains the preferences buttons and the horizontal splitter with the two render windows )
++        self.splitterV = QSplitter(Form)
++
++        sizePolicy = QSizePolicy(QSizePolicy.MinimumExpanding,QSizePolicy.MinimumExpanding)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.splitterV.sizePolicy().hasHeightForWidth())
++        self.splitterV.setSizePolicy(sizePolicy)
++        self.splitterV.setOrientation(Qt.Vertical)
++        self.splitterV.setObjectName(&quot;splitter&quot;)
++
++        # create the horizontal splitter wich contains the two ogre render windows and add it to the vertical splitter
++
++        ##################################
++        self.ogreWidget = OgreWidget.OgreWidget(&quot;OgreMainWin&quot;, self.ogreRoot, self.OgreMainWinSceneMgr, &quot;MainCam&quot;, self.splitterV,  0)
++        self.ogreWidget.setMinimumSize(QSize(250,250))
++
++        sizePolicy = QSizePolicy(QSizePolicy.Maximum,QSizePolicy.Maximum)
++        sizePolicy.setHorizontalStretch(0)
++        sizePolicy.setVerticalStretch(0)
++        sizePolicy.setHeightForWidth(self.ogreWidget.sizePolicy().hasHeightForWidth())
++        self.ogreWidget.setSizePolicy(sizePolicy)
++        self.ogreWidget.setObjectName(&quot;ogreWidget&quot;)
++        self.splitterV.addWidget(self.ogreWidget)
++        self.ogreWidget.setBackgroundColor(og.ColourValue(0, 1, 1))
++        ####################################
++
++        self.gridlayout.addWidget(self.splitterV,0,0,1,1)
++
++        # register the eventfilters for the render windows
++        # this is needed to catch mouse enter and mouse leave events for these windows
++        self.ogreWidget.installEventFilter(self)
++        self.ogreWidget.setAcceptDrops(True)
++        self.lastMousePosX = 0
++        self.lastMousePosY = 0
++
++        self.retranslateUi(Form)
++        QMetaObject.connectSlotsByName(Form)
++        
++        self.ogreWidget.setOgreViewportCreatedCallback(self.ogreViewportCreatedCallback)
++        
++    def ogreViewportCreatedCallback(self):
++        self.viewportGrid = ViewportGrid(self.OgreMainWinSceneMgr, self.ogreWidget.viewport)
++        self.viewportGrid.enable()
++        
++    def retranslateUi(self, Form):
++        Form.setWindowTitle(QApplication.translate(&quot;Form&quot;, &quot;Form&quot;, None, QApplication.UnicodeUTF8))
++
++    def keyPressEvent(self,  event):
++        if event.key() == Qt.Key_W:
++            self.moveCamForward = True
++        elif event.key() == Qt.Key_S:
++            self.moveCamBackward = True
++        elif event.key() == Qt.Key_A:
++            self.strafeCamLeft = True
++        elif event.key() == Qt.Key_D:
++            self.strafeCamRight= True
++
++    def keyReleaseEvent(self,  event):
++        if event.key() == Qt.Key_W:
++            self.moveCamForward = False
++        elif event.key() == Qt.Key_S:
++            self.moveCamBackward = False
++        elif event.key() == Qt.Key_A:
++            self.strafeCamLeft = False
++        elif event.key() == Qt.Key_D:
++            self.strafeCamRight= False
++
++    def eventFilter(self, obj, event):
++        if event.type() == 2:
++            self.ogreWidget.setFocus()
++            if event.button() == 1: # left mouse button is pressed
++                self.leftMouseDown = True
++                self.moduleManager.leftMouseDown = True
++
++                if self.rightMouseDown: #if right mouse button is already pressed dolly the camera
++                    self.mDollyCamera = True
++                else:
++                    self.calculateSelectionRay(event)
++
++            elif event.button() == 2: # right mouse button is pressed
++                self.rightMouseDown = True
++                self.moduleManager.rightMouseDown = True
++                QTimer.singleShot(50, self.onContextMenuTimer)
++
++            elif event.button() == 4: # middle mouse button is pressed
++                self.middleMouseDown = True
++                self.moduleManager.middleMouseDown = True
++
++            self.camUpdateTimer.start(15)
++
++        elif event.type() == 3:
++            if event.button() == 1: # left mouse button is released
++                self.leftMouseDown = False
++                self.moduleManager.leftMouseDown = False
++                self.moduleManager.leftMouseUp()
++
++                if self.mDollyCamera == True: #if we dolly the camera set it to false
++                    self.mDollyCamera = False
++
++            elif event.button() == 2: # right mouse button is released
++                self.rightMouseDown = False
++                self.moduleManager.rightMouseDown = False
++                
++            elif event.button() == 4: # middle mouse button is released
++                self.middleMouseDown = False
++                self.moduleManager.middleMouseDown = False
++
++            if not self.rightMouseDown:
++                self.mDollyCamera = False
++                self.camUpdateTimer.stop()
++
++            self.lastMousePosX = 0
++            self.lastMousePosY = 0
++
++        elif event.type() == 5: #mouse moved while button down
++            if self.lastMousePosX == 0: # check to avoid to huge values which may happen when the user clicks and lastMousePosX/Y is zero
++                self.lastMousePosX = event.globalX()
++            if self.lastMousePosY == 0:# check to avoid to huge values which may happen when the user clicks and lastMousePosX/Y is zero
++                self.lastMousePosY = event.globalY()
++
++            incX =  (event.globalX() - self.lastMousePosX)
++            incY =  (event.globalY() - self.lastMousePosY)
++
++            if self.moduleManager.pivot is not None and  self.leftMouseDown and not self.middleMouseDown and not self.rightMouseDown:
++                self.moduleManager.pivot.onMouseMoved(event.globalX,  event.globalY,  incX,  incY)
++
++            rotX = incX * 0.01
++            rotY = incY * 0.01
++
++            if self.mDollyCamera:
++                obj.dollyCamera(og.Vector3(rotX, -rotY,  0) * 3)
++            elif self.rightMouseDown:
++                obj.orbitCamera(-rotX,  rotY)
++
++            self.lastMousePosX = event.globalX()
++            self.lastMousePosY = event.globalY()
++
++        if event.type() == 60: #drag enter
++            self.dragEnterEvent(event)
++        if event.type() == 61: #drag move
++            self.dragMoveEvent(event)
++#        if event.type() == 62:
++#            self.finishDropEvent(event)
++        if event.type() == 63:
++            self.finishDropEvent(event)
++
++        return False
++
++    def dragEnterEvent(self, event):
++        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
++            data = event.mimeData().data(&quot;application/x-static_model&quot;)
++            stream = QDataStream(data, QIODevice.ReadOnly)
++            text = QString()
++            stream &gt;&gt; text
++
++            self.moduleManager.startDropModelAction(str(text), self.getCameraToViewportRay()) #start the model draging
++
++            event.setDropAction(Qt.CopyAction)
++            event.accept()
++
++        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
++            data = event.mimeData().data(&quot;application/x-game_object&quot;)
++            stream = QDataStream(data, QIODevice.ReadOnly)
++            text = QString()
++            stream &gt;&gt; text
++
++            self.moduleManager.startDropGameObjectAction(str(text), self.getCameraToViewportRay()) #start the model draging
++
++            event.setDropAction(Qt.CopyAction)
++            event.accept()
++        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
++            data = event.mimeData().data(&quot;application/x-material&quot;)
++            stream = QDataStream(data, QIODevice.ReadOnly)
++            text = QString()
++            stream &gt;&gt; text
++
++            self.moduleManager.startDropMaterialAction(str(text)) #start the material draging
++
++            event.setDropAction(Qt.CopyAction)
++            event.accept()
++        else:
++            event.ignore()
++
++
++    def dragMoveEvent(self, event):
++        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
++            self.moduleManager.moveDropModelAction(self.getCameraToViewportRay()) #move it with the mouse
++            event.accept()
++        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
++            self.moduleManager.moveDropGameObjectAction(self.getCameraToViewportRay()) #move it with the mouse
++            event.accept()
++        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
++            self.moduleManager.moveDropMaterialAction(event) #move it with the mouse
++            event.accept()
++        else:
++            event.ignore()
++
++    def finishDropEvent(self, event):
++        if event.mimeData().hasFormat(&quot;application/x-static_model&quot;):
++            self.moduleManager.finishDropModelAction(self.getCameraToViewportRay())
++            event.accept()
++        elif event.mimeData().hasFormat(&quot;application/x-game_object&quot;):
++            self.moduleManager.finishDropGameObjectAction(self.getCameraToViewportRay()) 
++            event.accept()
++        elif event.mimeData().hasFormat(&quot;application/x-material&quot;):
++            relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos())
++            self.moduleManager.finishDropMaterialAction(relMousePos.x(), relMousePos.y()) 
++            event.accept()
++        else:
++            event.ignore()
++
++    def getCameraToViewportRay(self):
++        relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos())
++
++        screenX = relMousePos.x()/float(self.ogreWidget.viewport.getActualWidth())
++        screenY = relMousePos.y()/float(self.ogreWidget.viewport.getActualHeight())
++
++        return self.ogreWidget.getCamera().getCameraToViewportRay(screenX, screenY)
++
++    #calculates the the selection ray and notifies the ModuleManager that something is about to be selected
++    def calculateSelectionRay(self,  event):
++        relMousePos = self.ogreWidget.mapFromGlobal(QPoint(event.globalX(),  event.globalY())) # get the mose position relative to the ogre window
++
++#        if self.lastSelectionClick != None:
++#            if self.lastSelectionClick.x() == relMousePos.x() and self.lastSelectionClick.y() == relMousePos.y(): # mouse didn't move
++#                # we don't initiate a new selection based on bounding boxes here, we just iterate through the list generated last time a selection was made
++#                # this is based on how far the distance of the object is from the camera (as returned by ogre)
++#                self.moduleManager.iterateEntityUnderMouse() # don't select something new, switch through the currently selected models
++#                return
++
++        self.lastSelectionClick = relMousePos
++        screenX = relMousePos.x()/float(self.ogreWidget.viewport.getActualWidth())
++        screenY = relMousePos.y()/float(self.ogreWidget.viewport.getActualHeight())
++
++        mouseRay = self.ogreWidget.getCamera().getCameraToViewportRay(screenX, screenY)
++
++        if event.modifiers() == Qt.ControlModifier:
++            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay,  True,  False)
++        elif event.modifiers() == Qt.ShiftModifier:
++            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay,  False,  True)
++        else:
++            self.moduleManager.selectionClick(relMousePos.x(), relMousePos.y(), mouseRay)
++
++    def getWidth():
++        return self.ogreWidget.getWidth()
++        
++    def getHeight():
++        return self.ogreWidget.getHeight()
++
++    def updateCamera(self):        
++        if self.moveCamForward:
++            self.ogreWidget.dollyCamera(og.Vector3( 0, 0,-0.2))
++        if self.moveCamBackward:
++            self.ogreWidget.dollyCamera(og.Vector3( 0, 0, 0.2))
++        if self.strafeCamLeft:
++            self.ogreWidget.dollyCamera(og.Vector3(-0.2, 0 , 0))
++        if self.strafeCamRight:
++            self.ogreWidget.dollyCamera(og.Vector3( 0.2, 0, 0))
++        
++        if self.moduleManager.pivot:
++            self.moduleManager.pivot.update()
++            
++    def updateRenderWindow(self):
++        self.ogreWidget.update()
++        
++    def onContextMenuTimer(self):
++        if not self.rightMouseDown:
++            relMousePos = self.ogreWidget.mapFromGlobal(QCursor.pos()) # get the mose position relative to the ogre window
++            
++            screenX = relMousePos.x()/float(self.ogreWidget.viewport.getActualWidth())
++            screenY = relMousePos.y()/float(self.ogreWidget.viewport.getActualHeight())
++            mouseRay = self.ogreWidget.getCamera().getCameraToViewportRay(screenX, screenY)
++
++            self.moduleManager.onContextMenu(relMousePos.x(), relMousePos.y(), mouseRay)
++            
++    def toggleViewportGrid(self):
++        if self.viewportGrid.isEnabled():
++            self.viewportGrid.disable()
++        else:
++            self.viewportGrid.enable()
++        
+
+Modified: rl/trunk/editors/Lockenwickler/src/media/PlainColorVP.glsl
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/PlainColorVP.glsl	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/media/PlainColorVP.glsl	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -1,5 +1,8 @@
++varying float depth;
++
+ void main()
+ {
++	depth = (gl_ModelViewMatrix * gl_Vertex).z;
+ 	gl_Position = ftransform();
+ }
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/media/depthmap.frag
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/media/depthmap.frag	2009-03-15 10:02:43 UTC (rev 4830)
++++ rl/trunk/editors/Lockenwickler/src/media/depthmap.frag	2009-03-15 16:35:16 UTC (rev 4831)
+@@ -1,12 +1,12 @@
+ uniform float fNear;
+ uniform float fFar;
++varying float depth;
+ 
+ void main()
+ {
+-      float fDepth = gl_FragCoord.z / gl_FragCoord.w;
+-      float temp = fNear / fFar;
+-      temp = temp * fDepth;
+-      float fColor = 1.0 / temp;
++      //float fDepth = gl_FragCoord.z / gl_FragCoord.w;
+       //float fColor = 1.0 - smoothstep(fNear, fFar, fDepth);
++      float fDepth = depth / gl_FragCoord.w;
++      float fColor = smoothstep(gl_DepthRange.near, gl_DepthRange.far, fDepth);
+       gl_FragColor = vec4(fColor, fColor, fColor, 1.0);
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001887.html">[Dsa-hl-svn] r4830 - modules/common/scripts	modules/regressiontest/dialogs modules/regressiontest/dsa	modules/regressiontest/scripts	modules/regressiontest/scripts/maps rl/trunk	rl/trunk/engine/rules/include rl/trunk/engine/rules/src	rl/trunk/engine/script/swig rl/trunk/tests	rl/trunk/tests/dialogtests
+</A></li>
+	<LI>Next message: <A HREF="001889.html">[Dsa-hl-svn] r4832 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1888">[ date ]</a>
+              <a href="thread.html#1888">[ thread ]</a>
+              <a href="subject.html#1888">[ subject ]</a>
+              <a href="author.html#1888">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

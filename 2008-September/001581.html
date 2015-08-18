@@ -1,0 +1,360 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4524 - in dependencies/OgreNewt_ngt: inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4524%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200809240950.m8O9omvJ001663%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001580.html">
+   <LINK REL="Next"  HREF="001582.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4524 - in dependencies/OgreNewt_ngt: inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4524%20-%20in%20dependencies/OgreNewt_ngt%3A%20inc%20src&In-Reply-To=%3C200809240950.m8O9omvJ001663%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4524 - in dependencies/OgreNewt_ngt: inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep 24 11:50:48 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001580.html">[Dsa-hl-svn] r4523 - in rl/trunk: editors/RLdialog	engine/common/include
+</A></li>
+        <LI>Next message: <A HREF="001582.html">[Dsa-hl-svn] r4525 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1581">[ date ]</a>
+              <a href="thread.html#1581">[ thread ]</a>
+              <a href="subject.html#1581">[ subject ]</a>
+              <a href="author.html#1581">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-09-24 11:50:37 +0200 (Wed, 24 Sep 2008)
+New Revision: 4524
+
+Modified:
+   dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+Log:
+Added support for ConvexCast
+
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2008-09-22 17:32:06 UTC (rev 4523)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2008-09-24 09:50:37 UTC (rev 4524)
+@@ -141,8 +141,122 @@
+ 
+ };
+ 
++//! general convexcast
++/*!
++	General class representing a convexcast query in the Newton world.  this class should be inherited to create specific convexcast behavior.
++*/
++class _OgreNewtExport Convexcast
++{
++public:
+ 
++	//! constructor
++	Convexcast();
++	
++	//! destuctor.
++	virtual ~Convexcast();
+ 
++	//! performs the convexcast.
++	/*!
++		call after creating the object.
++		\param world pointer to the OgreNewt::World
++                \param col pointer to a convex collision shape used for the cast
++		\param startpt starting point of ray in global space
++                \param colori orientation of the collision in global space
++		\param endpt ending point of ray in global space
++                \param maxcontactscount maximum number of contacts that should be saved,
++                       set to 0 if you only need the distance to the first intersection
++	*/
++	void go( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount);
++
++	//! user callback pre-filter function.
++	/*!
++		This function is an optional pre-filter to completely ignore specific bodies during the raycast.
++		return false from this function to ignore this body, return true (default) to accept it.
++	*/
++	virtual bool userPreFilterCallback( OgreNewt::Body* body ) { return true; }
++
++protected:
++
++        //! list that stores the results of the convex-cast
++        NewtonWorldConvexCastReturnInfo *mReturnInfoList;
++
++        //! the real length of the list
++        int mReturnInfoListLength;
++
++        //! the actual maximum length of the list (number of elements memory has been reserved for)
++        int mReturnInfoListSize;
++
++        //! distance in [0,1] to first contact
++        Ogre::Real mFirstContactDistance;
++
++private:
++
++	//! callback used for running the raycast prefilter... used internally
++	static unsigned _CDECL newtonConvexcastPreFilter( const NewtonBody* body, const NewtonCollision* collision, void* userData );
++};
++
++
++
++
++//! Basic implementation of the convexcast
++/*!
++	This class is provided for general convexcast use.  it returns information about the body hit by the convexcast
++*/
++class _OgreNewtExport BasicConvexcast : public Convexcast
++{
++public:
++	//! simple class that represents a single convexcast contact
++	class _OgreNewtExport ConvexcastContactInfo
++	{
++	public:
++		Ogre::Real              mDistance;      //!&lt; dist from point1 of the raycast, in range [0,1].
++		OgreNewt::Body*         mBody;          //!&lt; pointer to body intersected with
++		int                     mCollisionID;   //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
++		Ogre::Vector3           mContactNormal; //!&lt; normal of intersection.
++                Ogre::Vector3           mContactPoint;  //!&lt; point of the contact in global space
++                Ogre::Real              mContactPenetration; //!&lt; contact penetration at collision point
++
++		ConvexcastContactInfo();
++		~ConvexcastContactInfo();
++	};
++
++
++        //! empty constructor
++        BasicConvexcast();
++
++
++	//! constructor
++	/*!
++		performs a raycast, then the results can be queried from the object after creation.
++		\param world pointer to the OgreNewt::World
++                \param col pointer to a convex collision shape used for the cast
++		\param startpt starting point of ray in global space
++                \param colori orientation of the collision in global space
++		\param endpt ending point of ray in global space
++                \param maxcontactscount maximum number of contacts that should be saved
++	*/
++	BasicConvexcast( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount);
++
++	//! destuctor.
++	~BasicConvexcast();
++
++	// ------------------------------------------------------
++	// the following functions can be used to retrieve information about the bodies collided by the convexcast.
++	
++	//! how many bodies did we hit? if maxcontactscount is to small, this value will be smaller too!
++	int calculateBodyHitCount() const;
++
++        //! how many contacts do we have
++        int getContactsCount() const;
++
++	//! retrieve the raycast info for a specific hit.
++	ConvexcastContactInfo getInfoAt( int hitnum ) const;
++
++        //! retrieve the distance to the first contact (in range [0,1] from startpt to endpt)
++        Ogre::Real getDistanceToFirstHit() const;
++};
++
++
+ }	// end NAMESPACE OgreNewt
+ 	
+ 
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2008-09-22 17:32:06 UTC (rev 4523)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2008-09-24 09:50:37 UTC (rev 4524)
+@@ -1,4 +1,5 @@
+ #include &quot;OgreNewt_RayCast.h&quot;
++#include &quot;OgreNewt_Tools.h&quot;
+ 
+ 
+ namespace OgreNewt
+@@ -76,7 +77,7 @@
+ 		//return the closest hit...
+ 		BasicRaycast::BasicRaycastInfo ret;
+ 
+-		Ogre::Real dist = 10000.0;
++		Ogre::Real dist = Ogre::Math::POS_INFINITY;
+ 
+ 		RaycastInfoList::const_iterator it;
+ 		for (it = mRayList.begin(); it != mRayList.end(); it++)
+@@ -97,7 +98,7 @@
+ 	{
+ 		BasicRaycast::BasicRaycastInfo ret;
+ 
+-		if ((hitnum &lt; 0) || (hitnum &gt; mRayList.size()))
++		if ((hitnum &lt; 0) || (hitnum &gt;= mRayList.size()))
+ 			return ret;
+ 
+ 		ret = mRayList.at(hitnum);
+@@ -122,5 +123,130 @@
+ 
+ 
+ 
++
++//-------------------------------------------------------------------------------------
++        Convexcast::Convexcast() :
++            mReturnInfoList(NULL),
++            mReturnInfoListLength(0),
++            mReturnInfoListSize(0)
++        {
++        }
++
++	Convexcast::~Convexcast()
++        {
++            if( mReturnInfoList )
++            {
++                delete[] mReturnInfoList;
++            }
++        }
++
++
++	void Convexcast::go(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount)
++	{
++                // reserve memory
++                if( mReturnInfoListSize &lt; maxcontactscount )
++                {
++                    mReturnInfoListSize = 0;
++                    if( mReturnInfoList )
++                        delete[] mReturnInfoList;
++                    mReturnInfoList = new NewtonWorldConvexCastReturnInfo[maxcontactscount];
++                    mReturnInfoListSize = maxcontactscount;
++                }
++
++		// perform the cast
++                float matrix[16];
++                OgreNewt::Converters::QuatPosToMatrix(colori, startpt, &amp;matrix[0] );
++                mFirstContactDistance = -1;
++                mReturnInfoListLength = 
++                        NewtonWorldConvexCast( world-&gt;getNewtonWorld(), &amp;matrix[0], (float*)&amp;endpt, col-&gt;getNewtonCollision(),
++                                               &amp;mFirstContactDistance, this, OgreNewt::Convexcast::newtonConvexcastPreFilter,
++                                               mReturnInfoList, mReturnInfoListSize );
++	}
++
++	unsigned _CDECL Convexcast::newtonConvexcastPreFilter(const NewtonBody *body, const NewtonCollision *collision, void* userData)
++	{
++		// get our object!
++		Convexcast* me = (Convexcast*)userData;
++
++		Body* bod = (Body*)NewtonBodyGetUserData( body );
++
++		if (me-&gt;userPreFilterCallback( bod ))
++			return 1;
++		else
++			return 0;
++	}
++
++
++
++//-------------------------------------------------------------------------------------
++	BasicConvexcast::ConvexcastContactInfo::ConvexcastContactInfo()
++	{
++		mBody = NULL;
++		mDistance = -1.0;
++	}
++
++	BasicConvexcast::ConvexcastContactInfo::~ConvexcastContactInfo() {}
++
++        BasicConvexcast::BasicConvexcast()
++        {
++        }
++
++	BasicConvexcast::BasicConvexcast(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount)
++	{
++		go( world, col, startpt, colori, endpt, maxcontactscount);
++	}
++
++	BasicConvexcast::~BasicConvexcast()	{}
++
++
++	int BasicConvexcast::calculateBodyHitCount() const
++        {
++            int count = 0;
++            const NewtonBody * bod = NULL;
++            for( int i = 0; i &lt; mReturnInfoListLength; i++ )
++            {
++                if( bod != mReturnInfoList[i].m_hitBody )
++                {
++                    count++;
++                    bod = mReturnInfoList[i].m_hitBody;
++                }
++            }
++
++            return count;
++        }
++
++
++        int BasicConvexcast::getContactsCount() const
++        {
++            return mReturnInfoListLength;
++        }
++
++	BasicConvexcast::ConvexcastContactInfo BasicConvexcast::getInfoAt( int hitnum ) const
++	{
++            ConvexcastContactInfo info;
++
++            if( hitnum &lt; 0 || hitnum &gt;= mReturnInfoListLength )
++                return info;
++
++
++            info.mDistance = mReturnInfoList[hitnum].m_intersectionParam;
++            info.mBody = (OgreNewt::Body*) NewtonBodyGetUserData(mReturnInfoList[hitnum].m_hitBody);
++            info.mCollisionID = mReturnInfoList[hitnum].m_contactID;
++            info.mContactNormal.x = mReturnInfoList[hitnum].m_normal[0];
++            info.mContactNormal.y = mReturnInfoList[hitnum].m_normal[1];
++            info.mContactNormal.z = mReturnInfoList[hitnum].m_normal[2];
++            info.mContactPoint.x = mReturnInfoList[hitnum].m_point[0];
++            info.mContactPoint.y = mReturnInfoList[hitnum].m_point[1];
++            info.mContactPoint.z = mReturnInfoList[hitnum].m_point[2];
++            info.mContactPenetration = mReturnInfoList[hitnum].m_penetration;
++
++	    return info;
++	}
++
++        Ogre::Real BasicConvexcast::getDistanceToFirstHit() const
++        {
++            return mFirstContactDistance;
++        }
++
+ }	// end NAMESPACE OgreNewt
+ 
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001580.html">[Dsa-hl-svn] r4523 - in rl/trunk: editors/RLdialog	engine/common/include
+</A></li>
+	<LI>Next message: <A HREF="001582.html">[Dsa-hl-svn] r4525 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1581">[ date ]</a>
+              <a href="thread.html#1581">[ thread ]</a>
+              <a href="subject.html#1581">[ subject ]</a>
+              <a href="author.html#1581">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

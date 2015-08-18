@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3496 - rl/trunk/engine/rules/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-June/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3496%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200706031959.l53JxQ0n009065%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000566.html">
+   <LINK REL="Next"  HREF="000568.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3496 - rl/trunk/engine/rules/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3496%20-%20rl/trunk/engine/rules/src&In-Reply-To=%3C200706031959.l53JxQ0n009065%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3496 - rl/trunk/engine/rules/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Sun Jun  3 21:59:26 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000566.html">[Dsa-hl-svn] r3495 - in modules/ruchin: dsa scripts scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000568.html">[Dsa-hl-svn] r3497 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#567">[ date ]</a>
+              <a href="thread.html#567">[ thread ]</a>
+              <a href="subject.html#567">[ subject ]</a>
+              <a href="author.html#567">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-06-03 21:59:10 +0200 (Sun, 03 Jun 2007)
+New Revision: 3496
+
+Modified:
+   rl/trunk/engine/rules/src/MovingCreature.cpp
+Log:
+Fixed bug: problems with rotation
+
+Modified: rl/trunk/engine/rules/src/MovingCreature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-02 15:42:19 UTC (rev 3495)
++++ rl/trunk/engine/rules/src/MovingCreature.cpp	2007-06-03 19:59:10 UTC (rev 3496)
+@@ -27,6 +27,7 @@
+ 
+ 
+ 
++
+ using namespace Ogre;
+ using namespace std;
+ 
+@@ -83,9 +84,8 @@
+             mVelocity = direction * velocity;
+             applyAuChanges(elapsedTime);
+             setAnimation(elapsedTime);
+-            if( rotation != Vector3::ZERO )
+-                if( getRotationMovement()-&gt;isPossible() )
+-                    return getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
++            if( getRotationMovement()-&gt;isPossible() )
++                return getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
+             return false;
+         }
+         virtual void setAnimation(Ogre::Real elapsedTime)
+@@ -151,7 +151,7 @@
+         virtual bool isPossible() const
+         {
+             return 
+-                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR &amp;&amp;
++                mMovingCreature-&gt;getAbstractLocation() == MovingCreature::AL_FLOOR;// &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+                 !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+         }
+@@ -169,7 +169,9 @@
+             OgreNewt::Body *body = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody();
+             body-&gt;getMassMatrix(mass, inertia);
+ 
+-            Quaternion orientation = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getWorldOrientation();
++            Quaternion orientation;
++            Vector3 position;
++            body-&gt;getPositionOrientation(position, orientation);
+             // Calculate angular velocity
+             // We first need the yaw rotation from actual yaw to desired yaw
+             Vector3 src = orientation*Vector3::UNIT_Z;
+@@ -180,7 +182,7 @@
+ 
+             // using a spring system to apply the rotation
+             Vector3 diff = Vector3(0, yaw.valueRadians(), 0);
+-            Vector3 omega = mMovingCreature-&gt;getCreature()-&gt;getActor()-&gt;getPhysicalThing()-&gt;_getBody()-&gt;getOmega();
++            Vector3 omega = body-&gt;getOmega();
+             omega.x = omega.z = 0;
+             Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+             torque = mass * springAcc;
+@@ -530,9 +532,8 @@
+                 else
+                     mMovingCreature-&gt;setAnimation(&quot;hocke_gehen&quot;);
+                 applyAuChanges(elapsedTime);
+-                if( rotation != Vector3::ZERO )
+-                    if( getRotationMovement()-&gt;isPossible() )
+-                        getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
++                if( getRotationMovement()-&gt;isPossible() )
++                    getRotationMovement()-&gt;run(elapsedTime, direction, rotation);
+             }
+             else
+                 mVelocity = Vector3::ZERO;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000566.html">[Dsa-hl-svn] r3495 - in modules/ruchin: dsa scripts scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000568.html">[Dsa-hl-svn] r3497 - modules/common/scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#567">[ date ]</a>
+              <a href="thread.html#567">[ thread ]</a>
+              <a href="subject.html#567">[ subject ]</a>
+              <a href="author.html#567">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

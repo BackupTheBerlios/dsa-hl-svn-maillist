@@ -1,0 +1,462 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4123 - in rl/trunk/engine: core/include core/src	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4123%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200803041938.m24JcLH1007014%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001193.html">
+   <LINK REL="Next"  HREF="001195.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4123 - in rl/trunk/engine: core/include core/src	ui/src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4123%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09ui/src&In-Reply-To=%3C200803041938.m24JcLH1007014%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4123 - in rl/trunk/engine: core/include core/src	ui/src">timm at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar  4 20:38:21 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001193.html">[Dsa-hl-svn] r4122 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="001195.html">[Dsa-hl-svn] r4124 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1194">[ date ]</a>
+              <a href="thread.html#1194">[ thread ]</a>
+              <a href="subject.html#1194">[ subject ]</a>
+              <a href="author.html#1194">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-03-04 20:38:17 +0100 (Tue, 04 Mar 2008)
+New Revision: 4123
+
+Modified:
+   rl/trunk/engine/core/include/SaveGameFile.h
+   rl/trunk/engine/core/include/SaveGameManager.h
+   rl/trunk/engine/core/src/SaveGameFile.cpp
+   rl/trunk/engine/core/src/SaveGameManager.cpp
+   rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+   rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+Log:
+using ids to manage the save games
+
+Modified: rl/trunk/engine/core/include/SaveGameFile.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameFile.h	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/core/include/SaveGameFile.h	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -34,32 +34,42 @@
+     public:
+         static const Ogre::String PROPERTY_MODULEID;
+         static const Ogre::String PROPERTY_TIME;
++        static const Ogre::String PROPERTY_NAME;
++        static const Ogre::String PROPERTY_MODULENAME;
+ 
+-        SaveGameFile(const CeGuiString &amp;name);
++        SaveGameFile(const CeGuiString &amp;name, int id = 0);
+         ~SaveGameFile();
+         CeGuiString buildFilename();
+         CeGuiString getName();
++        int getId();
+         bool saveGameExists();
+ 
++        //access to file
+         Ogre::DataStreamPtr &amp;getDataStream();
+         void closeDataStream();
+         XERCES_CPP_NAMESPACE::XMLFormatTarget* getFormatTarget();
+         void deleteFileFromStorage();
+ 
++        //data to be saved
+         virtual const Ogre::StringVector&amp;  getScriptPatterns(void) const;
+         virtual void parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
+         virtual Ogre::Real getLoadingOrder(void) const;
+ 
++        //propertyholder
+         virtual const Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const Property&amp; value);
+         virtual PropertyRecord* getAllProperties() const;
+     protected:
++        //properties
+         CeGuiString mName;
+         CeGuiString mModuleID;
++        CeGuiString mModuleName;
+         CeGuiString mLocalTime;
+ 
++        //file access
+         Ogre::StringVector mScriptPatterns;
+         Ogre::DataStreamPtr mStream;
++        int mSaveGameId;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/SaveGameManager.h
+===================================================================
+--- rl/trunk/engine/core/include/SaveGameManager.h	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/core/include/SaveGameManager.h	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -63,7 +63,7 @@
+ 
+     typedef std::multimap&lt;int,SaveGameData*&gt; SaveGameDataOrderMap;
+ 
+-    typedef std::map&lt;std::pair&lt;CeGuiString,CeGuiString&gt;, SaveGameFile*&gt; SaveGameEntryMap; //pair: save game name, module id
++    typedef std::map&lt;int, SaveGameFile*&gt; SaveGameEntryMap;
+ 
+     class _RlCoreExport SaveGameManager : public Ogre::Singleton&lt;SaveGameManager&gt;, public Ogre::ScriptLoader
+     {
+@@ -75,9 +75,13 @@
+         SaveGameEntryMap listSaveGames(const CeGuiString &amp;moduleId);
+         void saveSaveGameFile(const CeGuiString &amp;name);
+         void loadSaveGameFile(const CeGuiString &amp;name, const CeGuiString&amp; moduleID);
++        void loadSaveGameFile(int id);
+         void deleteSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
++        void deleteSaveGameFile(int id);
+         bool SaveGameFileExists(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
+         SaveGameFile* getSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
++        SaveGameFile* getSaveGameFile(int id);
++        int getSaveGameId(const CeGuiString &amp;name, const CeGuiString &amp;moduleId);
+ 
+         virtual const Ogre::StringVector&amp;  getScriptPatterns(void) const;
+         virtual void parseScript(Ogre::DataStreamPtr &amp;stream, const Ogre::String &amp;groupName);
+@@ -85,6 +89,8 @@
+ 
+         void registerSaveGameData(SaveGameData* data);
+         void unregisterSaveGameData(SaveGameData* data);
++
++        int getHighestSaveGameNumber();
+     protected:
+         void freeSaveGameMap();
+ 
+@@ -92,6 +98,8 @@
+         SaveGameEntryMap mSaveGames;
+ 
+         SaveGameDataOrderMap mSaveGameDataOrderMap;
++
++        int mHighestSaveGameNumber;
+     };
+ }
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameFile.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameFile.cpp	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/core/src/SaveGameFile.cpp	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -17,6 +17,7 @@
+ #include &quot;stdinc.h&quot; //precompiled header
+ 
+ #include &quot;SaveGameFile.h&quot;
++#include &quot;SaveGameManager.h&quot;
+ #include &quot;OgreString.h&quot;
+ #include &lt;xercesc/framework/LocalFileFormatTarget.hpp&gt;
+ 
+@@ -28,11 +29,14 @@
+ {
+     const Ogre::String SaveGameFile::PROPERTY_MODULEID = &quot;moduleid&quot;;
+     const Ogre::String SaveGameFile::PROPERTY_TIME = &quot;time&quot;;
++    const Ogre::String SaveGameFile::PROPERTY_NAME = &quot;name&quot;;
++    const Ogre::String SaveGameFile::PROPERTY_MODULENAME = &quot;modulename&quot;;
+ 
+ 
+-    SaveGameFile::SaveGameFile(const CeGuiString &amp;name) : mStream((Ogre::DataStream*)NULL)
++    SaveGameFile::SaveGameFile(const CeGuiString &amp;name, int id) : mStream((Ogre::DataStream*)NULL)
+     {
+-        mName = name;
++        setProperty(PROPERTY_NAME,name);
++        mSaveGameId = id;
+     }
+ 
+     SaveGameFile::~SaveGameFile()
+@@ -42,17 +46,24 @@
+     CeGuiString SaveGameFile::buildFilename()
+     {
+ #       if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+-        return Ogre::String(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/saves/&quot; + mName + &quot;.&quot; + mModuleID + &quot;.save&quot;;
++        return Ogre::String(::getenv(&quot;HOME&quot;)) + &quot;/.rastullah/saves/&quot; 
++            + Ogre::StringConverter::toString(mSaveGameId) + &quot;.save&quot;;
+ #       else
+-        return ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/saves/&quot; + mName + &quot;.&quot; + mModuleID + &quot;.save&quot;;
++        return ConfigurationManager::getSingleton().getModulesRootDirectory() + &quot;/saves/&quot; 
++            + Ogre::StringConverter::toString(mSaveGameId) + &quot;.save&quot;;
+ #       endif        
+     }
+ 
+     CeGuiString SaveGameFile::getName()
+     {
+-        return mName;
++        return getProperty(PROPERTY_NAME);
+     }
+ 
++    int SaveGameFile::getId()
++    {
++        return mSaveGameId;
++    }
++
+     Ogre::DataStreamPtr &amp;SaveGameFile::getDataStream()
+     {
+         Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGame&quot;);
+@@ -102,6 +113,10 @@
+             return Property(mModuleID);
+         else if(key == PROPERTY_TIME)
+             return Property(mLocalTime);
++        else if(key == PROPERTY_MODULENAME)
++            return Property(mModuleName);
++        else if(key == PROPERTY_NAME)
++            return Property(mName);
+         else
+             return Property();
+     }
+@@ -118,6 +133,16 @@
+             if(value.isString())
+                 mLocalTime = value.toString();
+         }
++        else if(key == PROPERTY_NAME)
++        {
++            if(value.isString())
++                mName = value.toString();
++        }
++        else if(key == PROPERTY_MODULENAME)
++        {
++            if(value.isString())
++                mModuleName = value.toString();
++        }
+     }
+ 
+     PropertyRecord* SaveGameFile::getAllProperties() const
+@@ -125,6 +150,8 @@
+         PropertyRecord* set = new PropertyRecord();
+         set-&gt;setProperty(PROPERTY_MODULEID, getProperty(PROPERTY_MODULEID));
+         set-&gt;setProperty(PROPERTY_TIME, getProperty(PROPERTY_TIME));
++        set-&gt;setProperty(PROPERTY_NAME, getProperty(PROPERTY_NAME));
++        set-&gt;setProperty(PROPERTY_MODULENAME, getProperty(PROPERTY_MODULENAME));
+         return set;
+     }
+ 
+
+Modified: rl/trunk/engine/core/src/SaveGameManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/core/src/SaveGameManager.cpp	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -54,7 +54,7 @@
+         return string;
+     }
+ 
+-    SaveGameManager::SaveGameManager()
++    SaveGameManager::SaveGameManager() : mHighestSaveGameNumber(0)
+     { 
+         Ogre::ResourceGroupManager::getSingleton().createResourceGroup(&quot;SaveGames&quot;);
+ 
+@@ -82,7 +82,7 @@
+         SaveGameEntryMap entries;
+         for(SaveGameEntryMap::const_iterator iter = mSaveGames.begin(); iter != mSaveGames.end(); iter++)
+         {
+-            if(iter-&gt;first.second == moduleId)
++            if(iter-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString() == moduleId)
+             {
+                 entries[iter-&gt;first] = iter-&gt;second;
+             }
+@@ -97,20 +97,34 @@
+         time_t rawTime;
+         tm* localTime; 
+         time(&amp;rawTime);
+-        localTime = localtime(&amp;rawTime); 
+-        SaveGameFile* file = new SaveGameFile(name);
++        localTime = localtime(&amp;rawTime);
++
++        SaveGameFile* file = NULL;
++
++        if(SaveGameFileExists(name, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()))
++        {
++             file = getSaveGameFile(name, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId());
++             //new SaveGameFile(name,getSaveGameFile(name, CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId())-&gt;getId());
++        }
++        else
++        {
++            mHighestSaveGameNumber++;
++            file = new SaveGameFile(name, mHighestSaveGameNumber);
++        }
++        
+         file-&gt;setProperty(SaveGameFile::PROPERTY_TIME, Property(printTimeAsString(localTime)));
+         file-&gt;setProperty(SaveGameFile::PROPERTY_MODULEID, Property(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getId()));
++        file-&gt;setProperty(SaveGameFile::PROPERTY_MODULENAME, Property(CoreSubsystem::getSingleton().getActiveAdventureModule()-&gt;getName()));
+ 
+-        mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, file-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString())] = file;
++        mSaveGames[file-&gt;getId()] = file;
+ 
+         SaveGameFileWriter writer;
+         writer.buildSaveGameFile(file, mSaveGameDataOrderMap);
+ 
+-        freeSaveGameMap();
++        //freeSaveGameMap();
+ 
+-        Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGames&quot;);
+-        Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(&quot;SaveGames&quot;); //close all resource files -&gt; make them writable
++        //Ogre::ResourceGroupManager::getSingleton().initialiseResourceGroup(&quot;SaveGames&quot;);
++        //Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(&quot;SaveGames&quot;); //close all resource files -&gt; make them writable
+ 
+         MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameSaved&gt;();
+     }
+@@ -121,10 +135,9 @@
+         {
+             MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoading&gt;();
+ 
+-            SaveGameFile file(name);
+-            file.setProperty(SaveGameFile::PROPERTY_MODULEID, Property(moduleId));
++            SaveGameFile* file = getSaveGameFile(name, moduleId);
+             SaveGameFileReader reader;
+-            reader.parseSaveGameFile(&amp;file, mSaveGameDataOrderMap);
++            reader.parseSaveGameFile(file, mSaveGameDataOrderMap);
+             ///@todo: SaveGameReader
+ 
+             MessagePump::getSingleton().sendMessage&lt;MessageType_SaveGameLoaded&gt;();
+@@ -135,26 +148,42 @@
+     {
+         if(SaveGameFileExists(name, moduleId))
+         {
+-            static_cast&lt;SaveGameFile*&gt;(mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)])-&gt;deleteFileFromStorage();
+-            delete mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)];
+-            mSaveGames.erase(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId));
++            int id = getSaveGameId(name, moduleId);
++            static_cast&lt;SaveGameFile*&gt;(mSaveGames[id])-&gt;deleteFileFromStorage();
++            delete mSaveGames[id];
++            mSaveGames.erase(id);
+         }
+     }
+ 
+     bool SaveGameManager::SaveGameFileExists(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        if(mSaveGames.find(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId)) != mSaveGames.end())
+-            return true;
+-        return false;
++        bool saveGameFileExists = false;
++        for(SaveGameEntryMap::const_iterator it = mSaveGames.begin(); it != mSaveGames.end() &amp;&amp; !saveGameFileExists; ++it)
++        {
++            if(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_NAME).toString() == name 
++                &amp;&amp; it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString() == moduleId)
++                saveGameFileExists = true;
++        }
++        return saveGameFileExists;
+     }
+ 
+     SaveGameFile* SaveGameManager::getSaveGameFile(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
+     {
+-        SaveGameEntryMap::const_iterator it = mSaveGames.find(std::pair&lt;CeGuiString,CeGuiString&gt;(name, moduleId));
+-        if(it != mSaveGames.end())
+-            return it-&gt;second;
++        if(SaveGameFileExists(name, moduleId))
++            return mSaveGames[getSaveGameId(name, moduleId)];
+         return NULL;
+     }
++
++    int SaveGameManager::getSaveGameId(const CeGuiString &amp;name, const CeGuiString &amp;moduleId)
++    {
++        for(SaveGameEntryMap::const_iterator it = mSaveGames.begin(); it != mSaveGames.end(); ++it)
++        {
++            if(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_NAME).toString() == name 
++                &amp;&amp; it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString() == moduleId)
++                return it-&gt;first;
++        }
++        return -1;
++    }
+     
+     const Ogre::StringVector&amp; SaveGameManager::getScriptPatterns() const
+     {
+@@ -173,13 +202,18 @@
+         int pointpos = name.find_last_of(&quot;.&quot;);
+         name = name.substr(0, pointpos);
+ 
+-        SaveGameFile* file = new SaveGameFile(name);
+-        
+-        LOG_MESSAGE(Logger::RULES, &quot;Parsing header of save game: &quot; + name);
+-        SaveGameFileReader reader;
+-        reader.parseSaveGameFileHeader(stream, groupName, file);
+-        
+-        mSaveGames[std::pair&lt;CeGuiString,CeGuiString&gt;(name, file-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString())] = file;
++        if(Ogre::StringConverter::isNumber(name))
++        {
++            mHighestSaveGameNumber = std::max(mHighestSaveGameNumber, Ogre::StringConverter::parseInt(name));
++
++            SaveGameFile* file = new SaveGameFile(&quot;&quot;, mHighestSaveGameNumber);        
++            
++            LOG_MESSAGE(Logger::RULES, &quot;Parsing header of save game: &quot; + name + &quot;.save&quot;);
++            SaveGameFileReader reader;
++            reader.parseSaveGameFileHeader(stream, groupName, file);
++            
++            mSaveGames[Ogre::StringConverter::parseInt(name)] = file;
++        }
+     }
+ 
+     void SaveGameManager::registerSaveGameData(SaveGameData* data)
+@@ -214,4 +248,9 @@
+         }
+         mSaveGames.clear();
+     }
++
++    int SaveGameManager::getHighestSaveGameNumber()
++    {
++        return mHighestSaveGameNumber;
++    }
+ }
+
+Modified: rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/ui/src/GameSaveLoadWindow.cpp	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -184,7 +184,7 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first.first), 0, saveGameNum);
++            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getName()), 0, saveGameNum);
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME)), 1, saveGameNum);
+             saveGameNum++;
+         }
+
+Modified: rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 19:22:36 UTC (rev 4122)
++++ rl/trunk/engine/ui/src/MainMenuLoadWindow.cpp	2008-03-04 19:38:17 UTC (rev 4123)
+@@ -149,9 +149,9 @@
+ 
+         for(SaveGameEntryMap::iterator it = saveGames.begin(); it != saveGames.end(); it++)
+         {
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first.first), 0, saveGameNum);
+-            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;first.second), 1, saveGameNum);
+-            LOG_MESSAGE(Logger::UI, &quot;Module ID: &quot; + it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULEID).toString());
++            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getName()), 0, saveGameNum);
++            mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString()), 1, saveGameNum);
++            LOG_MESSAGE(Logger::UI, &quot;Module ID: &quot; + it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_MODULENAME).toString());
+             mSaveGameTable-&gt;setItem(new CEGUI::ListboxTextItem(it-&gt;second-&gt;getProperty(SaveGameFile::PROPERTY_TIME).toString()), 2, saveGameNum);
+             saveGameNum++;
+         }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001193.html">[Dsa-hl-svn] r4122 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="001195.html">[Dsa-hl-svn] r4124 - modules/regressiontest/dialogs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1194">[ date ]</a>
+              <a href="thread.html#1194">[ thread ]</a>
+              <a href="subject.html#1194">[ subject ]</a>
+              <a href="author.html#1194">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

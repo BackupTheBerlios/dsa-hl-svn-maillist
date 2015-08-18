@@ -1,0 +1,377 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4554 - in rl/branches/persistence: core/include	core/src rules/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-October/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4554%20-%20in%20rl/branches/persistence%3A%20core/include%0A%09core/src%20rules/src%20script/swig&In-Reply-To=%3C200810182315.m9INFPwJ023386%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001610.html">
+   <LINK REL="Next"  HREF="001612.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4554 - in rl/branches/persistence: core/include	core/src rules/src script/swig</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4554%20-%20in%20rl/branches/persistence%3A%20core/include%0A%09core/src%20rules/src%20script/swig&In-Reply-To=%3C200810182315.m9INFPwJ023386%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4554 - in rl/branches/persistence: core/include	core/src rules/src script/swig">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Oct 19 01:15:25 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001610.html">[Dsa-hl-svn] r4553 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+        <LI>Next message: <A HREF="001612.html">[Dsa-hl-svn] r4555 - in modules/intro: maps scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1611">[ date ]</a>
+              <a href="thread.html#1611">[ thread ]</a>
+              <a href="subject.html#1611">[ subject ]</a>
+              <a href="author.html#1611">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-10-19 01:15:06 +0200 (Sun, 19 Oct 2008)
+New Revision: 4554
+
+Modified:
+   rl/branches/persistence/core/include/GameAreaEventSource.h
+   rl/branches/persistence/core/include/SaveAbleFactory.h
+   rl/branches/persistence/core/include/Zone.h
+   rl/branches/persistence/core/include/ZoneManager.h
+   rl/branches/persistence/core/src/SaveAbleFactory.cpp
+   rl/branches/persistence/core/src/Zone.cpp
+   rl/branches/persistence/core/src/ZoneManager.cpp
+   rl/branches/persistence/rules/src/QuestBook.cpp
+   rl/branches/persistence/script/swig/RlCore.swig
+Log:
+- started makin zone persistent
+- export symbols for SaveAbleFactory and SaveAbleFactoryPool
+- changed id types of zone and gameareaeventsources to ceguistring
+
+Modified: rl/branches/persistence/core/include/GameAreaEventSource.h
+===================================================================
+--- rl/branches/persistence/core/include/GameAreaEventSource.h	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/include/GameAreaEventSource.h	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -84,12 +84,12 @@
+ protected:
+     /// helps the zonemanager to associate zones with areas
+     friend class ZoneManager;
+-    void setId(long id) {mId = id;}
+-    long getId() const {return mId;}
++    void setId(const CeGuiString &amp;id) {mId = id;}
++    CeGuiString getId() const {return mId;}
+     /// helps the zonemanger to get the values for saving the GameAreaEventSource
+     PropertyRecord mProperties;
+ private:
+-    long mId;
++    CeGuiString mId;
+     /** Verteilt die Events an die angef&#252;gten Listener
+     * F&#252;r jeden Actor wird ein einzelnes Ereigniss generiert, zuerst f&#252;r alle
+     * verlassenden Actoren, dann f&#252;r die betretenden
+
+Modified: rl/branches/persistence/core/include/SaveAbleFactory.h
+===================================================================
+--- rl/branches/persistence/core/include/SaveAbleFactory.h	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/include/SaveAbleFactory.h	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -22,13 +22,13 @@
+ 
+ namespace rl
+ {
+-	class SaveAbleFactory : public Ogre::Singleton&lt;SaveAbleFactory&gt;
++	class _RlCoreExport SaveAbleFactory : public Ogre::Singleton&lt;SaveAbleFactory&gt;
+ 	{
+ 	public:
+ 		virtual SaveAblePtr createSaveAble(PropertyRecordPtr params) = 0;
+ 	};
+ 
+-	class SaveAbleFactoryPool : public Ogre::Singleton&lt;SaveAbleFactoryPool&gt;
++	class _RlCoreExport SaveAbleFactoryPool : public Ogre::Singleton&lt;SaveAbleFactoryPool&gt;
+ 	{
+ 	public:
+ 		void registerFactory(const Ogre::String &amp;key, SaveAbleFactory* fac);
+
+Modified: rl/branches/persistence/core/include/Zone.h
+===================================================================
+--- rl/branches/persistence/core/include/Zone.h	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/include/Zone.h	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -18,6 +18,7 @@
+ 
+ #include &quot;CorePrerequisites.h&quot;
+ #include &quot;GameEventManager.h&quot;  /* wegen GameAreaEventSourceList */
++#include &quot;SaveAble.h&quot;
+ 
+ namespace rl {
+ 
+@@ -28,7 +29,7 @@
+     class ZoneManager;
+ 
+     /// an abstraction of an zone, consisting of all GameAreaEventSources with the associated id
+-    class _RlCoreExport Zone
++	class _RlCoreExport Zone : public SaveAble
+ 	{
+ 	public:
+         virtual ~Zone();
+@@ -49,13 +50,12 @@
+         void removeLight(Actor* light);
+         void removeSound(const Ogre::String&amp; name);
+         void removeTrigger(Trigger* trigger);
+-        long getId() const {return mId;}
+         
+         bool needsToBeSaved() const {return mNeedsToBeSaved;}
+ 
+     protected:
+         friend class ZoneManager;
+-        Zone(long id, bool needsToBeSaved);
++        Zone(const CeGuiString &amp;id, bool needsToBeSaved);
+         void addEventSource(GameAreaEventSource* gam);
+         void removeEventSource(GameAreaEventSource* gam);
+         GameAreaEventSourceList&amp; getEventSources();
+@@ -64,7 +64,6 @@
+         bool isActive() const; // only for the ZoneManager, in order to ask if a zone is active use ZoneManager::isZoneActive
+     private:
+         bool mNeedsToBeSaved;
+-        long mId;
+         Zone();
+ 		std::list&lt;Actor*&gt; mLights;
+ 		std::list&lt;Ogre::String&gt; mSounds;
+
+Modified: rl/branches/persistence/core/include/ZoneManager.h
+===================================================================
+--- rl/branches/persistence/core/include/ZoneManager.h	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/include/ZoneManager.h	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -90,7 +90,7 @@
+             unsigned long queryflags);
+ 		Zone* getDefaultZone();
+ 		Zone* getZone(const Ogre::String&amp; name);
+-        Zone* getZone(long id);
++        Zone* getZone(const CeGuiString &amp;id);
+ 
+         /// asks wether this zone is currently activated
+         bool isZoneActive(const Zone* zone) const;
+@@ -126,7 +126,7 @@
+         virtual int getPriority() const;  // zones must be loaded before triggers!
+ 	private:
+ 		ZoneMap mZones;
+-        std::map&lt;long, Zone*&gt; mZonesIdMap;
++        std::map&lt;CeGuiString, Zone*&gt; mZonesIdMap;
+ 		std::list&lt;Zone*&gt; mActiveZones;
+         typedef std::map&lt;const Ogre::String, Sound*&gt; SoundMap;
+         SoundMap mActiveSounds;
+
+Modified: rl/branches/persistence/core/src/SaveAbleFactory.cpp
+===================================================================
+--- rl/branches/persistence/core/src/SaveAbleFactory.cpp	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/src/SaveAbleFactory.cpp	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -18,6 +18,10 @@
+ 
+ #include &quot;SaveAbleFactory.h&quot;
+ 
++template&lt;&gt; rl::SaveAbleFactory* Ogre::Singleton&lt;rl::SaveAbleFactory&gt;::ms_Singleton = 0;
++
++template&lt;&gt; rl::SaveAbleFactoryPool* Ogre::Singleton&lt;rl::SaveAbleFactoryPool&gt;::ms_Singleton = 0;
++
+ namespace rl
+ {
+ 	void SaveAbleFactoryPool::registerFactory(const Ogre::String &amp;key, rl::SaveAbleFactory *fac)
+
+Modified: rl/branches/persistence/core/src/Zone.cpp
+===================================================================
+--- rl/branches/persistence/core/src/Zone.cpp	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/src/Zone.cpp	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -27,7 +27,7 @@
+ {
+ 
+ 
+-    Zone::Zone(long id, bool needsToBeSaved) : mId(id), mEaxPreset(&quot;&quot;), mNeedsToBeSaved(needsToBeSaved), mPersonsInside(0)
++    Zone::Zone(const CeGuiString &amp;id, bool needsToBeSaved) : mEaxPreset(&quot;&quot;), mNeedsToBeSaved(needsToBeSaved), mPersonsInside(0), SaveAble(id, needsToBeSaved)
+     {
+     }
+ 
+
+Modified: rl/branches/persistence/core/src/ZoneManager.cpp
+===================================================================
+--- rl/branches/persistence/core/src/ZoneManager.cpp	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/core/src/ZoneManager.cpp	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -43,7 +43,7 @@
+         GameTask(false)
+ 	{
+ 		// the default zone is active when no other Zone is active
+-		mDefaultZone = new Zone(0,false);
++		mDefaultZone = new Zone(&quot;Zone_0&quot;,false);
+         mNextZoneId = 1;
+ 		mActiveZones.push_front(mDefaultZone);
+ 
+@@ -60,7 +60,7 @@
+         for( ; it != mZonesToDelete.end(); it++)
+             doDestroyZone(*it);
+         mZonesToDelete.clear();
+-		for (std::map&lt;long, Zone*&gt;::iterator it = mZonesIdMap.begin(); it != mZonesIdMap.end(); ++it)
++		for (std::map&lt;CeGuiString, Zone*&gt;::iterator it = mZonesIdMap.begin(); it != mZonesIdMap.end(); ++it)
+ 		{
+ 			Zone* curZone = (*it).second;
+             doDestroyZone(curZone);
+@@ -86,9 +86,9 @@
+ 		}
+ 	}
+ 
+-	Zone* ZoneManager::getZone(long id)
++	Zone* ZoneManager::getZone(const CeGuiString &amp;id)
+ 	{
+-		std::map&lt;long, Zone*&gt;::const_iterator it = mZonesIdMap.find(id);
++		std::map&lt;CeGuiString, Zone*&gt;::const_iterator it = mZonesIdMap.find(id);
+ 		if (it == mZonesIdMap.end())
+ 		{
+ 			return NULL;
+@@ -101,8 +101,8 @@
+ 
+     Zone* ZoneManager::createZone(const Ogre::String&amp; name, bool needsToBeSaved)
+ 	{
+-        Zone* zone = new Zone(mNextZoneId, needsToBeSaved);
+-        mZonesIdMap[mNextZoneId] = zone;
++		Zone* zone = new Zone(&quot;Zone_&quot; + Ogre::StringConverter::toString(mNextZoneId), needsToBeSaved);
++        mZonesIdMap[&quot;Zone_&quot; + Ogre::StringConverter::toString(mNextZoneId)] = zone;
+         mZones[name] = zone;
+         mNextZoneId++;
+ 
+@@ -124,7 +124,7 @@
+         if( it != mZones.end() )
+             mZones.erase(it);
+ 
+-        std::map&lt;long, Zone*&gt;::iterator it_ = mZonesIdMap.find(zone-&gt;getId());
++        std::map&lt;CeGuiString, Zone*&gt;::iterator it_ = mZonesIdMap.find(zone-&gt;getId());
+         if( it_ != mZonesIdMap.end() )
+             mZonesIdMap.erase(it_);
+ 
+@@ -215,7 +215,7 @@
+             // diese funktion hier notwendig um die mask zu ignorieren
+             if( (*it)-&gt;getGameAreaType()-&gt;isInside(actor) )
+             {
+-                if( (*it)-&gt;getId() &lt; 0 )
++				if( (*it)-&gt;mProperties.getProperty(&quot;subtract&quot;))
+                     x--;
+                 else
+                     x++;
+@@ -269,7 +269,7 @@
+                 aabb, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+-        gam-&gt;setId( - (zone-&gt;getId())); // a negative id indicates to subtract this area from the zone
++        gam-&gt;setId((zone-&gt;getId())); // a negative id indicates to subtract this area from the zone
+         zone-&gt;addEventSource(gam);
+         // set the properties for saving
+         gam-&gt;mProperties.setProperty(&quot;subtract&quot;, Property(true));
+@@ -343,7 +343,7 @@
+                 entity, geom, this, queryflags, position + offset, orientation, true);
+ 
+         gam-&gt;getGameAreaType()-&gt;setTransitionDistance(transitionDistance);
+-        gam-&gt;setId( - (zone-&gt;getId()) ); // a negative id indicates to subtract this area from the zone
++        gam-&gt;setId((zone-&gt;getId()) ); // a negative id indicates to subtract this area from the zone
+ 
+         CoreSubsystem::getSingletonPtr()-&gt;getWorld()
+             -&gt;getSceneManager()-&gt;destroyEntity(entity);
+@@ -362,10 +362,10 @@
+ 
+ 	void ZoneManager::areaLeft(GameAreaEvent* gae)
+ 	{
+-        long id = gae-&gt;getSource()-&gt;getId();
+-        if( id != 0 )
++        CeGuiString id = gae-&gt;getSource()-&gt;getId();
++        if( id != &quot;&quot;)
+         {
+-            if( id &gt; 0 )
++			if( !gae-&gt;getSource()-&gt;mProperties.getProperty(&quot;subtract&quot;) )
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+@@ -377,7 +377,7 @@
+             }
+             else
+             {
+-                Zone *zone = getZone(-id); // means we have to subtract this area from the zone
++                Zone *zone = getZone(id); // means we have to subtract this area from the zone
+                 if( zone )
+                 {
+                     if( !zone-&gt;isActive() )
+@@ -392,10 +392,10 @@
+ 
+ 	void ZoneManager::areaEntered(GameAreaEvent* gae)
+ 	{
+-        long id = gae-&gt;getSource()-&gt;getId();
+-        if( id != 0 )
++        CeGuiString id = gae-&gt;getSource()-&gt;getId();
++        if( id != &quot;&quot; )
+         {
+-            if( id &gt; 0 )
++            if( !gae-&gt;getSource()-&gt;mProperties.getProperty(&quot;subtract&quot;) )
+             {
+                 Zone *zone = getZone(id);
+                 if( zone )
+@@ -407,7 +407,7 @@
+             }
+             else
+             {
+-                Zone *zone = getZone(-id); // means we have to subtract this area from the zone
++                Zone *zone = getZone(id); // means we have to subtract this area from the zone
+                 if( zone )
+                 {
+                     zone-&gt;personLeft();
+
+Modified: rl/branches/persistence/rules/src/QuestBook.cpp
+===================================================================
+--- rl/branches/persistence/rules/src/QuestBook.cpp	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/rules/src/QuestBook.cpp	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -86,6 +86,9 @@
+ 
+ 	SaveAblePtr QuestBook::createSaveAble(PropertyRecordPtr params)
+ 	{
++		SaveAblePtr ptr;
++		ptr.bind(static_cast&lt;SaveAble*&gt;(new Quest(&quot;&quot;))); //TODO !!!!!
++		return ptr; // TODO
+ 	}
+ 
+     void QuestBook::_fireQuestBookChanged(Quest *quest, int reason)
+
+Modified: rl/branches/persistence/script/swig/RlCore.swig
+===================================================================
+--- rl/branches/persistence/script/swig/RlCore.swig	2008-10-18 19:37:47 UTC (rev 4553)
++++ rl/branches/persistence/script/swig/RlCore.swig	2008-10-18 23:15:06 UTC (rev 4554)
+@@ -1165,7 +1165,7 @@
+         
+ 	rl::Zone* getDefaultZone();
+ 	rl::Zone* getZone(const Ogre::String&amp; name);
+-    rl::Zone* getZone(long id);
++    rl::Zone* getZone(const rl::CeGuiString &amp;id);
+     bool isZoneActive(const rl::Zone *zone) const;
+     bool isInZone(Zone* zone, Actor *actor);
+ };
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001610.html">[Dsa-hl-svn] r4553 - rl/trunk/editors/Lockenwickler/src
+</A></li>
+	<LI>Next message: <A HREF="001612.html">[Dsa-hl-svn] r4555 - in modules/intro: maps scripts
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1611">[ date ]</a>
+              <a href="thread.html#1611">[ thread ]</a>
+              <a href="subject.html#1611">[ subject ]</a>
+              <a href="author.html#1611">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

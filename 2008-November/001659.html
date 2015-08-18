@@ -1,0 +1,749 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4602 - rl/trunk/engine/core/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4602%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200811242159.mAOLxcQA007146%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001658.html">
+   <LINK REL="Next"  HREF="001660.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4602%20-%20rl/trunk/engine/core/src&In-Reply-To=%3C200811242159.mAOLxcQA007146%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4602 - rl/trunk/engine/core/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Nov 24 22:59:38 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001658.html">[Dsa-hl-svn] r4601 - in rl/branches/persistence: ai/src common/src	core/include core/src rules/src script/include script/src ui
+</A></li>
+        <LI>Next message: <A HREF="001660.html">[Dsa-hl-svn] r4603 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1659">[ date ]</a>
+              <a href="thread.html#1659">[ thread ]</a>
+              <a href="subject.html#1659">[ subject ]</a>
+              <a href="author.html#1659">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-11-24 22:59:37 +0100 (Mon, 24 Nov 2008)
+New Revision: 4602
+
+Modified:
+   rl/trunk/engine/core/src/JobScheduler.cpp
+Log:
+
+
+Modified: rl/trunk/engine/core/src/JobScheduler.cpp
+===================================================================
+--- rl/trunk/engine/core/src/JobScheduler.cpp	2008-11-23 18:09:31 UTC (rev 4601)
++++ rl/trunk/engine/core/src/JobScheduler.cpp	2008-11-24 21:59:37 UTC (rev 4602)
+@@ -1,323 +1,350 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;JobScheduler.h&quot;
+-#include &quot;Job.h&quot;
+-#include &quot;JobListener.h&quot;
+-#include &quot;GameLoop.h&quot;
+-#include &quot;TimeSource.h&quot;
+-#include &quot;SaveGameManager.h&quot;
+-
+-using namespace Ogre;
+-
+-template&lt;&gt; rl::JobScheduler* Singleton&lt;rl::JobScheduler&gt;::ms_Singleton = 0;
+-
+-namespace rl
+-{
+-    JobScheduler::JobScheduler()
+-        : GameTask(true),
+-        mJobQueue(), 
+-        mAddedJobs(),
+-        mTokenThreshold(JP_NORMAL), 
+-        mTicketCounter(0)
+-    {
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+-    }
+-
+-    JobScheduler::~JobScheduler()
+-    {
+-    }
+-
+-    unsigned long JobScheduler::addJob(AbstractJob* job, JobPriority priority, Real delay, Real maxRuntime,
+-        JobListener* listener)
+-    {
+-        unsigned long ticket = ++mTicketCounter;
+-        TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(
+-            job-&gt;getTimeSource());
+-        unsigned long clock = ts-&gt;getClock();
+-        unsigned long start = clock + delay*1000;
+-        unsigned long end = maxRuntime &gt;= Math::POS_INFINITY ?
+-            0xffffffff : static_cast&lt;unsigned long&gt;(start + maxRuntime*1000);
+-        JobEntry entry = {job, listener, ticket, priority, priority, start, end, start, job-&gt;getTimeSource(), false, false};
+-        mAddedJobs.push_back(entry);
+-        return ticket;
+-    }
+-
+-    void JobScheduler::run(Ogre::Real time)
+-    {
+-        ///@todo use different buckets for jobs not yet started, instead of
+-        ///      iterating over those each time.
+-
+-        ///@todo dynamically determine token threshold. Maybe make it work load depending.
+-
+-
+-        // Queue for finished jobs
+-        JobQueue notDone;
+-
+-        for (JobQueue::iterator it = mJobQueue.begin(), end = mJobQueue.end(); it != end; ++it)
+-        {
+-            JobEntry entry = *it;
+-
+-            TimeSource::TimeSourceType tst = entry.job-&gt;getTimeSource();
+-            TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(tst);
+-            Time clock = ts-&gt;getClock();
+-            if (tst != entry.timeSourceLastCall) // time source has changed, e.g. in a job queue
+-            {
+-                entry.timeLastCall = clock;
+-                entry.timeSourceLastCall = tst;
+-            }
+-
+-            if (entry.markedToRemove)
+-            {
+-                // Notify listener, the job was removed
+-                if (entry.listener != NULL)
+-                {
+-                    entry.listener-&gt;jobRemoved(entry.ticket);
+-                }
+-
+-                if (entry.job-&gt;destroyWhenDone() )
+-                {
+-                    delete entry.job;
+-                }
+-            }
+-            else if (entry.start &lt;= clock &amp;&amp; clock &lt; entry.end)
+-            {
+-                // Is the token threshold reached?
+-                if (entry.tokens &gt;= mTokenThreshold)
+-                {
+-                    // Yes, pay run fee and execute.
+-                    entry.tokens = 0;
+-                    bool runAgain = !entry.job-&gt;execute(clock - entry.timeLastCall);
+-
+-                    if (!entry.called)
+-                    {
+-                        // Notify listener, the job started for the first time
+-                        if (entry.listener != NULL)
+-                        {
+-                            entry.listener-&gt;jobStarted(entry.ticket);
+-                        }
+-                        entry.called = true;
+-                    }
+-
+-                    if (runAgain)
+-                    {
+-                        // Job is not done, reset token count and requeue.
+-                        entry.tokens = entry.priority;
+-                        entry.timeLastCall = clock;
+-                        notDone.push_back(entry);
+-                    }
+-                    else
+-                    {
+-                        // Notify listener, the job finished regularly.
+-                        if (entry.listener != NULL)
+-                        {
+-                            entry.listener-&gt;jobFinished(entry.ticket);
+-                        }
+-
+-                        // If we are supposed to delete the Job, do so now.
+-                        if (entry.job-&gt;destroyWhenDone())
+-                        {
+-                            delete entry.job;
+-                        }
+-                    }
+-                }
+-                else
+-                {
+-                    // No, increase token count
+-                    entry.tokens += entry.priority;
+-                    notDone.push_back(entry);
+-                }
+-            }
+-            else if (clock &lt; entry.end)
+-            {
+-                // Start time not yet reached. Queue again.
+-                notDone.push_back(entry);
+-            }
+-            else
+-            {
+-                // Job reached its end time and didn't want to finish itself, so we do it.
+-                if (entry.job-&gt;isDiscardable())
+-                {
+-                    entry.job-&gt;discard();
+-                    if (entry.listener != NULL)
+-                    {
+-                        entry.listener-&gt;jobDiscarded(entry.ticket);
+-                    }
+-                }
+-                if (entry.job-&gt;destroyWhenDone() )
+-                {
+-                    delete entry.job;
+-                }
+-            }
+-        }
+-
+-        // Copy requeued jobs for next run.
+-        mJobQueue = notDone;
+-		mJobQueue.insert(mJobQueue.end(), mAddedJobs.begin(), mAddedJobs.end());
+-		mAddedJobs.clear();
+-    }
+-
+-    void JobScheduler::removeJob(unsigned long ticket)
+-    {
+-        JobQueue::iterator it = std::find_if(mJobQueue.begin(), mJobQueue.end(),
+-            std::bind2nd(FindJobEntryByTicket(), ticket));
+-        if (it != mJobQueue.end())
+-        {
+-            //mRemovedJobs.push_back(*it);
+-            (*it).markedToRemove = true;
+-        }
+-        else
+-        {
+-			it = std::find_if(mAddedJobs.begin(), mAddedJobs.end(),
+-				std::bind2nd(FindJobEntryByTicket(), ticket));
+-			if (it != mAddedJobs.end())
+-			{
+-				mAddedJobs.erase(it);
+-			}
+-			else
+-			{
+-				///@todo Log missing job for the ticket.
+-			}
+-        }
+-    }
+-
+-    const Ogre::String&amp; JobScheduler::getName() const
+-    {
+-        static Ogre::String NAME = &quot;JobScheduler&quot;;
+-
+-        return NAME;
+-    }
+-
+-    using namespace XERCES_CPP_NAMESPACE;
+-
+-    void JobScheduler::writeData(SaveGameFileWriter* writer)
+-    {
+-        DOMElement* jobSchedulerParentNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+-
+-        for(JobQueue::const_iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++)
+-        {
+-            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT &amp;&amp; !(iter-&gt;markedToRemove) )
+-            {
+-                DOMElement* jobNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), jobSchedulerParentNode, &quot;job&quot;);
+-                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;priority&quot;, iter-&gt;priority);
+-                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;tokens&quot;, iter-&gt;tokens);
+-                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;start&quot;, iter-&gt;start);
+-                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;end&quot;, iter-&gt;end);
+-                writer-&gt;setAttributeValueAsInt64(jobNode, &quot;timeLastCall&quot;, iter-&gt;timeLastCall);
+-                writer-&gt;setAttributeValueAsBool(jobNode, &quot;called&quot;, iter-&gt;called);
+-                writer-&gt;setAttributeValueAsString(jobNode, &quot;classname&quot;, iter-&gt;job-&gt;getClassName());
+-
+-                PropertyMap map = iter-&gt;job-&gt;getAllProperties()-&gt;toPropertyMap();
+-                writer-&gt;writeEachPropertyToElem(jobNode, map);
+-            }
+-        }
+-    }
+-
+-    void JobScheduler::readData(SaveGameFileReader* reader)
+-    {
+-        // delete and discard old jobs
+-        for( JobQueue::iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++ )
+-        {
+-            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT )
+-            {
+-                // delete the job, but do not discard it!
+-                iter-&gt;markedToRemove = true;
+-            }
+-            else if( iter-&gt;job-&gt;getPersistenceType() == Job::FINISH_WHEN_GAME_LOADED )
+-            {
+-                // discard the job, then delete it
+-                if( iter-&gt;job-&gt;isDiscardable() )
+-                    iter-&gt;job-&gt;discard();
+-                iter-&gt;markedToRemove = true;
+-            }
+-        }
+-
+-        
+-        // load jobs from savegamefile
+-
+-        reader-&gt;initializeXml();
+-
+-
+-        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
+-        
+-        if(rootNodeList-&gt;getLength())
+-        {
+-            DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
+-            if (xmlJobs-&gt;getLength())
+-            {
+-                for (XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
+-                {
+-                    DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
+-                    if (xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-                    {
+-                        DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
+-                        JobPriority priority;
+-                        unsigned short tokens;
+-                        int start, end;
+-                        Time timeLastCall;
+-                        bool called;
+-                        priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
+-                        tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
+-                        start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
+-                        end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
+-                        timeLastCall = reader-&gt;getAttributeValueAsInt64(xmlJob, &quot;timeLastCall&quot;);
+-                        called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
+-
+-                        Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
+-
+-                        JobCreationMap::iterator it = mJobCreationMap.find(className);
+-                        if (it == mJobCreationMap.end())
+-                        {
+-                            LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
+-                            continue;
+-                        }
+-
+-                        AbstractJob* job = it-&gt;second();
+-                        if (job == NULL)
+-                        {
+-                            LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
+-                            continue;
+-                        }
+-                        PropertyRecordPtr properties = reader-&gt;getPropertiesAsRecord(xmlJob);
+-                        job-&gt;setProperties(properties);
+-                        
+-                        
+-                        unsigned long ticket = ++mTicketCounter;
+-                        TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(job-&gt;getTimeSource());
+-                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeLastCall, TimeSource::UNKNOWN, called, false};
+-                        mJobQueue.push_back(entry);
+-                    }
+-                }
+-            }
+-        }
+-
+-        reader-&gt;shutdownXml();
+-    }
+-
+-    int JobScheduler::getPriority() const
+-    {
+-        return 0; // must be loaded before triggers!
+-    }
+-
+-    CeGuiString JobScheduler::getXmlNodeIdentifier() const
+-    {
+-        static const CeGuiString name = &quot;jobscheduler&quot;;
+-        return name;
+-    }
+-
+-    JobScheduler::JobCreationMap JobScheduler::mJobCreationMap;
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;JobScheduler.h&quot;
++#include &quot;Job.h&quot;
++#include &quot;JobListener.h&quot;
++#include &quot;GameLoop.h&quot;
++#include &quot;TimeSource.h&quot;
++#include &quot;SaveGameManager.h&quot;
++
++using namespace Ogre;
++
++template&lt;&gt; rl::JobScheduler* Singleton&lt;rl::JobScheduler&gt;::ms_Singleton = 0;
++
++namespace rl
++{
++    JobScheduler::JobScheduler()
++        : GameTask(true),
++        mJobQueue(), 
++        mAddedJobs(),
++        mTokenThreshold(JP_NORMAL), 
++        mTicketCounter(0)
++    {
++        SaveGameManager::getSingleton().registerSaveGameData(this);
++    }
++
++    JobScheduler::~JobScheduler()
++    {
++    }
++
++    unsigned long JobScheduler::addJob(AbstractJob* job, JobPriority priority, Real delay, Real maxRuntime,
++        JobListener* listener)
++    {
++        unsigned long ticket = ++mTicketCounter;
++        TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(
++            job-&gt;getTimeSource());
++        unsigned long clock = ts-&gt;getClock();
++        unsigned long start = clock + delay*1000;
++        unsigned long end = maxRuntime &gt;= Math::POS_INFINITY ?
++            0xffffffff : static_cast&lt;unsigned long&gt;(start + maxRuntime*1000);
++        JobEntry entry = {job, listener, ticket, priority, priority, start, end, start, job-&gt;getTimeSource(), false, false};
++        mAddedJobs.push_back(entry);
++        return ticket;
++    }
++
++    void JobScheduler::run(Ogre::Real time)
++    {
++        ///@todo use different buckets for jobs not yet started, instead of
++        ///      iterating over those each time.
++
++        ///@todo dynamically determine token threshold. Maybe make it work load depending.
++
++
++        // Queue for finished jobs
++        JobQueue notDone;
++
++        for (JobQueue::iterator it = mJobQueue.begin(), end = mJobQueue.end(); it != end; ++it)
++        {
++            JobEntry entry = *it;
++
++            TimeSource::TimeSourceType tst = entry.job-&gt;getTimeSource();
++            TimeSource* ts = TimeSourceManager::getSingleton().getTimeSource(tst);
++            Time clock = ts-&gt;getClock();
++            if (tst != entry.timeSourceLastCall) // time source has changed, e.g. in a job queue
++            {
++                entry.timeLastCall = clock;
++                entry.timeSourceLastCall = tst;
++            }
++
++            if (entry.markedToRemove)
++            {
++                // Notify listener, the job was removed
++                if (entry.listener != NULL)
++                {
++                    entry.listener-&gt;jobRemoved(entry.ticket);
++                }
++
++                if (entry.job-&gt;destroyWhenDone() )
++                {
++                    delete entry.job;
++                }
++            }
++            else if (entry.start &lt;= clock &amp;&amp; clock &lt; entry.end)
++            {
++                // Is the token threshold reached?
++                if (entry.tokens &gt;= mTokenThreshold)
++                {
++                    // Yes, pay run fee and execute.
++                    entry.tokens = 0;
++                    bool runAgain = !entry.job-&gt;execute(clock - entry.timeLastCall);
++
++                    if (!entry.called)
++                    {
++                        // Notify listener, the job started for the first time
++                        if (entry.listener != NULL)
++                        {
++                            entry.listener-&gt;jobStarted(entry.ticket);
++                        }
++                        entry.called = true;
++                    }
++
++                    if (runAgain)
++                    {
++                        // Job is not done, reset token count and requeue.
++                        entry.tokens = entry.priority;
++                        entry.timeLastCall = clock;
++                        notDone.push_back(entry);
++                    }
++                    else
++                    {
++                        // Notify listener, the job finished regularly.
++                        if (entry.listener != NULL)
++                        {
++                            entry.listener-&gt;jobFinished(entry.ticket);
++                        }
++
++                        // If we are supposed to delete the Job, do so now.
++                        if (entry.job-&gt;destroyWhenDone())
++                        {
++                            delete entry.job;
++                        }
++                    }
++                }
++                else
++                {
++                    // No, increase token count
++                    entry.tokens += entry.priority;
++                    notDone.push_back(entry);
++                }
++            }
++            else if (clock &lt; entry.end)
++            {
++                // Start time not yet reached. Queue again.
++                notDone.push_back(entry);
++            }
++            else
++            {
++                // Job reached its end time and didn't want to finish itself, so we do it.
++                if (entry.job-&gt;isDiscardable())
++                {
++                    entry.job-&gt;discard();
++                    if (entry.listener != NULL)
++                    {
++                        entry.listener-&gt;jobDiscarded(entry.ticket);
++                    }
++                }
++                if (entry.job-&gt;destroyWhenDone() )
++                {
++                    delete entry.job;
++                }
++            }
++        }
++
++        // Copy requeued jobs for next run.
++        mJobQueue = notDone;
++		mJobQueue.insert(mJobQueue.end(), mAddedJobs.begin(), mAddedJobs.end());
++		mAddedJobs.clear();
++    }
++
++    void JobScheduler::removeJob(unsigned long ticket)
++    {
++        JobQueue::iterator it = std::find_if(mJobQueue.begin(), mJobQueue.end(),
++            std::bind2nd(FindJobEntryByTicket(), ticket));
++        if (it != mJobQueue.end())
++        {
++            //mRemovedJobs.push_back(*it);
++            (*it).markedToRemove = true;
++        }
++        else
++        {
++			it = std::find_if(mAddedJobs.begin(), mAddedJobs.end(),
++				std::bind2nd(FindJobEntryByTicket(), ticket));
++			if (it != mAddedJobs.end())
++			{
++				mAddedJobs.erase(it);
++			}
++			else
++			{
++				///@todo Log missing job for the ticket.
++			}
++        }
++    }
++
++    const Ogre::String&amp; JobScheduler::getName() const
++    {
++        static Ogre::String NAME = &quot;JobScheduler&quot;;
++
++        return NAME;
++    }
++
++    using namespace XERCES_CPP_NAMESPACE;
++
++    void JobScheduler::writeData(SaveGameFileWriter* writer)
++    {
++        DOMElement* jobSchedulerParentNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
++
++        for(JobQueue::const_iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++)
++        {
++            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT &amp;&amp; !(iter-&gt;markedToRemove) )
++            {
++                DOMElement* jobNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), jobSchedulerParentNode, &quot;job&quot;);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;priority&quot;, iter-&gt;priority);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;tokens&quot;, iter-&gt;tokens);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;start&quot;, iter-&gt;start);
++                writer-&gt;setAttributeValueAsInteger(jobNode, &quot;end&quot;, iter-&gt;end);
++                writer-&gt;setAttributeValueAsInt64(jobNode, &quot;timeLastCall&quot;, iter-&gt;timeLastCall);
++                writer-&gt;setAttributeValueAsBool(jobNode, &quot;called&quot;, iter-&gt;called);
++                writer-&gt;setAttributeValueAsString(jobNode, &quot;classname&quot;, iter-&gt;job-&gt;getClassName());
++                CeGuiString timeSource = &quot;unknown&quot;;
++                switch (iter-&gt;job-&gt;getTimeSource())
++                {
++                    case TimeSource::GAMETIME:
++                        timeSource = &quot;gametime&quot;;
++                        break;
++                    case TimeSource::REALTIME_CONTINUOUS:
++                        timeSource = &quot;realtime_continuous&quot;;
++                        break;
++                    case TimeSource::REALTIME_INTERRUPTABLE:
++                        timeSource = &quot;realtime_interruptable&quot;;
++                        break;
++                }
++                writer-&gt;setAttributeValueAsString(jobNode, &quot;time&quot;, timeSource);
++
++                PropertyMap map = iter-&gt;job-&gt;getAllProperties()-&gt;toPropertyMap();
++                writer-&gt;writeEachPropertyToElem(jobNode, map);
++            }
++        }
++    }
++
++    void JobScheduler::readData(SaveGameFileReader* reader)
++    {
++        // delete and discard old jobs
++        for( JobQueue::iterator iter = mJobQueue.begin(); iter != mJobQueue.end(); iter++ )
++        {
++            if( iter-&gt;job-&gt;getPersistenceType() == Job::PERSISTENT )
++            {
++                // delete the job, but do not discard it!
++                iter-&gt;markedToRemove = true;
++            }
++            else if( iter-&gt;job-&gt;getPersistenceType() == Job::FINISH_WHEN_GAME_LOADED )
++            {
++                // discard the job, then delete it
++                if( iter-&gt;job-&gt;isDiscardable() )
++                    iter-&gt;job-&gt;discard();
++                iter-&gt;markedToRemove = true;
++            }
++        }
++
++        
++        // load jobs from savegamefile
++
++        reader-&gt;initializeXml();
++
++
++        DOMNodeList* rootNodeList = reader-&gt;getDocument()-&gt;getDocumentElement()-&gt;getElementsByTagName(AutoXMLCh(getXmlNodeIdentifier().c_str()).data());
++        
++        if(rootNodeList-&gt;getLength())
++        {
++            DOMNodeList* xmlJobs = static_cast&lt;DOMElement*&gt;(rootNodeList-&gt;item(0))-&gt;getElementsByTagName(AutoXMLCh(&quot;job&quot;).data());
++            if (xmlJobs-&gt;getLength())
++            {
++                for (XMLSize_t childIdx1 = 0; childIdx1 &lt; xmlJobs-&gt;getLength(); childIdx1++)
++                {
++                    DOMNode* xmlJob_ = xmlJobs-&gt;item(childIdx1);
++                    if (xmlJob_-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
++                    {
++                        DOMElement* xmlJob = static_cast&lt;DOMElement*&gt;(xmlJob_);
++                        JobPriority priority;
++                        unsigned short tokens;
++                        int start, end;
++                        Time timeLastCall;
++                        bool called;
++                        priority = JobPriority(reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;priority&quot;));
++                        tokens = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;tokens&quot;);
++                        start = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;start&quot;);
++                        end = reader-&gt;getAttributeValueAsInteger(xmlJob, &quot;end&quot;);
++                        timeLastCall = reader-&gt;getAttributeValueAsInt64(xmlJob, &quot;timeLastCall&quot;);
++                        called = reader-&gt;getAttributeValueAsBool(xmlJob, &quot;called&quot;);
++
++                        Ogre::String className = reader-&gt;getAttributeValueAsStdString(xmlJob, &quot;classname&quot;);
++
++                        JobCreationMap::iterator it = mJobCreationMap.find(className);
++                        if (it == mJobCreationMap.end())
++                        {
++                            LOG_ERROR(Logger::CORE, &quot;Die Job-Klasse '&quot; + className + &quot;' ist nicht beim JobScheduler registriert!&quot;);
++                            continue;
++                        }
++
++                        AbstractJob* job = it-&gt;second();
++                        if (job == NULL)
++                        {
++                            LOG_ERROR(Logger::CORE, &quot;Fehler beim Erstellen eines Objekts der Job-Klasse '&quot; + className + &quot;'!&quot;);
++                            continue;
++                        }
++                        PropertyRecordPtr properties = reader-&gt;getPropertiesAsRecord(xmlJob);
++                        job-&gt;setProperties(properties);
++                        
++                        CeGuiString timeSourceStr = reader-&gt;getAttributeValueAsString(xmlJob, &quot;time&quot;);
++                        TimeSource::TimeSourceType ts = TimeSource::UNKNOWN;
++                        if (timeSourceStr == &quot;gametime&quot;) 
++                        {
++                            ts = TimeSource::GAMETIME;
++                        }
++                        else if (timeSourceStr == &quot;realtime_continuous&quot;) 
++                        {
++                            ts = TimeSource::REALTIME_CONTINUOUS;
++                        }
++                        else if (timeSourceStr == &quot;realtime_interruptable&quot;) 
++                        {
++                            ts = TimeSource::REALTIME_INTERRUPTABLE;
++                        }
++                        
++                        unsigned long ticket = ++mTicketCounter;
++                        JobEntry entry = {job, NULL, ticket, priority, tokens, start, end, timeLastCall, ts, called, false};
++                        mJobQueue.push_back(entry);
++                    }
++                }
++            }
++        }
++
++        reader-&gt;shutdownXml();
++    }
++
++    int JobScheduler::getPriority() const
++    {
++        return 0; // must be loaded before triggers!
++    }
++
++    CeGuiString JobScheduler::getXmlNodeIdentifier() const
++    {
++        static const CeGuiString name = &quot;jobscheduler&quot;;
++        return name;
++    }
++
++    JobScheduler::JobCreationMap JobScheduler::mJobCreationMap;
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001658.html">[Dsa-hl-svn] r4601 - in rl/branches/persistence: ai/src common/src	core/include core/src rules/src script/include script/src ui
+</A></li>
+	<LI>Next message: <A HREF="001660.html">[Dsa-hl-svn] r4603 - in rl/trunk/engine/rules: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1659">[ date ]</a>
+              <a href="thread.html#1659">[ thread ]</a>
+              <a href="subject.html#1659">[ subject ]</a>
+              <a href="author.html#1659">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

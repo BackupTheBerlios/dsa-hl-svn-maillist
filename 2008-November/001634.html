@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4577 - in rl/trunk/engine/ui: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4577%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200811071634.mA7GYVWe023127%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001633.html">
+   <LINK REL="Next"  HREF="001635.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4577 - in rl/trunk/engine/ui: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4577%20-%20in%20rl/trunk/engine/ui%3A%20include%20src&In-Reply-To=%3C200811071634.mA7GYVWe023127%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4577 - in rl/trunk/engine/ui: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Fri Nov  7 17:34:31 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001633.html">[Dsa-hl-svn] r4576 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="001635.html">[Dsa-hl-svn] r4578 - in rl/trunk/engine: ai/include ai/src	rules/include rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1634">[ date ]</a>
+              <a href="thread.html#1634">[ thread ]</a>
+              <a href="subject.html#1634">[ subject ]</a>
+              <a href="author.html#1634">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-11-07 17:34:30 +0100 (Fri, 07 Nov 2008)
+New Revision: 4577
+
+Modified:
+   rl/trunk/engine/ui/include/CombatGui.h
+   rl/trunk/engine/ui/src/CombatGui.cpp
+Log:
+Only hide/show when visible/not visible
+
+Modified: rl/trunk/engine/ui/include/CombatGui.h
+===================================================================
+--- rl/trunk/engine/ui/include/CombatGui.h	2008-11-07 16:33:37 UTC (rev 4576)
++++ rl/trunk/engine/ui/include/CombatGui.h	2008-11-07 16:34:30 UTC (rev 4577)
+@@ -73,6 +73,8 @@
+ 		/// Needed to only close it after combat if it was not shown before.
+ 		bool mGameLoggerWindowOpened;
+ 
++        bool mVisible;
++
+         Ogre::FloatRect getScreenRectFromWorldAabb(const Ogre::AxisAlignedBox&amp; aabb) const;
+ 	};
+ }
+
+Modified: rl/trunk/engine/ui/src/CombatGui.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/CombatGui.cpp	2008-11-07 16:33:37 UTC (rev 4576)
++++ rl/trunk/engine/ui/src/CombatGui.cpp	2008-11-07 16:34:30 UTC (rev 4577)
+@@ -37,7 +37,8 @@
+ 		  mCombat(combat),
+ 		  mCamera(camera),
+ 		  mUserInputEnabled(false),
+-		  mGameLoggerWindowOpened(false)
++		  mGameLoggerWindowOpened(false),
++          mVisible(false)
+     {
+         mCombatWindow = WindowFactory::getSingleton().getCombatWindow();
+ 		mGameLoggerWindow = WindowFactory::getSingleton().getGameLogger();
+@@ -68,7 +69,7 @@
+         sceneMgr-&gt;getRootSceneNode()-&gt;createChildSceneNode()-&gt;attachObject(mHud);
+ 
+ 		// Create an attack/parry/(goto) button set for all opponents present at the beginning.
+-        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllOpponents();
++        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllPlayerOpponents();
+         for (Combat::CombatantSet::const_iterator it = opponents.begin(), end = opponents.end();
+             it != end; ++it)
+         {
+@@ -82,6 +83,7 @@
+ 	CombatGui::~CombatGui()
+ 	{
+ 		hide();
++        mHud-&gt;getParentSceneNode()-&gt;detachObject(mHud);
+         SceneManager* sceneMgr = CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager();
+ 		sceneMgr-&gt;destroyManualObject(mHud);
+ 	}
+@@ -96,7 +98,7 @@
+         mHud-&gt;clear();
+ 
+         mHud-&gt;begin(&quot;alpha_red&quot;, RenderOperation::OT_LINE_LIST);
+-        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllOpponents();
++        const Combat::CombatantSet&amp; opponents = mCombat-&gt;getAllPlayerOpponents();
+         for (Combat::CombatantSet::const_iterator it = opponents.begin(), end = opponents.end();
+             it != end; ++it)
+         {
+@@ -160,16 +162,25 @@
+ 
+ 	void CombatGui::show()
+ 	{
+-		mGameLoggerWindowOpened = !mGameLoggerWindow-&gt;isVisible();
+-        mCombatWindow-&gt;setVisible(true);
+-		mGameLoggerWindow-&gt;setVisible(true);
++        if (!mVisible)
++        {
++		    mGameLoggerWindowOpened = !mGameLoggerWindow-&gt;isVisible();
++            mCombatWindow-&gt;setVisible(true);
++		    mGameLoggerWindow-&gt;setVisible(true);
++            mHud-&gt;setVisible(true);
++            mVisible = true;
++        }
+ 	}
+ 
+ 	void CombatGui::hide()
+ 	{
+-        mCombatWindow-&gt;setVisible(false);
+-		mGameLoggerWindow-&gt;setVisible(!mGameLoggerWindowOpened);
+-		mHud-&gt;clear();
++        if (mVisible)
++        {
++            mCombatWindow-&gt;setVisible(false);
++		    mGameLoggerWindow-&gt;setVisible(!mGameLoggerWindowOpened);
++            mHud-&gt;setVisible(false);
++            mVisible = false;
++        }
+ 	}
+ 
+ 	bool CombatGui::enemyButtonClicked(int handle, int buttonIndex)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001633.html">[Dsa-hl-svn] r4576 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="001635.html">[Dsa-hl-svn] r4578 - in rl/trunk/engine: ai/include ai/src	rules/include rules/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1634">[ date ]</a>
+              <a href="thread.html#1634">[ thread ]</a>
+              <a href="subject.html#1634">[ subject ]</a>
+              <a href="author.html#1634">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,578 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4525 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-September/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4525%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20ui/include%20ui/src&In-Reply-To=%3C200809240956.m8O9uRdh002417%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001581.html">
+   <LINK REL="Next"  HREF="001583.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4525 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4525%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20ui/include%20ui/src&In-Reply-To=%3C200809240956.m8O9uRdh002417%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4525 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Sep 24 11:56:27 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001581.html">[Dsa-hl-svn] r4524 - in dependencies/OgreNewt_ngt: inc src
+</A></li>
+        <LI>Next message: <A HREF="001583.html">[Dsa-hl-svn] r4526 - in rl/branches/newton20: editors/Lockenwickler	editors/Lockenwickler/src editors/Lockenwickler/src/media	editors/Lockenwickler/src/media/icons editors/RLdialog	engine/common/include engine/core/include engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1582">[ date ]</a>
+              <a href="thread.html#1582">[ thread ]</a>
+              <a href="subject.html#1582">[ subject ]</a>
+              <a href="author.html#1582">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2008-09-24 11:56:24 +0200 (Wed, 24 Sep 2008)
+New Revision: 4525
+
+Modified:
+   rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h
+   rl/branches/newton20/engine/core/src/ActorManager.cpp
+   rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp
+   rl/branches/newton20/engine/ui/include/MovementControlState.h
+   rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+Log:
+-changed camera mass
+-using ConvexCast for the camera movement in the MovementControlState
+ TODO/BUG: ConvexCast doesn't recognize level geometry!
+
+
+Modified: rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h	2008-09-24 09:50:37 UTC (rev 4524)
++++ rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h	2008-09-24 09:56:24 UTC (rev 4525)
+@@ -33,11 +33,12 @@
+     {
+         RaycastInfo() : mDistance(), mBody(), mNormal() {}
+         /// dist from point1 of the raycast, in range [0,1].
+-        Ogre::Real mDistance;	
++        Ogre::Real mDistance;
+         /// pointer to body intersected with
+         OgreNewt::Body* mBody;
+         /// normal of intersection.
+         Ogre::Vector3 mNormal;
++        // the collisionID for compound collisions could be added here, but we didn't need them yet
+     };
+ 
+     class _RlCoreExport PhysicsMaterialRaycast : OgreNewt::Raycast
+@@ -64,6 +65,7 @@
+         * If this param is NULL, every material will be found
+         * @param startpt start-point of the cast
+         * @param endpt end-point of the cast
++        * @param invertmat if &quot;true&quot;, the ray finds all collisions, which do NOT have the material-id &quot;material&quot;
+         */
+         RaycastInfo execute(OgreNewt::World* world, const MaterialVector* materials,
+             const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool invertmat = false);
+@@ -76,6 +78,60 @@
+         bool mGetNearest;
+         bool mInvertMat;
+     };
++
++
++
++// --------------------------------------------------------------------------------------
++
++    // we can use the info-class from OgreNewt
++    class _RlCoreExport ConvexcastInfo : public OgreNewt::BasicConvexcast::ConvexcastContactInfo
++    {
++        public:
++            ConvexcastInfo(const OgreNewt::BasicConvexcast::ConvexcastContactInfo&amp; info);
++    };
++
++    class _RlCoreExport PhysicsMaterialConvexcast : public OgreNewt::BasicConvexcast
++    {
++    public:
++        typedef std::vector&lt;const OgreNewt::MaterialID*&gt; MaterialVector;
++
++        PhysicsMaterialConvexcast();
++
++        /** executes the Convexcast
++        * @param world OgreNewt-World
++        * @param material The material, which will be found by the raycast.
++        * If this param is NULL, every material will be found
++        * @param col the collisions representing a convex shape used for the cast
++        * @param startpt start-point of the cast
++        * @param ori the orientation of the collision in global space
++        * @param endpt end-point of the cast
++        * @param invertmat if &quot;true&quot;, the ray finds all collisions, which do NOT have the material-id &quot;material&quot;
++        */
++        ConvexcastInfo execute(OgreNewt::World* world, const OgreNewt::MaterialID* material,
++            const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
++            const Ogre::Vector3&amp; endpt, bool invertmat = false);
++        
++        /** executes the Convexcast
++        * @param world OgreNewt-World
++        * @param materials a vector with pairs of a material and a boolean value, that describes if this material should be matched or not
++        * If this param is NULL, every material will be found
++        * @param col the collisions representing a convex shape used for the cast
++        * @param startpt start-point of the cast
++        * @param ori the orientation of the collision in global space
++        * @param endpt end-point of the cast
++        * @param invertmat if &quot;true&quot;, the ray finds all collisions, which do NOT have the material-id &quot;material&quot;
++        */
++        ConvexcastInfo execute(OgreNewt::World* world, const MaterialVector* materials,
++            const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;ori,
++            const Ogre::Vector3&amp; endpt, bool invertmat = false);
++
++
++        bool userPreFilterCallback( OgreNewt::Body *body );
++    private:
++        const MaterialVector *mMaterialVector;
++        const OgreNewt::MaterialID* mMaterial;
++        bool mInvertMat;
++    };
+ }
+ 
+ #endif
+
+Modified: rl/branches/newton20/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/ActorManager.cpp	2008-09-24 09:50:37 UTC (rev 4524)
++++ rl/branches/newton20/engine/core/src/ActorManager.cpp	2008-09-24 09:56:24 UTC (rev 4525)
+@@ -291,9 +291,11 @@
+         try
+         {
+             CameraObject* co = new CameraObject(uniquename);
++            // the mass should be as small as possible, so the camera doesn't interact with other bodies,
++            // but setting the mass to 0 means, that the body is static!
+             PhysicalThing* pt = PhysicsManager::getSingleton()
+                 .createPhysicalThing(GT_SPHERE, co,
+-                100.0f, true);
++                0.001f, true);
+             PhysicsManager::getSingleton().createPhysicsProxy(pt, NULL);
+             pt-&gt;_getBody()-&gt;setMaterialGroupID(
+                 PhysicsManager::getSingleton().createMaterialID(&quot;camera&quot;));
+
+Modified: rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp	2008-09-24 09:50:37 UTC (rev 4524)
++++ rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp	2008-09-24 09:56:24 UTC (rev 4525)
+@@ -120,4 +120,93 @@
+         return mGetNearest;
+     }
+ 
++
++// -------------------------------------------------------------------------------------------------
++
++    ConvexcastInfo::ConvexcastInfo(const OgreNewt::BasicConvexcast::ConvexcastContactInfo &amp;info) :
++        ConvexcastContactInfo(info)
++    {
++    }
++
++    PhysicsMaterialConvexcast::PhysicsMaterialConvexcast() :
++        mMaterialVector(NULL),
++        mMaterial(NULL),
++        mInvertMat(false)
++    {
++    }
++
++    ConvexcastInfo PhysicsMaterialConvexcast::execute(OgreNewt::World* world, const OgreNewt::MaterialID* material,
++                        const OgreNewt::Collision *col, const Vector3&amp; startpt, const Quaternion &amp;ori,
++                        const Vector3&amp; endpt, bool invertmat)
++    {
++        mMaterialVector = NULL;
++        mMaterial = material;
++        mInvertMat = invertmat;
++
++        BasicConvexcast::go(world, col, startpt, ori, endpt, 1);
++
++        return ConvexcastInfo(BasicConvexcast::getInfoAt(0));
++    }
++
++    ConvexcastInfo PhysicsMaterialConvexcast::execute(OgreNewt::World* world, const MaterialVector* materials,
++                        const OgreNewt::Collision *col, const Vector3&amp; startpt, const Quaternion &amp;ori,
++                        const Vector3&amp; endpt, bool invertmat)
++    {
++        mMaterialVector = materials;
++        mMaterial = NULL;
++        mInvertMat = invertmat;
++
++        BasicConvexcast::go(world, col, startpt, ori, endpt, 1);
++
++        return ConvexcastInfo(BasicConvexcast::getInfoAt(0));
++    }
++
++    bool PhysicsMaterialConvexcast::userPreFilterCallback( OgreNewt::Body *body )
++    {
++        if( body-&gt;getMaterialGroupID() == NULL )
++        {
++            LOG_MESSAGE(Logger::CORE, &quot;Warning PhysicsMaterialRaycast found body without material (getMaterialGroupId() == NULL)!&quot;);
++            return true;
++        }
++        else if( body-&gt;getMaterialGroupID() == PhysicsManager::getSingleton().createMaterialID(&quot;gamearea&quot;) ) // don't trigger gameareas
++        {
++            return false;
++        }
++        else
++        {
++            if( mMaterial == NULL &amp;&amp; mMaterialVector == NULL)
++            {
++                return true;
++            }
++            else if( mMaterial != NULL )
++            {
++                if (body-&gt;getMaterialGroupID()-&gt;getID() == mMaterial-&gt;getID() &amp;&amp; !mInvertMat ||
++                    body-&gt;getMaterialGroupID()-&gt;getID() != mMaterial-&gt;getID() &amp;&amp; mInvertMat)
++                {
++                    return true;
++                }
++            }
++            else // mMaterialVector != NULL
++            {
++                bool found = false;
++
++                MaterialVector::const_iterator iter;
++                for(iter = mMaterialVector-&gt;begin(); iter != mMaterialVector-&gt;end(); iter++)
++                {
++                    if (body-&gt;getMaterialGroupID()-&gt;getID() == (*iter)-&gt;getID())
++                    {
++                        found = true;
++                        break;
++                    }
++                }
++
++                if( found &amp;&amp; !mInvertMat || !found &amp;&amp; mInvertMat )
++                {
++                    return true;
++                }
++            }
++        }
++        return false;
++    }
++
+ }
+
+Modified: rl/branches/newton20/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/branches/newton20/engine/ui/include/MovementControlState.h	2008-09-24 09:50:37 UTC (rev 4524)
++++ rl/branches/newton20/engine/ui/include/MovementControlState.h	2008-09-24 09:56:24 UTC (rev 4525)
+@@ -123,12 +123,8 @@
+ 
+         ViewMode mViewMode;
+ 
+-        int mObstractedFrameCount;
+-        Ogre::Real mObstractedTime;
+-        int mCameraJammedFrameCount;
+-        Ogre::Real mCameraJammedTime;
+-
+         PhysicsMaterialRaycast* mRaycast;
++        PhysicsMaterialConvexcast * mConvexcast;
+         HalfSphereSelector mSelector;
+         HalfSphereSelector mCombatSelector;
+ 
+
+Modified: rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2008-09-24 09:50:37 UTC (rev 4524)
++++ rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2008-09-24 09:56:24 UTC (rev 4525)
+@@ -85,15 +85,12 @@
+         mRotationSpeed(Degree(120.0f)),
+         mMouseSensitivity(4.0f),
+         mViewMode(VM_THIRD_PERSON),
+-        mObstractedFrameCount(0),
+-        mObstractedTime(0.0f),
+-        mCameraJammedFrameCount(0),
+-        mCameraJammedTime(0.0f),
+         mRaycast(new PhysicsMaterialRaycast()),
++        mConvexcast(new PhysicsMaterialConvexcast()),
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+             QUERYFLAG_CREATURE),
+-        mCharPositionsBuffer(20),
++        mCharPositionsBuffer(100),
+         mCharPositionsBufferIdx(-1),
+         mCharacterOccludedTime(0),
+         mCharacterOccludedFrameCount(0),
+@@ -147,6 +144,7 @@
+         delete mSelector.getFilter();
+         mSelector.setFilter(NULL);
+         delete mRaycast;
++        delete mConvexcast;
+ 
+         if (DebugWindow::getSingletonPtr())
+         {
+@@ -268,42 +266,6 @@
+         }
+ 
+ 
+-
+-
+-        // Do we need to reset the Camera?
+-        Vector3 charPos = mCharacterActor-&gt;getWorldPosition();
+-        Quaternion charOri = mCharacterActor-&gt;getWorldOrientation();
+-        //mCharBody-&gt;getPositionOrientation(charPos, charOri);
+-
+-        Vector3 camPos;
+-        Quaternion camOri;
+-        mCamBody-&gt;getPositionOrientation(camPos, camOri);
+-
+-        float maxdistance;
+-        if (mViewMode == VM_FIRST_PERSON)
+-            maxdistance = 0.25;
+-        else
+-            maxdistance = 1.3f * mDesiredDistance + 1.4f;
+-
+-        // if we have more than 250ms and at least five frames with camera distance higher
+-        // than desired distance, reset camera
+-        if ((camPos - (charPos + charOri*mLookAtOffset)).length() &gt; maxdistance)
+-        {
+-            mCameraJammedTime += elapsedTime;
+-            ++mCameraJammedFrameCount;
+-        }
+-        else
+-        {
+-            mCameraJammedTime = 0.0f;
+-            mCameraJammedFrameCount = 0;
+-        }
+-
+-        if (mCameraJammedTime &gt; 0.250f &amp;&amp; mCameraJammedFrameCount &gt; 5)
+-        {
+-            mCameraJammedFrameCount = 0;
+-            resetCamera();
+-        }
+-
+         mCharacterState.mLastMovementState = mCharacterState.mCurrentMovementState;
+ 
+         if (isEnemyNear())
+@@ -819,6 +781,8 @@
+                 charPos,
+                 true);
+ 
++
++            // reset the camera if the character is to far away or cannot be seen any more (Raycast)
+             Real maxdistance = Math::Pow(1.5f * mDesiredDistance + 1.4f, 2);
+             if( infoCastChar.mBody || (camPos - charPos).squaredLength() &gt; maxdistance)
+             {
+@@ -826,7 +790,7 @@
+                 mCharacterOccludedFrameCount++;
+ 
+                 // falls zu lange, Kamera resetten:
+-                if( mCharacterOccludedTime &gt; 0.500f &amp;&amp; mCharacterOccludedFrameCount &gt; 10 )
++                if( mCharacterOccludedTime &gt; 0.250f &amp;&amp; mCharacterOccludedFrameCount &gt; 5 )
+                 {
+                     resetCamera();
+                     return;
+@@ -834,45 +798,45 @@
+ 
+             }
+             else
++            {
+                 mCharacterOccludedTime = 0;
++                mCharacterOccludedFrameCount = 0;
++            }
+ 
+-            if( infoCastOptPos.mBody )
++            if( infoCastOptPos.mBody &amp;&amp; !infoCastChar.mBody )
+             {
+-                if( !infoCastChar.mBody ) // Character noch im Blickfeld
+-                {
+-                    // andere Position ermitteln, die ziwschen optimaler und Character liegt
+-                    // und erreichbar ist
+-                    Real lenToOptCamPos = (optimalCamPos - charPos).length();
++                // andere Position ermitteln, die ziwschen optimaler und Character liegt
++                // und erreichbar ist
++                Real lenToOptCamPos = (optimalCamPos - charPos).length();
+ 
+-                    RaycastInfo infoCastNewPos;
+-                    Real delta = lenToOptCamPos/2.0f;
+-                    Vector3 temp = charPos + delta * normToOptCamPos;
+-                    // Annaeherung in Schritten, an den Punkt, der von der aktuellen Position aus erreicht werden kann!
+-                    while( delta &gt; 0.05 ) // genauigkeit des gefundenen Punktes
++                RaycastInfo infoCastNewPos;
++                Real delta = lenToOptCamPos/2.0f;
++                Vector3 temp = charPos + delta * normToOptCamPos;
++                // Annaeherung in Schritten, an den Punkt, der von der aktuellen Position aus erreicht werden kann!
++                while( delta &gt; 0.05 ) // genauigkeit des gefundenen Punktes
++                {
++                    infoCastNewPos = mRaycast-&gt;execute(
++                        world,
++                        &amp;materialVector,
++                        camPos + camRadius * normToOptCamPos, // Groesse der Kamera!
++                        temp,
++                        true);
++                    delta = delta/2.0f;
++                    if( infoCastNewPos.mBody ) // Hindernis gefunden, naeher an Char ran
+                     {
+-                        infoCastNewPos = mRaycast-&gt;execute(
+-                            world,
+-                            &amp;materialVector,
+-                            camPos + camRadius * normToOptCamPos, // Groesse der Kamera!
+-                            temp,
+-                            true);
+-                        delta = delta/2.0f;
+-                        if( infoCastNewPos.mBody ) // Hindernis gefunden, naeher an Char ran
+-                        {
+-                            temp = temp - delta * normToOptCamPos;
+-                        }
+-                        else // kein Hindernis gefunden, weiter von Char weg
+-                        {
+-                            temp = temp + delta * normToOptCamPos;
+-                        }
++                        temp = temp - delta * normToOptCamPos;
+                     }
+-
+-                    // Jetzt koennen wir sicher sein, dass diese Stelle erreichbar ist:
+-                    temp = temp - 0.05 * normToOptCamPos;
+-                    // Groesse der Kamera einbeziehen
+-                    optimalCamPos = temp - camRadius * normToOptCamPos;
+-                    // so ab hier kann ganz normal weiter gerechnet werden!
++                    else // kein Hindernis gefunden, weiter von Char weg
++                    {
++                        temp = temp + delta * normToOptCamPos;
++                    }
+                 }
++
++                // Jetzt koennen wir sicher sein, dass diese Stelle erreichbar ist:
++                temp = temp - 0.05 * normToOptCamPos;
++                // Groesse der Kamera einbeziehen
++                optimalCamPos = temp - camRadius * normToOptCamPos;
++                // so ab hier kann ganz normal weiter gerechnet werden!
+             }
+ 
+ 
+@@ -885,7 +849,7 @@
+                 // hier werden erstmal nur alte Player-Positionen betrachtet
+                 // es wird davon ausgegangen, dass diese &quot;nah&quot; genug aneinanderliegen
+                 // und durch &quot;Geraden&quot; miteinander verbunden werden koennen
+-                // durch das spring-Acc-Damping System sollten die Bewegungen trotzdem flssig
++                // durch das spring-Acc-Damping System sollten die Bewegungen trotzdem fluessig
+                 // und weich (keine scharfen Kurven) erscheinen
+ 
+                 size_t buffSize = mCharPositionsBuffer.size();
+@@ -1025,75 +989,36 @@
+                                                 Math::Cos(mPitch) * mDesiredDistance);
+             }
+ 
++            Vector3 diff = targetCamPos - charPos;
+ 
+-            // Kamera-Gr&#65533;e beziehen
+-            CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
+-                mCameraActor-&gt;getControlledObject());
+-            AxisAlignedBox aabb = ogreCam-&gt;getDefaultSize();
+-            // Radius berechnen
+-            Real radius = (aabb.getMaximum().z - aabb.getMinimum().z) / 2.0f;
+-            radius *= 1.1f; // bissle was dazu tun schadet nich, da ja nur wenige raycasts gemacht werden
+-            // unds eigentlich ne kugel ist!
+-
+-
+-
+-            Vector3 startRay[6], endRay[6];
+-
+-            Real sinPitchRad = Math::Sin(mPitch) * radius;
+-            Real cosPitchRad = Math::Cos(mPitch) * radius;
+-            Vector3 radiusOffset = charOri * Vector3(0, sinPitchRad, cosPitchRad);
+-
+-            startRay[0] = charPos;
+-            endRay[0] = targetCamPos; // hier ist nun leider was doppelt,
+-                                      // dadurch kann aber sichergestellt
+-                                      // werden, dass kein Objekt direkt
+-                                      // hinter dem Helden bersehen wird
+-            startRay[1] = charPos + radiusOffset;
+-            endRay[1] = targetCamPos + radiusOffset;
+-            radiusOffset = charOri * Vector3(radius, sinPitchRad, cosPitchRad);
+-            startRay[2] = charPos + radiusOffset;
+-            endRay[2] = targetCamPos + radiusOffset;
+-            startRay[3] = charPos - radiusOffset;
+-            endRay[3] = targetCamPos - radiusOffset;
+-            radiusOffset = charOri * Vector3(0, radius-cosPitchRad, -sinPitchRad);
+-            startRay[4] = charPos + radiusOffset;
+-            endRay[4] = targetCamPos + radiusOffset;
+-            startRay[5] = charPos - radiusOffset;
+-            endRay[5] = targetCamPos - radiusOffset;
+-
+-            const OgreNewt::MaterialID* materialId =
+-                mCharBody-&gt;getMaterialGroupID();
+-//                PhysicsManager::getSingleton()._getLevelMaterialID();
++            // Convexcast
++            PhysicsMaterialConvexcast::MaterialVector materialVector;
++            materialVector.push_back( mCharBody-&gt;getMaterialGroupID() );
++            materialVector.push_back( mCamBody-&gt;getMaterialGroupID() );
+             OgreNewt::World *world = PhysicsManager::getSingleton()._getNewtonWorld();
+ 
+-            Vector3 diff = targetCamPos - charPos;
+-            bool CollisionFound = false;
+-            for( int i = 0; i &lt; 6; i++ )
+-            {
+-                RaycastInfo info = mRaycast-&gt;execute(
++            ConvexcastInfo info = mConvexcast-&gt;execute(
+                     world,
+-                    materialId,
+-                    startRay[i],
+-                    endRay[i],
++                    &amp;materialVector,
++                    mCamBody-&gt;getCollision(),
++                    charPos,
++                    Quaternion::IDENTITY,
++                    targetCamPos,
+                     true);
+ 
+-                if( info.mBody &amp;&amp; info.mBody != mCamBody )
+-                {
+-                    CollisionFound = true;
+-                    Vector3 newdiff = (info.mDistance) * (endRay[i] - startRay[i]);
+-                    if( newdiff.squaredLength() &lt; diff.squaredLength() )
+-                        diff = newdiff;
+-                    if( i == 0 ) // beim ersten schon nahes hindernis gefunden?
+-                    {
+-                        if( diff.squaredLength() &lt; radius*radius )
+-                        {
+-                            diff -= charOri * Vector3(0, sinPitchRad, cosPitchRad);
+-                            break;
+-                        }
+-                    }
+-                }
++            bool CollisionFound = false;
++            if( info.mBody )
++            {
++                CollisionFound = true;
++                Real hitBodyVel = info.mBody-&gt;getVelocity().dotProduct(diff.normalisedCopy());
++                hitBodyVel = std::min(0.0f, hitBodyVel); // if the body moves, try to avoid it
++                Real dist = std::max(info.mDistance + (hitBodyVel*timestep - 0.1)/diff.length(), 0.0);
++                diff *= dist;
++
++                mLastCameraCollision = 0;
+             }
+ 
++
+             // Langsames Entfernen vom Char:
+             if( CollisionFound )
+                 mTimeOfLastCollision = 0.0f;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001581.html">[Dsa-hl-svn] r4524 - in dependencies/OgreNewt_ngt: inc src
+</A></li>
+	<LI>Next message: <A HREF="001583.html">[Dsa-hl-svn] r4526 - in rl/branches/newton20: editors/Lockenwickler	editors/Lockenwickler/src editors/Lockenwickler/src/media	editors/Lockenwickler/src/media/icons editors/RLdialog	engine/common/include engine/core/include engine/core/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1582">[ date ]</a>
+              <a href="thread.html#1582">[ thread ]</a>
+              <a href="subject.html#1582">[ subject ]</a>
+              <a href="author.html#1582">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4726 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4726%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20ui/include%20ui/src&In-Reply-To=%3C200901281228.n0SCSKK9011431%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001782.html">
+   <LINK REL="Next"  HREF="001784.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4726 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4726%20-%20in%20rl/branches/newton20/engine%3A%20core/include%0A%09core/src%20ui/include%20ui/src&In-Reply-To=%3C200901281228.n0SCSKK9011431%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4726 - in rl/branches/newton20/engine: core/include	core/src ui/include ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Wed Jan 28 13:28:20 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001782.html">[Dsa-hl-svn] r4725 - in rl/branches/newton20/engine: core/src ui/src
+</A></li>
+        <LI>Next message: <A HREF="001784.html">[Dsa-hl-svn] r4727 - in rl/branches/persistence: ai common	common/include core core/include core/include/fmod4driver	core/src core/src/fmod4driver rules script ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1783">[ date ]</a>
+              <a href="thread.html#1783">[ thread ]</a>
+              <a href="subject.html#1783">[ subject ]</a>
+              <a href="author.html#1783">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-01-28 13:28:09 +0100 (Wed, 28 Jan 2009)
+New Revision: 4726
+
+Modified:
+   rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h
+   rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp
+   rl/branches/newton20/engine/ui/include/MovementControlState.h
+   rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+Log:
+-some improvements in camera-movement and in convexcasts
+-added a simple workaround for the newton-bug &quot;spheres don't cast&quot;
+
+
+Modified: rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h
+===================================================================
+--- rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h	2009-01-28 00:49:24 UTC (rev 4725)
++++ rl/branches/newton20/engine/core/include/PhysicsMaterialRaycast.h	2009-01-28 12:28:09 UTC (rev 4726)
+@@ -90,6 +90,7 @@
+     {
+         public:
+             ConvexcastInfo(const OgreNewt::BasicConvexcast::ConvexcastContactInfo&amp; info);
++            Ogre::Real mDistance;
+     };
+ 
+     class _RlCoreExport PhysicsMaterialConvexcast : public OgreNewt::BasicConvexcast
+
+Modified: rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp
+===================================================================
+--- rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp	2009-01-28 00:49:24 UTC (rev 4725)
++++ rl/branches/newton20/engine/core/src/PhysicsMaterialRaycast.cpp	2009-01-28 12:28:09 UTC (rev 4726)
+@@ -173,7 +173,8 @@
+ // -------------------------------------------------------------------------------------------------
+ 
+     ConvexcastInfo::ConvexcastInfo(const OgreNewt::BasicConvexcast::ConvexcastContactInfo &amp;info) :
+-        ConvexcastContactInfo(info)
++        ConvexcastContactInfo(info),
++        mDistance(0)
+     {
+     }
+ 
+@@ -194,7 +195,9 @@
+ 
+         BasicConvexcast::go(world, col, startpt, ori, endpt, 1, 0); // set threadindex to 0, I hope this is ok
+ 
+-        return ConvexcastInfo(BasicConvexcast::getInfoAt(0));
++        ConvexcastInfo info(BasicConvexcast::getInfoAt(0));
++        info.mDistance = getDistanceToFirstHit();
++        return info;
+     }
+ 
+     ConvexcastInfo PhysicsMaterialConvexcast::execute(OgreNewt::World* world, const MaterialVector* materials,
+@@ -207,7 +210,9 @@
+ 
+         BasicConvexcast::go(world, col, startpt, ori, endpt, 1, 0); // set threadindex to 0, I hope this is ok
+ 
+-        return ConvexcastInfo(BasicConvexcast::getInfoAt(0));
++        ConvexcastInfo info(BasicConvexcast::getInfoAt(0));
++        info.mDistance = getDistanceToFirstHit();
++        return info;
+     }
+ 
+     bool PhysicsMaterialConvexcast::userPreFilterCallback( OgreNewt::Body *body )
+
+Modified: rl/branches/newton20/engine/ui/include/MovementControlState.h
+===================================================================
+--- rl/branches/newton20/engine/ui/include/MovementControlState.h	2009-01-28 00:49:24 UTC (rev 4725)
++++ rl/branches/newton20/engine/ui/include/MovementControlState.h	2009-01-28 12:28:09 UTC (rev 4726)
+@@ -125,6 +125,7 @@
+ 
+         PhysicsMaterialRaycast* mRaycast;
+         PhysicsMaterialConvexcast * mConvexcast;
++        OgreNewt::Collision *mCameraCastCollision;
+         HalfSphereSelector mSelector;
+         HalfSphereSelector mCombatSelector;
+ 
+
+Modified: rl/branches/newton20/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2009-01-28 00:49:24 UTC (rev 4725)
++++ rl/branches/newton20/engine/ui/src/MovementControlState.cpp	2009-01-28 12:28:09 UTC (rev 4726)
+@@ -87,6 +87,7 @@
+         mViewMode(VM_THIRD_PERSON),
+         mRaycast(new PhysicsMaterialRaycast()),
+         mConvexcast(new PhysicsMaterialConvexcast()),
++        mCameraCastCollision(NULL),
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+         mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
+             QUERYFLAG_CREATURE),
+@@ -134,6 +135,31 @@
+ 
+         mMessageType_SaveGameLoading_Handler = MessagePump::getSingleton().addMessageHandler&lt;MessageType_SaveGameLoading&gt;(
+             boost::bind(&amp;MovementControlState::beforeLoadingSaveGame, this));
++
++        // Kamera-Groesse beziehen
++        CameraObject* ogreCam = static_cast&lt;CameraObject*&gt;(
++            mCameraActor-&gt;getControlledObject());
++        AxisAlignedBox camAabb = ogreCam-&gt;getDefaultSize();
++        // Radius berechnen
++        Real camRadius = (camAabb.getMaximum().z - camAabb.getMinimum().z) / 2.0f;
++        camRadius *= 1.1f;
++        Vector3 verts[80];
++        int k = 0;
++        for(int i = 0; i &lt; 16; i++)
++        {
++            int n;
++            n = abs(abs(i-8)-8)+1;
++            for(int j = 0; j &lt; n; j++)
++            {
++                Real h = (i-7.5f)/7.5f;
++                Degree angle(360.0f/(n+1)*j);
++                Real rad = Math::Sqrt(1-h*h);
++                verts[k++] = camRadius*Vector3(rad*Math::Cos(angle),rad*Math::Sin(angle),h);
++            }
++        }
++        //! TODO: remove this workaround (newton-bug: &quot;spheres don't cast&quot;!)
++        mCameraCastCollision = new OgreNewt::CollisionPrimitives::ConvexHull(mCamBody-&gt;getWorld(), verts, 80);
++        //mCameraCastCollision = new OgreNewt::CollisionPrimitives::Ellipsoid(mCamBody-&gt;getWorld(), Vector3::UNIT_SCALE * camRadius);
+     }
+ 
+     //------------------------------------------------------------------------
+@@ -145,6 +171,7 @@
+         mSelector.setFilter(NULL);
+         delete mRaycast;
+         delete mConvexcast;
++        delete mCameraCastCollision;
+ 
+         if (DebugWindow::getSingletonPtr())
+         {
+@@ -676,7 +703,7 @@
+         }
+ 
+         setContactSoftness(0.8f);
+-        setContactElasticity(0.0f);
++        setContactElasticity(0.4f);
+         mLastCameraCollision = 0;
+ 
+         return 1;
+@@ -1002,26 +1029,23 @@
+             materialVector.push_back( mCharBody-&gt;getMaterialGroupID() );
+             materialVector.push_back( mCamBody-&gt;getMaterialGroupID() );
+             OgreNewt::World *world = PhysicsManager::getSingleton()._getNewtonWorld();
+-            OgreNewt::Collision* box = new OgreNewt::CollisionPrimitives::Box(mCamBody-&gt;getWorld(), Vector3::UNIT_SCALE * camRadius * Ogre::Math::Sqrt(2), charOri);
+ 
+             ConvexcastInfo info = mConvexcast-&gt;execute(
+                     world,
+                     &amp;materialVector,
+-                    box, //mCamBody-&gt;getCollision(),
++                    mCameraCastCollision,
+                     charPos,
+                     Quaternion::IDENTITY,
+                     targetCamPos,
+                     true);
+ 
+-            delete box;
+-
+             bool CollisionFound = false;
+             if( info.mBody )
+             {
+                 CollisionFound = true;
+                 Real hitBodyVel = info.mBody-&gt;getVelocity().dotProduct(diff.normalisedCopy());
+                 hitBodyVel = std::min(0.0f, hitBodyVel); // if the body moves, try to avoid it
+-                Real dist = std::max((info.mContactPoint-charPos).length() - camRadius  + (hitBodyVel*timestep - 0.01)/diff.length(), 0.0);
++                Real dist = std::max(info.mDistance  + (hitBodyVel*timestep - 0.01)/diff.length(), 0.0);
+                 diff *= dist;
+ 
+                 mLastCameraCollision = 0;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001782.html">[Dsa-hl-svn] r4725 - in rl/branches/newton20/engine: core/src ui/src
+</A></li>
+	<LI>Next message: <A HREF="001784.html">[Dsa-hl-svn] r4727 - in rl/branches/persistence: ai common	common/include core core/include core/include/fmod4driver	core/src core/src/fmod4driver rules script ui ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1783">[ date ]</a>
+              <a href="thread.html#1783">[ thread ]</a>
+              <a href="subject.html#1783">[ subject ]</a>
+              <a href="author.html#1783">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

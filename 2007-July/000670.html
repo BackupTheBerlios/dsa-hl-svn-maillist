@@ -1,0 +1,1538 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3599 - in rl/trunk/engine: dialog/include ui/include	ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3599%20-%20in%20rl/trunk/engine%3A%20dialog/include%20ui/include%0A%09ui/src&In-Reply-To=%3C200707122000.l6CK0Y2Z006716%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000669.html">
+   <LINK REL="Next"  HREF="000671.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3599 - in rl/trunk/engine: dialog/include ui/include	ui/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3599%20-%20in%20rl/trunk/engine%3A%20dialog/include%20ui/include%0A%09ui/src&In-Reply-To=%3C200707122000.l6CK0Y2Z006716%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3599 - in rl/trunk/engine: dialog/include ui/include	ui/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Thu Jul 12 22:00:34 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000669.html">[Dsa-hl-svn] r3598 - rl/trunk/engine/rules
+</A></li>
+        <LI>Next message: <A HREF="000671.html">[Dsa-hl-svn] r3600 - in rl/trunk: engine/ai engine/ai/include	engine/ai/src engine/common engine/common/include	engine/common/src engine/core engine/core/include	engine/core/src engine/core/src/nulldriver engine/dialog	engine/dialog/include engine/dialog/src	engine/dialog/src/predicates engine/rules	engine/rules/include engine/rules/src engine/script	engine/script/include engine/script/src engine/ui	engine/ui/include engine/ui/src plugins/fmod4driver
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#670">[ date ]</a>
+              <a href="thread.html#670">[ thread ]</a>
+              <a href="subject.html#670">[ subject ]</a>
+              <a href="author.html#670">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-07-12 22:00:25 +0200 (Thu, 12 Jul 2007)
+New Revision: 3599
+
+Modified:
+   rl/trunk/engine/dialog/include/DialogResponse.h
+   rl/trunk/engine/ui/include/DialogControlState.h
+   rl/trunk/engine/ui/include/DialogWindow.h
+   rl/trunk/engine/ui/include/ListboxWrappedTextItem.h
+   rl/trunk/engine/ui/include/WindowFactory.h
+   rl/trunk/engine/ui/src/DialogControlState.cpp
+   rl/trunk/engine/ui/src/DialogWindow.cpp
+   rl/trunk/engine/ui/src/ListboxWrappedTextItem.cpp
+   rl/trunk/engine/ui/src/WindowFactory.cpp
+Log:
+- Removed all dialog control flow from DialogWindow
+- DialogWindow is a view controlled by DialogControlState
+- TODO: move all dialog option/response calculation functions to dialog subsystem
+
+
+Modified: rl/trunk/engine/dialog/include/DialogResponse.h
+===================================================================
+--- rl/trunk/engine/dialog/include/DialogResponse.h	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/dialog/include/DialogResponse.h	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -38,7 +38,7 @@
+ 	public:
+ 		typedef std::map&lt;int, CeGuiString&gt; Options;
+ 		typedef std::list&lt;std::pair&lt;CeGuiString, CeGuiString&gt; &gt; Responses;
+-		typedef std::list&lt;DialogOption*&gt; DialogOptions;
++		typedef std::vector&lt;DialogOption*&gt; DialogOptions;
+ 
+ 		DialogResponse( const CeGuiString&amp; input, 
+ 						const CeGuiString&amp; response,
+@@ -67,7 +67,7 @@
+ 		Options mSelectableOptions;
+ 		
+ 		Responses mResponses;
+-		std::list&lt;DialogOption*&gt; mOptions;
++		DialogOptions mOptions;
+ 		AimlBot&lt;CeGuiString&gt;* mBot;
+ 
+ 		NaturalLanguageProcessor* mNlp;
+
+Modified: rl/trunk/engine/ui/include/DialogControlState.h
+===================================================================
+--- rl/trunk/engine/ui/include/DialogControlState.h	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/include/DialogControlState.h	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -25,7 +25,10 @@
+ namespace rl {
+ 
+ 	class Actor;
++	class DialogCharacter;
++	class DialogResponse;
+ 	class DialogWindow;
++	class GameLoggerWindow;
+ 	class MeshAnimation;
+ 	class SoundObject;
+ 	class SubtitleWindow;
+@@ -63,10 +66,12 @@
+ 		/// Antwort eines der Dialogf&#252;hrenden
+ 		void response(Actor* actor, const CeGuiString&amp; text, const Ogre::String&amp; soundFile = &quot;&quot;);
+ 
+-		void setDialogWindow(DialogWindow* dialog);
+-		void setSubtitleWindow(SubtitleWindow* subtitles);
+-	
+         virtual bool mouseReleased(const OIS::MouseEvent&amp; evt, OIS::MouseButtonID id);
++
++		bool handleDialogSelectOption();	
++		bool handleDialogClose();
++		bool requestDialogClose();
++
+ 	private:
+ 		/// Die Zielkameraposition in lokalen Koordinaten
+ 		Ogre::Vector3 mTargetCameraPosition;
+@@ -100,6 +105,37 @@
+ 	
+ 		float getShowTextLength(const CeGuiString&amp; text) const;
+         void recalculateCamera( Actor* speaker, Actor* listener );
++
++		enum DialogState
++		{
++			CHOOSING_OPTION = 1,
++			TALKING_PARTNER_CHARACTER,
++			TALKING_PLAYER_CHARACTER,
++			CLOSING_DIALOG
++		};
++
++		DialogCharacter* mBot;
++		DialogResponse* mCurrentResponse;
++		GameLoggerWindow* mGameLogger;
++		DialogState mState;
++		CeGuiString mCurrentResponseText;
++				
++		void getOptions(const CeGuiString&amp; question);
++
++		static const CeGuiString DIALOG_START;
++		static const CeGuiString DIALOG_EXIT;
++		static const CeGuiString DIALOG_END;
++
++		void getResponse(const CeGuiString&amp; msg);
++		unsigned int count();
++		void setCallback(Ogre::String function);
++		int getSelectedOption();
++
++		void initialize(DialogCharacter* bot);
++		void textFinished();
++
++        void start();
++
+ 	};
+ }
+ #endif
+
+Modified: rl/trunk/engine/ui/include/DialogWindow.h
+===================================================================
+--- rl/trunk/engine/ui/include/DialogWindow.h	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/include/DialogWindow.h	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -26,60 +26,31 @@
+ 
+ namespace rl {
+ 
+-	class DialogCharacter;
+-	class DialogResponse;
+ 	class DialogControlState;
+-	class GameLoggerWindow;
+ 
+ 	class _RlUiExport DialogWindow : public AbstractWindow
+ 	{
+ 	public:
+-		DialogWindow(GameLoggerWindow* gamelogger);
+-		~DialogWindow();
++		DialogWindow(DialogControlState* controller);
+ 
+-        void initialize(DialogControlState* controller, DialogCharacter* character);
++		void setName(const CeGuiString&amp; name);
++		void setImage(const CeGuiString&amp; imageset, const CeGuiString&amp; image);
++		void setAvailableOptions(const CeGuiStringVector&amp; options);
++		void setChosenOption(const CeGuiString&amp; option);
++		void setResponse(const CeGuiString&amp; response);
++		void setDialogEnd();
++		int getSelectedOptionIndex() const;
+ 
+-		void getResponse(const CeGuiString&amp; msg);
+-		unsigned int count();
+-		void setCallback(Ogre::String function);
+-		void setName(Ogre::String name);
+-		void setImage(Ogre::String imageset, Ogre::String image);
+-		int getSelectedOption();
+-
+-		void textFinished();
+-
+-        void start();
+-
+ 	private:
+-		enum DialogState
+-		{
+-			CHOOSING_OPTION = 1,
+-			TALKING_PARTNER_CHARACTER,
+-			TALKING_PLAYER_CHARACTER,
+-			CLOSING_DIALOG
+-		};
++		static const CEGUI::colour COLOR_PLAYER_CHARACTER;
++		static const CEGUI::colour COLOR_NON_PLAYER_CHARACTER;
+ 
+-		DialogCharacter* mBot;
+-		DialogResponse* mCurrentResponse;
+ 		CEGUI::Listbox* mDialogOptions;
+ 		CEGUI::Window* mImage;
+ 		CEGUI::Listbox* mQuestion;
+ 		CEGUI::Window* mName;
+-		GameLoggerWindow* mGameLogger;
+-		DialogControlState* mController;
+-		DialogState mState;
+-		CeGuiString mCurrentResponseText;
+-				
+-		bool handleSelectOption();	
+-		bool handleClose();
+-		bool requestClose();
+-		void getOptions(const CeGuiString&amp; question);
+-
+-		static const CEGUI::colour COLOR_PLAYER_CHARACTER;
+-		static const CEGUI::colour COLOR_NON_PLAYER_CHARACTER;
+-		static const CeGuiString DIALOG_START;
+-		static const CeGuiString DIALOG_EXIT;
+-		static const CeGuiString DIALOG_END;
++		CEGUI::ListboxTextItem* mPlayerText;
++		CEGUI::ListboxTextItem* mNscText;
+ 	};
+ 
+ }
+
+Modified: rl/trunk/engine/ui/include/ListboxWrappedTextItem.h
+===================================================================
+--- rl/trunk/engine/ui/include/ListboxWrappedTextItem.h	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/include/ListboxWrappedTextItem.h	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -28,7 +28,7 @@
+ 
+ namespace CEGUI {
+ 
+-class ListboxWrappedTextItem : public ListboxItem
++class ListboxWrappedTextItem : public ListboxTextItem
+ {
+ public:
+ 	/*************************************************************************
+
+Modified: rl/trunk/engine/ui/include/WindowFactory.h
+===================================================================
+--- rl/trunk/engine/ui/include/WindowFactory.h	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/include/WindowFactory.h	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -42,7 +42,6 @@
+     class Creature;
+     class DebugWindow;
+     class DialogCharacter;
+-    class DialogWindow;
+     class GameLoggerWindow;
+     class GameObject;
+     class PropertiesWindow;
+@@ -56,7 +55,6 @@
+     class ObjectDescriptionWindow;
+     class Person;
+     class SaveLoadWindow;
+-    class SubtitleWindow;
+     class WindowUpdater;
+ 
+     class _RlUiExport WindowFactory : public Ogre::Singleton&lt;WindowFactory&gt;
+@@ -104,8 +102,6 @@
+         void toggleInGameGlobalMenu();
+         void toggleInventoryWindow();
+ 
+-        DialogWindow* getDialogWindow();
+-        SubtitleWindow* getSubtitleWindow();
+         CombatWindow* getCombatWindow();
+ 
+         void checkForErrors();
+@@ -125,8 +121,6 @@
+ 
+         GameLoggerWindow* mGameLogger;
+         CharacterStateWindow* mCharacterStateWindow;
+-        DialogWindow* mDialogWindow;
+-        SubtitleWindow* mSubtitleWindow;
+         InGameMenuWindow* mInGameMenuWindow;
+         CharacterSheetWindow* mCharacterSheet;
+         JournalWindow* mJournalWindow;
+
+Modified: rl/trunk/engine/ui/src/DialogControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogControlState.cpp	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/src/DialogControlState.cpp	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -1,300 +1,492 @@
+-/*
+-* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Perl Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Perl Artistic License for more details.
+-*
+-*  You should have received a copy of the Perl Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.perldoc.com/perl5.6/Artistic.html.">http://www.perldoc.com/perl5.6/Artistic.html.</A>
+-*/
+-
+-#include &quot;DialogControlState.h&quot;
+-#include &quot;Exception.h&quot;
+-
+-#include &quot;Actor.h&quot;
+-#include &quot;CameraObject.h&quot;
+-#include &quot;CommandMapper.h&quot;
+-#include &quot;ConfigurationManager.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;DialogCharacter.h&quot;
+-#include &quot;DialogSubsystem.h&quot;
+-#include &quot;DialogWindow.h&quot;
+-#include &quot;InputManager.h&quot;
+-#include &quot;MeshAnimation.h&quot;
+-#include &quot;MeshObject.h&quot;
+-#include &quot;Person.h&quot;
+-#include &quot;PhysicalThing.h&quot;
+-#include &quot;Sound.h&quot;
+-#include &quot;SoundDriver.h&quot;
+-#include &quot;SoundManager.h&quot;
+-#include &quot;SoundObject.h&quot;
+-#include &quot;SubtitleWindow.h&quot;
+-#include &quot;WindowFactory.h&quot;
+-#include &quot;WindowManager.h&quot;
+-#include &quot;World.h&quot;
+-
+-#include &lt;OgreSceneManager.h&gt;
+-#include &lt;OgreNewt_Body.h&gt;
+-
+-using namespace Ogre;
+-
+-namespace rl {
+-
+-    DialogControlState::DialogControlState(CommandMapper* cmdMapper,
+-        Actor* camera, Person* character)
+-        : ControlState(cmdMapper, camera, character, CST_DIALOG),
+-        mTargetCameraPosition(Vector3::ZERO),
+-        mTargetCameraDirection(Vector3::UNIT_Z),
+-        mCurrFadeTextTime(0),
+-        mTotalFadeTextTime(0),
+-        mText(),
+-        mDialogMode(DM_FRONT),
+-        mTextShown(false),
+-        mDialogWindow(NULL),
+-        mSubtitleWindow(NULL),
+-        mSoundObject(NULL),
+-        mTalkAnimation(NULL),
+-        mSubtitleSpeed(1.0f)
+-    {
+-        mSubtitleSpeed = ConfigurationManager::getSingleton().getRealSetting(
+-            &quot;General&quot;, &quot;Subtitle Speed&quot;);
+-
+-    }
+-
+-    DialogControlState::~DialogControlState()
+-    {
+-        delete mSoundObject;
+-    }
+-
+-    void DialogControlState::pause()
+-    {
+-        if(mDialogPartner)
+-        {
+-            MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(mDialogPartner-&gt;getControlledObject());
+-            if (mesh != NULL)
+-            {
+-                mesh-&gt;stopAllAnimations();
+-                if (mesh-&gt;hasAnimation(&quot;idle&quot;))
+-                {
+-                    mTalkAnimation = mesh-&gt;startAnimation(&quot;idle&quot;);
+-                }
+-            }
+-        }
+-        mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        mDialogWindow-&gt;setVisible(false, false);
+-        mSubtitleWindow-&gt;setVisible(false, false);
+-    }
+-
+-    void DialogControlState::resume()
+-    {
+-        mCharacterActor-&gt;setVisible(true);
+-
+-        mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+-        mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+-        Camera* ogreCam = static_cast&lt;Camera*&gt;(mCameraActor-&gt;_getMovableObject());
+-        ogreCam-&gt;setFixedYawAxis(true);
+-        ogreCam-&gt;setPosition(Vector3::ZERO);
+-        ogreCam-&gt;setOrientation(Quaternion::IDENTITY);
+-        mCameraActor-&gt;_getSceneNode()-&gt;setFixedYawAxis(true);
+-
+-        DialogCharacter* bot = DialogSubsystem::getSingleton().getCurrentDialogCharacter();
+-        bot-&gt;setDialogCharacter(mCharacter);
+-		mDialogPartner = bot-&gt;getDialogPartner()-&gt;getActor();
+-
+-        recalculateCamera( mDialogPartner, mCharacterActor );
+-
+-        mSubtitleWindow = WindowFactory::getSingleton().getSubtitleWindow();
+-
+-        mDialogWindow = WindowFactory::getSingleton().getDialogWindow();
+-        mDialogWindow-&gt;initialize(this, bot);
+-		mDialogWindow-&gt;start();
+-    }
+-
+-    void DialogControlState::run(Real elapsedTime)
+-    {
+-        if( elapsedTime &lt;= 0.0 )
+-            return;
+-
+-        // Aktuellen Abstand zur gew&#252;nschten Position berechnen
+-        Vector3 posDistance = (mTargetCameraPosition - mCameraActor-&gt;_getSceneNode()-&gt;getPosition());
+-        // Ist eine Anpassung n&#246;tig?
+-        if( posDistance != Vector3::ZERO )
+-        {
+-            // Die Kameraanpassgeschwindigkeit
+-            Real speed = 1/elapsedTime;
+-            mCameraActor-&gt;setPosition(mTargetCameraPosition);
+-        }
+-
+-        mCameraActor-&gt;setOrientation( Quaternion::IDENTITY );
+-        mCameraActor-&gt;_getSceneNode()-&gt;setDirection( mTargetCameraDirection );
+-        mCameraActor-&gt;_getSceneNode()-&gt;_update( true, false );
+-
+-        // Textanzeigedauer
+-        if (mCurrFadeTextTime &gt;= 0)
+-        {
+-            mCurrFadeTextTime -= elapsedTime;
+-        }
+-
+-        if (mTextShown &amp;&amp; mCurrFadeTextTime &lt;= 0)
+-        {
+-            mCurrFadeTextTime = 0;
+-            mTotalFadeTextTime = 0;
+-            mTextShown = false;
+-               if (mSoundObject)
+-            {
+-                mSoundObject-&gt;stop();
+-            }
+-            mSubtitleWindow-&gt;setVisible(false, false);
+-            mDialogWindow-&gt;textFinished();
+-        }
+-
+-        LOG_DEBUG(Logger::UI,
+-                StringConverter::toString(mSubtitleWindow-&gt;getWindow()-&gt;getEffectiveAlpha())
+-                + &quot;: &quot;
+-                + mSubtitleWindow-&gt;getText()
+-                + CeGuiString(mSubtitleWindow-&gt;getWindow()-&gt;isVisible() ? &quot;vis&quot; : &quot;unvis&quot;)
+-                + &quot;, Time: &quot;
+-                + StringConverter::toString(mCurrFadeTextTime));
+-    }
+-
+-    void DialogControlState::recalculateCamera( Actor* speaker, Actor* listener )
+-    {
+-        // Position camera at position between char and dialog partner
+-        Vector3 charEyes = speaker-&gt;getWorldPosition();
+-        // Modify by MeshBounds
+-        if( speaker-&gt;getControlledObject()-&gt;isMeshObject() )
+-        {
+-            MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(speaker-&gt;getControlledObject());
+-            Ogre::AxisAlignedBox aab = mo-&gt;getDefaultSize();
+-            Vector3 offset(
+-                aab.getCenter().x,
+-                aab.getMaximum().y*0.933,
+-                aab.getCenter().z );
+-            charEyes += speaker-&gt;getWorldOrientation()*offset;
+-        }
+-
+-        Vector3 partEyes = listener-&gt;getWorldPosition();
+-        // Modify by MeshBounds
+-        if( listener-&gt;getControlledObject()-&gt;isMeshObject() )
+-        {
+-            MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(listener-&gt;getControlledObject());
+-            Ogre::AxisAlignedBox aab = mo-&gt;getDefaultSize();
+-            Vector3 offset(
+-                aab.getCenter().x,
+-                aab.getMaximum().y*0.933,
+-                aab.getCenter().z );
+-            partEyes += listener-&gt;getWorldOrientation()*offset;
+-        }
+-
+-        Vector3 globalCameraPosition = ( charEyes + partEyes ) / 2.0f;
+-
+-        // Weltkoordinaten in lokale umwandeln
+-        mTargetCameraPosition =
+-            -1*(mCameraActor-&gt;_getSceneNode()-&gt;getParentSceneNode()-&gt;getWorldOrientation().Inverse()*
+-            (mCameraActor-&gt;_getSceneNode()-&gt;getParentSceneNode()-&gt;getWorldPosition() - globalCameraPosition));
+-
+-
+-        mTargetCameraDirection = ( partEyes - mTargetCameraPosition ).normalisedCopy();
+-    }
+-
+-    float DialogControlState::getShowTextLength(const CeGuiString&amp; text) const
+-    {
+-        return 0.019f * text.length() + // Zeit f&#252;rs Text lesen
+-               0.25f;                   // Fade in
+-    }
+-
+-    void DialogControlState::response(
+-        Actor* actor, const CeGuiString&amp; text, const Ogre::String&amp; soundFile)
+-    {
+-        if( actor == mDialogPartner )
+-            recalculateCamera( mCharacterActor, mDialogPartner );
+-        else
+-            recalculateCamera( mDialogPartner, mCharacterActor );
+-
+-        // Ungef&#228;hre Lesedauer bestimmen
+-        float fadeTime = getShowTextLength(text);
+-        if (soundFile.length() == 0)
+-        {
+-            float speed = mSubtitleSpeed;
+-
+-            if( mSubtitleSpeed == 0.0 )
+-                speed = 1.0;
+-
+-            mCurrFadeTextTime = fadeTime*speed;
+-            mTotalFadeTextTime = fadeTime*speed;
+-        }
+-        else
+-        {
+-            if( mSoundObject != NULL )
+-                mSoundObject-&gt;getMovableObject()-&gt;getParentSceneNode()-&gt;detachObject(
+-                    mSoundObject-&gt;getMovableObject() );
+-
+-            delete mSoundObject;
+-            mSoundObject = new SoundObject(SoundManager::getSingleton().getActiveDriver()-&gt;
+-                    createSound(soundFile, ST_SAMPLE), soundFile);
+-
+-            // An Sprecher h&#228;ngen
+-            actor-&gt;_getSceneNode()-&gt;attachObject( mSoundObject-&gt;getMovableObject() );
+-            actor-&gt;_getSceneNode()-&gt;_update( true, false );
+-            mSoundObject-&gt;_setActor( actor );
+-            mSoundObject-&gt;set3d(true);
+-            mSoundObject-&gt;play();
+-            mSoundObject-&gt;_update();
+-
+-
+-            mCurrFadeTextTime = std::max(fadeTime*mSubtitleSpeed,mSoundObject-&gt;getLength());
+-            mTotalFadeTextTime = mCurrFadeTextTime;
+-        }
+-
+-        MeshObject* mesh = dynamic_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
+-        if (mesh != NULL)
+-        {
+-            if (mesh-&gt;hasAnimation(&quot;reden&quot;))
+-            {
+-                mesh-&gt;stopAllAnimations();
+-                mTalkAnimation = mesh-&gt;startAnimation(&quot;reden&quot;);
+-            }
+-        }
+-
+-        LOG_DEBUG(Logger::UI,
+-            &quot;Response: &quot;
+-                + actor-&gt;getName()
+-                + &quot; File: '&quot;
+-                + soundFile
+-                + &quot;', Text: '&quot; + text + &quot;', Time: &quot;
+-                + StringConverter::toString(mCurrFadeTextTime));
+-
+-
+-        mTextShown = true;
+-
+-        if (mSubtitleWindow != NULL &amp;&amp; !text.empty())
+-        {
+-            mSubtitleWindow-&gt;show(text);
+-        }
+-    }
+-
+-    bool DialogControlState::mouseReleased(const OIS::MouseEvent&amp; evt,
+-        OIS::MouseButtonID id)
+-    {
+-
+-        if (mTextShown &amp;&amp; (mCurrFadeTextTime + 0.25) &lt; mTotalFadeTextTime)
+-        {
+-            mCurrFadeTextTime = -1;
+-
+-            return true;
+-        }
+-        else
+-        {
+-            return false;
+-        }
+-
+-    }
+-}
++&#255;&#254;/
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
+\ No newline at end of file
+
+Modified: rl/trunk/engine/ui/src/DialogWindow.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/DialogWindow.cpp	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/src/DialogWindow.cpp	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -34,291 +34,113 @@
+ 
+ namespace rl {
+ 
+-using namespace Ogre;
+-using namespace CEGUI;
++	using namespace Ogre;
++	using namespace CEGUI;
+ 
+-const CEGUI::colour DialogWindow::COLOR_PLAYER_CHARACTER(	 0xFFFF7F7F);
+-const CEGUI::colour DialogWindow::COLOR_NON_PLAYER_CHARACTER(0xFFFFFF7F);
++	const CEGUI::colour DialogWindow::COLOR_PLAYER_CHARACTER(	 0xFFFF7F7F);
++	const CEGUI::colour DialogWindow::COLOR_NON_PLAYER_CHARACTER(0xFFFFFF7F);
+ 
+-const CeGuiString DialogWindow::DIALOG_START = &quot;1&quot;;
+-const CeGuiString DialogWindow::DIALOG_END = &quot;DIALOG BEENDET&quot;;
+-const CeGuiString DialogWindow::DIALOG_EXIT = &quot;EXIT&quot;;
++	DialogWindow::DialogWindow(DialogControlState* controller)
++	  : AbstractWindow(&quot;dialogwindow.xml&quot;, WIT_MOUSE_INPUT, false)
++	{
++		mImage = getWindow(&quot;DialogWindow/Image&quot;);
++		mName = getWindow(&quot;DialogWindow/Name&quot;);
++		mQuestion = getListbox(&quot;DialogWindow/Question&quot;);
++		mDialogOptions = getListbox(&quot;DialogWindow/OptionList&quot;);
+ 
+-DialogWindow::DialogWindow(GameLoggerWindow* gamelogger)
+-  : AbstractWindow(&quot;dialogwindow.xml&quot;, WIT_MOUSE_INPUT, false),
+-	mBot(NULL), 
+-	mCurrentResponse(NULL),
+-    mCurrentResponseText(&quot;&quot;),
+-	mGameLogger(gamelogger),
+-	mController(NULL),
+-    mState( TALKING_PLAYER_CHARACTER )
+-{
+-	mImage = getWindow(&quot;DialogWindow/Image&quot;);
+-	mName = getWindow(&quot;DialogWindow/Name&quot;);
+-	mQuestion = getListbox(&quot;DialogWindow/Question&quot;);
+-	mDialogOptions = getListbox(&quot;DialogWindow/OptionList&quot;);
++		mWindow-&gt;subscribeEvent(
++			FrameWindow::EventCloseClicked, // Verstecken, falls Close geklickt wird
++			boost::bind(&amp;DialogControlState::requestDialogClose, controller)); //TODO: als Abbrechen werten 
+ 
+-	mWindow-&gt;subscribeEvent(
+-		FrameWindow::EventCloseClicked, // Verstecken, falls Close geklickt wird
+-		boost::bind(&amp;DialogWindow::requestClose, this)); //TODO: als Abbrechen werten 
++		mDialogOptions-&gt;subscribeEvent(
++			Listbox::EventSelectionChanged, 
++			boost::bind(&amp;DialogControlState::handleDialogSelectOption, controller));
+ 
+-	mDialogOptions-&gt;subscribeEvent(
+-		Listbox::EventSelectionChanged, 
+-		boost::bind(&amp;DialogWindow::handleSelectOption, this));
+-	mDialogOptions-&gt;moveToFront();
+-	mDialogOptions-&gt;setClippedByParent(true);
+-	mDialogOptions-&gt;setShowHorzScrollbar(false);
+-	mDialogOptions-&gt;setShowVertScrollbar(false);
+-	mDialogOptions-&gt;setMultiselectEnabled(false);
+-}
++		mDialogOptions-&gt;moveToFront();
++		mDialogOptions-&gt;setClippedByParent(true);
++		mDialogOptions-&gt;setShowHorzScrollbar(false);
++		mDialogOptions-&gt;setShowVertScrollbar(false);
++		mDialogOptions-&gt;setMultiselectEnabled(false);
+ 
+-DialogWindow::~DialogWindow()
+-{
+-	delete mCurrentResponse;
+-	mCurrentResponse = NULL;
+-}
++		// Add 2 ListboxItems, one for the nsc responses, 
++		// one for the player selections
++		mPlayerText = new ListboxWrappedTextItem(&quot;&quot;, 6);
++		mPlayerText-&gt;setTextColours(COLOR_PLAYER_CHARACTER);
++		mQuestion-&gt;addItem(mPlayerText);
+ 
+-void DialogWindow::initialize(DialogControlState* controller, DialogCharacter* character)
+-{
+-    mController = controller;
+-    mBot = character;
+-	
+-	// Add 2 ListboxItems, one for the nsc responses, 
+-	// one for the player selections
+-	ListboxWrappedTextItem* item = new ListboxWrappedTextItem(&quot;&quot;, 6);
+-	item-&gt;setTextColours(COLOR_PLAYER_CHARACTER);
+-	mQuestion-&gt;addItem(item);
+-	item = new ListboxWrappedTextItem(&quot;&quot;, 0);
+-	item-&gt;setTextColours(COLOR_NON_PLAYER_CHARACTER);
+-	mQuestion-&gt;addItem(item);
+-	item = NULL;
++		mNscText = new ListboxWrappedTextItem(&quot;&quot;, 0);
++		mNscText-&gt;setTextColours(COLOR_NON_PLAYER_CHARACTER);
++		mQuestion-&gt;addItem(mNscText);
++	}
+ 
+-	
+-	Ogre::String voiceFile = mBot-&gt;getVoiceFile().c_str();
+-	if (voiceFile != &quot;&quot;)
++	void DialogWindow::setImage(const CeGuiString&amp; imageset, const CeGuiString&amp; image)
+ 	{
+-		if (voiceFile.find(&quot;.zip&quot;) != Ogre::String::npos)
+-		{
+-			ResourceGroupManager::getSingleton().addResourceLocation(
+-				voiceFile, &quot;Zip&quot;, voiceFile);
+-		}
+-		else
+-		{
+-			ResourceGroupManager::getSingleton().addResourceLocation(
+-           		voiceFile, &quot;FileSystem&quot;, voiceFile);
+-		}
++		mImage-&gt;setProperty(&quot;Image&quot;, &quot;set:&quot; + imageset + &quot; image:&quot; + image);
+ 	}
+-}
+ 
+-void DialogWindow::start()
+-{
+-    if (mBot == NULL || mController == NULL)
+-    {
+-        Throw(IllegalStateException, &quot;DialogWindow not properly initialized.&quot;);
+-    }
+-
+-	mName-&gt;setText(mBot-&gt;getName());
+-	getResponse(DIALOG_START);
+-}
+-
+-void DialogWindow::getResponse(const CeGuiString&amp; msg)
+-{
+-	delete mCurrentResponse;
+-	mCurrentResponse = mBot-&gt;createResponse(msg);
+-	
+-    if(mBot-&gt;hasExitRequest())
+-    {
+-        mQuestion-&gt;getListboxItemFromIndex(0)-&gt;setText(DIALOG_END);
+-		mQuestion-&gt;getListboxItemFromIndex(1)-&gt;setText(&quot;&quot;);
+-		mState = CLOSING_DIALOG;
+-        handleClose();
+-        return;
+-    }
+-	if(mCurrentResponse == NULL)
++	void DialogWindow::setName(const CeGuiString&amp; name)
+ 	{
+-		mQuestion-&gt;getListboxItemFromIndex(0)-&gt;setText(DIALOG_END);
+-		mQuestion-&gt;getListboxItemFromIndex(1)-&gt;setText(&quot;&quot;);
+-		mState = CLOSING_DIALOG;
+-	//	&#239;&#191;&#189;bergangsl&#239;&#191;&#189;sung, wenn gerade kein sprecher aktiv ist wird 
+-	//	nicht nicht textFinished aufgerufen
+-    //  hier m&#239;&#191;&#189;sste wahrscheinlich requestClose auftauchen
+-		handleClose();
+-		return;
++		mName-&gt;setText(name);
+ 	}
+ 
+-	DialogResponse::Responses responses = mCurrentResponse-&gt;getResponses();
+-	CeGuiString responseSound = &quot;null.ogg&quot;;
+-	CeGuiString responseText;
+-	if(!responses.empty())
++	void DialogWindow::setDialogEnd()
+ 	{
+-		responseSound = responses.begin()-&gt;first;
+-		responseText = responses.begin()-&gt;second;
+-		responseText.c_str();
+-		responseSound.c_str();	
++		setChosenOption(&quot;Ende&quot;);
++		setResponse(&quot;&quot;);
+ 	}
+ 
+-	mController-&gt;response(
+-			mBot-&gt;getDialogPartner()-&gt;getActor(), 
+-			responseText, responseSound.c_str());
+-
+-	if(!responseText.empty())
++	void DialogWindow::setAvailableOptions(const CeGuiStringVector&amp; options)
+ 	{
+-		mQuestion-&gt;getListboxItemFromIndex(1)-&gt;
+-			setText(mBot-&gt;getName() + &quot;: &quot; + responseText);
+-		mQuestion-&gt;handleUpdatedItemData();
++		unsigned int i = 0;
++		for(CeGuiStringVector::const_iterator itr = options.begin(); 
++			itr != options.end(); ++itr)
++		{	
++			ListboxWrappedTextItem* item = NULL;
++			if(i &lt; mDialogOptions-&gt;getItemCount())
++			{
++				item = static_cast&lt;ListboxWrappedTextItem*&gt;(
++					mDialogOptions-&gt;getListboxItemFromIndex(i));
++				item-&gt;setText(*itr);
++			}
++			else
++			{
++				item =	new ListboxWrappedTextItem(*itr, 6, true);
++				mDialogOptions-&gt;addItem(item);
++			}
+ 
+-		mGameLogger-&gt;logDialogEvent(mBot-&gt;getName(), responseText);
+-		LOG_MESSAGE(Logger::DIALOG, mBot-&gt;getName() + &quot; says: &quot; + responseText);
+-	}
++			item-&gt;setTextFormatting(CEGUI::WordWrapLeftAligned);
++			mDialogOptions-&gt;handleUpdatedItemData();
+ 
+-	setVisible(false);
+-	mState = TALKING_PARTNER_CHARACTER;
+-	mCurrentResponseText = msg;
+-
+-}
+-
+-void DialogWindow::textFinished()
+-{
+-	if (mState == TALKING_PARTNER_CHARACTER)
+-	{
+-		getOptions(mCurrentResponseText);
+-		setVisible(true);
+-		mState = CHOOSING_OPTION;
++			++i;
++		}
++		while(i &lt; mDialogOptions-&gt;getItemCount())
++		{
++			mDialogOptions-&gt;removeItem(mDialogOptions-&gt;getListboxItemFromIndex(i));
++		}	
+ 	}
+-	
+-	if (mState == TALKING_PLAYER_CHARACTER)
+-	{
+-		getResponse(mCurrentResponseText);
+-	}
+-	
+-    LOG_DEBUG(Logger::UI, 
+-				StringConverter::toString(mState)
+-				+ &quot; bei textFinished&quot; );
+-}
+ 
+-void DialogWindow::getOptions(const CeGuiString&amp; question)
+-{
+-	if(mCurrentResponse == NULL)
++	int DialogWindow::getSelectedOptionIndex() const
+ 	{
+-		Throw(rl::IllegalStateException, &quot;mCurrentResponse must not be NULL.&quot;);
+-		return;
+-	}
+-	
+-	DialogResponse::DialogOptions options = mCurrentResponse-&gt;getDialogOptions();
+-	
+-	if(options.empty())
+-	{
+-		mQuestion-&gt;getListboxItemFromIndex(0)-&gt;setText(DIALOG_END);
+-		mQuestion-&gt;getListboxItemFromIndex(1)-&gt;setText(&quot;&quot;);
+-		handleClose();
+-		return;
+-	}
+-	
+-	//mDialogOptions-&gt;clearAllSelections();
+-
+-	unsigned int i = 0;
+-	for(DialogResponse::DialogOptions::const_iterator itr = options.begin(); 
+-		itr != options.end(); ++itr)
+-	{	
+-		CeGuiString currentResponse = (*itr)-&gt;getText();
+-	    LOG_MESSAGE(Logger::UI, 
+-			&quot;Player says: &quot; + currentResponse);
+-		if(i &lt; mDialogOptions-&gt;getItemCount())
++		CEGUI::ListboxItem* curr = mDialogOptions-&gt;getFirstSelectedItem();
++		if (curr)
+ 		{
+-			ListboxWrappedTextItem* item = 
+-				static_cast &lt;ListboxWrappedTextItem*&gt;(mDialogOptions-&gt;getListboxItemFromIndex(i));
+-			item-&gt;setUserData(*itr);
+-			item-&gt;setText(currentResponse);
+-			item-&gt;setTextFormatting(CEGUI::WordWrapLeftAligned);
+-			mDialogOptions-&gt;handleUpdatedItemData();
++			return mDialogOptions-&gt;getItemIndex(curr);
+ 		}
+ 		else
+ 		{
+-			ListboxWrappedTextItem* item = 
+-				new ListboxWrappedTextItem((*itr)-&gt;getText(), 6, true);
+-			item-&gt;setUserData(*itr);
+-			item-&gt;setTextFormatting(CEGUI::WordWrapLeftAligned);
+-			mDialogOptions-&gt;addItem(item);
++			return -1;
+ 		}
+-
+-		++i;
+ 	}
+-	while(i &lt; mDialogOptions-&gt;getItemCount())
++
++	void DialogWindow::setChosenOption(const CeGuiString&amp; option)
+ 	{
+-		mDialogOptions-&gt;removeItem(mDialogOptions-&gt;getListboxItemFromIndex(i));
+-	}	
+-}
++		mPlayerText-&gt;setText(&quot;Held: &quot; + option);
++	}
+ 
+-unsigned int DialogWindow::count()
+-{
+-	return mDialogOptions-&gt;getItemCount();
+-}
+-
+-void DialogWindow::setCallback(Ogre::String function)
+-{
+-	// TO DO: DialogWindow::setCallback(string function)
+-}
+-
+-int DialogWindow::getSelectedOption()
+-{
+-	// TO DO: DialogWindow::getSelectedOption()
+-	return 0;
+-}
+-
+-bool DialogWindow::handleSelectOption()
+-{
+-	DebugWindow::getSingleton().setMessageText(StringConverter::toString(getSelectedOption()));
+-	ListboxWrappedTextItem* item = 
+-		static_cast&lt;ListboxWrappedTextItem*&gt;(mDialogOptions-&gt;getFirstSelectedItem());
+-	if(item != NULL)
++	void DialogWindow::setResponse(const CeGuiString&amp; response)
+ 	{
+-		DialogOption* option = static_cast&lt;DialogOption*&gt;(item-&gt;getUserData());
+-		option-&gt;processSelection();
+-		mCurrentResponseText = option-&gt;getPattern();
+-		CeGuiString selectedOption = option-&gt;getText();
+-		if(mCurrentResponseText != &quot;0&quot; &amp;&amp; mCurrentResponseText != &quot;666&quot;)
+-		{
+-			if(!selectedOption.empty())
+-			{
+-				mState = TALKING_PLAYER_CHARACTER;
+-				mGameLogger-&gt;logDialogEvent(&quot;Held&quot;, selectedOption);
+-				LOG_MESSAGE(Logger::DIALOG,
+-                    &quot;Player says: &quot; + selectedOption);
+-				mQuestion-&gt;getListboxItemFromIndex(0)-&gt;setText(&quot;Held: &quot; + selectedOption);	
+-				mController-&gt;response(
+-					mBot-&gt;getDialogCharacter()-&gt;getActor(), 
+-					selectedOption, 
+-					option-&gt;getId().c_str());			
+-				setVisible(false);
+-			}
+-		}
++		mNscText-&gt;setText(mName-&gt;getText() + &quot;: &quot; + response);
++		mQuestion-&gt;handleUpdatedItemData();
+ 	}
+-	
+-	return true;
+-}
+ 
+-bool DialogWindow::handleClose()
+-{
+-	InputManager::getSingleton().popControlState();
+-	hideWindow();
+-	return true;
+ }
+-
+-bool DialogWindow::requestClose()
+-{
+-//	handleClose is called automatically 
+-	getResponse(DIALOG_EXIT);
+-	return true;
+-}
+-
+-void DialogWindow::setImage(Ogre::String imageset, Ogre::String image)
+-{
+-    mImage-&gt;setProperty(&quot;Image&quot;, &quot;set:&quot; + imageset + &quot; image:&quot; + image);
+-}
+-
+-void DialogWindow::setName(Ogre::String name)
+-{
+-	mName-&gt;setProperty(&quot;Text&quot;, name);
+-}
+-
+-}
+
+Modified: rl/trunk/engine/ui/src/ListboxWrappedTextItem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/ListboxWrappedTextItem.cpp	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/src/ListboxWrappedTextItem.cpp	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -42,7 +42,7 @@
+     ListboxWrappedTextItem::ListboxWrappedTextItem(const String&amp; text, int padding,
+         bool draw_bullet, uint item_id,
+         void* item_data, bool disabled, bool auto_delete) :
+-    ListboxItem(text, item_id, item_data, disabled, auto_delete),
++    ListboxTextItem(text, item_id, item_data, disabled, auto_delete),
+         d_textCols(DefaultTextColour, DefaultTextColour, DefaultTextColour, DefaultTextColour),
+         d_padding(padding), d_draw_bullet(draw_bullet),
+         d_font(0), d_textFormatting(WordWrapLeftAligned)
+
+Modified: rl/trunk/engine/ui/src/WindowFactory.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/WindowFactory.cpp	2007-07-12 18:58:30 UTC (rev 3598)
++++ rl/trunk/engine/ui/src/WindowFactory.cpp	2007-07-12 20:00:25 UTC (rev 3599)
+@@ -68,8 +68,6 @@
+     WindowFactory::WindowFactory()
+         : mGameLogger(NULL),
+         mCharacterStateWindow(NULL),
+-        mDialogWindow(NULL),
+-        mSubtitleWindow(NULL),
+         mInGameMenuWindow(NULL),
+         mCharacterSheet(NULL),
+         mJournalWindow(NULL),
+@@ -129,8 +127,6 @@
+         delete mMainMenuWindow;
+         delete mCloseConfirmationWindow;
+         delete mGameSettings;
+-        delete mDialogWindow;
+-        delete mSubtitleWindow;
+         delete mCombatWindow;
+     }
+ 
+@@ -409,24 +405,6 @@
+         }
+     }
+ 
+-    DialogWindow* WindowFactory::getDialogWindow()
+-    {
+-        if (mDialogWindow == NULL)
+-        {
+-            mDialogWindow = new DialogWindow(mGameLogger);
+-        }
+-        return mDialogWindow;
+-    }
+-
+-    SubtitleWindow* WindowFactory::getSubtitleWindow()
+-    {
+-        if (mSubtitleWindow == NULL)
+-        {
+-            mSubtitleWindow = new SubtitleWindow();
+-        }
+-        return mSubtitleWindow;
+-    }
+-
+     CombatWindow* WindowFactory::getCombatWindow()
+     {
+         if (mCombatWindow == NULL)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000669.html">[Dsa-hl-svn] r3598 - rl/trunk/engine/rules
+</A></li>
+	<LI>Next message: <A HREF="000671.html">[Dsa-hl-svn] r3600 - in rl/trunk: engine/ai engine/ai/include	engine/ai/src engine/common engine/common/include	engine/common/src engine/core engine/core/include	engine/core/src engine/core/src/nulldriver engine/dialog	engine/dialog/include engine/dialog/src	engine/dialog/src/predicates engine/rules	engine/rules/include engine/rules/src engine/script	engine/script/include engine/script/src engine/ui	engine/ui/include engine/ui/src plugins/fmod4driver
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#670">[ date ]</a>
+              <a href="thread.html#670">[ thread ]</a>
+              <a href="subject.html#670">[ subject ]</a>
+              <a href="author.html#670">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

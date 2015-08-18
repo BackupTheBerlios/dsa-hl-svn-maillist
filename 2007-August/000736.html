@@ -1,0 +1,177 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3665 - in rl/trunk/engine/rules: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3665%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200708052252.l75MqA1Q006437%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000735.html">
+   <LINK REL="Next"  HREF="000737.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3665 - in rl/trunk/engine/rules: include src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3665%20-%20in%20rl/trunk/engine/rules%3A%20include%20src&In-Reply-To=%3C200708052252.l75MqA1Q006437%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3665 - in rl/trunk/engine/rules: include src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Aug  6 00:52:10 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000735.html">[Dsa-hl-svn] r3664 - rl/trunk/engine/ui/src
+</A></li>
+        <LI>Next message: <A HREF="000737.html">[Dsa-hl-svn] r3666 - in modules: common/materials/model	common/materials/programs regressiontest/maps ruchin/maps	ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#736">[ date ]</a>
+              <a href="thread.html#736">[ thread ]</a>
+              <a href="subject.html#736">[ subject ]</a>
+              <a href="author.html#736">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-08-06 00:51:58 +0200 (Mon, 06 Aug 2007)
+New Revision: 3665
+
+Modified:
+   rl/trunk/engine/rules/include/CreatureController.h
+   rl/trunk/engine/rules/src/CreatureController.cpp
+Log:
+-now using TimeSource for the time since last floor contact
+-some small fixes
+
+Modified: rl/trunk/engine/rules/include/CreatureController.h
+===================================================================
+--- rl/trunk/engine/rules/include/CreatureController.h	2007-08-05 22:44:06 UTC (rev 3664)
++++ rl/trunk/engine/rules/include/CreatureController.h	2007-08-05 22:51:58 UTC (rev 3665)
+@@ -172,7 +172,7 @@
+         Ogre::String mStillWeightedAnimationName;
+ 
+         // only used in userProcess
+-        Ogre::Real mLastFloorContact;
++        Time mLastFloorContact;
+ 
+         // used to reset the material
+         const OgreNewt::MaterialID *mOldMaterialId;
+
+Modified: rl/trunk/engine/rules/src/CreatureController.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/CreatureController.cpp	2007-08-05 22:44:06 UTC (rev 3664)
++++ rl/trunk/engine/rules/src/CreatureController.cpp	2007-08-05 22:51:58 UTC (rev 3665)
+@@ -24,6 +24,7 @@
+ #include &quot;CreatureControllerManager.h&quot;
+ #include &quot;PhysicsManager.h&quot;
+ #include &quot;PhysicalThing.h&quot;
++#include &quot;TimeSource.h&quot;
+ 
+ 
+ 
+@@ -153,7 +154,7 @@
+         virtual bool isPossible() const
+         {
+             return
+-                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR;// &amp;&amp;
++                mMovingCreature-&gt;getAbstractLocation() == CreatureController::AL_FLOOR &amp;&amp;
+                 mMovingCreature-&gt;getCreature()-&gt;getAu() &gt; 1 &amp;&amp;
+                 !(mMovingCreature-&gt;getCreature()-&gt;getStatus() &amp; (Effect::STATUS_IMMOBILE));
+         }
+@@ -190,9 +191,7 @@
+             omega.x = omega.z = 0;
+             Vector3 springAcc = mRotLinearSpringK*diff - mRotLinearDampingK * omega;
+ 
+-            /// @ todo change this
+-            torque = springAcc * inertia; // this would be correct
+-            //torque = springAcc * mass * 40;
++            torque = springAcc * inertia;
+         }
+         virtual bool run(Ogre::Real elapsedTime,  Ogre::Vector3 direction, Ogre::Vector3 rotation)
+         {
+@@ -205,7 +204,8 @@
+             Vector3 position;
+             body-&gt;getPositionOrientation(position, orientation);
+ 
+-            return orientation.getYaw() != mYaw;
++            Real diff = (orientation.getYaw() - mYaw).valueDegrees();
++            return diff &lt;= 0.5f &amp;&amp; diff &gt;= -0.5f;
+         }
+         virtual bool isDirectionPossible(Ogre::Vector3 &amp;direction) const
+         {
+@@ -1139,7 +1139,7 @@
+         mLastCollisionName(&quot;&quot;),
+         mLastAnimationSpeed(1),
+         mStillWeightedAnimationName(&quot;&quot;),
+-        mLastFloorContact(0)
++        mLastFloorContact(TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock())
+     {
+         CreatureControllerManager::getSingleton().add(this);
+ 
+@@ -1324,6 +1324,12 @@
+ 
+     bool CreatureController::run(Real elapsedTime)
+     {
++        Time timeSinceLastFloorContact = 
++            TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock()
++            - mLastFloorContact;
++        if(timeSinceLastFloorContact &gt;= Time(Date::ONE_SECOND*2) || getAbstractLocation() == AL_AIRBORNE) // 2 seconds?
++                setAbstractLocation(AL_AIRBORNE);
++
+         if(mMovement != NULL)
+         {
+             mLastMovementChange += elapsedTime;
+@@ -1338,6 +1344,7 @@
+             mRotation = Vector3::ZERO;
+             return mMovement-&gt;run(elapsedTime, mDirection, rotation);
+         }
++
+         return false;
+     }
+ 
+@@ -1398,16 +1405,9 @@
+             if(stepHeight &gt; 0.1f)
+                 setContactNormalAcceleration(10);
+             setContactElasticity(0.0f);
+-            mLastFloorContact = 0.0f;
++            mLastFloorContact = TimeSourceManager::getSingleton().getTimeSource(TimeSource::REALTIME_INTERRUPTABLE)-&gt;getClock();
+         }
+-        else
+-        {
+-            mLastFloorContact += PhysicsManager::getSingleton()._getNewtonWorld()-&gt;getTimeStep();
+-            if(mLastFloorContact &gt;= 2.2f || getAbstractLocation() == AL_AIRBORNE)
+-                setAbstractLocation(AL_AIRBORNE);
+-        }
+ 
+-
+         if(mMovement != NULL)
+         {
+             // i hope this will copy the protected members of the contact callback
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000735.html">[Dsa-hl-svn] r3664 - rl/trunk/engine/ui/src
+</A></li>
+	<LI>Next message: <A HREF="000737.html">[Dsa-hl-svn] r3666 - in modules: common/materials/model	common/materials/programs regressiontest/maps ruchin/maps	ruchin/models
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#736">[ date ]</a>
+              <a href="thread.html#736">[ thread ]</a>
+              <a href="subject.html#736">[ subject ]</a>
+              <a href="author.html#736">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

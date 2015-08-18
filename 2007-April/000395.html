@@ -1,0 +1,317 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3324 - tools/MaterialParser
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3324%20-%20tools/MaterialParser&In-Reply-To=%3C200704201048.l3KAm1Sw022154%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000394.html">
+   <LINK REL="Next"  HREF="000396.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3324 - tools/MaterialParser</H1>
+    <B>zero-gravity at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3324%20-%20tools/MaterialParser&In-Reply-To=%3C200704201048.l3KAm1Sw022154%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3324 - tools/MaterialParser">zero-gravity at mail.berlios.de
+       </A><BR>
+    <I>Fri Apr 20 12:48:01 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000394.html">[Dsa-hl-svn] r3323 - rl/trunk/engine/ui
+</A></li>
+        <LI>Next message: <A HREF="000396.html">[Dsa-hl-svn] r3325 - tools/MaterialParser
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#395">[ date ]</a>
+              <a href="thread.html#395">[ thread ]</a>
+              <a href="subject.html#395">[ subject ]</a>
+              <a href="author.html#395">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: zero-gravity
+Date: 2007-04-20 12:47:56 +0200 (Fri, 20 Apr 2007)
+New Revision: 3324
+
+Modified:
+   tools/MaterialParser/MaterialClasses.rb
+   tools/MaterialParser/MaterialParser.rb
+   tools/MaterialParser/Materializer.rb
+Log:
+Small improvements, now using Ogres Rules for newlines
+
+Modified: tools/MaterialParser/MaterialClasses.rb
+===================================================================
+--- tools/MaterialParser/MaterialClasses.rb	2007-04-20 09:01:19 UTC (rev 3323)
++++ tools/MaterialParser/MaterialClasses.rb	2007-04-20 10:47:56 UTC (rev 3324)
+@@ -13,7 +13,8 @@
+         @attributes = []
+     end
+ 
+-    def addAttribute( name, *attributes )
++    def addAttribute( name, attributes )
++        attributes.pop
+         @attributes.push( Attribute.new( name, attributes ) )
+     end
+ 
+
+Modified: tools/MaterialParser/MaterialParser.rb
+===================================================================
+--- tools/MaterialParser/MaterialParser.rb	2007-04-20 09:01:19 UTC (rev 3323)
++++ tools/MaterialParser/MaterialParser.rb	2007-04-20 10:47:56 UTC (rev 3324)
+@@ -1,5 +1,7 @@
+ require &quot;MaterialClasses.rb&quot;
+ 
++NEWLINE = &quot;_NEWLINE_&quot;
++
+ class MaterialParser
+     attr_reader :materials
+ 
+@@ -27,14 +29,15 @@
+ 
+         parser = RDParser.new do
+             # Whitespaces und Kommentare werden ignoriert
++            token(/^\s*\/\/*.*$/)
++            token(/\s*\n/) { ::NEWLINE }
+             token(/[\s\n]+/)   
+-            token(/^\s*\/\/*.*$/)
+             # Integer
+             token(/\b[-+]?\d+\b/) {|m| m.to_i }
+             # Float
+             token(/\b\d+(\.\d+)?\b/) {|m| m.to_f }            
+             # Wortzeichen
+-            token(/[^\s]+/) {|m| m.to_s }
++            token(/[^\s:]+/) {|m| m.to_s }
+             # Einzelne Zeichen
+             token(/./) {|m| m }
+ 
+@@ -43,82 +46,87 @@
+             end
+ 
+             start :skript do
+-                match('material', :string, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat);mat = Material.new }
+-                match('material', :string, ':', :string, '{', :material, '}' ) {|_,n,_,b| mat.name = n; mat.basename = b; mp.addMaterial(mat); mat = Material.new }
++                match('material', :string, :newlines, '{', :material, '}' ) {|_,n| mat.name = n; mp.addMaterial(mat);mat = Material.new }
++                match('material', :string, ':', :string, :newlines, '{', :material, '}' ) {|_,n,_,b| mat.name = n; mat.basename = b; mp.addMaterial(mat); mat = Material.new }
+ 
++                match( ::NEWLINE )
+                 match(:skript, :skript ) 
+             end
+ 
+             rule :material do
+-                match('technique', :string, '{', :technique, '}' ) {|_,n| tec.name = n; mat.techniques.push( tec ); tec = Technique.new; }
+-                match('technique', '{', :technique, '}' ) { mat.techniques.push( tec ); tec = Technique.new; } 
++                match('technique', :string, :newlines, '{', :technique, '}' ) {|_,n| tec.name = n; mat.techniques.push( tec ); tec = Technique.new; }
++                match('technique', :newlines, '{', :technique, '}' ) { mat.techniques.push( tec ); tec = Technique.new; } 
+ 
+-                match('receive_shadows', :string ) {|n,*a| save_attr(mat,n,a) }
+-                match('lod_distances', :float ) {|n,*a| save_attr(mat,n,a) }
+-                match('lighting', :string ) {|n,*a| save_attr(mat,n,a) }
+-                match('set_texture_alias', :string, :string ) {|n,*a| save_attr(mat,n,a) } 
++                match('receive_shadows', :string, ::NEWLINE ) {|n,*a| save_attr(mat,n,a) }
++                match('lod_distances', :float, ::NEWLINE ) {|n,*a| save_attr(mat,n,a) }
++                match('lighting', :string, ::NEWLINE ) {|n,*a| save_attr(mat,n,a) }
++                match('set_texture_alias', :string, :string, ::NEWLINE ) {|n,*a| save_attr(mat,n,a) } 
+ 
++                match( ::NEWLINE )
+                 match(:material, :material ) 
+             end
+ 
+             rule :technique do
+-                match('pass', :string, '{', :pass, '}' ) {|_,n| pa.name = n; tec.passes.push( pa ); pa = Pass.new; }
+-                match('pass', '{', :pass, '}' ) { tec.passes.push( pa ); pa = Pass.new; } 
++                match('pass', :string, :newlines, '{', :pass, '}' ) {|_,n| pa.name = n; tec.passes.push( pa ); pa = Pass.new; }
++                match('pass', :newlines, '{', :pass, '}' ) { tec.passes.push( pa ); pa = Pass.new; } 
+ 
+-                match('lod_index', :int ) {|n,*a| save_attr(tec,n,a) }
+-                match('scheme', :string ) {|n,*a| save_attr(tec,n,a) }
++                match('lod_index', :int, ::NEWLINE ) {|n,*a| save_attr(tec,n,a) }
++                match('scheme', :string, ::NEWLINE ) {|n,*a| save_attr(tec,n,a) }
+ 
++                match( ::NEWLINE )
+                 match(:technique, :technique ) 
+             end
+ 
+             rule :pass do
+-                match('texture_unit', :string, '{', :texture_unit, '}' ) {|_,n| tu.name = n; pa.tus.push( tu ); tu = TextureUnit.new; }
+-                match('texture_unit', '{', :texture_unit, '}' ) { pa.tus.push( tu ); tu = TextureUnit.new; } 
++                match('texture_unit', :string, :newlines, '{', :texture_unit, '}' ) {|_,n| tu.name = n; pa.tus.push( tu ); tu = TextureUnit.new; }
++                match('texture_unit', :newlines, '{', :texture_unit, '}' ) { pa.tus.push( tu ); tu = TextureUnit.new; } 
+ 
+-                match('vertex_program_ref', :string, '{', :vertex_program_ref, '}' ) {|_,n| tu.name = n; pa.vprs.push( vpr ); vpr = VertexProgramRef.new; }
+-                match('vertex_program_ref','{', :vertex_program_ref, '}' ) { pa.vprs.push( vpr ); vpr = VertexProgramRef.new; } 
++                match('vertex_program_ref', :string, :newlines, '{', :vertex_program_ref, '}' ) {|_,n| tu.name = n; pa.vprs.push( vpr ); vpr = VertexProgramRef.new; }
++                match('vertex_program_ref', :newlines,'{', :vertex_program_ref, '}' ) { pa.vprs.push( vpr ); vpr = VertexProgramRef.new; } 
+ 
+-                match('shadow_caster_vertex_program_ref', :string, '{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
+-                match('shadow_caster_vertex_program_ref','{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
++                match('shadow_caster_vertex_program_ref', :string, :newlines, '{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
++                match('shadow_caster_vertex_program_ref', :newlines,'{', :shadow_caster_vertex_program_ref, '}' ) { pa.scvprs.push( scvpr ); scvpr = ShadowCasterVertexProgramRef.new; } 
+ 
+-                match('fragment_program_ref', :string, '{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
+-                match('fragment_program_ref','{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
++                match('fragment_program_ref', :string, :newlines, '{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
++                match('fragment_program_ref', :newlines,'{', :fragment_program_ref, '}' ) { pa.fprs.push( fpr ); fpr = FragmentProgramRef.new; } 
+ 
+-                match('alpha_rejection', :string, :int ) {|n,*a| save_attr(pa,n,a) }
+-                match('depth_write', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('point_sprites', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('point_size', :int ) {|n,*a| save_attr(pa,n,a) }
+-                match('point_size_attenuation', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('lighting', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('scene_blend', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('shading', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('ambient', :color ) {|n,*a| save_attr(pa,n,a) }
+-                match('diffuse', :color ) {|n,*a| save_attr(pa,n,a) }
+-                match('specular', :color ) {|n,*a| save_attr(pa,n,a) }
+-                match('cull_hardware', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('cull_software', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('depth_func', :string ) {|n,*a| save_attr(pa,n,a) }
+-                match('fog_override', :string, :string ) {|n,*a| save_attr(pa,n,a) }
++                match('alpha_rejection', :string, :int, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('depth_write', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('point_sprites', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('point_size', :int, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('point_size_attenuation', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('lighting', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('scene_blend', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('shading', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('ambient', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('diffuse', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('specular', :color, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('cull_hardware', :string, ::NEWLINE) {|n,*a| save_attr(pa,n,a) }
++                match('cull_software', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('depth_func', :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
++                match('fog_override', :string, :string, ::NEWLINE ) {|n,*a| save_attr(pa,n,a) }
+ 
++                match( ::NEWLINE )
+                 match(:pass, :pass ) 
+             end
+ 
+             rule :texture_unit do                 
+-                match('texture', :string ) {|n,*a| save_attr(tu,n,a) }
+-                match('texture_alias', :int ) {|n,*a| save_attr(tu,n,a) }
+-                match('tex_coord_set', :int ) {|n,*a| save_attr(tu,n,a) } 
+-                match('scale', :float, :float ) {|n,*a| save_attr(tu,n,a) }
+-                match('scroll_anim', :float, :float ) {|n,*a| save_attr(tu,n,a) }
+-                match('cubic_texture', :string, :string ) {|n,*a| save_attr(tu,n,a) }
+-                match('filtering', :string, :string, :string ) {|n,*a| save_attr(tu,n,a) }
+-                match('filtering', :string ) {|n,*a| save_attr(tu,n,a) }
+-                match('max_anisotropy', :int ) {|n,*a| save_attr(tu,n,a) }
+-                match('tex_address_mode', :string ) {|n,*a| save_attr(tu,n,a) }
+-                match('colour_op_multipass_fallback', :string, :string ) {|n,*a| save_attr(tu,n,a) } 
+-                match('colour_op_ex', :string, :string, :string, :float, :float, :float  ) {|n,*a| save_attr(tu,n,a) } 
+-                match('colour_op_ex', :string, :string, :string ) {|n,*a| save_attr(tu,n,a) } 
+-                match('alpha_op_ex', :string, :string, :string, :float ) {|n,*a| save_attr(tu,n,a) } 
++                match('texture', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('texture_alias', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('tex_coord_set', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
++                match('scale', :float, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('scroll_anim', :float, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('cubic_texture', :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('filtering', :string, :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('filtering', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('max_anisotropy', :int, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('tex_address_mode', :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) }
++                match('colour_op_multipass_fallback', :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
++                match('colour_op_ex', :string, :string, :string, :float, :float, :float, ::NEWLINE  ) {|n,*a| save_attr(tu,n,a) } 
++                match('colour_op_ex', :string, :string, :string, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
++                match('alpha_op_ex', :string, :string, :string, :float, ::NEWLINE ) {|n,*a| save_attr(tu,n,a) } 
+ 
++                match( ::NEWLINE )
+                 match(:texture_unit, :texture_unit ) 
+             end
+ 
+@@ -126,6 +134,7 @@
+                 match('param_named_auto', :string, :string, :int ) {|n,*a| save_attr(vpr,n,a) }
+                 match('param_named_auto', :string, :string ) {|n,*a| save_attr(vpr,n,a) }
+                 
++                match( ::NEWLINE )
+                 match(:vertex_program_ref, :vertex_program_ref ) 
+             end
+              
+@@ -133,6 +142,7 @@
+                 match('param_named_auto', :string, :string, :int ) {|n,*a| save_attr(scvpr,n,a) }
+                 match('param_named_auto', :string, :string ) {|n,*a| save_attr(scvpr,n,a) }
+                 
++                match( ::NEWLINE )
+                 match(:shadow_caster_vertex_program_ref, :shadow_caster_vertex_program_ref ) 
+             end
+ 
+@@ -140,6 +150,7 @@
+                 match('param_named', :string, :string, :float ) {|n,*a| save_attr(fpr,n,a) }
+                 match('param_named', :string, :string, :int ) {|n,*a| save_attr(fpr,n,a) }
+                 
++                match( ::NEWLINE )
+                 match(:fragment_program_ref, :fragment_program_ref ) 
+             end
+ 
+@@ -163,6 +174,11 @@
+             rule :int do
+                 match(Integer)
+             end
++
++            rule :newlines do 
++                match(::NEWLINE)
++                match(::NEWLINE,:newlines)
++            end
+         end
+ 
+         parser.parse( string )
+
+Modified: tools/MaterialParser/Materializer.rb
+===================================================================
+--- tools/MaterialParser/Materializer.rb	2007-04-20 09:01:19 UTC (rev 3323)
++++ tools/MaterialParser/Materializer.rb	2007-04-20 10:47:56 UTC (rev 3324)
+@@ -3,7 +3,7 @@
+ require &quot;pp.rb&quot;
+ 
+ 
+-basePath = &quot;E:/RL/rl/rl_dist/modules/&quot;
++basePath = &quot;E:/Programmieren/ms_vs/rl/trunk/rl_dist/modules/&quot;
+ Dir.chdir( basePath )
+ allMaterials = Dir['**/*.material']
+ 
+@@ -15,9 +15,9 @@
+     begin
+         mp.parseString( parseMe )
+     rescue RuntimeError =&gt; error
+-        print error
++        print error.to_s
+         print &quot;\n&quot;
+-        print  basePath+filename+&quot;:0:&quot;+error
++        print  basePath+filename+&quot;:0:&quot;+error.to_s
+         break
+     end
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000394.html">[Dsa-hl-svn] r3323 - rl/trunk/engine/ui
+</A></li>
+	<LI>Next message: <A HREF="000396.html">[Dsa-hl-svn] r3325 - tools/MaterialParser
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#395">[ date ]</a>
+              <a href="thread.html#395">[ thread ]</a>
+              <a href="subject.html#395">[ subject ]</a>
+              <a href="author.html#395">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

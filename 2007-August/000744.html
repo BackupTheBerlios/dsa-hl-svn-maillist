@@ -1,0 +1,798 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3673 - in modules/common/materials: model programs
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-August/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3673%20-%20in%20modules/common/materials%3A%20model%20programs&In-Reply-To=%3C200708071556.l77Futja016482%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000743.html">
+   <LINK REL="Next"  HREF="000745.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3673 - in modules/common/materials: model programs</H1>
+    <B>pnyx at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3673%20-%20in%20modules/common/materials%3A%20model%20programs&In-Reply-To=%3C200708071556.l77Futja016482%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3673 - in modules/common/materials: model programs">pnyx at mail.berlios.de
+       </A><BR>
+    <I>Tue Aug  7 17:56:55 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000743.html">[Dsa-hl-svn] r3672 - in modules/common: materials materials/model	materials/programs models
+</A></li>
+        <LI>Next message: <A HREF="000745.html">[Dsa-hl-svn] r3674 - in rl/trunk/engine: ai ai/include ai/src rules	rules/include rules/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#744">[ date ]</a>
+              <a href="thread.html#744">[ thread ]</a>
+              <a href="subject.html#744">[ subject ]</a>
+              <a href="author.html#744">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: pnyx
+Date: 2007-08-07 17:56:25 +0200 (Tue, 07 Aug 2007)
+New Revision: 3673
+
+Added:
+   modules/common/materials/model/hair_lookup.png
+   modules/common/materials/model/men_human_female_hair_long_01_spec.png
+   modules/common/materials/programs/Hair_Pixel_Shader.source
+   modules/common/materials/programs/Hair_Pixel_Shader_glsl.source
+   modules/common/materials/programs/Hair_Vertex_Shader.material
+   modules/common/materials/programs/Hair_Vertex_Shader.source
+   modules/common/materials/programs/Hair_Vertex_Shader_glsl.source
+Log:
+*hairshader test added, glsl version did not convert properly, no clue yet
+
+Added: modules/common/materials/model/hair_lookup.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: modules/common/materials/model/hair_lookup.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: modules/common/materials/model/men_human_female_hair_long_01_spec.png
+===================================================================
+(Binary files differ)
+
+
+Property changes on: modules/common/materials/model/men_human_female_hair_long_01_spec.png
+___________________________________________________________________
+Name: svn:mime-type
+   + application/octet-stream
+
+Added: modules/common/materials/programs/Hair_Pixel_Shader.source
+===================================================================
+--- modules/common/materials/programs/Hair_Pixel_Shader.source	2007-08-07 15:54:19 UTC (rev 3672)
++++ modules/common/materials/programs/Hair_Pixel_Shader.source	2007-08-07 15:56:25 UTC (rev 3673)
+@@ -0,0 +1,26 @@
++sampler2D baseMap;
++sampler2D specMap;
++sampler lookup;
++
++struct PS_INPUT 
++{
++   float2 Texcoord : TEXCOORD0;
++   float2 Texcoord1: TEXCOORD1;
++   float2 Texcoord2: TEXCOORD2;
++   float4 Color    : TEXCOORD3;
++   float4 Specular : TEXCOORD4;
++   
++};
++
++float4 ps_main( PS_INPUT Input ) : COLOR0
++{
++   float4 texcolor =tex2D( baseMap, Input.Texcoord );
++   float4 speccolor=tex2D( specMap, Input.Texcoord );
++   float4 endcolor =texcolor*(Input.Color +tex1D(lookup, clamp(pow(speccolor,2)*Input.Specular*4 ,0.01,0.99))/2);
++   endcolor.a = texcolor.a;
++   return endcolor;
++
++}
++
++
++
+
+Added: modules/common/materials/programs/Hair_Pixel_Shader_glsl.source
+===================================================================
+--- modules/common/materials/programs/Hair_Pixel_Shader_glsl.source	2007-08-07 15:54:19 UTC (rev 3672)
++++ modules/common/materials/programs/Hair_Pixel_Shader_glsl.source	2007-08-07 15:56:25 UTC (rev 3673)
+@@ -0,0 +1,63 @@
++//
++// Structure definitions
++//
++
++struct PS_INPUT {
++    vec2 Texcoord;
++    vec2 Texcoord1;
++    vec2 Texcoord2;
++    vec4 Color;
++    vec4 Specular;
++};
++
++
++//
++// Global variable definitions
++//
++
++uniform sampler2D baseMap;
++uniform sampler1D lookup;
++uniform sampler2D specMap;
++
++//
++// Function declarations
++//
++
++vec4 ps_main( in PS_INPUT Input );
++
++//
++// Function definitions
++//
++
++vec4 ps_main( in PS_INPUT Input ) {
++    vec4 texcolor;
++    vec4 speccolor;
++    vec4 endcolor;
++
++    texcolor = texture2D( baseMap, Input.Texcoord);
++    speccolor = texture2D( specMap, Input.Texcoord);
++    endcolor = (texcolor * (Input.Color + (texture1D( lookup, float( clamp( ((pow( speccolor, vec4( 2.00000)) * Input.Specular) * 4.00000), vec4( 0.0100000), vec4( 0.990000)))) / 2.00000)));
++    endcolor.w  = texcolor.w ;
++    return endcolor;
++    //return vec4( ((speccolor.xyz  * Input.Specular.xyz ) * 4.00000), 1.00000);
++}
++
++
++//
++// Translator's entry point
++//
++void main() {
++    vec4 xlat_retVal;
++    PS_INPUT xlat_temp_Input;
++    xlat_temp_Input.Texcoord = vec2( gl_TexCoord[0]);
++    xlat_temp_Input.Texcoord1 = vec2( gl_TexCoord[1]);
++    xlat_temp_Input.Texcoord2 = vec2( gl_TexCoord[2]);
++    xlat_temp_Input.Color = vec4( gl_TexCoord[3]);
++    xlat_temp_Input.Specular = vec4( gl_TexCoord[4]);
++
++    xlat_retVal = ps_main( xlat_temp_Input);
++
++    gl_FragData[0] = vec4( xlat_retVal);
++}
++
++
+
+Added: modules/common/materials/programs/Hair_Vertex_Shader.material
+===================================================================
+--- modules/common/materials/programs/Hair_Vertex_Shader.material	2007-08-07 15:54:19 UTC (rev 3672)
++++ modules/common/materials/programs/Hair_Vertex_Shader.material	2007-08-07 15:56:25 UTC (rev 3673)
+@@ -0,0 +1,304 @@
++//Effect: Textured
++
++//DirectX 9.0 HLSL Vertex Shader vs_2_0
++vertex_program Hair_Vertex_Shader hlsl
++{
++	source Hair_Vertex_Shader.source
++	target vs_2_0
++	entry_point vs_main
++}
++//DirectX 9.0 HLSL Pixel Shader ps_2_0
++fragment_program Hair_Pixel_Shader hlsl
++{
++	source Hair_Pixel_Shader.source
++	target ps_2_0
++	entry_point ps_main
++}
++
++
++//DirectX 9.0 HLSL Vertex Shader vs_2_0
++vertex_program Hair_Vertex_Shader_glsl glsl
++{
++	source Hair_Vertex_Shader_glsl.source
++}
++//DirectX 9.0 HLSL Pixel Shader ps_2_0
++fragment_program Hair_Pixel_Shader_glsl glsl
++{
++	source Hair_Pixel_Shader_glsl.source
++}
++
++material Hair_Vertex_Shader
++{	
++	technique glsl
++	{
++		//Rendering Pass: Pass 0 (pass index: #0 )
++		pass
++		{
++			scene_blend alpha_blend 
++      		// Tiefenpuffer aus
++      		//depth_write off
++      		alpha_rejection greater 128
++      		
++      		cull_hardware anticlockwise 
++      		cull_software back 
++      		
++			//DirectX 9.0 HLSL Pixel Shader ps_2_0
++			fragment_program_ref Hair_Pixel_Shader_glsl
++			{
++				param_named baseMap int 0
++				param_named specMap int 1
++				param_named lookup int 2
++			}
++			//DirectX 9.0 HLSL Vertex Shader vs_2_0
++			vertex_program_ref Hair_Vertex_Shader_glsl
++			{
++				// param_named_auto
++
++				param_named_auto Light1_attenuation light_attenuation 0
++				param_named_auto Light1_color light_diffuse_colour 0
++				param_named_auto Light1_position light_position_object_space 0
++				param_named Light1_spec_power float 0.3
++				
++				param_named_auto Light2_attenuation light_attenuation 1
++				param_named_auto Light2_color light_diffuse_colour 1
++				param_named_auto Light2_position light_position_object_space 1
++				param_named Light2_spec_power float 0.3
++				
++				param_named_auto Light3_attenuation light_attenuation 2
++				param_named_auto Light3_color light_diffuse_colour 2
++				param_named_auto Light3_position light_position_object_space 2
++				param_named Light3_spec_power float 1.0
++				
++				
++				param_named_auto matViewProjection worldviewproj_matrix
++				param_named_auto vViewPosition camera_position_object_space
++				
++				
++				param_named skycolor float4 0.5 0.5 0.5 1.0
++				param_named groundcolor float4 0.10 0.10 0.10 1.0
++			}
++
++			texture_unit
++			{
++				texture_alias diffuse
++
++			}
++			texture_unit
++			{
++				texture_alias spec
++
++			}
++			texture_unit
++			{
++				texture hair_lookup.png
++				texture_alias lookup
++
++			}
++		}
++		
++		pass
++		{
++			scene_blend alpha_blend 
++      		// Tiefenpuffer aus
++      		//depth_write off
++      		alpha_rejection greater 20
++      		
++      		cull_hardware clockwise 
++      		cull_software front 
++      		
++			//DirectX 9.0 HLSL Pixel Shader ps_2_0
++			fragment_program_ref Hair_Pixel_Shader_glsl
++			{
++				param_named baseMap int 0
++				param_named specMap int 1
++				param_named lookup int 2
++			}
++			//DirectX 9.0 HLSL Vertex Shader vs_2_0
++			vertex_program_ref Hair_Vertex_Shader_glsl
++			{
++				// param_named_auto
++
++				param_named_auto Light1_attenuation light_attenuation 0
++				param_named_auto Light1_color light_diffuse_colour 0
++				param_named_auto Light1_position light_position_object_space 0
++				param_named Light1_spec_power float 0.3
++				
++				param_named_auto Light2_attenuation light_attenuation 1
++				param_named_auto Light2_color light_diffuse_colour 1
++				param_named_auto Light2_position light_position_object_space 1
++				param_named Light2_spec_power float 0.3
++				
++				param_named_auto Light3_attenuation light_attenuation 2
++				param_named_auto Light3_color light_diffuse_colour 2
++				param_named_auto Light3_position light_position_object_space 2
++				param_named Light3_spec_power float 1.0
++				
++				
++				param_named_auto matViewProjection worldviewproj_matrix
++				param_named_auto vViewPosition camera_position_object_space
++				
++				
++				param_named skycolor float4 0.5 0.5 0.5 1.0
++				param_named groundcolor float4 0.10 0.10 0.10 1.0
++			}
++
++			texture_unit
++			{
++				texture_alias diffuse
++
++			}
++			texture_unit
++			{
++				texture_alias spec
++
++			}
++			texture_unit
++			{
++				texture hair_lookup.png
++				texture_alias lookup
++
++			}
++		}
++		
++		
++	}
++		
++	technique hlsl
++	{
++		//Rendering Pass: Pass 0 (pass index: #0 )
++		pass
++		{
++			scene_blend alpha_blend 
++      		// Tiefenpuffer aus
++      		//depth_write off
++      		alpha_rejection greater 128
++      		
++      		cull_hardware anticlockwise 
++      		cull_software back 
++      		
++			//DirectX 9.0 HLSL Pixel Shader ps_2_0
++			fragment_program_ref Hair_Pixel_Shader
++			{
++			}
++			//DirectX 9.0 HLSL Vertex Shader vs_2_0
++			vertex_program_ref Hair_Vertex_Shader
++			{
++				// param_named_auto
++
++				param_named_auto Light1_attenuation light_attenuation 0
++				param_named_auto Light1_color light_diffuse_colour 0
++				param_named_auto Light1_position light_position_object_space 0
++				param_named Light1_spec_power float 0.3
++				
++				param_named_auto Light2_attenuation light_attenuation 1
++				param_named_auto Light2_color light_diffuse_colour 1
++				param_named_auto Light2_position light_position_object_space 1
++				param_named Light2_spec_power float 0.3
++				
++				param_named_auto Light3_attenuation light_attenuation 2
++				param_named_auto Light3_color light_diffuse_colour 2
++				param_named_auto Light3_position light_position_object_space 2
++				param_named Light3_spec_power float 1.0
++				
++				
++				param_named_auto matViewProjection worldviewproj_matrix
++				param_named_auto vViewPosition camera_position_object_space
++				
++				
++				param_named skycolor float4 0.5 0.5 0.5 1.0
++				param_named groundcolor float4 0.10 0.10 0.10 1.0
++			}
++
++			texture_unit
++			{
++				texture_alias diffuse
++
++			}
++			texture_unit
++			{
++				texture_alias spec
++
++			}
++			texture_unit
++			{
++				texture hair_lookup.png
++				texture_alias lookup
++
++			}
++		}
++		
++		pass
++		{
++			scene_blend alpha_blend 
++      		// Tiefenpuffer aus
++      		//depth_write off
++      		alpha_rejection greater 20
++      		
++      		cull_hardware clockwise 
++      		cull_software front 
++      		
++			//DirectX 9.0 HLSL Pixel Shader ps_2_0
++			fragment_program_ref Hair_Pixel_Shader
++			{
++			}
++			//DirectX 9.0 HLSL Vertex Shader vs_2_0
++			vertex_program_ref Hair_Vertex_Shader
++			{
++				// param_named_auto
++
++				param_named_auto Light1_attenuation light_attenuation 0
++				param_named_auto Light1_color light_diffuse_colour 0
++				param_named_auto Light1_position light_position_object_space 0
++				param_named Light1_spec_power float 0.3
++				
++				param_named_auto Light2_attenuation light_attenuation 1
++				param_named_auto Light2_color light_diffuse_colour 1
++				param_named_auto Light2_position light_position_object_space 1
++				param_named Light2_spec_power float 0.3
++				
++				param_named_auto Light3_attenuation light_attenuation 2
++				param_named_auto Light3_color light_diffuse_colour 2
++				param_named_auto Light3_position light_position_object_space 2
++				param_named Light3_spec_power float 1.0
++				
++				
++				param_named_auto matViewProjection worldviewproj_matrix
++				param_named_auto vViewPosition camera_position_object_space
++				
++				
++				param_named skycolor float4 0.5 0.5 0.5 1.0
++				param_named groundcolor float4 0.10 0.10 0.10 1.0
++			}
++
++			texture_unit
++			{
++				texture_alias diffuse
++
++			}
++			texture_unit
++			{
++				texture_alias spec
++
++			}
++			texture_unit
++			{
++				texture hair_lookup.png
++				texture_alias lookup
++
++			}
++		}
++		
++		
++	}	
++
++	technique fixed_function
++	{
++        pass
++        {
++            texture_unit
++            {
++                texture_alias spec
++            }
++        }
++    }
++}
+
+Added: modules/common/materials/programs/Hair_Vertex_Shader.source
+===================================================================
+--- modules/common/materials/programs/Hair_Vertex_Shader.source	2007-08-07 15:54:19 UTC (rev 3672)
++++ modules/common/materials/programs/Hair_Vertex_Shader.source	2007-08-07 15:56:25 UTC (rev 3673)
+@@ -0,0 +1,124 @@
++float4x4 matViewProjection;
++float4 skycolor;
++float4 groundcolor;
++float4 Light1_attenuation;
++float4 Light1_position;
++float4 Light1_color;
++float4 Light1_spec_power;
++
++float4 Light2_attenuation;
++float4 Light2_position;
++float4 Light2_color;
++float4 Light2_spec_power;
++
++float4 Light3_attenuation;
++float4 Light3_position;
++float4 Light3_color;
++float4 Light3_spec_power;
++
++float4 vViewPosition;
++
++struct VS_INPUT 
++{
++   float4 Position : POSITION0;
++   float2 Texcoord : TEXCOORD0;
++   float2 Texcoord1 : TEXCOORD1;
++   float2 Texcoord2: TEXCOORD2;
++   float3 Normal   : NORMAL;
++   
++};
++
++struct VS_OUTPUT 
++{
++   float4 Position : POSITION0;
++   float2 Texcoord : TEXCOORD0;
++   float2 Texcoord1: TEXCOORD1;
++   float2 Texcoord2: TEXCOORD2;
++   float4 Color    : TEXCOORD3;
++   float4 Specular   : TEXCOORD4;
++   
++};
++
++VS_OUTPUT vs_main( VS_INPUT Input )
++{
++   VS_OUTPUT Output;
++   Output.Color = lerp(skycolor,groundcolor,(dot(Input.Normal, float3(0,-1,0))+1)/2 );
++   Output.Position = mul( matViewProjection, Input.Position );
++   
++   
++   
++   // Light1
++   
++   float3 LightDir = Light1_position - Input.Position * Light1_position.w;
++   float Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   float AngleAttn = saturate( dot(Input.Normal ,LightDir));
++   
++   float3 EyeVect = normalize(Input.Position - vViewPosition);
++   float3 HalfVect = normalize(LightDir - EyeVect);
++   
++   
++   float DistAttn = clamp(1/ (Light1_attenuation.y +
++                              Light1_attenuation.z * Dist +
++                              Light1_attenuation.w * Dist * Dist)
++                          ,0,1);
++                          
++   Output.Specular = Light1_color * Light1_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),8) * DistAttn;
++   
++   Output.Color += (Light1_color * AngleAttn) * DistAttn ;
++   
++   
++   // Light3
++   
++   LightDir = Light3_position - Input.Position * Light3_position.w;
++   Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   AngleAttn = saturate( dot(Input.Normal ,LightDir));
++   
++   EyeVect = normalize(Input.Position - vViewPosition);
++   HalfVect = normalize(LightDir - EyeVect);
++   
++   
++   DistAttn = clamp(1/ (Light3_attenuation.y +
++                              Light3_attenuation.z * Dist +
++                              Light3_attenuation.w * Dist * Dist)
++                          ,0,1);
++   Output.Specular += Light3_color * Light3_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),8)*DistAttn;
++   
++   
++   Output.Color += (Light3_color * AngleAttn) * DistAttn ;
++   
++   
++   // Light2
++   
++   LightDir = Light2_position - Input.Position * Light2_position.w;
++   Dist = length(LightDir);
++   LightDir = LightDir / Dist;
++   
++   AngleAttn = saturate( dot(Input.Normal ,LightDir));
++   
++   HalfVect = normalize(LightDir - EyeVect);
++   
++   
++   DistAttn = clamp(1/ (Light2_attenuation.y +
++                        Light2_attenuation.z * Dist +
++                        Light2_attenuation.w * Dist * Dist)
++                        ,0,1);
++                        
++   Output.Specular += Light2_color *Light2_spec_power * pow(clamp(dot(Input.Normal,HalfVect),0,1),8)*DistAttn;
++   
++   
++   Output.Color += (Light2_color * AngleAttn) * DistAttn ;
++   
++   Output.Texcoord = Input.Texcoord;
++   Output.Texcoord1 = Input.Texcoord1;
++   Output.Texcoord2 = Input.Texcoord2;
++   
++   return( Output );
++   
++}
++
++
++
+
+Added: modules/common/materials/programs/Hair_Vertex_Shader_glsl.source
+===================================================================
+--- modules/common/materials/programs/Hair_Vertex_Shader_glsl.source	2007-08-07 15:54:19 UTC (rev 3672)
++++ modules/common/materials/programs/Hair_Vertex_Shader_glsl.source	2007-08-07 15:56:25 UTC (rev 3673)
+@@ -0,0 +1,154 @@
++//
++// Translator library functions
++//
++
++float xlat_lib_saturate( float x) {
++  return clamp( x, 0.0, 1.0);
++}
++
++vec2 xlat_lib_saturate( vec2 x) {
++  return clamp( x, 0.0, 1.0);
++}
++
++vec3 xlat_lib_saturate( vec3 x) {
++  return clamp( x, 0.0, 1.0);
++}
++
++vec4 xlat_lib_saturate( vec4 x) {
++  return clamp( x, 0.0, 1.0);
++}
++
++mat2 xlat_lib_saturate(mat2 m) {
++  return mat2( clamp(m[0], 0.0, 1.0), clamp(m[1], 0.0, 1.0));
++}
++
++mat3 xlat_lib_saturate(mat3 m) {
++  return mat3( clamp(m[0], 0.0, 1.0), clamp(m[1], 0.0, 1.0), clamp(m[2], 0.0, 1.0));
++}
++
++mat4 xlat_lib_saturate(mat4 m) {
++  return mat4( clamp(m[0], 0.0, 1.0), clamp(m[1], 0.0, 1.0), clamp(m[2], 0.0, 1.0), clamp(m[3], 0.0, 1.0));
++}
++
++
++//
++// Structure definitions
++//
++
++struct VS_OUTPUT {
++    vec4 Position;
++    vec2 Texcoord;
++    vec2 Texcoord1;
++    vec2 Texcoord2;
++    vec4 Color;
++    vec4 Specular;
++};
++
++struct VS_INPUT {
++    vec4 Position;
++    vec2 Texcoord;
++    vec2 Texcoord1;
++    vec2 Texcoord2;
++    vec3 Normal;
++};
++
++
++//
++// Global variable definitions
++//
++
++uniform vec4 Light1_attenuation;
++uniform vec4 Light1_color;
++uniform vec4 Light1_position;
++uniform vec4 Light1_spec_power;
++uniform vec4 Light2_attenuation;
++uniform vec4 Light2_color;
++uniform vec4 Light2_position;
++uniform vec4 Light2_spec_power;
++uniform vec4 Light3_attenuation;
++uniform vec4 Light3_color;
++uniform vec4 Light3_position;
++uniform vec4 Light3_spec_power;
++uniform vec4 groundcolor;
++uniform mat4 matViewProjection;
++uniform vec4 skycolor;
++uniform vec4 vViewPosition;
++
++//
++// Function declarations
++//
++
++VS_OUTPUT vs_main( in VS_INPUT Input );
++
++//
++// Function definitions
++//
++
++VS_OUTPUT vs_main( in VS_INPUT Input ) {
++    VS_OUTPUT Output;
++    vec3 LightDir;
++    float Dist;
++    float AngleAttn;
++    vec3 EyeVect;
++    vec3 HalfVect;
++    float DistAttn;
++
++    Output.Color = mix( skycolor, groundcolor, vec4( ((dot( Input.Normal, vec3( 0.000000, -1.00000, 0.000000)) + 1.00000) / 2.00000)));
++    Output.Position = ( matViewProjection * Input.Position );
++    LightDir = vec3( (Light1_position - (Input.Position * Light1_position.w )));
++    Dist = length( LightDir );
++    LightDir = (LightDir / Dist);
++    AngleAttn = xlat_lib_saturate( dot( Input.Normal, LightDir) );
++    EyeVect = vec3( normalize( (Input.Position - vViewPosition) ));
++    HalfVect = normalize( (LightDir - EyeVect) );
++    DistAttn = clamp( (1.00000 / ((Light1_attenuation.y  + (Light1_attenuation.z  * Dist)) + ((Light1_attenuation.w  * Dist) * Dist))), 0.000000, 1.00000);
++    Output.Specular = (((Light1_color * Light1_spec_power) * pow( clamp( dot( Input.Normal, HalfVect), 0.000000, 1.00000), 8.00000)) * DistAttn);
++    Output.Color += ((Light1_color * AngleAttn) * DistAttn);
++    LightDir = vec3( (Light3_position - (Input.Position * Light3_position.w )));
++    Dist = length( LightDir );
++    LightDir = (LightDir / Dist);
++    AngleAttn = xlat_lib_saturate( dot( Input.Normal, LightDir) );
++    EyeVect = vec3( normalize( (Input.Position - vViewPosition) ));
++    HalfVect = normalize( (LightDir - EyeVect) );
++    DistAttn = clamp( (1.00000 / ((Light3_attenuation.y  + (Light3_attenuation.z  * Dist)) + ((Light3_attenuation.w  * Dist) * Dist))), 0.000000, 1.00000);
++    Output.Specular += (((Light3_color * Light3_spec_power) * pow( clamp( dot( Input.Normal, HalfVect), 0.000000, 1.00000), 8.00000)) * DistAttn);
++    Output.Color += ((Light3_color * AngleAttn) * DistAttn);
++    LightDir = vec3( (Light2_position - (Input.Position * Light2_position.w )));
++    Dist = length( LightDir );
++    LightDir = (LightDir / Dist);
++    AngleAttn = xlat_lib_saturate( dot( Input.Normal, LightDir) );
++    HalfVect = normalize( (LightDir - EyeVect) );
++    DistAttn = clamp( (1.00000 / ((Light2_attenuation.y  + (Light2_attenuation.z  * Dist)) + ((Light2_attenuation.w  * Dist) * Dist))), 0.000000, 1.00000);
++    Output.Specular += (((Light2_color * Light2_spec_power) * pow( clamp( dot( Input.Normal, HalfVect), 0.000000, 1.00000), 8.00000)) * DistAttn);
++    Output.Color += ((Light2_color * AngleAttn) * DistAttn);
++    Output.Texcoord = Input.Texcoord;
++    Output.Texcoord1 = Input.Texcoord1;
++    Output.Texcoord2 = Input.Texcoord2;
++    return Output;
++}
++
++
++//
++// Translator's entry point
++//
++void main() {
++    VS_OUTPUT xlat_retVal;
++    VS_INPUT xlat_temp_Input;
++    xlat_temp_Input.Position = vec4( gl_Vertex);
++    xlat_temp_Input.Texcoord = vec2( gl_MultiTexCoord0);
++    xlat_temp_Input.Texcoord1 = vec2( gl_MultiTexCoord1);
++    xlat_temp_Input.Texcoord2 = vec2( gl_MultiTexCoord2);
++    xlat_temp_Input.Normal = vec3( gl_Normal);
++
++    xlat_retVal = vs_main( xlat_temp_Input);
++
++    gl_Position = vec4( xlat_retVal.Position);
++    gl_TexCoord[0] = vec4( xlat_retVal.Texcoord, 0.0, 0.0);
++    gl_TexCoord[1] = vec4( xlat_retVal.Texcoord1, 0.0, 0.0);
++    gl_TexCoord[2] = vec4( xlat_retVal.Texcoord2, 0.0, 0.0);
++    gl_TexCoord[3] = vec4( xlat_retVal.Color);
++    gl_TexCoord[4] = vec4( xlat_retVal.Specular);
++}
++
++
++
+\ No newline at end of file
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000743.html">[Dsa-hl-svn] r3672 - in modules/common: materials materials/model	materials/programs models
+</A></li>
+	<LI>Next message: <A HREF="000745.html">[Dsa-hl-svn] r3674 - in rl/trunk/engine: ai ai/include ai/src rules	rules/include rules/src script/swig ui/include ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#744">[ date ]</a>
+              <a href="thread.html#744">[ thread ]</a>
+              <a href="subject.html#744">[ subject ]</a>
+              <a href="author.html#744">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

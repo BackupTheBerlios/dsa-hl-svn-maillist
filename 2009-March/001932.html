@@ -1,0 +1,1417 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4875 - in rl/trunk/engine: core core/include core/src	script/swig ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4875%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200903311846.n2VIkdDt003040%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001931.html">
+   <LINK REL="Next"  HREF="001933.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4875 - in rl/trunk/engine: core core/include core/src	script/swig ui/src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4875%20-%20in%20rl/trunk/engine%3A%20core%20core/include%20core/src%0A%09script/swig%20ui/src&In-Reply-To=%3C200903311846.n2VIkdDt003040%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4875 - in rl/trunk/engine: core core/include core/src	script/swig ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar 31 20:46:39 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001931.html">[Dsa-hl-svn] r4874 - modules/common/models
+</A></li>
+        <LI>Next message: <A HREF="001933.html">[Dsa-hl-svn] r4876 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1932">[ date ]</a>
+              <a href="thread.html#1932">[ thread ]</a>
+              <a href="subject.html#1932">[ subject ]</a>
+              <a href="author.html#1932">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-03-31 20:46:33 +0200 (Tue, 31 Mar 2009)
+New Revision: 4875
+
+Added:
+   rl/trunk/engine/core/include/PhysicsRagDoll.h
+   rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+Modified:
+   rl/trunk/engine/core/CMakeLists.txt
+   rl/trunk/engine/core/include/PhysicalThing.h
+   rl/trunk/engine/core/include/PhysicsManager.h
+   rl/trunk/engine/core/src/Actor.cpp
+   rl/trunk/engine/core/src/ActorManager.cpp
+   rl/trunk/engine/core/src/PhysicalThing.cpp
+   rl/trunk/engine/core/src/PhysicsManager.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/ui/src/FreeflightControlState.cpp
+   rl/trunk/engine/ui/src/MovementControlState.cpp
+Log:
+-Added a RagDoll-class...
+-You can just create a ragdoll using the PhysicsManager. Just take a usual PhysicalThing, delete its physics-proxy and create the ragdoll proxy instead...
+ there's sample code in the FreeflightControlState (uncomment it)
+
+
+Modified: rl/trunk/engine/core/CMakeLists.txt
+===================================================================
+--- rl/trunk/engine/core/CMakeLists.txt	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/CMakeLists.txt	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -54,6 +54,7 @@
+ src/PhysicsGenericContactCallback.cpp
+ src/PhysicsManager.cpp
+ src/PhysicsMaterialRaycast.cpp
++src/PhysicsRagDoll.cpp
+ src/PlayAnimationJob.cpp
+ src/PlaySoundJob.cpp
+ src/PolynomicSoundFadeFunctor.cpp
+
+Modified: rl/trunk/engine/core/include/PhysicalThing.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicalThing.h	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/include/PhysicalThing.h	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -31,6 +31,7 @@
+ 
+ 	class Actor;
+ 	class MeshObject;
++    class PhysicsRagDoll;
+ 
+ 	/** PhysicalThing contains the physical representation of an ActorControlledObject.
+ 	 * It utilizes a default collision primitiv derived from the default mesh, but it
+@@ -129,7 +130,7 @@
+         Ogre::Real getMass() const;
+         void setMass(Ogre::Real mass);
+ 
+-		void createPhysicsProxy(Ogre::SceneNode* node);
++		void createPhysicsProxy();
+         void updatePhysicsProxy();
+ 		void destroyPhysicsProxy();
+ 
+@@ -172,13 +173,20 @@
+          */
+         const OgreNewt::MaterialID* getMaterialID() const;
+ 
++        //! retrieve the ragdoll
++        PhysicsRagDoll* getRagDoll() { return mRagDoll; }
++
++        //! create a RagDoll, it is destroyed with
++        void createPhysicsProxy_RagDoll();
++
++/*
+     protected:
+ 		void prepareUserControl(OgreNewt::MaterialID* material);
+         void unprepareUserControl();
+-
++*/
+     private:
+         Actor* mActor;
+-		//! The newton body object this physical thing works with
++		//! The newton body object this physical thing works with, if it has a ragdoll, this is the main-body!
+         OgreNewt::Body* mBody;
+ 		//! an upjoint to keep the body from falling over
+         OgreNewt::BasicJoints::UpVector* mUpVectorJoint;
+@@ -197,7 +205,7 @@
+ 
+ 		//! typedefinition for easing variable declaration
+         typedef std::map&lt;Ogre::String, OgreNewt::CollisionPtr&gt; CollisionMap;
+-		//! ??
++		//! Cache for collisions created by fitToPose
+         CollisionMap mPoseCollisions;
+ 
+ 		//! the objects mass
+@@ -219,6 +227,9 @@
+ 		void setBody(OgreNewt::Body* body);
+ 
+         OgreNewt::CollisionPtr createCollision(PhysicalObject* po, Ogre::Vector3&amp; inertia) const;
++
++        //! the ragdoll, if this thing is controlled by a ragdoll
++        PhysicsRagDoll* mRagDoll;
+ 	};
+ }
+ 
+
+Modified: rl/trunk/engine/core/include/PhysicsManager.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsManager.h	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/include/PhysicsManager.h	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -110,8 +110,13 @@
+ 		/**
+ 		 * Erschafft den entg&#252;ltigen Physikproxy
+ 		 */
+-		void createPhysicsProxy(PhysicalThing* pt, Ogre::SceneNode* node);
++		void createPhysicsProxy(PhysicalThing* pt);
+ 
++        /**
++         * Creates a ragdoll as physics proxy
++         */
++        void createPhysicsProxy_RagDoll(PhysicalThing* pt);
++
+ 		/**
+ 		 * Removes the physics proxy
+ 		 * @param pt the physics proxy wrapper; is not deleted
+
+Added: rl/trunk/engine/core/include/PhysicsRagDoll.h
+===================================================================
+--- rl/trunk/engine/core/include/PhysicsRagDoll.h	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/include/PhysicsRagDoll.h	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -0,0 +1,214 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++#ifndef __PhysicsRagdoll_H__
++#define __PhysicsRagdoll_H__
++
++#include &lt;xercesc/dom/DOMElement.hpp&gt;
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;PhysicsManager.h&quot;
++#include &quot;XmlProcessor.h&quot;
++
++#ifdef __APPLE__
++#   include &lt;OgreNewt/OgreNewt.h&gt;
++#else
++#   include &lt;OgreNewt.h&gt;
++#endif
++
++
++
++namespace rl {
++
++class Actor;
++
++
++/** PhysicsRagDoll creates a ragdoll for an (Mesh-)Actor in the world. All currently acting animations are stopped.
++ * The Actor must already be placed in the scene.
++ * @warnig starting any animation while it is controlled by the ragdoll will cause errors (strange deformation of the mesh ingame)
++*/
++class PhysicsRagDoll : private XmlProcessor
++{
++public:
++	
++    
++    /**
++     * Main bone class, it represents a single bone (rigid body) in the ragdoll and is linked to a bone in the skeleton of the mesh
++	*/
++	class RagBone
++	{
++	public:
++        /** The type of the collision used for the bone, usually BS_CONVEXHULL
++        */
++		enum BoneShape
++		{
++			BS_BOX, BS_ELLIPSOID, BS_CYLINDER, BS_CAPSULE, BS_CONE, BS_CONVEXHULL
++		};
++
++        /** The constructor, creates a body for the bone, which is then controlled by this class (eg the orientation of the bone will be set to
++         * the orientation of the body)
++         * @param creator the parent ragdoll
++         * @param world pointer to the OgreNewt-World
++         * @param parent the parent bone, if set NULL, it is assumed, that this is the root bone
++         * @param ogreBone the Ogre-Bone that'll be controlled by this RagBone
++         * @param mesh only used to create a convexhull-collision
++         * @param dir only used when creating an ellipsoid, a cylinder or a cone
++         * @param shape the type of the collision to create
++         * @param size this value has different meanings for the convexhull-collision and for the others:
++         *          - box and ellipsoid: the size as expected
++         *          - capsule, cone and cylinder: only size.x and size.y are used
++         *          - convexhull: size.x is used as minimum weight of vertexes used to create the hull
++         *  @param mass the mass of the bone
++        */
++		RagBone( PhysicsRagDoll* creator, OgreNewt::World* world, RagBone* parent, Ogre::Bone* ogreBone, Ogre::MeshPtr mesh, Ogre::Vector3 dir, RagBone::BoneShape shape, Ogre::Vector3 size, Ogre::Real mass, Actor* parentActor );
++
++        /** the destructor
++        */
++		~RagBone();
++
++		//! get the newton body, can be NULL
++		OgreNewt::Body* getBody() { return mBody; }
++
++		//! set the limits (only used for the hinge-joint)
++		void setLimits( Ogre::Real limit1, Ogre::Real limit2 ) { mLimit1 = limit1; mLimit2 = limit2; }
++
++		//! get limit
++		Ogre::Real getLimit1() { return mLimit1; }
++		//! get limit
++		Ogre::Real getLimit2() { return mLimit2; }
++
++		//! get the ogre bone
++		Ogre::Bone* getOgreBone() { return mOgreBone; }
++
++		//! hinge callback function for newton
++		static void _hingeCallback( OgreNewt::BasicJoints::Hinge* me );
++
++		//! get the parent bone, can be NULL
++		RagBone* getParent() { return mParent; }
++
++		//! get the RagDoll
++		PhysicsRagDoll* getParentRagDoll() { return mDoll; }
++
++		//! set the orientation and the offset manually (used for the root bone)
++		void setOffset( Ogre::Quaternion orient, Ogre::Vector3 pos ) { mOffsetOrient = orient; mOffsetPos = pos; }
++
++		//! get offset orientation (used for the root bone)
++		Ogre::Quaternion getOffsetOrient() { return mOffsetOrient; }
++        //! get offset position (used for the root bone)
++		Ogre::Vector3 getOffsetPos() { return mOffsetPos; }
++
++	private:
++        //! create a convexhull from a mesh
++		OgreNewt::ConvexCollision* _makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight );
++
++		//! the ragdoll to that this bone belongs
++		PhysicsRagDoll* mDoll;
++
++        //! the parent bone, can be NULL
++		RagBone* mParent;
++
++        //! the OgreNewt body
++		OgreNewt::Body* mBody;
++
++        //! the corresponding ogre bone
++		Ogre::Bone* mOgreBone;
++
++		//! limits.
++		Ogre::Real mLimit1;
++		//! limits.
++		Ogre::Real mLimit2;
++
++		//! the offset position for the root bone
++		Ogre::Vector3 mOffsetPos;
++		//! the offset orientation for the root bone
++		Ogre::Quaternion mOffsetOrient;
++	};
++
++ 
++    
++
++	/** constructor for the RagDoll, create it with new and delete it if you don't need it any more...
++     * @param ragdollResource the name of the xml-file with the ragdoll definition
++     * @param actor an Actor that is already attached to the scene and contains a MeshObject
++    */
++	PhysicsRagDoll( const Ogre::String&amp; ragdollResource, Actor* actor);
++
++    //! destructor
++	~PhysicsRagDoll();
++
++	//! set a different main node
++	void setSceneNode( Ogre::SceneNode* node ) { mNode = node; }
++
++    //! set the initial velocity and Omega
++	void setInheritedVelOmega( const Ogre::Vector3&amp; vel, const Ogre::Vector3&amp; omega );
++    void setPositionOrientation( const Ogre::Vector3&amp; pos, const Ogre::Quaternion&amp; orient );
++    
++    //! set the Material id
++    void setMaterialID(const OgreNewt::MaterialID* materialid);
++
++    //! get the body of the root bone
++    RagBone* getRootBone();
++
++
++	//! callback function for newton
++	static void _placementCallback( OgreNewt::Body* me, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, int threadindex );
++
++private:
++	//! the type of the joint
++	enum JointType
++	{
++		JT_BALLSOCKET, JT_HINGE
++	};
++
++	/** Function for adding one bone.
++     * The parameters are passed to the constructor of the RagBone
++    */
++	RagBone* _addBone( OgreNewt::World* world, RagBone* parent, Ogre::Vector3 dir, RagBone::BoneShape shape, Ogre::Vector3 size, Ogre::Real mass, Ogre::Bone* ogrebone, Actor* parentActor );
++
++	//! recursive function for creating bones and joints
++	RagBone* _addAllBones( RagBone* parent, XERCES_CPP_NAMESPACE::DOMElement* boneElem, Actor* parentActor );
++
++    //! add a joint between two bodies
++	void _joinBones( PhysicsRagDoll::JointType type, RagBone* parent, RagBone* child, Ogre::Vector3 pos, Ogre::Vector3 pin, Ogre::Real limit1, Ogre::Real limit2, OgreNewt::World* world );
++
++    // we need a multimap here, cause there could be multiple ragbones without bodies
++	typedef std::multimap&lt;OgreNewt::Body*,RagBone*&gt; RagBoneMap;
++	typedef std::multimap&lt;OgreNewt::Body*,RagBone*&gt;::iterator RagBoneMapIterator;
++
++    //! a list with all bones
++	RagBoneMap mRagBonesMap;
++
++    //! the root bone
++    RagBone* mRootBone;
++	
++	//! the scene node
++	Ogre::SceneNode* mNode;
++
++	//! the mesh for this character.
++	Ogre::MeshPtr mMesh;
++
++	//! the skeleton instance.
++	Ogre::SkeletonInstance* mSkeleton;
++
++	//! the OgreNewt world.
++	OgreNewt::World* mWorld;
++
++};
++}
++
++
++#endif
++
+
+Modified: rl/trunk/engine/core/src/Actor.cpp
+===================================================================
+--- rl/trunk/engine/core/src/Actor.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/src/Actor.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -125,6 +125,8 @@
+     void Actor::setPhysicalThing( PhysicalThing* pt )
+     {
+         mPhysicalThing = pt;
++        if( mPhysicalThing != NULL )
++            mPhysicalThing-&gt;_setActor(this);
+     }
+ 
+     Ogre::Real Actor::getRenderingDistance() const
+@@ -815,7 +817,7 @@
+         // Physikverkn&#252;pfung anpassen
+         if (mPhysicalThing &amp;&amp; mActorControlledObject)
+         {
+-            PhysicsManager::getSingleton().createPhysicsProxy(mPhysicalThing, mSceneNode);
++            PhysicsManager::getSingleton().createPhysicsProxy(mPhysicalThing);
+ 
+             // Knochen angegeben und handelt sich um ein Mesh
+             if( physicsBone.length() &gt; 0 &amp;&amp; mActorControlledObject-&gt;isMeshObject())
+
+Modified: rl/trunk/engine/core/src/ActorManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ActorManager.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/src/ActorManager.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -296,7 +296,7 @@
+             PhysicalThing* pt = PhysicsManager::getSingleton()
+                 .createPhysicalThing(GT_SPHERE, co,
+                 0.001f, true);
+-            PhysicsManager::getSingleton().createPhysicsProxy(pt, NULL);
++            PhysicsManager::getSingleton().createPhysicsProxy(pt);
+             pt-&gt;_getBody()-&gt;setMaterialGroupID(
+                 PhysicsManager::getSingleton().createMaterialID(&quot;camera&quot;));
+             actor = new Actor(uniquename, co, pt);
+
+Modified: rl/trunk/engine/core/src/PhysicalThing.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicalThing.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/src/PhysicalThing.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -24,6 +24,7 @@
+ #include &quot;MathUtil.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;PhysicalObject.h&quot;
++#include &quot;PhysicsRagDoll.h&quot;
+ 
+ using namespace Ogre;
+ using namespace OgreNewt;
+@@ -46,15 +47,14 @@
+ 		mPhysicalObject(po),
+ 		mMass(mass),
+ 		mHullModifier(hullModifier),
+-        mPhysicsController(NULL)
++        mPhysicsController(NULL),
++        mRagDoll(NULL)
+ 	{
+ 	}
+ 
+     PhysicalThing::~PhysicalThing()
+ 	{
+-                mPoseCollisions.clear();
+-		delete mBody;
+-		mBody = NULL;
++        destroyPhysicsProxy();
+     }
+ 
+     Ogre::Vector3 PhysicalThing::getPosition() const
+@@ -75,7 +75,10 @@
+         Quaternion quat;
+         Vector3 oldPos;
+         mBody-&gt;getPositionOrientation(oldPos, quat);
+-        mBody-&gt;setPositionOrientation(pos, quat);
++        if( mRagDoll )
++            mRagDoll-&gt;setPositionOrientation(pos, quat);
++        else
++            mBody-&gt;setPositionOrientation(pos, quat);
+     }
+ 
+     Ogre::Quaternion PhysicalThing::getOrientation() const
+@@ -96,7 +99,10 @@
+         Quaternion oldOrientation;
+         Vector3 pos;
+         mBody-&gt;getPositionOrientation(pos, oldOrientation);
+-        mBody-&gt;setPositionOrientation(pos, orientation);
++        if( mRagDoll )
++            mRagDoll-&gt;setPositionOrientation(pos, orientation);
++        else
++            mBody-&gt;setPositionOrientation(pos, orientation);
+     }
+ 
+     void PhysicalThing::setVelocity(const Vector3&amp; vel)
+@@ -129,9 +135,18 @@
+     {
+ 		if (mBody &amp;&amp; mActor)
+ 		{
+-			mBody-&gt;setPositionOrientation(
+-				mActor-&gt;_getSceneNode()-&gt;_getDerivedPosition(),
+-				mActor-&gt;_getSceneNode()-&gt;_getDerivedOrientation());
++            if( mRagDoll )
++            {
++                mRagDoll-&gt;setPositionOrientation(
++		    		mActor-&gt;_getSceneNode()-&gt;_getDerivedPosition(),
++				    mActor-&gt;_getSceneNode()-&gt;_getDerivedOrientation());
++            }
++            else
++            {
++			    mBody-&gt;setPositionOrientation(
++		    		mActor-&gt;_getSceneNode()-&gt;_getDerivedPosition(),
++				    mActor-&gt;_getSceneNode()-&gt;_getDerivedOrientation());
++            }
+ 			mActor-&gt;_update(Actor::UF_ALL &amp; ~Actor::UF_PHYSICAL_THING);
+ 		}
+     }
+@@ -145,7 +160,10 @@
+ 
+     void PhysicalThing::_attachToSceneNode(Ogre::SceneNode* node)
+     {
+-        mBody-&gt;attachNode(node);
++        if( mRagDoll )
++            mRagDoll-&gt;setSceneNode( node );
++        else
++            mBody-&gt;attachNode(node);
+     }
+ 
+     void PhysicalThing::_attachToBone(MeshObject* object, const std::string&amp; boneName )
+@@ -162,6 +180,9 @@
+ 
+     void PhysicalThing::setUpConstraint(const Vector3&amp; upVector)
+     {
++        RlAssert(!mRagDoll,
++           &quot;PhysicalThing::setUpConstraint: using UpConstraint not possible while a RagDoll controls this PhysicalThing!&quot;);
++
+         if (!mUpVectorJoint)
+         {
+             mUpVectorJoint = new OgreNewt::BasicJoints::UpVector(
+@@ -185,8 +206,11 @@
+ 
+     void PhysicalThing::clearUpConstraint()
+     {
+-        delete mUpVectorJoint;
+-        mUpVectorJoint = NULL;
++        if( mUpVectorJoint )
++        {
++            delete mUpVectorJoint;
++            mUpVectorJoint = NULL;
++        }
+     }
+ 
+     void PhysicalThing::onApplyForceAndTorque(float timestep)
+@@ -210,10 +234,16 @@
+ 
+     void PhysicalThing::setMass(Ogre::Real mass)
+     {
+-        Vector3 inertia;
+-        mBody-&gt;getMassMatrix(mMass, inertia);
++        // effect on ragdoll?
++
++        if( mBody &amp;&amp; !mRagDoll )
++        {
++            Vector3 inertia;
++            mBody-&gt;getMassMatrix(mMass, inertia);
++            mMass = mass;
++            mBody-&gt;setMassMatrix(mass, inertia);
++        }
+         mMass = mass;
+-        mBody-&gt;setMassMatrix(mass, inertia);
+     }
+ 
+     void PhysicalThing::setGravityOverride(bool override, const Vector3&amp; gravity)
+@@ -233,7 +263,9 @@
+         entity-&gt;_updateAnimation();
+         Node* node = entity-&gt;getParentNode();
+         RlAssert(node,
+-            &quot;Actor has to be placed in the scene in order to update its collision hull.&quot;);
++            &quot;PhysicalThing::updateCollisionHull: Actor has to be placed in the scene in order to update its collision hull.&quot;);
++        RlAssert(!mRagDoll,
++            &quot;PhysicalThing::updateCollisionHull: PhysicalThing must not be controlled by a RagDoll in order to update its collision hull.&quot;);
+ 
+ 
+         Vector3 position;
+@@ -328,6 +360,9 @@
+ 
+     void PhysicalThing::fitToPose(const Ogre::String&amp; animName)
+     {
++        if( mRagDoll )
++            Throw(IllegalArgumentException, &quot;PhysicalThing::fitToPose cannot be used while the PhysicalThing is controlled by a RagDoll!&quot;);
++
+ 		CollisionPtr coll;
+ 
+         if (mPhysicalObject-&gt;isMeshObject())
+@@ -385,12 +420,27 @@
+ 
+ 	void PhysicalThing::destroyPhysicsProxy()
+ 	{
+-		delete mBody;
+-		mBody = NULL;
++        setPhysicsController(NULL);
++        clearUpConstraint();
++        mPoseCollisions.clear();
++        if( mRagDoll )
++        {
++            delete mRagDoll;
++            mRagDoll = NULL;
++            mBody = NULL;
++        }
++        else if( mBody )
++        {
++		    delete mBody;
++		    mBody = NULL;
++        }
++
+ 	}
+ 
+-    void PhysicalThing::createPhysicsProxy(SceneNode* node)
++    void PhysicalThing::createPhysicsProxy()
+ 	{
++        RlAssert( !mRagDoll,
++                &quot;PhysicalThing::createPhysicsProxy: cannot create physics proxy while the PhysicalThing is controlled by a RagDoll!&quot;);
+ 		if (!mBody)
+ 		{
+             Vector3 inertia;
+@@ -409,6 +459,13 @@
+ 			body-&gt;setCustomForceAndTorqueCallback(PhysicsManager::genericForceCallback);
+ 
+             setBody(body);
++
++            if( mActor )
++            {
++                if( mActor-&gt;_getSceneNode() )
++                    _attachToSceneNode(mActor-&gt;_getSceneNode());
++
++            }
+         }
+ 	}
+ 
+@@ -450,7 +507,7 @@
+ 
+     void PhysicalThing::updatePhysicsProxy()
+     {
+-        if (mBody)
++        if (mBody &amp;&amp; !mRagDoll)
+         {
+             mPoseCollisions.clear();
+ 
+@@ -498,7 +555,10 @@
+ 
+     void PhysicalThing::setMaterialID(const OgreNewt::MaterialID* materialid)
+     {
+-        mBody-&gt;setMaterialGroupID(materialid);
++        if( mRagDoll )
++            mRagDoll-&gt;setMaterialID(materialid);
++        else
++            mBody-&gt;setMaterialGroupID(materialid);
+     }
+ 
+     const OgreNewt::MaterialID* PhysicalThing::getMaterialID() const
+@@ -506,4 +566,37 @@
+         return mBody-&gt;getMaterialGroupID();
+     }
+ 
++
++    void PhysicalThing::createPhysicsProxy_RagDoll()
++    {
++        if(!mRagDoll)
++        {
++            if( mBody )
++            {
++                Throw(OperationNotSupportedException, &quot;PhysicalThing::createPhysicsProxy_RagDoll: there is already a body connected to this PhysicalThing!&quot;);
++            }
++
++
++
++            if( !mPhysicalObject-&gt;isMeshObject() )
++                Throw(IllegalArgumentException, &quot;PhysicalThing::createPhysicsProxy_RagDoll needs a Mesh-Actor as argument!&quot;);
++            MeshObject* meshObj = static_cast&lt;MeshObject*&gt;(mPhysicalObject);
++
++            String ragdollRes = meshObj-&gt;getMeshName();
++            ragdollRes = ragdollRes.substr(0,ragdollRes.find(&quot;.mesh&quot;)) + &quot;_ragdoll.xml&quot;;
++            mRagDoll = new PhysicsRagDoll(ragdollRes, mActor);
++            mBody = NULL;
++            if( mRagDoll-&gt;getRootBone() )
++                mBody = mRagDoll-&gt;getRootBone()-&gt;getBody();
++
++            if( !mBody )
++            {
++                delete mRagDoll;
++                mRagDoll = NULL;
++                Throw(NullPointerException, &quot;Error creating the ragdoll!&quot;);
++            }
++        }
++    }
++
+ }
++
+
+Modified: rl/trunk/engine/core/src/PhysicsManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsManager.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/src/PhysicsManager.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -366,12 +366,18 @@
+         mWorld-&gt;setWorldSize(mWorldAABB);
+     }
+ 
+-	void PhysicsManager::createPhysicsProxy(PhysicalThing* pt, SceneNode* node)
++	void PhysicsManager::createPhysicsProxy(PhysicalThing* pt)
+ 	{
+-		pt-&gt;createPhysicsProxy(node);
++		pt-&gt;createPhysicsProxy();
+ 		mPhysicalThings.push_back(pt);
+ 	}
+ 
++    void PhysicsManager::createPhysicsProxy_RagDoll(PhysicalThing* pt)
++    {
++        pt-&gt;createPhysicsProxy_RagDoll();
++        mPhysicalThings.push_back(pt);
++    }
++
+ 	void PhysicsManager::destroyPhysicsProxy(PhysicalThing* pt)
+ 	{
+         vector&lt;PhysicalThing*&gt;::iterator it = find(mPhysicalThings.begin(),
+@@ -541,12 +547,6 @@
+                     case GT_ELLIPSOID: // from createEllipsoid
+                     case GT_PYRAMID: // createPyramid
+                     case GT_SPHERE:
+-                        {
+-                            Vector3 inert_offs=Vector3::ZERO;
+-                            static_cast&lt;OgreNewt::ConvexCollision*&gt;(rval)-&gt;calculateInertialMatrix(*inertia, inert_offs);
+-                            *inertia *= mass;
+-                        }
+-                        break;
+                     case GT_MESH:
+                     case GT_NONE:
+                         *inertia = Ogre::Vector3::ZERO;
+
+Added: rl/trunk/engine/core/src/PhysicsRagDoll.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/core/src/PhysicsRagDoll.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -0,0 +1,558 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot; //precompiled header
++
++
++#include &quot;Actor.h&quot;
++#include &quot;MeshObject.h&quot;
++#include &quot;PhysicsRagDoll.h&quot;
++#include &quot;PhysicalThing.h&quot;
++
++#include &lt;sstream&gt;
++
++using namespace XERCES_CPP_NAMESPACE;
++
++namespace rl
++{
++
++PhysicsRagDoll::RagBone::RagBone( PhysicsRagDoll* creator, OgreNewt::World* world, PhysicsRagDoll::RagBone* parent, Ogre::Bone* ogreBone, Ogre::MeshPtr mesh, 
++						  Ogre::Vector3 dir, PhysicsRagDoll::RagBone::BoneShape shape, Ogre::Vector3 size, Ogre::Real mass, Actor* parentActor )
++{
++	mDoll = creator;
++	mParent = parent;
++	mOgreBone = ogreBone;
++
++	OgreNewt::ConvexCollision* col = NULL;
++
++	// in the case of the cylindrical primitives, they need to be rotated to align the main axis with the direction vector.
++	Ogre::Quaternion orient = Ogre::Quaternion::IDENTITY;
++	Ogre::Vector3 pos = Ogre::Vector3::ZERO;
++	Ogre::Matrix3 rot;
++
++	if (dir == Ogre::Vector3::UNIT_Y)
++	{
++		rot.FromEulerAnglesXYZ(Ogre::Degree(0), Ogre::Degree(0), Ogre::Degree(90));
++		orient.FromRotationMatrix( rot );
++	}
++
++	if (dir == Ogre::Vector3::UNIT_Z)
++	{
++		rot.FromEulerAnglesXYZ(Ogre::Degree(0), Ogre::Degree(90), Ogre::Degree(0));
++		orient.FromRotationMatrix( rot );
++	}
++
++
++	// make the rigid body.
++	switch (shape)
++	{
++	case PhysicsRagDoll::RagBone::BS_BOX:
++		col = new OgreNewt::CollisionPrimitives::Box( world, size );
++		break;
++
++	case PhysicsRagDoll::RagBone::BS_CAPSULE:
++		col = new OgreNewt::CollisionPrimitives::Capsule( world, size.y, size.x, orient, pos );
++		break;
++
++	case PhysicsRagDoll::RagBone::BS_CONE:
++		col = new OgreNewt::CollisionPrimitives::Cone( world, size.y, size.x, orient, pos );
++		break;
++
++	case PhysicsRagDoll::RagBone::BS_CYLINDER:
++		col = new OgreNewt::CollisionPrimitives::Cylinder( world, size.y, size.x, orient, pos );
++		break;
++
++	case PhysicsRagDoll::RagBone::BS_ELLIPSOID:
++		col = new OgreNewt::CollisionPrimitives::Ellipsoid( world, size );
++		break;
++
++	case PhysicsRagDoll::RagBone::BS_CONVEXHULL:
++		col = _makeConvexHull( world, mesh, size.x );
++		break;
++
++	default:
++		col = new OgreNewt::CollisionPrimitives::Box( world, size );
++		break;
++	}
++
++    if( col )
++    {
++        if( col-&gt;getNewtonCollision() == NULL )
++        {
++            delete col;
++            col = NULL;
++        }
++    }
++
++    if( col == NULL )
++    {
++        LOG_WARNING(Logger::CORE, &quot; error creating collision for '&quot; + ogreBone-&gt;getName() + &quot;', still continuing.&quot;);
++        mBody = NULL;
++    }
++    else
++    {
++    	mBody = new OgreNewt::Body( world, col );
++	    mBody-&gt;setUserData( parentActor );
++    	mBody-&gt;setStandardForceCallback();
++        const OgreNewt::MaterialID* ragdollMat = PhysicsManager::getSingleton().createMaterialID(&quot;default&quot;);
++        mBody-&gt;setMaterialGroupID(ragdollMat);
++
++	    Ogre::Vector3 inertia;
++    	Ogre::Vector3 com;
++    	col-&gt;calculateInertialMatrix( inertia, com );
++	
++	    mBody-&gt;setMassMatrix( mass, inertia * mass );
++    	mBody-&gt;setCenterOfMass( com );
++
++	    mBody-&gt;setCustomTransformCallback( PhysicsRagDoll::_placementCallback );
++
++
++    	mOgreBone-&gt;setManuallyControlled( true );
++    }
++}
++
++
++PhysicsRagDoll::RagBone::~RagBone()
++{
++	mOgreBone-&gt;setManuallyControlled( false );
++    if( mBody )
++    	delete mBody;
++}
++
++
++void PhysicsRagDoll::RagBone::_hingeCallback( OgreNewt::BasicJoints::Hinge* me )
++{
++	PhysicsRagDoll::RagBone* bone = (PhysicsRagDoll::RagBone*)me-&gt;getUserData();
++
++	Ogre::Degree angle = me-&gt;getJointAngle();
++	Ogre::Degree lim1( bone-&gt;getLimit1() );
++	Ogre::Degree lim2( bone-&gt;getLimit2() );
++
++	if (angle &lt; lim1)
++	{
++		Ogre::Real accel = me-&gt;calculateStopAlpha( lim1 );
++		me-&gt;setCallbackAccel( accel );
++	}
++
++	if (angle &gt; lim2)
++	{
++		Ogre::Real accel = me-&gt;calculateStopAlpha( lim2 );
++		me-&gt;setCallbackAccel( accel );
++	}
++
++}
++
++
++OgreNewt::ConvexCollision* PhysicsRagDoll::RagBone::_makeConvexHull( OgreNewt::World* world, Ogre::MeshPtr mesh, Ogre::Real minWeight )
++{
++	std::vector&lt; Ogre::Vector3 &gt; vertexVector;
++
++	// for this bone, gather all of the vertices linked to it, and make an individual convex hull.
++	std::string boneName = mOgreBone-&gt;getName();
++	unsigned int boneIndex = mOgreBone-&gt;getHandle();
++
++	Ogre::Matrix4 invMatrix;
++	invMatrix.makeInverseTransform( -mOgreBone-&gt;_getBindingPoseInversePosition(), Ogre::Vector3::UNIT_SCALE / mOgreBone-&gt;_getBindingPoseInverseScale(), mOgreBone-&gt;_getBindingPoseInverseOrientation().Inverse());
++
++	unsigned int num_sub = mesh-&gt;getNumSubMeshes();
++
++	for (unsigned int i = 0; i &lt; num_sub; i++)
++	{
++		Ogre::SubMesh* submesh = mesh-&gt;getSubMesh(i);
++		Ogre::SubMesh::BoneAssignmentIterator bai = submesh-&gt;getBoneAssignmentIterator();
++
++		Ogre::VertexDeclaration* v_decl;
++		const Ogre::VertexElement* p_elem;
++		float* v_Posptr;
++		size_t v_count;
++		Ogre::VertexData* v_data = NULL;
++
++		if (submesh-&gt;useSharedVertices)
++		{
++			v_data = mesh-&gt;sharedVertexData;
++			v_count = v_data-&gt;vertexCount;
++			v_decl = v_data-&gt;vertexDeclaration;
++			p_elem = v_decl-&gt;findElementBySemantic( Ogre::VES_POSITION );
++		}
++		else
++		{
++			v_data = submesh-&gt;vertexData;
++			v_count = v_data-&gt;vertexCount;
++			v_decl = v_data-&gt;vertexDeclaration;
++			p_elem = v_decl-&gt;findElementBySemantic( Ogre::VES_POSITION );
++		}		
++			
++		size_t start = v_data-&gt;vertexStart;
++		//pointer
++		Ogre::HardwareVertexBufferSharedPtr v_sptr = v_data-&gt;vertexBufferBinding-&gt;getBuffer( p_elem-&gt;getSource() );
++		unsigned char* v_ptr = static_cast&lt;unsigned char*&gt;(v_sptr-&gt;lock( Ogre::HardwareBuffer::HBL_READ_ONLY ));
++		unsigned char* v_offset;
++		
++		while (bai.hasMoreElements())
++		{
++			Ogre::VertexBoneAssignment vba = bai.getNext();
++			if (vba.boneIndex == boneIndex)
++			{
++				//found a vertex that is attached to this bone.
++				if (vba.weight &gt;= minWeight)
++				{
++					//get offset to Position data!
++					v_offset = v_ptr + (vba.vertexIndex * v_sptr-&gt;getVertexSize());
++					p_elem-&gt;baseVertexPointerToElement( v_offset, &amp;v_Posptr );
++
++					Ogre::Vector3 vert;
++					vert.x = *v_Posptr; v_Posptr++;
++					vert.y = *v_Posptr; v_Posptr++;
++					vert.z = *v_Posptr; 
++
++					// apply transformation in to local space.
++					vert = invMatrix * vert;
++
++					vertexVector.push_back( vert );
++
++					Ogre::LogManager::getSingletonPtr()-&gt;logMessage(&quot;  vertex found! id:&quot;+Ogre::StringConverter::toString(vba.vertexIndex));
++				}
++			}
++
++		}
++
++		v_sptr-&gt;unlock();
++
++	}
++		
++
++	// okay, we have gathered all verts for this bone.  make a convex hull!
++	unsigned int numVerts = vertexVector.size();
++	Ogre::Vector3* verts = new Ogre::Vector3[ numVerts ];
++	unsigned int j = 0;
++	while (!vertexVector.empty())
++	{
++		verts[j] = vertexVector.back();
++		vertexVector.pop_back();
++		j++;
++	}
++
++	//////////////////////////////////////////////////////////////////////////////////
++    OgreNewt::ConvexCollision* col = NULL;
++    if( numVerts &gt; 0 )
++    	col = new OgreNewt::CollisionPrimitives::ConvexHull( world, verts, numVerts );
++
++	delete []verts;
++
++	return col;	
++}
++
++
++
++
++PhysicsRagDoll::PhysicsRagDoll( const Ogre::String&amp; ragdollResource, Actor* actor) :
++    mRootBone(NULL),
++    mNode(NULL),
++    mWorld(NULL),
++    mMesh(NULL),
++    mSkeleton(NULL)
++{
++    mRootBone = NULL;
++	mNode = actor-&gt;_getSceneNode();
++	mWorld = PhysicsManager::getSingleton()._getNewtonWorld();
++    if( !actor-&gt;getControlledObject()-&gt;isMeshObject() )
++        Throw(IllegalArgumentException, &quot;PhysicsRagDoll::PhysicsRagDoll needs a Mesh-Actor as argument!&quot;);
++
++    MeshObject* meshObj = static_cast&lt;MeshObject*&gt;(actor-&gt;getControlledObject());
++
++    // stop all animations
++    meshObj-&gt;stopAllAnimations();
++
++	// get the skeleton.
++	mSkeleton = meshObj-&gt;getEntity()-&gt;getSkeleton();
++
++	// get the mesh.
++	mMesh = meshObj-&gt;getEntity()-&gt;getMesh();
++
++
++    LOG_MESSAGE(Logger::CORE, &quot;Loading ragdoll '&quot; + ragdollResource + &quot;'&quot;);
++
++    initializeXml();
++    DOMDocument* doc = loadDocument(ragdollResource);
++    if( !doc )
++    {
++        LOG_ERROR(Logger::CORE, &quot;Ragdoll resource '&quot; + ragdollResource + &quot;' not found&quot;);
++    }
++    else
++    {
++
++	    DOMElement* dataDocumentContent = doc-&gt;getDocumentElement();
++		mRootBone =_addAllBones( NULL, getChildNamed(dataDocumentContent, &quot;Bone&quot;), actor);
++    }
++    shutdownXml();
++
++}
++
++
++PhysicsRagDoll::RagBone* PhysicsRagDoll::_addAllBones(PhysicsRagDoll::RagBone* parent, DOMElement* boneElement, Actor* parentActor)
++{
++	// get the information for the bone represented by this element.
++    Ogre::Vector3 dir = getAttributeValueAsVector3(boneElement, &quot;dir&quot;);
++	Ogre::Real length = getAttributeValueAsReal( boneElement, &quot;length&quot;);
++		
++	Ogre::Vector3 size = getAttributeValueAsVector3( boneElement, &quot;size&quot;);
++	
++	
++	Ogre::String skeleton_bone = getAttributeValueAsStdString( boneElement, &quot;skeleton_bone&quot;);
++	Ogre::Bone* ogrebone = mSkeleton-&gt;getBone( skeleton_bone );
++
++
++	Ogre::String shapestr = getAttributeValueAsStdString( boneElement, &quot;shape&quot;);
++	PhysicsRagDoll::RagBone::BoneShape shape = PhysicsRagDoll::RagBone::BS_BOX;
++
++	if (shapestr==&quot;box&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_BOX;
++	
++	if (shapestr==&quot;capsule&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_CAPSULE;
++	
++	if (shapestr==&quot;cylinder&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_CYLINDER;
++	
++	if (shapestr==&quot;cone&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_CONE;
++	
++	if (shapestr==&quot;ellipsoid&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_ELLIPSOID;
++
++	if (shapestr==&quot;hull&quot;)
++		shape = PhysicsRagDoll::RagBone::BS_CONVEXHULL;
++
++	Ogre::Real mass = getAttributeValueAsReal( boneElement, &quot;mass&quot; );
++	
++	///////////////////////////////////////////////////////////////////////////////
++	RagBone* me = _addBone( mWorld, parent, dir, shape, size, mass, ogrebone,  parentActor);
++	///////////////////////////////////////////////////////////////////////////////
++
++	// position the bone.
++	Ogre::Quaternion boneorient = mNode-&gt;_getDerivedOrientation() * ogrebone-&gt;_getDerivedOrientation();
++	Ogre::Vector3 bonepos;
++	if (shape != PhysicsRagDoll::RagBone::BS_CONVEXHULL)
++		bonepos = mNode-&gt;_getFullTransform() * ogrebone-&gt;_getDerivedPosition() + (boneorient * (dir * (length*0.5f)));
++	else
++		bonepos = mNode-&gt;_getFullTransform() * ogrebone-&gt;_getDerivedPosition();
++
++    if( me-&gt;getBody() )
++    	me-&gt;getBody()-&gt;setPositionOrientation( bonepos, boneorient );
++
++	// set offsets
++	if (!parent)
++	{
++		Ogre::Quaternion offsetorient = (boneorient.Inverse()) * mNode-&gt;_getDerivedOrientation();
++		Ogre::Vector3 offsetpos = boneorient.Inverse() * (mNode-&gt;_getDerivedPosition() - bonepos);
++		me-&gt;setOffset( offsetorient, offsetpos );
++	}
++
++
++	// get the joint to connect this bone with it's parent.
++	if (parent &amp;&amp; me-&gt;getBody() )
++	{
++		DOMElement* jointElement = getChildNamed( boneElement, &quot;Joint&quot; );
++		if (!jointElement)
++		{
++			// error!
++            LOG_ERROR(Logger::CORE, &quot; Joint not found while creating Ragdoll! &quot;);
++			return me;
++		}
++
++		Ogre::Vector3 jointpin = getAttributeValueAsVector3( jointElement, &quot;pin&quot;);
++		Ogre::String jointtypestr = getAttributeValueAsStdString( jointElement, &quot;type&quot;);
++		PhysicsRagDoll::JointType jointtype = PhysicsRagDoll::JT_BALLSOCKET;
++
++		if (jointtypestr == &quot;ballsocket&quot;)
++			jointtype = PhysicsRagDoll::JT_BALLSOCKET;
++
++		if (jointtypestr == &quot;hinge&quot;)
++			jointtype = PhysicsRagDoll::JT_HINGE;
++
++
++		Ogre::Real limit1 = getAttributeValueAsReal( jointElement, &quot;limit1&quot; );
++		Ogre::Real limit2 = getAttributeValueAsReal( jointElement, &quot;limit2&quot; );
++
++		Ogre::Vector3 jpos = mNode-&gt;_getFullTransform() * ogrebone-&gt;_getDerivedPosition();
++		Ogre::Vector3 jpin = (mNode-&gt;_getDerivedOrientation() * parent-&gt;getOgreBone()-&gt;_getDerivedOrientation()) * jointpin;
++
++		_joinBones( jointtype, parent, me, jpos, jpin, limit1, limit2, mWorld);
++	}
++	
++    LOG_MESSAGE(Logger::CORE, &quot; added bone from '&quot;+ogrebone-&gt;getName()+&quot;'.&quot;);
++
++	///////////////////////////////////////////////////////////////////////////////
++	///////////////////////////////////////////////////////////////////////////////
++	// add all children of this bone.
++    for (DOMNode* cur = boneElement-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
++    {
++        if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE &amp;&amp; hasNodeName(cur, &quot;Bone&quot;))
++        {
++            DOMElement* childBoneElem = static_cast&lt;DOMElement*&gt;(cur);
++		    _addAllBones( me, childBoneElem, parentActor );
++        }
++	}
++
++    return me;
++}
++
++
++PhysicsRagDoll::~PhysicsRagDoll()
++{
++    for(RagBoneMapIterator it = mRagBonesMap.begin(); it != mRagBonesMap.end(); it++)
++    {
++		RagBone* bone = it-&gt;second;
++		delete bone;
++	}
++}
++
++
++PhysicsRagDoll::RagBone* PhysicsRagDoll::_addBone( OgreNewt::World* world, PhysicsRagDoll::RagBone* parent, Ogre::Vector3 dir, RagBone::BoneShape shape, Ogre::Vector3 size, Ogre::Real mass, Ogre::Bone* ogrebone, Actor* parentActor )
++{
++	PhysicsRagDoll::RagBone* bone = new PhysicsRagDoll::RagBone( this, world, parent, ogrebone, mMesh, dir, shape, size, mass, parentActor );
++
++	mRagBonesMap.insert(std::make_pair( bone-&gt;getBody(), bone ));
++
++	return bone;
++}
++
++void PhysicsRagDoll::_joinBones( PhysicsRagDoll::JointType type, RagBone* parent, RagBone* child, Ogre::Vector3 pos, Ogre::Vector3 pin, Ogre::Real limit1, Ogre::Real limit2, OgreNewt::World* world )
++{
++	pin.normalise();
++	OgreNewt::Joint* joint = NULL;
++
++	switch (type)
++	{
++	case PhysicsRagDoll::JT_BALLSOCKET:
++		joint = new OgreNewt::BasicJoints::BallAndSocket( world, child-&gt;getBody(), parent-&gt;getBody(), pos );
++		((OgreNewt::BasicJoints::BallAndSocket*)joint)-&gt;setLimits(pin, Ogre::Degree(limit1), Ogre::Degree(limit2));
++		break;
++
++	case PhysicsRagDoll::JT_HINGE:
++		joint = new OgreNewt::BasicJoints::Hinge( world, child-&gt;getBody(), parent-&gt;getBody(), pos, pin );
++		((OgreNewt::BasicJoints::Hinge*)joint)-&gt;setCallback( RagBone::_hingeCallback );
++		joint-&gt;setUserData( child );
++		child-&gt;setLimits( limit1, limit2 );
++		break;
++	}
++
++}
++
++
++void PhysicsRagDoll::_placementCallback( OgreNewt::Body* me, const Ogre::Quaternion&amp; orient, const Ogre::Vector3&amp; pos, int threadindex )
++{
++    Actor* parentActor = static_cast&lt;Actor*&gt;(me-&gt;getUserData());
++	PhysicsRagDoll* doll = parentActor-&gt;getPhysicalThing()-&gt;getRagDoll();
++    PhysicsRagDoll::RagBoneMapIterator it = doll-&gt;mRagBonesMap.find(me);
++    if( it == doll-&gt;mRagBonesMap.end() )
++    {
++        LOG_ERROR(Logger::CORE, &quot;Could not find ragdoll-bone in PhysicsRagDoll::_placementCallback!&quot;);
++        return;
++    }
++	PhysicsRagDoll::RagBone* bone = it-&gt;second;
++
++	// is this the root bone?
++	if (!bone-&gt;getParent())
++	{
++		Ogre::Quaternion finalorient = (orient * bone-&gt;getOffsetOrient());
++		Ogre::Vector3 finalpos = pos + (orient * bone-&gt;getOffsetPos());
++
++		doll-&gt;mNode-&gt;setPosition( finalpos );
++		doll-&gt;mNode-&gt;setOrientation( finalorient );
++	}
++	else
++	{
++		// standard bone, calculate the local orientation between it and it's parent.
++		Ogre::Quaternion parentorient;
++		Ogre::Vector3 parentpos;
++
++        if( bone-&gt;getParent()-&gt;getBody() )
++    		bone-&gt;getParent()-&gt;getBody()-&gt;getPositionOrientation( parentpos, parentorient );
++        else
++            parentorient = bone-&gt;getParent()-&gt;getOgreBone()-&gt;getOrientation();
++
++
++        Ogre::Quaternion localorient = orient;
++        if( bone-&gt;getOgreBone()-&gt;getInheritOrientation() )
++            localorient = parentorient.Inverse() * localorient;
++
++		bone-&gt;getOgreBone()-&gt;setOrientation( localorient );
++	}
++}
++
++
++void PhysicsRagDoll::setInheritedVelOmega( const Ogre::Vector3&amp; vel, const Ogre::Vector3&amp; omega )
++{
++	// find main position.
++	Ogre::Vector3 mainpos = mNode-&gt;_getDerivedPosition();
++
++	for (RagBoneMapIterator it = mRagBonesMap.begin(); it != mRagBonesMap.end(); it++)
++	{
++		Ogre::Vector3 pos;
++		Ogre::Quaternion orient;
++
++        if( it-&gt;second-&gt;getBody() )
++        {
++		    it-&gt;second-&gt;getBody()-&gt;getPositionOrientation( pos, orient );
++		    it-&gt;second-&gt;getBody()-&gt;setVelocity( vel + omega.crossProduct( pos - mainpos ) );
++        }
++	}
++}
++
++void PhysicsRagDoll::setPositionOrientation( const Ogre::Vector3&amp; pos, const Ogre::Quaternion &amp;orient )
++{
++    Ogre::Vector3 oldPos = mNode-&gt;_getDerivedPosition();
++    Ogre::Quaternion oldOri = mNode-&gt;_getDerivedOrientation();
++    Ogre::Quaternion oldOriInv = oldOri.Inverse();
++
++    for (RagBoneMapIterator it = mRagBonesMap.begin(); it != mRagBonesMap.end(); it++)
++    {
++        OgreNewt::Body* body = it-&gt;second-&gt;getBody();
++        if( body )
++        {
++            Ogre::Vector3 boneOldPos;
++            Ogre::Quaternion boneOldOri;
++            body-&gt;getPositionOrientation(boneOldPos, boneOldOri);
++            
++            // get old position and orientation in local space
++            Ogre::Vector3 boneOldLocalPos = oldOriInv*(boneOldPos - oldPos);
++            Ogre::Quaternion boneOldLocalOri = oldOriInv*boneOldOri;
++
++            // calculate and set new position in orientation
++            body-&gt;setPositionOrientation(pos + orient*boneOldLocalPos, orient*boneOldLocalOri);
++            body-&gt;unFreeze();
++        }
++    }
++    mNode-&gt;setPosition(pos);
++    mNode-&gt;setOrientation(orient);
++}
++
++void PhysicsRagDoll::setMaterialID(const OgreNewt::MaterialID* materialid)
++{
++    for(RagBoneMapIterator it = mRagBonesMap.begin(); it != mRagBonesMap.end(); it++)
++    {
++        if( it-&gt;second-&gt;getBody() )
++            it-&gt;second-&gt;getBody()-&gt;setMaterialGroupID(materialid);
++    }
++}
++
++PhysicsRagDoll::RagBone* PhysicsRagDoll::getRootBone()
++{
++    return mRootBone;
++}
++
++}
++
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/script/swig/RlCore.swig	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -702,6 +702,12 @@
+ 
+     void removeAndDestroyPhysicalThing(PhysicalThing* thing);
+ 
++    void createPhysicsProxy(PhysicalThing* pt);
++
++    void createPhysicsProxy_RagDoll(PhysicalThing* pt);
++
++    void destroyPhysicsProxy(PhysicalThing* pt);
++
+     // Global Settings
+     void setGravity(Ogre::Real x, Ogre::Real y, Ogre::Real z);
+     Ogre::Vector3 getGravity() const;
+
+Modified: rl/trunk/engine/ui/src/FreeflightControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/FreeflightControlState.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/ui/src/FreeflightControlState.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -29,6 +29,9 @@
+ #include &quot;CommandMapper.h&quot;
+ #include &quot;MeshObject.h&quot;
+ #include &quot;WindowManager.h&quot;
++#include &quot;CreatureControllerManager.h&quot;
++#include &quot;Creature.h&quot;
++#include &quot;PhysicsRagDoll.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -61,7 +64,8 @@
+     {
+ 		mCameraActor-&gt;getPhysicalThing()-&gt;freeze();
+ 		//mCharacterActor-&gt;getPhysicalThing()-&gt;unfreeze();
+-        delete mOgreNewtPlayerController;
++//        delete mOgreNewtPlayerController;
++
+         mOgreNewtPlayerController = NULL;
+         mCharacterActor-&gt;getPhysicalThing()-&gt;setUpConstraint();
+         mCameraActor-&gt;getPhysicalThing()-&gt;setPhysicsController(NULL);
+@@ -84,7 +88,7 @@
+         mCameraActor-&gt;getPhysicalThing()-&gt;unfreeze();
+ 		//mCharacterActor-&gt;getPhysicalThing()-&gt;freeze();
+         mCharacterActor-&gt;getPhysicalThing()-&gt;clearUpConstraint();
+-        mOgreNewtPlayerController = new OgreNewt::PlayerController(mCharBody);
++//        mOgreNewtPlayerController = new OgreNewt::PlayerController(mCharBody);
+ 
+         resetCamera();
+ 
+@@ -164,7 +168,8 @@
+             // put character here
+             if( mCharacterActor != NULL )
+             {
+-                mCharacterActor-&gt;setPosition(
++                //mCharacterActor-&gt;setPosition(
++                mCharacterActor-&gt;getPhysicalThing()-&gt;setPosition(
+                     mCameraActor-&gt;getPosition()
+                     + mCameraActor-&gt;getWorldOrientation() * Vector3::NEGATIVE_UNIT_Z * 2
+                     - 1.5 * Vector3::UNIT_Y);
+@@ -213,8 +218,8 @@
+         if (mPitch &lt; mPitchRange.first) mPitch = mPitchRange.first;
+         if (mPitch &gt; mPitchRange.second) mPitch = mPitchRange.second;
+ 
+-if( mCollisionsEnabled )
+-    mOgreNewtPlayerController-&gt;setVelocity(mDesiredVelocity.z, mDesiredVelocity.x, mYaw);
++//if( mCollisionsEnabled )
++//    mOgreNewtPlayerController-&gt;setVelocity(mDesiredVelocity.z, mDesiredVelocity.x, mYaw);
+ 
+         mCameraActor-&gt;setOrientation(Quaternion::IDENTITY);
+         mCameraActor-&gt;yaw(mYaw.valueDegrees());
+@@ -232,6 +237,20 @@
+ 		// with or without collision?
+         // be careful to enable collision if beeing in another collision
+         mCollisionsEnabled = !mCollisionsEnabled;
++/*
++        if( mCollisionsEnabled )
++        {
++            CreatureControllerManager::getSingleton().detachController(mCharacter);
++            PhysicsManager::getSingleton().destroyPhysicsProxy(mCharacterActor-&gt;getPhysicalThing());
++            PhysicsManager::getSingleton().createPhysicsProxy_RagDoll(mCharacterActor-&gt;getPhysicalThing());
++        }
++        else
++        {
++            PhysicsManager::getSingleton().destroyPhysicsProxy(mCharacterActor-&gt;getPhysicalThing());
++            PhysicsManager::getSingleton().createPhysicsProxy(mCharacterActor-&gt;getPhysicalThing());
++            CreatureControllerManager::getSingleton().getCreatureController(mCharacter);
++        }
++*/
+ 	}
+ 
+ 	void FreeflightControlState::resetCamera()
+@@ -285,7 +304,7 @@
+             }
+             else if (command == &quot;toggle_camera_collision&quot; )
+             {
+-                mCollisionsEnabled = !mCollisionsEnabled;
++                toggleCameraCollision();
+                 retval = true;
+             }
+         }
+
+Modified: rl/trunk/engine/ui/src/MovementControlState.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementControlState.cpp	2009-03-31 16:31:25 UTC (rev 4874)
++++ rl/trunk/engine/ui/src/MovementControlState.cpp	2009-03-31 18:46:33 UTC (rev 4875)
+@@ -222,6 +222,7 @@
+             mController =
+                 CreatureControllerManager::getSingleton().getCreatureController(mCharacter);
+         }
++        mCharBody = mCharacterActor-&gt;getPhysicalThing()-&gt;_getBody();
+ 
+         // We want to check for visibility from char's POV.
+         mSelector.setCheckVisibility(true, mCharacter);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001931.html">[Dsa-hl-svn] r4874 - modules/common/models
+</A></li>
+	<LI>Next message: <A HREF="001933.html">[Dsa-hl-svn] r4876 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1932">[ date ]</a>
+              <a href="thread.html#1932">[ thread ]</a>
+              <a href="subject.html#1932">[ subject ]</a>
+              <a href="author.html#1932">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

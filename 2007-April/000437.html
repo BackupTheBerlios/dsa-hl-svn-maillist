@@ -1,0 +1,386 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3366 - in rl/trunk/engine: rules/src script/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3366%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/src&In-Reply-To=%3C200704300558.l3U5woU8030293%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000436.html">
+   <LINK REL="Next"  HREF="000438.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3366 - in rl/trunk/engine: rules/src script/src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3366%20-%20in%20rl/trunk/engine%3A%20rules/src%20script/src&In-Reply-To=%3C200704300558.l3U5woU8030293%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3366 - in rl/trunk/engine: rules/src script/src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Mon Apr 30 07:58:50 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000436.html">[Dsa-hl-svn] r3365 - in rl/trunk/engine: rules/src script/src
+</A></li>
+        <LI>Next message: <A HREF="000438.html">[Dsa-hl-svn] r3367 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#437">[ date ]</a>
+              <a href="thread.html#437">[ thread ]</a>
+              <a href="subject.html#437">[ subject ]</a>
+              <a href="author.html#437">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2007-04-30 07:58:46 +0200 (Mon, 30 Apr 2007)
+New Revision: 3366
+
+Added:
+   rl/trunk/engine/script/src/MapLoader.cpp
+Removed:
+   rl/trunk/engine/rules/src/MapLoader.cpp
+Log:
+Map loading moved to RlScript to allow access on RlAi classes
+
+Deleted: rl/trunk/engine/rules/src/MapLoader.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/MapLoader.cpp	2007-04-30 05:58:15 UTC (rev 3365)
++++ rl/trunk/engine/rules/src/MapLoader.cpp	2007-04-30 05:58:46 UTC (rev 3366)
+@@ -1,306 +0,0 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &lt;xercesc/dom/DOM.hpp&gt;
+-#include &lt;xercesc/parsers/XercesDOMParser.hpp&gt;
+-#include &lt;xercesc/util/PlatformUtils.hpp&gt;
+-
+-#include &quot;MapLoader.h&quot;
+-
+-#include &lt;OgreResourceManager.h&gt;
+-
+-#include &quot;AbstractMapNodeProcessor.h&quot;
+-#include &quot;Actor.h&quot;
+-#include &quot;ActorManager.h&quot;
+-#include &quot;ContentModule.h&quot;
+-#include &quot;CoreSubsystem.h&quot;
+-#include &quot;EntityNodeProcessor.h&quot;
+-#include &quot;GameObjectConstants.h&quot;
+-#include &quot;GameObjectNodeProcessor.h&quot;
+-#include &quot;LightNodeProcessor.h&quot;
+-#include &quot;PropertyReader.h&quot;
+-#include &quot;SoundNodeProcessor.h&quot;
+-#include &quot;World.h&quot;
+-#include &quot;XmlHelper.h&quot;
+-#include &quot;XmlResource.h&quot;
+-#include &quot;XmlResourceManager.h&quot;
+-#include &quot;Zone.h&quot;
+-#include &quot;ZoneManager.h&quot;
+-
+-using namespace Ogre;
+-using namespace XERCES_CPP_NAMESPACE;
+-using std::list;
+-
+-namespace rl {
+-
+-    using XERCES_CPP_NAMESPACE::DOMDocument; //XXX: for VS 2003/2005
+-    
+-    MapLoader::MapLoader(const Ogre::String&amp; resourceGroup)
+-        : mRootSceneNode(NULL),
+-          mResourceGroup(resourceGroup)
+-    {
+-        mXmlPropertyProcessor = new XmlPropertyReader();
+-
+-        mNodeProcessors.push_back(new EntityNodeProcessor(resourceGroup));
+-        mNodeProcessors.push_back(new GameObjectNodeProcessor());
+-        mNodeProcessors.push_back(new SoundNodeProcessor());
+-        mNodeProcessors.push_back(new LightNodeProcessor());
+-    }
+-
+-    MapLoader::~MapLoader()
+-    {
+-        for (list&lt;AbstractMapNodeProcessor*&gt;::const_iterator it = mNodeProcessors.begin(); 
+-            it != mNodeProcessors.end(); ++it)
+-        {
+-            delete *it;
+-        }
+-        delete mXmlPropertyProcessor;
+-    }
+-
+-    void MapLoader::loadMap(const Ogre::String&amp; mapresource, bool loadGameObjects)
+-    {
+-        LOG_MESSAGE(Logger::RULES, &quot;Loading map &quot; + mapresource);
+-  		XMLPlatformUtils::Initialize();
+-
+-		XmlHelper::initializeTranscoder();
+-		XercesDOMParser* parser = new XercesDOMParser();
+-
+-        parser-&gt;setValidationScheme(XercesDOMParser::Val_Auto);    // optional.
+-        parser-&gt;setDoNamespaces(true);    // optional
+-		
+-        XmlPtr res = XmlResourceManager::getSingleton().getByName(mapresource);
+-        if (res.isNull())
+-        {
+-            Ogre::String group = ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
+-            if (ResourceGroupManager::getSingleton().resourceExists(
+-                mResourceGroup, mapresource))
+-            {
+-                group = mResourceGroup;
+-            }
+-            res = XmlResourceManager::getSingleton().create(mapresource, group);
+-        }
+-                
+-        if (!res.isNull())
+-        {
+-            res-&gt;parseBy(parser);
+-    
+-            setRootSceneNode(CoreSubsystem::getSingleton().getWorld()
+-                    -&gt;getSceneManager()-&gt;getRootSceneNode()-&gt;createChildSceneNode(mapresource));
+-
+-            DOMDocument* doc = parser-&gt;getDocument();
+-            DOMElement* dataDocumentContent = doc-&gt;getDocumentElement();
+-            
+-            
+-            ///@todo process map file DOM ;)        
+-                        
+-            LOG_MESSAGE(Logger::RULES, &quot;Processing nodes&quot;);
+-            
+-            processSceneNodes(XmlHelper::getChildNamed(dataDocumentContent, &quot;nodes&quot;), loadGameObjects);
+-            processZones(XmlHelper::getChildNamed(dataDocumentContent, &quot;zones&quot;));
+-            processSkySettings(XmlHelper::getChildNamed(dataDocumentContent, &quot;sky&quot;));
+-            
+-            LOG_MESSAGE(Logger::RULES, &quot;Map loaded&quot;);
+-    
+-            doc-&gt;release();
+-
+-			CoreSubsystem::getSingleton().getWorld()-&gt;initializeDefaultCamera();
+-        }
+-        else
+-        {
+-            LOG_ERROR(Logger::RULES, &quot;Map resource '&quot; + mapresource + &quot;' not found&quot;);
+-        }
+-       
+-		XMLPlatformUtils::Terminate();
+-    }
+-
+-    void MapLoader::processSceneNodes(DOMElement* nodesElem, bool loadGameObjects)
+-    {
+-		if (nodesElem == NULL)
+-		{
+-			return;
+-		}
+-
+-        for (DOMNode* cur = nodesElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
+-        {
+-            if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-            {
+-                DOMElement* curElem = static_cast&lt;DOMElement*&gt;(cur);
+-
+-                list&lt;AbstractMapNodeProcessor*&gt;::iterator it = mNodeProcessors.begin();
+-                while (it != mNodeProcessors.end() &amp;&amp; !(*it)-&gt;processNode(curElem, loadGameObjects))
+-                {
+-                    ++it;
+-                }
+-                
+-                if (it == mNodeProcessors.end())
+-                {
+-                    LOG_WARNING(Logger::RULES,
+-                        &quot;Node &quot; + XmlHelper::transcodeToString(curElem-&gt;getNodeName()) + &quot; could not be processed.&quot;);
+-                }
+-            }
+-        }
+-    }
+-
+-	void MapLoader::processZones(xercesc_2_7::DOMElement *zonesElem)
+-	{
+-		if (zonesElem == NULL)
+-		{
+-			return; // no zones
+-		}
+-
+-        for (DOMNode* cur = zonesElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
+-        {
+-            if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE
+-				&amp;&amp; XmlHelper::hasNodeName(cur, &quot;zone&quot;))
+-            {
+-				DOMElement* curZoneElem = static_cast&lt;DOMElement*&gt;(cur);
+-				if (XmlHelper::hasAttribute(curZoneElem, &quot;type&quot;))
+-				{
+-					Ogre::String type = XmlHelper::getAttributeValueAsStdString(curZoneElem, &quot;type&quot;);
+-					Zone* zone = NULL;
+-					if (type == &quot;default&quot;)
+-					{
+-						zone = ZoneManager::getSingleton().getDefaultZone();
+-					}
+-					else if (type == &quot;mesh&quot;)
+-					{
+-						///@todo: zone = ZoneManager::getSingleton().createZone(...);
+-					}
+-					else if (type == &quot;sphere&quot;)
+-					{						
+-						Vector3 center = Vector3::ZERO;
+-						DOMElement* centerElem = XmlHelper::getChildNamed(curZoneElem, &quot;center&quot;);
+-						if (centerElem != NULL)
+-						{
+-							center = XmlHelper::getValueAsVector3(centerElem);
+-						}
+-
+-						Real radius = 1;
+-						DOMElement* radiusElem = XmlHelper::getChildNamed(curZoneElem, &quot;radius&quot;);
+-						if (radiusElem != NULL)
+-						{
+-							radius = XmlHelper::getAttributeValueAsReal(radiusElem, &quot;r&quot;);
+-						}
+-
+-						Ogre::String name = XmlHelper::getAttributeValueAsStdString(curZoneElem, &quot;name&quot;);
+-
+-						zone = ZoneManager::getSingleton().createZone(
+-							name, center, radius, QUERYFLAG_PLAYER);
+-					}
+-
+-					if (zone != NULL)
+-					{
+-						for (DOMNode* cur = curZoneElem-&gt;getFirstChild(); cur != NULL; cur = cur-&gt;getNextSibling())
+-						{
+-							if (cur-&gt;getNodeType() == DOMNode::ELEMENT_NODE)
+-							{
+-								DOMElement* curElem = static_cast&lt;DOMElement*&gt;(cur);
+-								if (XmlHelper::hasNodeName(curElem, &quot;light&quot;))
+-								{
+-									Ogre::String name = XmlHelper::getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-									zone-&gt;addLight(ActorManager::getSingleton().getActor(name));
+-								}
+-								else if (XmlHelper::hasNodeName(curElem, &quot;sound&quot;))
+-								{
+-									Ogre::String name = XmlHelper::getAttributeValueAsStdString(curElem, &quot;name&quot;);
+-									zone-&gt;addSound(name);
+-								}
+-							}
+-						}
+-					}
+-					else
+-					{
+-						LOG_ERROR(Logger::RULES, &quot;Zone of type '&quot;+type+&quot;' could not be processes.&quot;);
+-					}
+-				}
+-				else
+-				{
+-					LOG_ERROR(Logger::RULES, &quot;&lt;zone&gt; element must have attribute 'type'.&quot;);
+-				}
+-			}
+-		}
+-	}
+-
+-	void MapLoader::processSkySettings(XERCES_CPP_NAMESPACE::DOMElement* skyElem)
+-	{
+-        if (skyElem == NULL)
+-		{
+-			return;
+-		}
+-
+-		if (!XmlHelper::hasAttribute(skyElem, &quot;material&quot;) 
+-			|| !XmlHelper::hasAttribute(skyElem, &quot;type&quot;))
+-		{
+-			LOG_ERROR(Logger::RULES, &quot;&lt;sky&gt; element must have at least attributes 'type' and 'material'.&quot;);
+-		}
+-		else
+-		{
+-			Ogre::String type = XmlHelper::getAttributeValueAsStdString(skyElem, &quot;type&quot;);
+-			Ogre::String material = XmlHelper::getAttributeValueAsStdString(skyElem, &quot;material&quot;);
+-
+-			bool drawFirst = true;
+-			if (XmlHelper::hasAttribute(skyElem, &quot;drawfirst&quot;))
+-			{
+-				drawFirst = XmlHelper::getAttributeValueAsBool(skyElem, &quot;drawfirst&quot;);
+-			}
+-			
+-			Ogre::Real distance = 5000;
+-			if (XmlHelper::hasAttribute(skyElem, &quot;distance&quot;))
+-			{
+-				drawFirst = XmlHelper::getAttributeValueAsBool(skyElem, &quot;distance&quot;);
+-			}				
+-
+-			if (type == &quot;dome&quot;)
+-			{
+-				Ogre::Real curvature = 10;
+-				Ogre::Real tiling = 8;
+-
+-				DOMElement* domeSettings = XmlHelper::getChildNamed(skyElem, &quot;skydomesettings&quot;);
+-				if (domeSettings != NULL)
+-				{
+-					if (XmlHelper::hasAttribute(domeSettings, &quot;curvature&quot;))
+-					{
+-						curvature = XmlHelper::getAttributeValueAsReal(domeSettings, &quot;curvature&quot;);
+-					}
+-					if (XmlHelper::hasAttribute(domeSettings, &quot;tiling&quot;))
+-					{
+-						curvature = XmlHelper::getAttributeValueAsReal(domeSettings, &quot;tiling&quot;);
+-					}
+-				}
+-				CoreSubsystem::getSingleton().getWorld()-&gt;setSkyDome(
+-					true, material, curvature, tiling, distance, drawFirst);
+-			}
+-			else if (type == &quot;box&quot;)
+-			{
+-				CoreSubsystem::getSingleton().getWorld()-&gt;setSkyBox(true, material, distance, drawFirst);
+-			}
+-			else if (type == &quot;plane&quot;)
+-			{
+-				LOG_ERROR(Logger::RULES, &quot;Sky Plane is not implemented yet.&quot;);
+-			}
+-		}
+-	}
+-
+-    void MapLoader::setRootSceneNode(SceneNode* node)
+-    {
+-        mRootSceneNode = node;
+-        for (list&lt;AbstractMapNodeProcessor*&gt;::const_iterator it = mNodeProcessors.begin(); 
+-            it != mNodeProcessors.end(); ++it)
+-        {
+-            (*it)-&gt;setRootSceneNode(node);
+-        }
+-    }
+-    
+-} // namespace rl
+
+Copied: rl/trunk/engine/script/src/MapLoader.cpp (from rev 3365, rl/trunk/engine/rules/src/MapLoader.cpp)
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000436.html">[Dsa-hl-svn] r3365 - in rl/trunk/engine: rules/src script/src
+</A></li>
+	<LI>Next message: <A HREF="000438.html">[Dsa-hl-svn] r3367 - rl/trunk/engine/ui/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#437">[ date ]</a>
+              <a href="thread.html#437">[ thread ]</a>
+              <a href="subject.html#437">[ subject ]</a>
+              <a href="author.html#437">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4935 - in rl/trunk/engine: core/src script/swig
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-May/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4935%20-%20in%20rl/trunk/engine%3A%20core/src%20script/swig&In-Reply-To=%3C200905202248.n4KMm8E4020909%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001990.html">
+   <LINK REL="Next"  HREF="001992.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4935 - in rl/trunk/engine: core/src script/swig</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4935%20-%20in%20rl/trunk/engine%3A%20core/src%20script/swig&In-Reply-To=%3C200905202248.n4KMm8E4020909%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4935 - in rl/trunk/engine: core/src script/swig">melven at mail.berlios.de
+       </A><BR>
+    <I>Thu May 21 00:48:08 CEST 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001990.html">[Dsa-hl-svn] r4934 - in modules: common/scripts common/scripts/jobs	regressiontest/scripts
+</A></li>
+        <LI>Next message: <A HREF="001992.html">[Dsa-hl-svn] r4936 - in rl/branches/persistence2/engine: rules/src	script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1991">[ date ]</a>
+              <a href="thread.html#1991">[ thread ]</a>
+              <a href="subject.html#1991">[ subject ]</a>
+              <a href="author.html#1991">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-05-21 00:48:05 +0200 (Thu, 21 May 2009)
+New Revision: 4935
+
+Modified:
+   rl/trunk/engine/core/src/PlayAnimationJob.cpp
+   rl/trunk/engine/script/swig/RlCore.swig
+   rl/trunk/engine/script/swig/RlRules.swig
+Log:
+-fixed some outdated swig code
+-fixed PlayAnimationJob (don't delete Animations directly, but use the AnimationManager or the MeshObject (for MeshAnimations))
+
+
+Modified: rl/trunk/engine/core/src/PlayAnimationJob.cpp
+===================================================================
+--- rl/trunk/engine/core/src/PlayAnimationJob.cpp	2009-05-20 22:46:16 UTC (rev 4934)
++++ rl/trunk/engine/core/src/PlayAnimationJob.cpp	2009-05-20 22:48:05 UTC (rev 4935)
+@@ -103,15 +103,22 @@
+             if (mAnimationRunning &amp;&amp; mAnimation) 
+             {
+                 mAnimationRunning = false;
+-                if (mHoldOnEnd) 
++                    
++                mAnimation-&gt;pause();
++                
++                if (!mHoldOnEnd) 
+                 {
+-                    mAnimation-&gt;pause();
++                    if( mActor )
++                    {
++                        MeshObject* mo = dynamic_cast&lt;MeshObject*&gt;(mActor-&gt;getControlledObject());
++                        mo-&gt;stopAnimation(mAnimName);
++                    }
++                    else
++                    {
++                        //! TODO: what to do here?
++                    }
+                 }
+-                else
+-                {
+-                    mAnimation-&gt;stop();
+-                    delete mAnimation;
+-                }
++
+                 mAnimation = NULL;
+             }
+             return true;
+
+Modified: rl/trunk/engine/script/swig/RlCore.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlCore.swig	2009-05-20 22:46:16 UTC (rev 4934)
++++ rl/trunk/engine/script/swig/RlCore.swig	2009-05-20 22:48:05 UTC (rev 4935)
+@@ -1053,6 +1053,7 @@
+     PlayAnimationJob(Actor* actor, const Ogre::String&amp; anim, int loops = 1,
+ 		bool replaceAllAnims=true);
+     virtual ~PlayAnimationJob();
++    virtual void setHoldOnEnd(bool hold);
+     
+ private:
+     bool execute(Ogre::Real time);
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2009-05-20 22:46:16 UTC (rev 4934)
++++ rl/trunk/engine/script/swig/RlRules.swig	2009-05-20 22:48:05 UTC (rev 4935)
+@@ -302,7 +302,7 @@
+         virtual int getTargetClass() const;
+         virtual void doAction(rl::GameObject *object, rl::Creature *actor,
+             rl::GameObject *target);
+-        virtual bool canDo(rl::GameObject* object, rl::Creature* actor) const;
++        virtual bool canDo(rl::GameObject* object, rl::Creature* actor, rl::GameObject* target = NULL) const;
+             
+         void setGroup(rl::ActionGroup* group);
+         rl::ActionGroup* getGroup() const;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001990.html">[Dsa-hl-svn] r4934 - in modules: common/scripts common/scripts/jobs	regressiontest/scripts
+</A></li>
+	<LI>Next message: <A HREF="001992.html">[Dsa-hl-svn] r4936 - in rl/branches/persistence2/engine: rules/src	script/src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1991">[ date ]</a>
+              <a href="thread.html#1991">[ thread ]</a>
+              <a href="subject.html#1991">[ subject ]</a>
+              <a href="author.html#1991">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

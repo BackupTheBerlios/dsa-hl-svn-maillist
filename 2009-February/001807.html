@@ -1,0 +1,1521 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4750 - in dependencies/OgreNewt_ngt: . inc src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4750%20-%20in%20dependencies/OgreNewt_ngt%3A%20.%20inc%20src&In-Reply-To=%3C200902091846.n19IkA7H005532%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001806.html">
+   <LINK REL="Next"  HREF="001808.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4750 - in dependencies/OgreNewt_ngt: . inc src</H1>
+    <B>melven at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4750%20-%20in%20dependencies/OgreNewt_ngt%3A%20.%20inc%20src&In-Reply-To=%3C200902091846.n19IkA7H005532%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4750 - in dependencies/OgreNewt_ngt: . inc src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Feb  9 19:46:10 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001806.html">[Dsa-hl-svn] r4749 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj Mac/tools editors/Lockenwickler	editors/Lockenwickler/_eric4project editors/Lockenwickler/src	editors/Lockenwickler/src/media engine/core/include	engine/core/src engine/script/src
+</A></li>
+        <LI>Next message: <A HREF="001808.html">[Dsa-hl-svn] r4751 - in rl/branches/newton20: cmake	engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1807">[ date ]</a>
+              <a href="thread.html#1807">[ thread ]</a>
+              <a href="subject.html#1807">[ subject ]</a>
+              <a href="author.html#1807">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2009-02-09 19:46:03 +0100 (Mon, 09 Feb 2009)
+New Revision: 4750
+
+Added:
+   dependencies/OgreNewt_ngt/src/OgreNewt_BodyInAABBIterator.cpp
+Modified:
+   dependencies/OgreNewt_ngt/CMakeLists.txt
+   dependencies/OgreNewt_ngt/inc/OgreNewt.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_BodyInAABBIterator.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+   dependencies/OgreNewt_ngt/inc/OgreNewt_World.h
+   dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_PlayerController.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+   dependencies/OgreNewt_ngt/src/OgreNewt_World.cpp
+Log:
+-removed &quot;Singletons&quot; and made former singleton-classes a &quot;part&quot; of the OgreNewt::World
+-some changes in the PlayerController (not finished yet!)
+
+
+Modified: dependencies/OgreNewt_ngt/CMakeLists.txt
+===================================================================
+--- dependencies/OgreNewt_ngt/CMakeLists.txt	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/CMakeLists.txt	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -71,6 +71,7 @@
+ SET(OgreNewt_LIB_SRCS
+ src/OgreNewt_BasicJoints.cpp
+ src/OgreNewt_Body.cpp
++src/OgreNewt_BodyInAABBIterator.cpp
+ src/OgreNewt_Collision.cpp
+ src/OgreNewt_CollisionPrimitives.cpp
+ src/OgreNewt_CollisionSerializer.cpp
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -52,7 +52,8 @@
+ 
+     Problems and missing features in this version
+         - PlayerController not finished
+-        - only one world is possible, the Debugger and Body
++        - the convexcast seems to have difficulties with more than one contact (I've segfault when debugging it with the OgreNewt::Debugger...)
++          I added a hack, it only creates one contact at the maximum at the moment!
+         - this library supports the newton functions for multithreading but there are several functions/classes in this
+           library itself, that are not thread safe (I don't need multiple threads)
+         - the copied MovableText class (in Tools::OgreAddons) seems to have some graphics error (it's used
+@@ -75,7 +76,9 @@
+             - added a lots of new simple &quot;iterators&quot;:
+                 - for Bodies use body = World-&gt;getFirstBody() and body = body-&gt;getNext()
+                 - for the 
+-            - BodyIterator renamed to BodyInAABBIterator, it does now only iterate throuch bodies in a specific AABB
++            - BodyIterator renamed to BodyInAABBIterator, it does now only iterate through bodies in a specific AABB
++            - removed &quot;Singleton-classes&quot;, the debugger and the BodyInAABBIterator are now part of a World
++              (call world-&gt;getDebugger() / world-&gt;getBodyInAABBIterator() to use these classes!)
+         - added support for trigger-volumes (ConvexCollision::setAsTriggerVolume ...)
+         - added support for convexcasts
+         - added additional debugging features:
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_BodyInAABBIterator.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_BodyInAABBIterator.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_BodyInAABBIterator.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -28,8 +28,8 @@
+ //! Iterate through all bodies in a specific AABB in the world.
+ /*!
+ 	this class is an easy way to loop through all bodies in an AABB in the world, performing some kind of action.
+-    if you want to iterate through all bodies, use the world-&gt;getFirstBody and body-&gt;getNext functions
+-    warning: this class is not thread safe
++    if you want to iterate through all bodies, use the world-&gt;getFirstBody and body-&gt;getNext functions.
++    You can access this class via World::getBodyInAABBIterator()
+ */
+ class _OgreNewtExport BodyInAABBIterator
+ {
+@@ -38,62 +38,39 @@
+ 	/*!
+ 		This function will be called for every body iterated.  you can put any functionality you might want inside this function.
+ 	*/
+-	typedef boost::function&lt;void(Body*)&gt; IteratorCallback;
++	typedef boost::function&lt;void(const Body*)&gt; IteratorCallback;
+ 
+-	//! init the singleton class.
+-	/*!
+-		This function must be called before any iterator functions are called!
+-		\param world pointer to the OgreNewt::World.  
+-	*/
+-	void Init( const OgreNewt::World* world ) { m_world = world; }
+-
+ 	//! perform an iteration
+ 	/*!
+ 		will call the provided function for all bodies in the world.
+ 		\param callback pointer to a function to be used
++        \warning you cannot call this functions from different threads at the same time
+ 	*/
+-	void go( const Ogre::AxisAlignedBox &amp;aabb, IteratorCallback callback )
++	void go( const Ogre::AxisAlignedBox &amp;aabb, IteratorCallback callback ) const;
++	template &lt;class c&gt; void go( const Ogre::AxisAlignedBox &amp;aabb, boost::function&lt;void(c*, Body*)&gt; callback, c* instancedClassPointer ) const
+ 	{
+-		m_callback = callback;
+-        NewtonWorldForEachBodyInAABBDo(m_world-&gt;getNewtonWorld(), &amp;aabb.getMinimum().x, &amp;aabb.getMaximum().x, newtonIterator);
+-        
+-	}
+-	template &lt;class c&gt; void go( const Ogre::AxisAlignedBox &amp;aabb, boost::function&lt;void(c*, Body*)&gt; callback, c* instancedClassPointer )
+-	{
+ 		go ( aabb, boost::bind(callback, instancedClassPointer, _1) );
+ 	}
+ 
+-	//! get the singleton.
+-	/*!
+-		The body iterator is a singleton class, only one instance should exist per application.  you can perform many different
+-		kinds of iterations by using different callback functions.
+-	*/
+-	static BodyInAABBIterator&amp; getSingleton()
+-	{
+-		static BodyInAABBIterator instance;
+-		return instance;
+-	}
++protected:
++    friend class OgreNewt::World;
++    //! this function must only be used by an instance of the OgreNewt::World class
++    BodyInAABBIterator(const OgreNewt::World* world);
+ 
+-	//! destructor
+-	~BodyInAABBIterator() {}
++	const OgreNewt::World*			m_world;
++	mutable IteratorCallback		m_callback;
+ 
+-protected:
++private:
++    //! this function is declared private, so nobody can use it!
++	BodyInAABBIterator();
+ 
+-	BodyInAABBIterator()
+-	{
+-		m_world = NULL;
+-		m_callback = NULL;
+-	}
++    //! this function is declared private, so nobody can use it!
++    BodyInAABBIterator(const BodyInAABBIterator&amp;);
+ 
+-	static void _CDECL newtonIterator( const NewtonBody* body )
+-	{
+-		OgreNewt::Body* bod = (OgreNewt::Body*)NewtonBodyGetUserData( body );
+-		getSingleton().m_callback( bod );
+-	}
++    //! this function is declared private, so nobody can use it!
++    const BodyInAABBIterator&amp; operator=(const BodyInAABBIterator&amp;);
+ 
+-	const OgreNewt::World*			m_world;
+-	IteratorCallback				m_callback;
+-    
++	static void _CDECL newtonIterator( const NewtonBody* body );
+ };
+ 
+ 
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_Debugger.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -25,7 +25,8 @@
+ 
+ 	//! For viewing the Newton rigid bodies visually.
+ 	/*!
+-		This class implements a debug view of the Newton world.  it is a Singleton!
++		This class implements a debug view of the Newton world. You can access it via World::getDebugger().
++        It needs to be initialized (call World::getDebugger().init(...)).
+ 	*/
+ 	class _OgreNewtExport Debugger
+ 	{
+@@ -33,9 +34,6 @@
+ 	public:
+ 		~Debugger();
+ 
+-		//! get the singleton reference
+-		static Debugger&amp; getSingleton();
+-
+ 		//! init the debugger.
+ 		/*
+ 			\param smgr pointer to your Ogre::SceneManager
+@@ -48,9 +46,8 @@
+ 		//! show the newton world
+ 		/*!
+ 			Draws the Newton world as 3D lines with informative text above each body
+-			\param world pointer to the OgreNewt::World
+ 		*/
+-		void showDebugInformation( OgreNewt::World* world );
++		void showDebugInformation();
+ 
+ 		//! remove lines and text drawn
+ 		void hideDebugInformation();
+@@ -90,10 +87,13 @@
+ 
+         //! this function is used internally
+         void addHitBody(const OgreNewt::Body* body);
++
+ 	protected:
+-		Debugger();
+-	
+-	protected:
++        friend class OgreNewt::World;
++        //! this function must only be used by an instance of the OgreNewt::World class
++        Debugger(const OgreNewt::World* world);
++
++        const OgreNewt::World*        m_world;
+ 		Ogre::SceneNode*		m_debugnode;
+         typedef std::map&lt;int, Ogre::ColourValue&gt; MaterialIdColorMap;
+         MaterialIdColorMap      m_materialcolors;
+@@ -117,11 +117,20 @@
+         typedef std::map&lt;OgreNewt::Body*, BodyDebugData&gt; BodyDebugDataMap;
+         BodyDebugDataMap m_cachemap;
+ 
+-        // create debug information for one body
++        //! create debug information for one body
+         void processBody(Body* body);
+ 
+ 
+     private:
++        //! this function is declared private, so nobody can use it!
++        Debugger();
++
++        //! this function is declared private, so nobody can use it!
++        Debugger(const Debugger&amp;);
++
++        //! this function is declared private, so nobody can use it!
++        const Debugger&amp; operator=(const Debugger&amp;);
++
+ 		static void _CDECL newtonPerPoly( void* userData, int vertexCount, const float* faceVertec, int id );
+ 	};
+ 
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_PlayerController.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -80,8 +80,8 @@
+ protected:
+     OgreNewt::Body *m_body; // we need this again, because in the joint it's constant!
+ 
+-    Ogre::Real m_forwardSpeed, m_sideSpeed, m_maxStepHeight;
+-    Ogre::Radian m_heading, m_maxSlope, m_restitution;
++    Ogre::Real m_forwardSpeed, m_sideSpeed, m_maxStepHeight, m_restitution;
++    Ogre::Radian m_heading, m_maxSlope;
+     Ogre::Vector3 m_upVector;
+ 
+     bool m_isInJumpState;
+@@ -107,7 +107,8 @@
+ 
+ 
+     // other parameters
+-    int m_maxCollisionsIterations;
++    int m_maxCollisionsIteration;
++    int m_maxContactsCount;
+ 
+     // variables used in submitConstraint
+     Ogre::Quaternion m_lastOri;
+@@ -130,42 +131,40 @@
+     class StaticConvexCast : public OgreNewt::BasicConvexcast
+     {
+         public:
+-            StaticConvexCast(PlayerController *pc, const OgreNewt::World* world,
+-                             const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+-                    m_parent(pc)
+-                {}
++            StaticConvexCast(PlayerController *pc) : m_parent(pc) {}
+ 
++            void go(const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
++                    const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread)
++            {
++                go(m_parent-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread);
++            }
++
+             virtual bool userPreFilterCallback(OgreNewt::Body* body) {return m_parent-&gt;convexStaticCastPreFilter(body);}
+         private:
+             OgreNewt::PlayerController* m_parent;
++            using BasicConvexcast::go;
+     };
+ 
+     class DynamicConvexCast : public OgreNewt::BasicConvexcast
+     {
+         public:
+-            DynamicConvexCast(PlayerController *pc, const OgreNewt::World* world,
+-                             const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+-                    m_parent(pc)
+-                {}
++            DynamicConvexCast(PlayerController *pc) : m_parent(pc) {}
+ 
++            void go(const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
++                    const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread)
++            {
++                go(m_parent-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread);
++            }
++
+             virtual bool userPreFilterCallback(OgreNewt::Body* body) {return m_parent-&gt;convexDynamicCastPreFilter(body);}
+         private:
+             OgreNewt::PlayerController* m_parent;
++            using BasicConvexcast::go;
+     };
+ 
+     class AllBodyConvexCast : public OgreNewt::BasicConvexcast
+     {
+         public:
+-            AllBodyConvexCast(PlayerController *pc, const OgreNewt::World* world,
+-                             const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt,
+-                             const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int thread) :
+-                    BasicConvexcast(pc-&gt;getControlledBody()-&gt;getWorld(), col, startpt, colori, endpt, maxcontactscount, thread),
+-                    m_parent(pc)
+-                {}
+ 
+             virtual bool userPreFilterCallback(OgreNewt::Body* body) {return m_parent-&gt;convexAllBodyCastPreFilter(body);}
+         private:
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_RayCast.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -1,11 +1,11 @@
+ /* 
+-	OgreNewt Library
++    OgreNewt Library
+ 
+-	Ogre implementation of Newton Game Dynamics SDK
++    Ogre implementation of Newton Game Dynamics SDK
+ 
+-	OgreNewt basically has no license, you may use any or all of the library however you desire... I hope it can help you in any way.
++    OgreNewt basically has no license, you may use any or all of the library however you desire... I hope it can help you in any way.
+ 
+-		by Walaber
++        by Walaber
+ 
+ */
+ 
+@@ -25,59 +25,59 @@
+ 
+ //! general raycast
+ /*!
+-	General class representing a raycast query in the Newton world.  this class should be inherited to create specific raycast behavior.
++    General class representing a raycast query in the Newton world.  this class should be inherited to create specific raycast behavior.
+ */
+ class _OgreNewtExport Raycast
+ {
+ public:
+ 
+-	//! constructor
+-	Raycast();
+-	
+-	//! destuctor.
+-	virtual ~Raycast();
++    //! constructor
++    Raycast();
++    
++    //! destuctor.
++    virtual ~Raycast();
+ 
+-	//! performs the raycast.  
+-	/*!
+-		call after creating the object.
+-		\param world pointer to the OgreNewt::World
+-		\param startpt starting point of ray in global space
+-		\param endpt ending point of ray in global space
+-	*/
+-	void go( const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt );
++    //! performs the raycast.  
++    /*!
++        call after creating the object.
++        \param world pointer to the OgreNewt::World
++        \param startpt starting point of ray in global space
++        \param endpt ending point of ray in global space
++    */
++    void go( const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt );
+ 
+-	//! user callback pre-filter function.
+-	/*!
+-		This function is an optional pre-filter to completely ignore specific bodies during the raycast.
+-		return false from this function to ignore this body, return true (default) to accept it.
+-	*/
+-	virtual bool userPreFilterCallback( OgreNewt::Body* body ) { return true; }
++    //! user callback pre-filter function.
++    /*!
++        This function is an optional pre-filter to completely ignore specific bodies during the raycast.
++        return false from this function to ignore this body, return true (default) to accept it.
++    */
++    virtual bool userPreFilterCallback( OgreNewt::Body* body ) { return true; }
+ 
+-	//! user callback filter function
+-	/*! user callback function.  
+-		This function must be implemented by the user.
+-		Newton calls this function for each body intersected by the ray.  however it doesn't
+-		necessarily go perfect cloest-to-farthest order.
+-		return true and the callback will only be called for bodies closer to the start point than the current body.
+-		return false and the callback will call for any other bodies, even those farther than the current one.
+-	*/
+-	virtual bool userCallback( OgreNewt::Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID ) = 0;
++    //! user callback filter function
++    /*! user callback function.  
++        This function must be implemented by the user.
++        Newton calls this function for each body intersected by the ray.  however it doesn't
++        necessarily go perfect cloest-to-farthest order.
++        return true and the callback will only be called for bodies closer to the start point than the current body.
++        return false and the callback will call for any other bodies, even those farther than the current one.
++    */
++    virtual bool userCallback( OgreNewt::Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID ) = 0;
+ 
+-	friend float CollisionPrimitives::TreeCollision::newtonRayCastCallback(float distance, float *normal, int faceId, void *userData);
++    friend float CollisionPrimitives::TreeCollision::newtonRayCastCallback(float distance, float *normal, int faceId, void *userData);
+ protected:
+-	//! save the last OgreNewt::Body from the newtonRaycastPreFilter to use this for example the TreeCollisionRayCallback
+-	OgreNewt::Body *m_treecollisioncallback_lastbody;
++    //! save the last OgreNewt::Body from the newtonRaycastPreFilter to use this for example the TreeCollisionRayCallback
++    OgreNewt::Body *m_treecollisioncallback_lastbody;
+ 
+-	//! save if this body was already added by RayCastCallback from TreeCollision
+-	bool m_treecollisioncallback_bodyalreadyadded;
++    //! save if this body was already added by RayCastCallback from TreeCollision
++    bool m_treecollisioncallback_bodyalreadyadded;
+ 
+ private:
+ 
+-	//! callback used for running the raycast itself... used internally
+-	static float _CDECL newtonRaycastFilter(const NewtonBody* body, const float* hitNormal, int collisionID, void* userData, float intersetParam);
++    //! callback used for running the raycast itself... used internally
++    static float _CDECL newtonRaycastFilter(const NewtonBody* body, const float* hitNormal, int collisionID, void* userData, float intersetParam);
+ 
+-	//! callback used for running the raycast prefilder... used internally
+-	static unsigned _CDECL newtonRaycastPreFilter( const NewtonBody* body, const NewtonCollision* collision, void* userData );
++    //! callback used for running the raycast prefilder... used internally
++    static unsigned _CDECL newtonRaycastPreFilter( const NewtonBody* body, const NewtonCollision* collision, void* userData );
+ };
+ 
+ 
+@@ -85,102 +85,114 @@
+ 
+ //! Basic implementation of the raycast
+ /*!
+-	This class is provided for general raycast use.  it returns information about all bodies hit by the ray.
++    This class is provided for general raycast use.  it returns information about all bodies hit by the ray.
+ */
+ class _OgreNewtExport BasicRaycast : public Raycast
+ {
+ public:
+-	//! simple class that represents a single raycast rigid body intersection.
+-	class _OgreNewtExport BasicRaycastInfo
+-	{
+-	public:
+-		Ogre::Real					mDistance;	//!&lt; dist from point1 of the raycast, in range [0,1].
+-		OgreNewt::Body*				mBody;	//!&lt; pointer to body intersected with
+-		int							mCollisionID;		//!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
+-		Ogre::Vector3				mNormal;	//!&lt; normal of intersection.
++    //! simple class that represents a single raycast rigid body intersection.
++    class _OgreNewtExport BasicRaycastInfo
++    {
++    public:
++        Ogre::Real        mDistance;     //!&lt; dist from point1 of the raycast, in range [0,1].
++        OgreNewt::Body*   mBody;         //!&lt; pointer to body intersected with
++        int               mCollisionID;  //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
++        Ogre::Vector3     mNormal;       //!&lt; normal of intersection.
+ 
+-		BasicRaycastInfo();
+-		~BasicRaycastInfo();
++        BasicRaycastInfo();
++        ~BasicRaycastInfo();
+         
+-                bool operator&lt;(const BasicRaycastInfo&amp; rhs) const
+-                {
+-                    return mDistance &lt; rhs.mDistance;
+-                }
+-	};
++        bool operator&lt;(const BasicRaycastInfo&amp; rhs) const
++        {
++            return mDistance &lt; rhs.mDistance;
++        }
++    };
+ 
+ 
+-	//! constructor
+-	/*!
+-		performs a raycast, then the results can be queried from the object after creation.
++    //! empty constructor
++    BasicRaycast();
++
++    //! constructor
++    /*!
++        performs a raycast, then the results can be queried from the object after creation.
+         \param world pointer to the OgreNewt::World
+         \param startpt starting point of the ray in global space
+         \param endpt ending point of the ray in global space
+         \param sorted sort the results by distance
+-        \param prefilter pointer to a prefilter function
+-	*/
+-	BasicRaycast( const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool sorted);
+-	
+-	//! destuctor.
+-	~BasicRaycast();
++    */
++    BasicRaycast( const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool sorted);
+ 
+-	//! the all-important custom callback function.
+-	bool userCallback( Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID );
++    //! perform a raycast
++    /*!
++        performs a raycast, then the results can be queried from the object after creation.
++        \param world pointer to the OgreNewt::World
++        \param startpt starting point of the ray in global space
++        \param endpt ending point of the ray in global space
++        \param sorted sort the results by distance
++    */
++    void go( const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool sorted);
++    
++    //! destuctor.
++    ~BasicRaycast();
+ 
+-	// ------------------------------------------------------
+-	// the following functions can be used to retrieve information about the bodies collided by the ray.
+-	
+-	//! how many bodies did we hit?
+-	int getHitCount() const;
++    //! the all-important custom callback function.
++    bool userCallback( Body* body, Ogre::Real distance, const Ogre::Vector3&amp; normal, int collisionID );
+ 
+-	//! retrieve the raycast info for a specific hit.
+-	BasicRaycastInfo getInfoAt( int hitnum ) const;
++    // ------------------------------------------------------
++    // the following functions can be used to retrieve information about the bodies collided by the ray.
++    
++    //! how many bodies did we hit?
++    int getHitCount() const;
+ 
+-	//! get the closest body hit by the ray.
+-	BasicRaycastInfo getFirstHit() const;
++    //! retrieve the raycast info for a specific hit.
++    BasicRaycastInfo getInfoAt( int hitnum ) const;
+ 
++    //! get the closest body hit by the ray.
++    BasicRaycastInfo getFirstHit() const;
+ 
++
+ private:
+ 
+ 
+-	// container for results.
+-	typedef std::vector&lt;BasicRaycastInfo&gt; RaycastInfoList;
++    // container for results.
++    typedef std::vector&lt;BasicRaycastInfo&gt; RaycastInfoList;
+ 
+-	RaycastInfoList mRayList;
++    RaycastInfoList mRayList;
+ };
+ 
+ //! general convexcast
+ /*!
+-	General class representing a convexcast query in the Newton world.  this class should be inherited to create specific convexcast behavior.
++    General class representing a convexcast query in the Newton world.  this class should be inherited to create specific convexcast behavior.
+ */
+ class _OgreNewtExport Convexcast
+ {
+ public:
+ 
+-	//! constructor
+-	Convexcast();
+-	
+-	//! destuctor.
+-	virtual ~Convexcast();
++    //! constructor
++    Convexcast();
++    
++    //! destuctor.
++    virtual ~Convexcast();
+ 
+-	//! performs the convexcast.
+-	/*!
+-		call after creating the object.
+-		\param world pointer to the OgreNewt::World
+-                \param col pointer to a convex collision shape used for the cast
+-		\param startpt starting point of ray in global space
+-                \param colori orientation of the collision in global space
+-		\param endpt ending point of ray in global space
+-                \param maxcontactscount maximum number of contacts that should be saved,
+-                       set to 0 if you only need the distance to the first intersection
+-	*/
+-	void go( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
++    //! performs the convexcast.
++    /*!
++        call after creating the object.
++        \param world pointer to the OgreNewt::World
++        \param col pointer to a convex collision shape used for the cast
++        \param startpt starting point of ray in global space
++        \param colori orientation of the collision in global space
++        \param endpt ending point of ray in global space
++        \param maxcontactscount maximum number of contacts that should be saved,
++               set to 0 if you only need the distance to the first intersection
++    */
++    void go( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
+ 
+-	//! user callback pre-filter function.
+-	/*!
+-		This function is an optional pre-filter to completely ignore specific bodies during the raycast.
+-		return false from this function to ignore this body, return true (default) to accept it.
+-	*/
+-	virtual bool userPreFilterCallback( OgreNewt::Body* body ) { return true; }
++    //! user callback pre-filter function.
++    /*!
++        This function is an optional pre-filter to completely ignore specific bodies during the raycast.
++        return false from this function to ignore this body, return true (default) to accept it.
++    */
++    virtual bool userPreFilterCallback( OgreNewt::Body* body ) { return true; }
+ 
+ protected:
+ 
+@@ -198,8 +210,8 @@
+ 
+ private:
+ 
+-	//! callback used for running the raycast prefilter... used internally
+-	static unsigned _CDECL newtonConvexcastPreFilter( const NewtonBody* body, const NewtonCollision* collision, void* userData );
++    //! callback used for running the raycast prefilter... used internally
++    static unsigned _CDECL newtonConvexcastPreFilter( const NewtonBody* body, const NewtonCollision* collision, void* userData );
+ };
+ 
+ 
+@@ -207,68 +219,67 @@
+ 
+ //! Basic implementation of the convexcast
+ /*!
+-	This class is provided for general convexcast use.  it returns information about the body hit by the convexcast
++    This class is provided for general convexcast use.  it returns information about the body hit by the convexcast
+ */
+ class _OgreNewtExport BasicConvexcast : public Convexcast
+ {
+ public:
+-	//! simple class that represents a single convexcast contact
+-	class _OgreNewtExport ConvexcastContactInfo
+-	{
+-	public:
+-		//Ogre::Real              mDistance;      //!&lt; dist from point1 of the raycast, in range [0,1].
+-		OgreNewt::Body*         mBody;          //!&lt; pointer to body intersected with
+-		int                     mCollisionID;   //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
+-		Ogre::Vector3           mContactNormal; //!&lt; normal of intersection.
+-                Ogre::Vector3           mContactPoint;  //!&lt; point of the contact in global space
+-                Ogre::Real              mContactPenetration; //!&lt; contact penetration at collision point
++    //! simple class that represents a single convexcast contact
++    class _OgreNewtExport ConvexcastContactInfo
++    {
++    public:
++        //Ogre::Real              mDistance;              //!&lt; dist from point1 of the raycast, in range [0,1].
++        OgreNewt::Body*         mBody;                  //!&lt; pointer to body intersected with
++        int                     mCollisionID;           //!&lt; collision ID of the primitive hit by the ray (for compound collision bodies)
++        Ogre::Vector3           mContactNormal;         //!&lt; normal of intersection.
++        Ogre::Vector3           mContactPoint;          //!&lt; point of the contact in global space
++        Ogre::Real              mContactPenetration;    //!&lt; contact penetration at collision point
+ 
+-		ConvexcastContactInfo();
+-		~ConvexcastContactInfo();
+-	};
++        ConvexcastContactInfo();
++        ~ConvexcastContactInfo();
++    };
+ 
+ 
+-        //! empty constructor
+-        BasicConvexcast();
++    //! empty constructor
++    BasicConvexcast();
+ 
+-	//! constructor
+-	/*!
+-		performs a raycast, then the results can be queried from the object after creation.
+-		\param world pointer to the OgreNewt::World
+-                \param col pointer to a convex collision shape used for the cast
+-		\param startpt starting point of ray in global space
+-                \param colori orientation of the collision in global space
+-		\param endpt ending point of ray in global space
+-                \param maxcontactscount maximum number of contacts that should be saved
+-                \param prefilter pointer to a prefilter function
+-	*/
+-	BasicConvexcast( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
++    //! constructor
++    /*!
++        performs a raycast, then the results can be queried from the object after creation.
++        \param world pointer to the OgreNewt::World
++        \param col pointer to a convex collision shape used for the cast
++        \param startpt starting point of ray in global space
++        \param colori orientation of the collision in global space
++        \param endpt ending point of ray in global space
++        \param maxcontactscount maximum number of contacts that should be saved        
++    */
++    BasicConvexcast( const OgreNewt::World* world, const OgreNewt::Collision* col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex);
+ 
+-	//! destuctor.
+-	~BasicConvexcast();
++    //! destuctor.
++    ~BasicConvexcast();
+ 
+-	// ------------------------------------------------------
+-	// the following functions can be used to retrieve information about the bodies collided by the convexcast.
+-	
+-	//! how many bodies did we hit? if maxcontactscount is to small, this value will be smaller too!
+-	int calculateBodyHitCount() const;
++    // ------------------------------------------------------
++    // the following functions can be used to retrieve information about the bodies collided by the convexcast.
++    
++    //! how many bodies did we hit? if maxcontactscount is to small, this value will be smaller too!
++    int calculateBodyHitCount() const;
+ 
+         //! how many contacts do we have
+         int getContactsCount() const;
+ 
+-	//! retrieve the raycast info for a specific hit.
+-	ConvexcastContactInfo getInfoAt( int hitnum ) const;
++    //! retrieve the raycast info for a specific hit.
++    ConvexcastContactInfo getInfoAt( int hitnum ) const;
+ 
+         //! retrieve the distance to the first contact (in range [0,1] from startpt to endpt)
+         Ogre::Real getDistanceToFirstHit() const;
+ };
+ 
+ 
+-}	// end NAMESPACE OgreNewt
+-	
++}    // end NAMESPACE OgreNewt
++    
+ 
+ 
+ 
+ 
+-#endif	// _INCLUDE_OGRENEWT_RAYCAST
++#endif    // _INCLUDE_OGRENEWT_RAYCAST
+ 
+
+Modified: dependencies/OgreNewt_ngt/inc/OgreNewt_World.h
+===================================================================
+--- dependencies/OgreNewt_ngt/inc/OgreNewt_World.h	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/inc/OgreNewt_World.h	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -12,6 +12,8 @@
+ 
+ 
+ #include &quot;OgreNewt_Prerequisites.h&quot;
++#include &quot;OgreNewt_BodyInAABBIterator.h&quot;
++#include &quot;OgreNewt_Debugger.h&quot;
+ #include &lt;boost/function.hpp&gt;
+ #include &lt;boost/bind.hpp&gt;
+ 
+@@ -192,14 +194,21 @@
+ 	//! updates only the collision of the world and call the callback functions if necessary, can be used for an collision only system
+ 	void CollisionUpdate() { NewtonCollisionUpdate( m_world ); }
+     //! to iterate through all bodies call this function and then use body-&gt;getNext()
+-    Body* getFirstBody();
++    Body* getFirstBody() const;
+ 
+     /*
+     //! to iterate through all material-pairs use this function and then call matPair-&gt;getNext()
+     MaterialGroupID* getFirstMaterialGroupID();
+     */
+ 
++    //! get a bodyInAABBIterator for this world
++    const BodyInAABBIterator&amp; getBodyInAABBIterator() const {return m_bodyInAABBIterator;}
+ 
++    //! get the debugger for this world
++    /*!
++     * the debugger needs to be initialized (Debugger::init(...) ) in order to work correctly
++    */
++    Debugger&amp; getDebugger() const {return m_debugger;}
+ 
+ protected:
+ 	
+@@ -207,7 +216,11 @@
+ 	MaterialID* m_defaultMatID;
+ 
+ 	LeaveWorldCallback m_leaveCallback;
++    
++    BodyInAABBIterator m_bodyInAABBIterator;
+ 
++    mutable Debugger m_debugger;
++
+ private:
+ 
+ 	static void _CDECL newtonLeaveWorld( const NewtonBody* body, int threadIndex );
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_BasicFrameListener.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -14,7 +14,7 @@
+ 	m_elapsed = 0.0f;
+ 
+ 	// add the standard debug viewer.
+-	Debugger::getSingleton().init( mgr );
++	W-&gt;getDebugger().init( mgr );
+ 
+ 	OIS::ParamList pl;
+ 	size_t windowHnd = 0;
+@@ -83,11 +83,11 @@
+ 
+ 	if (mKeyboard-&gt;isKeyDown(OIS::KC_F3))
+ 	{
+-		Debugger::getSingleton().showDebugInformation( m_World );
++		m_world-&gt;getDebugger().showDebugInformation( m_World );
+ 	}
+ 	else
+ 	{
+-		Debugger::getSingleton().hideDebugInformation();
++		m_world-&gt;getDebugger().hideDebugInformation();
+ 	}
+ 
+ 	
+
+Added: dependencies/OgreNewt_ngt/src/OgreNewt_BodyInAABBIterator.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_BodyInAABBIterator.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_BodyInAABBIterator.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -0,0 +1,33 @@
++#include &quot;OgreNewt_BodyInAABBIterator.h&quot;
++#include &quot;OgreNewt_World.h&quot;
++
++
++namespace OgreNewt
++{
++
++
++BodyInAABBIterator::BodyInAABBIterator(const OgreNewt::World* world) :
++    m_world(world),
++    m_callback(NULL)
++{
++}
++
++void BodyInAABBIterator::go( const Ogre::AxisAlignedBox &amp;aabb, IteratorCallback callback) const
++{
++    m_callback = callback;
++    NewtonWorldForEachBodyInAABBDo(m_world-&gt;getNewtonWorld(), &amp;aabb.getMinimum().x, &amp;aabb.getMaximum().x, BodyInAABBIterator::newtonIterator);
++}
++
++
++void _CDECL BodyInAABBIterator::newtonIterator( const NewtonBody* newtonBody )
++{
++    const OgreNewt::Body* body = (const OgreNewt::Body*) NewtonBodyGetUserData(newtonBody);
++    const NewtonWorld* newtonWorld = NewtonBodyGetWorld(newtonBody);
++    const OgreNewt::World* world = (const OgreNewt::World*) NewtonWorldGetUserData(newtonWorld);
++
++    world-&gt;getBodyInAABBIterator().m_callback(body);
++}
++
++
++}
++
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_Debugger.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -10,8 +10,9 @@
+ //////////////////////////////////////////////////////////
+ // DEUBBER FUNCTIONS
+ //////////////////////////////////////////////////////////
+-Debugger::Debugger()
++Debugger::Debugger(const OgreNewt::World* world)
+ {
++    m_world = world;
+     m_debugnode = NULL;
+     m_defaultcolor = Ogre::ColourValue::White;
+ 
+@@ -25,15 +26,9 @@
+ 
+ Debugger::~Debugger()
+ {
+-    Debugger::getSingleton().deInit();
++    deInit();
+ }
+ 
+-Debugger&amp; Debugger::getSingleton()
+-{
+-    static Debugger instance;
+-    return instance;
+-}
+-		
+ void Debugger::init( Ogre::SceneManager* smgr )
+ {
+     if( !m_debugnode )
+@@ -75,12 +70,12 @@
+ }
+ 
+ 
+-void Debugger::showDebugInformation( OgreNewt::World* world )
++void Debugger::showDebugInformation( )
+ {
+     m_debugnode-&gt;removeAllChildren();
+ 
+     // make the new lines.
+-    for( Body* body = world-&gt;getFirstBody(); body; body = body-&gt;getNext() )
++    for( Body* body = m_world-&gt;getFirstBody(); body; body = body-&gt;getNext() )
+     {
+         processBody(body);
+     }
+@@ -89,7 +84,7 @@
+ 
+     // delete old entries
+     BodyDebugDataMap newmap;
+-    for(BodyDebugDataMap::iterator it = Debugger::getSingleton().m_cachemap.begin(); it != Debugger::getSingleton().m_cachemap.end(); it++)
++    for(BodyDebugDataMap::iterator it = m_cachemap.begin(); it != m_cachemap.end(); it++)
+     {
+         if( it-&gt;second.m_updated )
+             newmap.insert(*it);
+@@ -100,7 +95,7 @@
+                 delete mo;
+         }
+     }
+-    Debugger::getSingleton().m_cachemap.swap(newmap);
++    m_cachemap.swap(newmap);
+ }
+ 
+ void Debugger::hideDebugInformation()
+@@ -148,14 +143,14 @@
+ 
+ 
+     // look for cached data
+-    BodyDebugData* data = &amp;Debugger::getSingleton().m_cachemap[bod];
++    BodyDebugData* data = &amp;m_cachemap[bod];
+     if( data-&gt;m_lastcol == bod-&gt;getCollision() ) // use cached data
+     {
+         // set new position...
+         data-&gt;m_node-&gt;setPosition(pos);
+         data-&gt;m_node-&gt;setOrientation(ori);
+         data-&gt;m_updated = 1;
+-        Debugger::getSingleton().m_debugnode-&gt;addChild(data-&gt;m_node);
++        m_debugnode-&gt;addChild(data-&gt;m_node);
+         data-&gt;m_text-&gt;setCaption(oss_info.str());
+         data-&gt;m_text-&gt;setLocalTranslation(bod-&gt;getAABB().getSize().y*1.1*Ogre::Vector3::UNIT_Y);
+     }
+@@ -171,7 +166,7 @@
+             data-&gt;m_node-&gt;setOrientation(ori);
+         }
+         else
+-            data-&gt;m_node = Debugger::getSingleton().m_debugnode-&gt;createChildSceneNode(pos, ori);
++            data-&gt;m_node = m_debugnode-&gt;createChildSceneNode(pos, ori);
+ 
+         if( data-&gt;m_lines )
+             data-&gt;m_lines-&gt;clear();
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_PlayerController.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_PlayerController.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_PlayerController.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -3,6 +3,7 @@
+ #include &quot;OgreNewt_Collision.h&quot;
+ #include &quot;OgreNewt_CollisionPrimitives.h&quot;
+ #include &quot;OgreNewt_World.h&quot;
++#include &lt;vector&gt;
+ 
+ namespace OgreNewt
+ {
+@@ -11,6 +12,9 @@
+     CustomJoint(6, child, NULL),
+     m_body(child)
+ {
++    // initialize some non settable parameters
++    m_maxCollisionsIteration = 8;
++    m_maxContactsCount = 16;
+     // initialize settable values
+     m_forwardSpeed = 0;
+     m_sideSpeed = 0;
+@@ -31,6 +35,8 @@
+     // initialize sensor-shape parameters
+     m_staticRadiusFactor = 1.125f;
+     m_dynamicRadiusFactor = 1.5f;
++    //! TODO I think there's an error with the radius...
++    m_dynamicRadiusFactor = 0.75f;
+     m_floorFinderRadiusFactor = 1.0f;
+     m_maxPlayerHeightPaddFactor = 0.01f;
+     m_sensorShapeSegments = 32;
+@@ -138,8 +144,8 @@
+     height = aab.getMaximum().y - aab.getMinimum().y;
+ 
+     Ogre::Real rx = aab.getMaximum().x - aab.getMinimum().x;
+-    Ogre::Real ry = aab.getMaximum().y - aab.getMinimum().y;
+-    radius = std::max(rx,ry);
++    Ogre::Real rz = aab.getMaximum().z - aab.getMinimum().z;
++    radius = std::max(rx,rz) / 2.0f;
+ }
+ 
+ 
+@@ -183,7 +189,69 @@
+     m_body-&gt;unFreeze();
+ }
+ 
++/*
++// helper class
++class HitBodyCache : public BasicConvexcast::ConvexcastContactInfo
++{
++    public:
++        Ogre::Vector3 mVel;
++        Ogre::Vector3 mOmega;
++        HitBodyCache() {}
++        HitBodyCache(const BasicConvexcast::ConvexcastContactInfo&amp; info) :
++            BasicConvexcast::ConvexcastContactInfo(info)
++        {
++            mVel = mBody-&gt;getVelocity();
++            mOmega = mBody-&gt;getOmega();
++        }
++};
+ 
++// helper class
++class HitBodyVector : public std::vector&lt;HitBodyCache&gt;
++{
++    public:
++        void getCollidingBodiesFromConvexcast(const BasicConvexcast&amp; cast)
++        {
++            // find first contact with each body and cache it
++            resize(0);
++            for(int i = 0; i &lt; size(); i++)
++            {
++                int j;
++                for( j = 0; j &lt; size(); j++ )
++                {
++                    if( cast.getInfoAt(i).mBody == at(j).mBody )
++                        break;
++                }
++                if( j == size() )
++                    push_back(HitBodyCache(cast.getInfoAt(0)));
++            }
++        }
++};
++*/
++
++// helper class
++class HitBodyVector : public std::vector&lt;Body*&gt;
++{
++    public:
++        void getCollidingBodiesFromConvexcast(const BasicConvexcast&amp; cast)
++        {
++            // find first contact with each body and cache it
++            resize(0);
++            for(int i = 0; i &lt; size(); i++)
++            {
++                Body* body = cast.getInfoAt(i).mBody;
++                int j;
++                for( j = 0; j &lt; size(); j++ )
++                {
++                    if( body == at(j) )
++                        break;
++                }
++                if( j == size() )
++                    push_back(body);
++            }
++        }
++};
++
++
+ void PlayerController::submitConstraint( Ogre::Real timestep, int threadindex )
+ {
+ 
+@@ -308,7 +376,197 @@
+ 
+ 
+ 
++
++            // ----------------- DYNAMIC CONVEXCAST ---------------------
++
++            // first cast directly in front of the player
++            Ogre::Vector3 startCast = pos;
++            Ogre::Vector3 endCast = startCast;
++            DynamicConvexCast dynamicConvexCast(this);
++            HitBodyVector hitBodyVec;
++            hitBodyVec.reserve(m_maxContactsCount);
++
++            endCast = startCast + horizontalDesiredVel*timestep;
++            dynamicConvexCast.go(m_dynamicsSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
++
++            for(int iterations = 0; iterations &lt; m_maxCollisionsIteration; iterations++)
++            {
++                bool velocCorrection;
++                Ogre::Real timeToFirstContact;
++                int numOfContacts;
++
++
++                numOfContacts = dynamicConvexCast.getContactsCount();
++                if( numOfContacts == 0 )
++                    break;
++
++                timeToFirstContact = (dynamicConvexCast.getInfoAt(0).mContactPoint - startCast).dotProduct(horizontalDesiredVel) / 
++                                     horizontalDesiredVel.squaredLength();
++                velocCorrection = false;
++
++
++                // correct velocity if the body cannot be pushed and calculate impulse if it can be pushed
++                for(int i = 0; i &lt; numOfContacts; i++)
++                {
++                    Ogre::Real hitMass;
++                    Ogre::Vector3 hitInertia;
++                    Ogre::Vector3 hitNormal;
++                    Body* hitBody = dynamicConvexCast.getInfoAt(i).mBody;
++                    hitBody-&gt;getMassMatrix(hitMass, hitInertia);
++                    hitNormal = dynamicConvexCast.getInfoAt(i).mContactNormal;
++                    hitNormal.y = 0;
++                    hitNormal.normalise();
++
++                    if( !canPushBody(hitBody) )
++                    {
++                        Ogre::Real reboundVel, penetrationVel;
++                        Ogre::Real penetration;
++                        penetration = dynamicConvexCast.getInfoAt(i).mContactPenetration;
++                        penetration = std::max(penetration, 0.1f);
++                        penetrationVel = -0.5f/timestep * penetration;
++
++                        reboundVel = horizontalDesiredVel.dotProduct(hitNormal) * (1.0f+m_restitution) + penetrationVel;
++                        if( reboundVel &lt; 0.0f )
++                        {
++                            velocCorrection = true;
++                            horizontalDesiredVel -= hitNormal*reboundVel;
++                        }
++                    }
++                    else // if( !canPushBody(body) )  -&gt; can push body
++                    {
++                        Ogre::Real relVel, projVel, massWeigh, momentumDamper, playerNormalVel;
++                        Ogre::Vector3 hitCenterOfMass, hitPos, hitContactPointVel;
++                        Ogre::Quaternion hitOri;
++
++                        hitBody-&gt;getPositionOrientation(hitPos, hitOri);
++                        hitCenterOfMass = hitBody-&gt;getCenterOfMass();
++                        // calculate hitContactPointVel
++                        hitCenterOfMass = hitOri*hitCenterOfMass;
++                        hitContactPointVel = hitBody-&gt;getOmega() * (dynamicConvexCast.getInfoAt(i).mContactPoint - hitCenterOfMass);
++                        hitContactPointVel.y = 0.0f; //! WHY??
++                        hitContactPointVel += hitBody-&gt;getVelocity();
++
++                        massWeigh = mass / (mass + hitMass);
++                        massWeigh = std::min(massWeigh, 0.5f);
++
++                        projVel = hitContactPointVel.dotProduct(hitNormal);
++                        playerNormalVel = horizontalDesiredVel.dotProduct(hitNormal);
++                        relVel = playerNormalVel * massWeigh - projVel;
++                        if( relVel &lt; 0.0f )
++                        {
++                            momentumDamper = 0.1f;
++                            velocCorrection = true;
++                            // correct horizontalDesiredVel
++                            horizontalDesiredVel -= hitNormal*( relVel * (1.0f - momentumDamper) + playerNormalVel*(1.0f - massWeigh) );
++
++                            //apply impulse to hit body
++                            hitBody-&gt;addImpulse(hitNormal*relVel*momentumDamper, hitCenterOfMass); // not the real CenterOffMass any more!
++                        }
++                    }
++                }
++
++
++
++                // now restore hit body state and apply a force to archive the hit impulse
++                hitBodyVec.getCollidingBodiesFromConvexcast(dynamicConvexCast);
++                for(int i = 0; i &lt; hitBodyVec.size(); i++)
++                {
++                    Ogre::Real hitMass;
++                    Ogre::Vector3 hitInertia;
++                    Body* hitBody = hitBodyVec[i];
++                    hitBody-&gt;getMassMatrix(hitMass, hitInertia);
++
++                    if( canPushBody(hitBody) &amp;&amp; mass &gt; 1.0e-3f )
++                    {
++                        Ogre::Vector3 hitPos, force, torque;
++                        Ogre::Quaternion hitOri;
++
++                        hitBody-&gt;getPositionOrientation(hitPos, hitOri);
++                        
++                        // calculate the force and the torque to archive the desired push
++                        force = (vel - hitBody-&gt;getVelocity())*mass/timestep - hitBody-&gt;getForceAcceleration();
++                        hitBody-&gt;addForce(force);
++                        
++                        torque = (omega - hitBody-&gt;getOmega())/timestep * (hitOri*hitInertia) - hitBody-&gt;getTorqueAcceleration();
++                        hitBody-&gt;addTorque(torque);
++                    }
++                }
++
++
++                // has the horizontalDesiredVel changed, so we need a new cast?
++                if( timeToFirstContact &gt; 0.01*timestep &amp;&amp; velocCorrection )
++                {
++                    endCast = startCast + horizontalDesiredVel*timestep;
++                    dynamicConvexCast.go(m_dynamicsSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
++                }
++            }
++
++
++            // ----------------- STATIC CONVEXCAST ---------------------
++            StaticConvexCast staticConvexCast(this);
++            startCast.y += 0.5f*m_maxStepHeight;
++            endCast = startCast + horizontalDesiredVel*timestep;
++
++            staticConvexCast.go(m_horizontalSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
++            for(int iterations = 0; iterations &lt; m_maxCollisionsIteration; iterations++)
++            {
++                bool velocCorrection;
++                Ogre::Real timeToFirstContact;
++                int numOfContacts;
++
++
++                numOfContacts = staticConvexCast.getContactsCount();
++                if( numOfContacts == 0 )
++                    break;
++
++                timeToFirstContact = (staticConvexCast.getInfoAt(0).mContactPoint - startCast).dotProduct(horizontalDesiredVel) / 
++                                     horizontalDesiredVel.squaredLength();
++                velocCorrection = false;
++
++
++                // correct velocity (like body that can't be pushed above!)
++                for(int i = 0; i &lt; numOfContacts; i++)
++                {
++                    Ogre::Real hitMass;
++                    Ogre::Vector3 hitInertia;
++                    Ogre::Vector3 hitNormal;
++                    Ogre::Real reboundVel, penetrationVel;
++                    Ogre::Real penetration;
++
++                    Body* hitBody = staticConvexCast.getInfoAt(i).mBody;
++                    hitBody-&gt;getMassMatrix(hitMass, hitInertia);
++                    hitNormal = staticConvexCast.getInfoAt(i).mContactNormal;
++                    hitNormal.y = 0;
++                    hitNormal.normalise();
++
++                    penetration = staticConvexCast.getInfoAt(i).mContactPenetration;
++                    penetration = std::max(penetration, 0.1f);
++                    penetrationVel = -0.5f/timestep * penetration;
++
++                    reboundVel = horizontalDesiredVel.dotProduct(hitNormal) * (1.0f+m_restitution) + penetrationVel;
++                    if( reboundVel &lt; 0.0f )
++                    {
++                        velocCorrection = true;
++                        horizontalDesiredVel -= hitNormal*reboundVel;
++                    }
++                }
++
++
++                // has the horizontalDesiredVel changed, so we need a new cast?
++                if( timeToFirstContact &gt; 0.01*timestep &amp;&amp; velocCorrection )
++                {
++                    endCast = startCast + horizontalDesiredVel*timestep;
++                    staticConvexCast.go(m_horizontalSensorShape, startCast, yawOri, endCast, m_maxContactsCount, threadindex);
++                }
++            }
++//! TODO MISSING FURTHER CASTS ETC
++
++
++
++
++
+             // calculate force needed for desired velocity
++            horizontalDesiredVel.y = 0.0f;
+             Ogre::Vector3 force = m_body-&gt;calculateInverseDynamicsForce(timestep, horizontalDesiredVel);
+             Ogre::Vector3 forceAcc = m_body-&gt;getForceAcceleration();
+             force -= forceAcc;
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_RayCast.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -3,6 +3,7 @@
+ #include &quot;OgreNewt_Debugger.h&quot;
+ #include &quot;OgreNewt_World.h&quot;
+ #include &quot;OgreNewt_Collision.h&quot;
++#include &quot;OgreNewt_Body.h&quot;
+ 
+ 
+ namespace OgreNewt
+@@ -15,9 +16,9 @@
+ 
+ 	void Raycast::go(const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt )
+ 	{
+-        if( Debugger::getSingleton().isRaycastRecording() )
++        if( world-&gt;getDebugger().isRaycastRecording() )
+         {
+-            Debugger::getSingleton().addRay(startpt, endpt);
++            world-&gt;getDebugger().addRay(startpt, endpt);
+         }
+ 
+         m_treecollisioncallback_lastbody = NULL;
+@@ -35,6 +36,7 @@
+ 		Raycast* me = (Raycast*)userData;
+ 
+ 		Body* bod = (Body*)NewtonBodyGetUserData( body );
++        const World* world = bod-&gt;getWorld();
+ 		Ogre::Vector3 normal = Ogre::Vector3( hitNormal[0], hitNormal[1], hitNormal[2] );
+ 
+ 
+@@ -42,9 +44,9 @@
+             return intersectParam;
+ 
+ 
+-        if( Debugger::getSingleton().isRaycastRecording() &amp;&amp; Debugger::getSingleton().isRaycastRecordingHitBodies() )
++        if( world-&gt;getDebugger().isRaycastRecording() &amp;&amp; world-&gt;getDebugger().isRaycastRecordingHitBodies() )
+         {
+-            Debugger::getSingleton().addHitBody(bod);
++            world-&gt;getDebugger().addHitBody(bod);
+         }
+ 
+ 
+@@ -61,6 +63,7 @@
+ 		Raycast* me = (Raycast*)userData;
+ 
+ 		Body* bod = (Body*)NewtonBodyGetUserData( body );
++        const World* world = bod-&gt;getWorld();
+ 
+ 
+         me-&gt;m_treecollisioncallback_bodyalreadyadded = false;
+@@ -71,9 +74,9 @@
+ 		else
+         {
+ 
+-            if( Debugger::getSingleton().isRaycastRecording() &amp;&amp; Debugger::getSingleton().isRaycastRecordingHitBodies() )
++            if( world-&gt;getDebugger().isRaycastRecording() &amp;&amp; world-&gt;getDebugger().isRaycastRecordingHitBodies() )
+             {
+-                Debugger::getSingleton().addDiscardedBody(bod);
++                world-&gt;getDebugger().addDiscardedBody(bod);
+             }
+ 
+ 			return 0;
+@@ -93,16 +96,26 @@
+ 	BasicRaycast::BasicRaycastInfo::~BasicRaycastInfo() {}
+ 
+ 
++	BasicRaycast::BasicRaycast()    {}
++
++
+ 	BasicRaycast::BasicRaycast(const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool sorted)
+         : Raycast()
+ 	{
+-		go( world, startpt, endpt );
+-                if( sorted )
+-                {
+-                    std::sort(mRayList.begin(), mRayList.end());
+-                }
++		go( world, startpt, endpt, sorted );
+ 	}
+ 
++
++    void BasicRaycast::go(const OgreNewt::World* world, const Ogre::Vector3&amp; startpt, const Ogre::Vector3&amp; endpt, bool sorted)
++	{
++        Raycast::go( world, startpt, endpt );
++        if( sorted )
++        {
++            std::sort(mRayList.begin(), mRayList.end());
++        }
++	}
++
++
+ 	BasicRaycast::~BasicRaycast()	{}
+ 
+ 
+@@ -181,9 +194,9 @@
+ 	void Convexcast::go(const OgreNewt::World* world, const OgreNewt::Collision *col, const Ogre::Vector3&amp; startpt, const Ogre::Quaternion &amp;colori, const Ogre::Vector3&amp; endpt, int maxcontactscount, int threadIndex)
+ 	{
+ 
+-        if( Debugger::getSingleton().isRaycastRecording() )
++        if( world-&gt;getDebugger().isRaycastRecording() )
+         {
+-            Debugger::getSingleton().addConvexRay(col, startpt, colori, endpt);
++            world-&gt;getDebugger().addConvexRay(col, startpt, colori, endpt);
+         }
+                 // reserve memory
+                 if( mReturnInfoListSize &lt; maxcontactscount )
+@@ -195,6 +208,7 @@
+                     mReturnInfoListSize = maxcontactscount;
+                 }
+ 
++                memset(mReturnInfoList, 0, sizeof(mReturnInfoList[0])*mReturnInfoListSize);
+ 		// perform the cast
+                 float matrix[16];
+                 OgreNewt::Converters::QuatPosToMatrix(colori, startpt, &amp;matrix[0] );
+@@ -204,12 +218,19 @@
+                                                &amp;mFirstContactDistance, this, OgreNewt::Convexcast::newtonConvexcastPreFilter,
+                                                mReturnInfoList, mReturnInfoListSize, threadIndex);
+ 
+-            if( Debugger::getSingleton().isRaycastRecording() &amp;&amp; Debugger::getSingleton().isRaycastRecordingHitBodies() )
++                //! TODO: that's a hack here!!
++                if( mReturnInfoListLength &gt; 0 )
++                {
++                    mReturnInfoListLength = 1;
++                }
++
++            if( world-&gt;getDebugger().isRaycastRecording() &amp;&amp; world-&gt;getDebugger().isRaycastRecordingHitBodies() )
+             {
++                Body* body;
+                 for(int i = 0; i &lt; mReturnInfoListLength; i++)
+                 {
+-                    Body* body = (OgreNewt::Body*) NewtonBodyGetUserData(mReturnInfoList[i].m_hitBody);
+-                    Debugger::getSingleton().addHitBody(body);
++                    body = (OgreNewt::Body*) NewtonBodyGetUserData(mReturnInfoList[i].m_hitBody);
++                    world-&gt;getDebugger().addHitBody(body);
+                 }
+             }
+ 	}
+@@ -220,15 +241,16 @@
+ 		Convexcast* me = (Convexcast*)userData;
+ 
+ 		Body* bod = (Body*)NewtonBodyGetUserData( body );
++        const World* world = bod-&gt;getWorld();
+ 
+ 		if (me-&gt;userPreFilterCallback( bod ))
+ 			return 1;
+ 		else
+         {
+ 
+-            if( Debugger::getSingleton().isRaycastRecording() &amp;&amp; Debugger::getSingleton().isRaycastRecordingHitBodies() )
++            if( world-&gt;getDebugger().isRaycastRecording() &amp;&amp; world-&gt;getDebugger().isRaycastRecordingHitBodies() )
+             {
+-                Debugger::getSingleton().addDiscardedBody(bod);
++                world-&gt;getDebugger().addDiscardedBody(bod);
+             }
+ 
+ 			return 0;
+@@ -260,14 +282,15 @@
+ 	int BasicConvexcast::calculateBodyHitCount() const
+         {
+             int count = 0;
+-            const NewtonBody * bod = NULL;
+             for( int i = 0; i &lt; mReturnInfoListLength; i++ )
+             {
+-                if( bod != mReturnInfoList[i].m_hitBody )
+-                {
++                int j;
++                for( j = 0; j &lt; i; j++ )
++                    if( mReturnInfoList[i].m_hitBody == mReturnInfoList[j].m_hitBody )
++                        break;
++
++                if( j == i )
+                     count++;
+-                    bod = mReturnInfoList[i].m_hitBody;
+-                }
+             }
+ 
+             return count;
+
+Modified: dependencies/OgreNewt_ngt/src/OgreNewt_World.cpp
+===================================================================
+--- dependencies/OgreNewt_ngt/src/OgreNewt_World.cpp	2009-02-09 18:44:47 UTC (rev 4749)
++++ dependencies/OgreNewt_ngt/src/OgreNewt_World.cpp	2009-02-09 18:46:03 UTC (rev 4750)
+@@ -7,7 +7,9 @@
+ 
+ 
+ // Constructor
+-World::World()
++World::World() :
++    m_bodyInAABBIterator(this),
++    m_debugger(this)
+ {
+ 	m_limits = Ogre::AxisAlignedBox(Ogre::Vector3(-100,-100,-100), Ogre::Vector3(100,100,100));
+ 
+@@ -83,7 +85,7 @@
+ 	}
+ }
+ 
+-Body* World::getFirstBody()
++Body* World::getFirstBody() const
+ {
+     NewtonBody* body = NewtonWorldGetFirstBody( m_world );
+     if( body )
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001806.html">[Dsa-hl-svn] r4749 - in rl/branches/newton20:	Mac/Rastullah.xcodeproj Mac/tools editors/Lockenwickler	editors/Lockenwickler/_eric4project editors/Lockenwickler/src	editors/Lockenwickler/src/media engine/core/include	engine/core/src engine/script/src
+</A></li>
+	<LI>Next message: <A HREF="001808.html">[Dsa-hl-svn] r4751 - in rl/branches/newton20: cmake	engine/common/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1807">[ date ]</a>
+              <a href="thread.html#1807">[ thread ]</a>
+              <a href="subject.html#1807">[ subject ]</a>
+              <a href="author.html#1807">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

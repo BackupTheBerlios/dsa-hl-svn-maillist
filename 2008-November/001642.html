@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4585 - in rl/branches/persistence/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-November/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4585%20-%20in%20rl/branches/persistence/core%3A%20include%20src&In-Reply-To=%3C200811091413.mA9EDlXb029215%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001641.html">
+   <LINK REL="Next"  HREF="001643.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4585 - in rl/branches/persistence/core: include src</H1>
+    <B>timm at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4585%20-%20in%20rl/branches/persistence/core%3A%20include%20src&In-Reply-To=%3C200811091413.mA9EDlXb029215%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4585 - in rl/branches/persistence/core: include src">timm at mail.berlios.de
+       </A><BR>
+    <I>Sun Nov  9 15:13:47 CET 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001641.html">[Dsa-hl-svn] r4584 - rl/branches/persistence/script/src
+</A></li>
+        <LI>Next message: <A HREF="001643.html">[Dsa-hl-svn] r4586 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1642">[ date ]</a>
+              <a href="thread.html#1642">[ thread ]</a>
+              <a href="subject.html#1642">[ subject ]</a>
+              <a href="author.html#1642">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: timm
+Date: 2008-11-09 15:13:40 +0100 (Sun, 09 Nov 2008)
+New Revision: 4585
+
+Modified:
+   rl/branches/persistence/core/include/ContentModule.h
+   rl/branches/persistence/core/src/ContentModule.cpp
+Log:
+ContentModule is not SaveGameData anymore
+
+Modified: rl/branches/persistence/core/include/ContentModule.h
+===================================================================
+--- rl/branches/persistence/core/include/ContentModule.h	2008-11-09 13:35:01 UTC (rev 4584)
++++ rl/branches/persistence/core/include/ContentModule.h	2008-11-09 14:13:40 UTC (rev 4585)
+@@ -24,7 +24,7 @@
+ namespace rl
+ {
+ 
+-    class _RlCoreExport ContentModule : public SaveGameData
++    class _RlCoreExport ContentModule
+ 	{
+ 	public:
+ 		ContentModule(const Ogre::String&amp; id, const CeGuiString&amp; name, bool common, long minimumEngineVersion);
+@@ -52,12 +52,6 @@
+         bool isLoaded() const;
+ 
+         void registerContentLoader(ContentLoader* loader);
+-
+-        CeGuiString getXmlNodeIdentifier() const;
+-        void writeData(SaveGameFileWriter* writer);
+-        void readData(SaveGameFileReader* reader);
+-        /// defines the loading/saving order higher priority are saved last and loaded first
+-        int getPriority() const;
+ 	private:
+         typedef std::vector&lt;ContentLoader*&gt; ContentLoaderVector;
+         ContentLoaderVector mContentLoaders;
+
+Modified: rl/branches/persistence/core/src/ContentModule.cpp
+===================================================================
+--- rl/branches/persistence/core/src/ContentModule.cpp	2008-11-09 13:35:01 UTC (rev 4584)
++++ rl/branches/persistence/core/src/ContentModule.cpp	2008-11-09 14:13:40 UTC (rev 4585)
+@@ -110,8 +110,6 @@
+ 
+     void ContentModule::initialize()
+     {
+-        SaveGameManager::getSingleton().registerSaveGameData(this);
+-
+         Ogre::String moduleDir = getDirectory();
+ 
+         Ogre::String resourceGroup = getId();
+@@ -191,7 +189,6 @@
+ 
+     void ContentModule::unload()
+     {
+-        SaveGameManager::getSingleton().unregisterSaveGameData(this);
+         for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
+         {
+             (*it)-&gt;unloadContent();
+@@ -211,38 +208,4 @@
+     {
+         mContentLoaders.push_back(loader);
+     }
+-
+-    CeGuiString ContentModule::getXmlNodeIdentifier() const
+-    {
+-        return &quot;ContentModule&quot;;
+-    }
+-
+-    using namespace XERCES_CPP_NAMESPACE;
+-
+-    void ContentModule::writeData(SaveGameFileWriter* writer)
+-    {
+-        if(!this-&gt;isCommon())
+-        {
+-            LOG_MESSAGE(Logger::CORE, &quot;Saving ContentLoaders&quot;);
+-            DOMElement* contentLoadersNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), writer-&gt;getDocument()-&gt;getDocumentElement(), getXmlNodeIdentifier().c_str());
+-            writer-&gt;setAttributeValueAsString(contentLoadersNode, &quot;name&quot;, mName);
+-
+-            for(ContentLoaderVector::const_iterator it = mContentLoaders.begin(); it != mContentLoaders.end(); ++it)
+-            {
+-                DOMElement* contentLoaderNode = writer-&gt;appendChildElement(writer-&gt;getDocument(), contentLoadersNode, &quot;contentloader&quot;);
+-                writer-&gt;setAttributeValueAsString(contentLoaderNode, &quot;classname&quot;, Property((*it)-&gt;getClassName()));
+-                writer-&gt;writeEachPropertyToElem(contentLoaderNode, (*it)-&gt;getAllProperties()-&gt;toPropertyMap());
+-            }
+-        }
+-    }
+-
+-    void ContentModule::readData(SaveGameFileReader* reader)
+-    {
+-    }
+-
+-    /// defines the loading/saving order higher priority are saved last and loaded first
+-    int ContentModule::getPriority() const
+-    {
+-        return 10;
+-    }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001641.html">[Dsa-hl-svn] r4584 - rl/branches/persistence/script/src
+</A></li>
+	<LI>Next message: <A HREF="001643.html">[Dsa-hl-svn] r4586 - in rl/trunk/editors/Lockenwickler: . src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1642">[ date ]</a>
+              <a href="thread.html#1642">[ thread ]</a>
+              <a href="subject.html#1642">[ subject ]</a>
+              <a href="author.html#1642">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

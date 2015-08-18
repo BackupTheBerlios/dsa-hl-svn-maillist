@@ -1,0 +1,447 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r2953 - rl/trunk/engine/ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-January/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2953%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200701082105.l08L5rqJ011374%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000023.html">
+   <LINK REL="Next"  HREF="000025.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r2953 - rl/trunk/engine/ui/src</H1>
+    <B>melven at BerliOS</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r2953%20-%20rl/trunk/engine/ui/src&In-Reply-To=%3C200701082105.l08L5rqJ011374%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r2953 - rl/trunk/engine/ui/src">melven at mail.berlios.de
+       </A><BR>
+    <I>Mon Jan  8 22:05:53 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000023.html">[Dsa-hl-svn] r2952 - modules/config
+</A></li>
+        <LI>Next message: <A HREF="000025.html">[Dsa-hl-svn] r2954 - in rl/trunk/engine: script startup
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#24">[ date ]</a>
+              <a href="thread.html#24">[ thread ]</a>
+              <a href="subject.html#24">[ subject ]</a>
+              <a href="author.html#24">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: melven
+Date: 2007-01-08 22:05:52 +0100 (Mon, 08 Jan 2007)
+New Revision: 2953
+
+Modified:
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+Log:
+bugs behoben in animationen (sprung), aber bewegungen noch unvollst?\195?\164ndig
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-01-08 20:09:47 UTC (rev 2952)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-01-08 21:05:52 UTC (rev 2953)
+@@ -198,6 +198,17 @@
+         updateSelection();
+ 
+ 
++        // Do we need to reset the character?
++        static Real charAnimationOccTime = 0;
++        charAnimationOccTime += elapsedTime;
++        if( mCharacterState.mPose != CharacterState::Stand &amp;&amp;
++            mCharacterState.mPose != CharacterState::Crouch )
++        {
++            if( charAnimationOccTime &gt; 10.0f ) // mehr als ... sekunden!
++                mCharacterState.mPose = CharacterState::Stand;
++        }
++        else
++            charAnimationOccTime = 0;
+ 
+         // Do we need to reset the Camera?
+         Vector3 charPos = mCharacterActor-&gt;getWorldPosition();
+@@ -289,11 +300,11 @@
+             }
+             else if( movement &amp; MOVE_LEFT )
+             {
+-                mCharacterState.mDesiredVel = Vector3(1,0,0) * gs / 3.6;
++                mCharacterState.mDesiredVel = Vector3(-1,0,0) * gs / 3.6;
+             }
+             else if( movement &amp; MOVE_RIGHT )
+             {
+-                mCharacterState.mDesiredVel = Vector3(-1,0,0) * gs / 3.6;
++                mCharacterState.mDesiredVel = Vector3(1,0,0) * gs / 3.6;
+             }
+ 
+             if (movement &amp; TURN_LEFT)  mYaw += rotationSpeed*elapsedTime;
+@@ -312,7 +323,83 @@
+ 
+         }
+ 
++/*
++// soll daf&#252;r sorgen, dass er auf dem
++// Boden bleibt und &#252;ber kleine Hindernisse kommt
+ 
++Quaternion orientation = mCharacterActor-&gt;getWorldOrientation();
++Vector3 position = mCharacterActor-&gt;getWorldPosition();
++Vector3 delta(0,0.05,0);
++position += delta;
++Real stepHeight = 0.5;
++Real stepWidth = 0.3;
++Vector3 dirVector = stepWidth*mCharacterState.mDesiredVel;
++dirVector.y = stepHeight;
++RaycastInfo info;
++Vector3 relCollPos;
++do
++{
++    // Raycast in Bewegungsrichtung
++    info = mRaycast-&gt;execute(
++        PhysicsManager::getSingleton()._getNewtonWorld(),
++        mCharBody-&gt;getMaterialGroupID(),
++        position, position + orientation * dirVector,
++        true);
++    if( info.mBody )
++    {
++        relCollPos = (info.mDistance * 1.1) * dirVector.normalisedCopy();
++        dirVector.y += 0.1;
++        break;
++    }
++    dirVector.y -= 0.2;
++}
++while( dirVector.y &gt; -stepHeight );
++
++// kann das Hindernis &#252;berwunden werden:
++dirVector = relCollPos;
++while( dirVector.y &lt;= stepHeight )
++{
++    info = mRaycast-&gt;execute(
++        PhysicsManager::getSingleton()._getNewtonWorld(),
++        mCharBody-&gt;getMaterialGroupID(),
++        position, position + orientation * dirVector,
++        true);
++    if( info.mBody )
++    {
++        break;
++    }
++    dirVector.y += 0.1;
++}
++
++// linie an der angegebenen Stelle anzeigen
++LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
++if(lineSet != NULL)
++{
++    lineSet-&gt;clear();
++    lineSet-&gt;addLine(delta, delta+dirVector, ColourValue::Blue);
++    lineSet-&gt;addLine(delta+dirVector, delta+2*dirVector, ColourValue::Red);
++    lineSet-&gt;addLine(delta, delta-dirVector, ColourValue::Red);
++    lineSet-&gt;addLine(delta, delta+relCollPos, ColourValue::White);
++}
++
++if( dirVector.y &lt; stepHeight &amp;&amp; dirVector.y &gt; -stepHeight )
++{
++    mCharacterState.mDesiredVel.y = dirVector.y;
++    // Bremsen wenn bergab:
++    if (dirVector.y &lt; 0)
++    {
++        mCharacterState.mDesiredVel *= (1 + dirVector.y/stepHeight * 0.5);
++    }
++}
++*/
++
++
++
++
++
++
++
++
+ 		mDesiredDistance -= im-&gt;getMouseRelativeZ() * 0.002;
+ 		if (mDesiredDistance &lt; mDistanceRange.first)
+ 		{
+@@ -401,6 +488,9 @@
+         // Character ausblenden, wenn Kamera zu nah.
+         if( mViewMode != VM_FIRST_PERSON )
+         {
++            Vector3 charPos;
++            Quaternion charOri;
++            mCharBody-&gt;getPositionOrientation(charPos, charOri);
+             Vector3 camPos;
+             Quaternion camOri;
+             mCamBody-&gt;getPositionOrientation(camPos, camOri);
+@@ -492,7 +582,7 @@
+             // der erste Sprung bleibt normal, jeder weitere Sprung ist ungef&#228;hr um
+             // die angegebene Zahl h&#246;her (eher 2*die angegebene Zahl oder so, 
+             // vermutlich wieder framedauer abh&#228;ngig!)
+-			setContactElasticity(0.0f); // was 0.3f 
++			setContactElasticity(0.3f); // was 0.3f 
+ 			setContactSoftness(0.01f);
+ 
+ 			setContactFrictionState(1, 0);
+@@ -575,38 +665,6 @@
+                         0);
+ 			    }
+ 
+-// NOCH NICHT FERTIG, TUT NOCH NICHTS
+-// soll daf&#252;r sorgen, dass er auf dem
+-// Boden bleibt und &#252;ber kleien Hindernisse kommt
+-/*
+-Degree angleToFloor (-9.0f);
+-RaycastInfo info;
+-bool foundFloor (false);
+-do
+-{
+-    // Raycast in Bewegungsrichtung
+-    info = mRaycast-&gt;execute(
+-        PhysicsManager::getSingleton()._getNewtonWorld(),
+-        mCharBody-&gt;getMaterialGroupID(),
+-        position, position + mCharacterState.mDesiredVel / 2.0,
+-        true);
+-    if( info.mBody ) // etwas gefunden
+-    {
+-        angleToFloor += Degree(10);
+-        foundFloor = true;
+-    }
+-    else
+-    {
+-        if (foundFloor)
+-            break;
+-        else
+-            angleToFloor -= Degree(10);
+-    }
+-}
+-while( angleToFloor &lt; Degree(60) &amp;&amp; angleToFloor &gt; Degree(-60) );
+-*/
+-
+-
+                 Real delay = 2 * PhysicsManager::getSingleton().getMaxTimestep(); // so ist die Beschleunigung unabh&#228;ngig von der framerate!
+                 force += mass*(orientation*mCharacterState.mDesiredVel - currentVel) / delay;
+             }
+@@ -1180,6 +1238,7 @@
+             {
+                 newAnimation = &quot;hocke_idle&quot;;
+                 mCharacterState.mPose = CharacterState::Crouch;
++                pt-&gt;fitToPose(newAnimation);
+             }
+             // kamera-offset interpolieren grrr
+             Real factor;
+@@ -1210,7 +1269,9 @@
+             MeshAnimation *meshAnim = mesh-&gt;getAnimation(&quot;hocke_zu_stehen&quot;);
+             if (meshAnim-&gt;getTimePlayed() &gt;= meshAnim-&gt;getLength())
+             {
++                newAnimation = &quot;idle&quot;;
+                 mCharacterState.mPose = CharacterState::Stand;
++                pt-&gt;fitToPose(newAnimation);
+             }
+             // kamera-offset interpolieren grrr
+             Real factor;
+@@ -1277,8 +1338,7 @@
+ 
+ 
+         // absichtlich kein else!
+-        if(mCharacterState.mPose == CharacterState::Stand &amp;&amp; !(movement &amp; MOVE_SNEAK)
+-            &amp;&amp; !(movement &amp; MOVE_JUMP))
++        if( mCharacterState.mPose == CharacterState::Stand &amp;&amp; !(movement &amp; MOVE_SNEAK) )
+         {
+             newAnimation = &quot;idle&quot;;
+ 
+@@ -1328,32 +1388,33 @@
+                 newAnimation = &quot;rennen&quot;;
+                 animSpeed = factor_rennen * vel;
+             }
+-        }
+-        else if(mCharacterState.mPose == CharacterState::Stand &amp;&amp; !(movement &amp; MOVE_SNEAK)
+-            &amp;&amp; (movement &amp; MOVE_JUMP))
+-        {
+-            // Beginn eines Sprunges
+-            if( lastAnimation == &quot;rennen&quot; )
++
++
++            if( movement &amp; MOVE_JUMP )
+             {
+-                newAnimation = &quot;rennen_absprung&quot;;
+-                animTimesToPlay = 1;
+-                animSpeed = factor_rennen_absprung * vel;
+-                mCharacterState.mPose = CharacterState::StartJump;
+-            }
+-            else 
+-            {
+-                if ( vel &gt; 0.1 )
++                // Beginn eines Sprunges
++                if( newAnimation == &quot;rennen&quot; )
+                 {
+-                    // erstmal anhalten!
+-                    movement = MOVE_NONE;
+-                    jumpNextFrame = true;
+-                }
+-                else
+-                {
+-                    newAnimation = &quot;idle_absprung&quot;;
++                    newAnimation = &quot;rennen_absprung&quot;;
+                     animTimesToPlay = 1;
++                    animSpeed = factor_rennen_absprung * vel;
+                     mCharacterState.mPose = CharacterState::StartJump;
+                 }
++                else 
++                {
++                    if ( vel &gt; 0.1 )
++                    {
++                        // erstmal anhalten!
++                        movement = MOVE_NONE;
++                        jumpNextFrame = true;
++                    }
++                    else
++                    {
++                        newAnimation = &quot;idle_absprung&quot;;
++                        animTimesToPlay = 1;
++                        mCharacterState.mPose = CharacterState::StartJump;
++                    }
++                }
+             }
+         }
+ 
+@@ -1365,11 +1426,11 @@
+ 
+         if (newAnimation != &quot;&quot;)
+         {
++            if( animSpeed &lt; 1 ) // nur schneller nicht langsamer ausf&#252;hren!
++                animSpeed = 1;
+             if (lastAnimation != newAnimation)
+             {
+-                // DIE REIHENFOLGE HIER IST EXTREM WICHTIG
+-                //mesh-&gt;getAnimation(newAnimation);
+-                pt-&gt;fitToPose(newAnimation);
++                //pt-&gt;fitToPose(newAnimation);
+                 mesh-&gt;stopAllAnimations();
+                 mesh-&gt;startAnimation(newAnimation, animSpeed, animTimesToPlay);
+                 lastAnimation = newAnimation;
+@@ -1385,86 +1446,6 @@
+                 }
+             }
+         }
+-
+-        
+-
+-/*
+-		if (mCharacterState.mCurrentMovementState != mCharacterState.mLastMovementState
+-            || mCharacterState.mIsAirBorne != lastAirBorne)
+-		{
+-            // Do we need to update coliision proxy?
+-            if (mCharacterState.mCurrentMovementState &amp; MOVE_SNEAK
+-                &amp;&amp; mCharacterState.mPose != CharacterState::Crouch)
+-            {
+-                pt-&gt;fitToPose(&quot;hocke_idle&quot;);
+-                mCharacterState.mPose = CharacterState::Crouch;
+-            }
+-            else if (!(mCharacterState.mCurrentMovementState &amp; MOVE_SNEAK)
+-                &amp;&amp; mCharacterState.mPose == CharacterState::Crouch)
+-            {
+-                pt-&gt;fitToPose(&quot;idle&quot;);
+-                mCharacterState.mPose = CharacterState::Stand;
+-            }
+-
+-			// Update animation state
+-            mesh-&gt;stopAllAnimations();
+-            if (mCharacterState.mIsAirBorne)
+-            {
+-            }
+-			else if (mCharacterState.mCurrentMovementState &amp; MOVE_SNEAK)
+-			{
+-				if (mCharacterState.mCurrentMovementState &amp; MOVE_FORWARD)
+-				{
+-					mesh-&gt;startAnimation(&quot;hocke_gehen&quot;);
+-				}
+-				else
+-				{
+-					mesh-&gt;startAnimation(&quot;hocke_idle&quot;);
+-				}
+-			}
+-			else if (isRunMovement(mCharacterState.mCurrentMovementState) 
+-				&amp;&amp; (mCharacterState.mCurrentMovementState != MOVE_RUN) 
+-				&amp;&amp; (mCharacterState.mCurrentMovementState != MOVE_RUN_LOCK))
+-			{
+-				mesh-&gt;startAnimation(&quot;rennen&quot;);
+-			}
+-			else if (mCharacterState.mCurrentMovementState == MOVE_NONE ||
+-				mCharacterState.mCurrentMovementState == MOVE_RUN)
+-			{
+-				mesh-&gt;startAnimation(&quot;idle&quot;);
+-			}
+-			else
+-			{
+-				// standard walk in any direction
+-				if (mCharacterState.mCurrentMovementState &amp; MOVE_FORWARD)
+-				{
+-					mesh-&gt;startAnimation(&quot;gehen&quot;);
+-				}
+-				else if (mCharacterState.mCurrentMovementState &amp; MOVE_BACKWARD)
+-				{
+-					mesh-&gt;startAnimation(&quot;gehen_rueckwaerts&quot;);
+-				}
+-				else if (mCharacterState.mCurrentMovementState &amp; MOVE_LEFT)
+-				{
+-					mesh-&gt;startAnimation(&quot;seitwaerts_links&quot;);
+-				}
+-				else if (mCharacterState.mCurrentMovementState &amp; MOVE_RIGHT)
+-				{
+-					mesh-&gt;startAnimation(&quot;seitwaerts_rechts&quot;);
+-				}
+-				else if (mCharacterState.mCurrentMovementState &amp; TURN_LEFT)
+-				{
+-					mesh-&gt;startAnimation(&quot;drehen_links&quot;);
+-				}
+-				else if (mCharacterState.mCurrentMovementState &amp; TURN_RIGHT)
+-				{
+-					mesh-&gt;startAnimation(&quot;drehen_rechts&quot;);
+-				}
+-			}
+-
+-            lastAirBorne = mCharacterState.mIsAirBorne;
+-		}
+-*/
+     }
+ 
+     //------------------------------------------------------------------------
+@@ -1667,9 +1648,9 @@
+         }
+ 
+         LineSetPrimitive* lineSet = static_cast&lt;LineSetPrimitive*&gt;(mPrimitive);
+-        lineSet-&gt;clear();
+-        lineSet-&gt;addLine(mLookAtOffset, mLookAtOffset + Vector3(0, 1.2, 0), ColourValue::Red);
+-        lineSet-&gt;addLine(Vector3::ZERO, mGravitation * 0.1, ColourValue::Green);
++        //lineSet-&gt;clear();
++        //lineSet-&gt;addLine(mLookAtOffset, mLookAtOffset + Vector3(0, 1.2, 0), ColourValue::Red);
++        //lineSet-&gt;addLine(Vector3::ZERO, mGravitation * 0.1, ColourValue::Green);
+     }
+ 
+     //------------------------------------------------------------------------
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000023.html">[Dsa-hl-svn] r2952 - modules/config
+</A></li>
+	<LI>Next message: <A HREF="000025.html">[Dsa-hl-svn] r2954 - in rl/trunk/engine: script startup
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#24">[ date ]</a>
+              <a href="thread.html#24">[ thread ]</a>
+              <a href="subject.html#24">[ subject ]</a>
+              <a href="author.html#24">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,517 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3256 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig ui ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3256%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/swig%20ui%20ui/include%20ui/src&In-Reply-To=%3C200704111959.l3BJxSJR000592%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000326.html">
+   <LINK REL="Next"  HREF="000328.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3256 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig ui ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3256%20-%20in%20rl/trunk/engine%3A%20core/include%20core/src%0A%09rules/include%20rules/src%20script/swig%20ui%20ui/include%20ui/src&In-Reply-To=%3C200704111959.l3BJxSJR000592%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3256 - in rl/trunk/engine: core/include core/src	rules/include rules/src script/swig ui ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 11 21:59:28 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000326.html">[Dsa-hl-svn] r3255 - rl/trunk/engine/rules/include
+</A></li>
+        <LI>Next message: <A HREF="000328.html">[Dsa-hl-svn] r3257 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#327">[ date ]</a>
+              <a href="thread.html#327">[ thread ]</a>
+              <a href="subject.html#327">[ subject ]</a>
+              <a href="author.html#327">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-04-11 21:59:08 +0200 (Wed, 11 Apr 2007)
+New Revision: 3256
+
+Modified:
+   rl/trunk/engine/core/include/SceneQuery.h
+   rl/trunk/engine/core/include/World.h
+   rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+   rl/trunk/engine/core/src/SceneQuery.cpp
+   rl/trunk/engine/core/src/World.cpp
+   rl/trunk/engine/rules/include/Creature.h
+   rl/trunk/engine/rules/src/Creature.cpp
+   rl/trunk/engine/script/swig/RlRules.swig
+   rl/trunk/engine/ui/RlUI2005.vcproj
+   rl/trunk/engine/ui/include/CutsceneCharacterController.h
+   rl/trunk/engine/ui/include/Selector.h
+   rl/trunk/engine/ui/src/MovementCharacterController.cpp
+   rl/trunk/engine/ui/src/Selector.cpp
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+
+
+Modified: rl/trunk/engine/core/include/SceneQuery.h
+===================================================================
+--- rl/trunk/engine/core/include/SceneQuery.h	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/core/include/SceneQuery.h	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -96,6 +96,23 @@
+         bool mLevelOcclusion;
+     };
+ 
++    /// This query queries for objects within a sphere.
++    class _RlCoreExport SphereSceneQuery : public SceneQuery
++    {
++    public:
++        SphereSceneQuery(Ogre::SceneManager* smgr, unsigned long mask = 0xffffffff);
++
++        virtual const ActorVector&amp; execute();
++
++        /// Set the radius of the sphere. Value has to be non-negative.
++        void setRadius(Ogre::Real radius);
++        Ogre::Real getRadius() const;
++
++    protected:
++        Ogre::SphereSceneQuery* mSceneQuery;
++        Ogre::Real mRadius;
++    };
++
+     /// This query queries for objects within a half-sphere.
+     /// The half-sphere's ground plate is on the local XY-plane, with its center
+     /// in the origin. The half-sphere expands in the local -Z direction.
+
+Modified: rl/trunk/engine/core/include/World.h
+===================================================================
+--- rl/trunk/engine/core/include/World.h	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/core/include/World.h	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -40,8 +40,6 @@
+ 
+         World() : mSceneMgr(0), mCamera(0), mActiveActor(0), mUniqueNameSeed(0) {}
+ 
+-        /**@todo Klaeren, wer f&#252;r Zerstoerung von mCamera und mSceneMgr
+-        *verantwortlich ist. */
+         virtual ~World() {}
+ 
+         virtual Ogre::SceneManager* getSceneManager(void) const;
+@@ -49,9 +47,6 @@
+ 
+         virtual Ogre::Camera* getActiveCamera(void) const { return mCamera; };
+ 
+-        Actor* getActiveActor() const;
+-        void setActiveActor(Actor* actor);
+-
+         virtual Ogre::Vector3 getStartPoint() const;
+ 
+         virtual void clearScene(void) = 0;
+
+Modified: rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp
+===================================================================
+--- rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/core/src/DotSceneOctreeWorld.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -59,7 +59,6 @@
+             mCamera-&gt;setAutoAspectRatio(true);
+ 
+             actor-&gt;placeIntoScene();
+-            setActiveActor( actor );
+         }
+ 
+         // Ein Viewport, das komplette Fenster
+
+Modified: rl/trunk/engine/core/src/SceneQuery.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SceneQuery.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/core/src/SceneQuery.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -142,6 +142,46 @@
+         mLevelOcclusion = occ;
+     }
+ 
++    SphereSceneQuery::SphereSceneQuery(SceneManager* smgr, unsigned long mask)
++        : SceneQuery(mask), mSceneQuery(NULL), mRadius(0.0f)
++    {
++        mSceneQuery = smgr-&gt;createSphereQuery(Sphere());
++    }
++
++    const ActorVector&amp; SphereSceneQuery::execute()
++    {
++        // Discard results from last query
++        mResult.clear();
++
++        // Prepare query
++        mSceneQuery-&gt;setSphere(Sphere(mPosition, mRadius));
++        mSceneQuery-&gt;setQueryMask(mQueryMask);
++
++        // Determine plane facing of the half-sphere ground plain.
++        Vector3 forward = mOrientation * Vector3::NEGATIVE_UNIT_Z;
++
++        const SceneQueryResult&amp; result = mSceneQuery-&gt;execute();
++        for (SceneQueryResultMovableList::const_iterator it = result.movables.begin(),
++            end = result.movables.end(); it != end; ++it)
++        {
++            Actor* actor = dynamic_cast&lt;Actor*&gt;((*it)-&gt;getUserObject());
++            if (actor != NULL) mResult.push_back(actor);
++        }
++
++        return mResult;
++    }
++
++    void SphereSceneQuery::setRadius(Ogre::Real radius)
++    {
++        mRadius = radius;
++    }
++
++    Ogre::Real SphereSceneQuery::getRadius() const
++    {
++        return mRadius;
++    }
++
++
+     //////////////////////////////////////////////////////////////////////////
+ 
+     /// function object for sorting Actors in the query result set
+
+Modified: rl/trunk/engine/core/src/World.cpp
+===================================================================
+--- rl/trunk/engine/core/src/World.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/core/src/World.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -107,16 +107,6 @@
+         return mSceneMgr-&gt;getFogEnd();
+     }
+ 
+-	void World::setActiveActor(Actor* actor)
+-	{
+-		mActiveActor = actor;
+-	}
+-
+-	Actor* World::getActiveActor() const
+-	{
+-		return mActiveActor;
+-	}
+-
+ 	Vector3 World::getStartPoint() const
+ 	{
+         return Vector3::ZERO;
+
+Modified: rl/trunk/engine/rules/include/Creature.h
+===================================================================
+--- rl/trunk/engine/rules/include/Creature.h	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/rules/include/Creature.h	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -138,6 +138,15 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ // Enums
++            /// Alignment of a Creature towards the player. This determines
++            /// whether a combat is entered.
++            enum Alignment
++            {
++                ALIGNMENT_ALLY,    ///&lt; Creature fights with the player.
++                ALIGNMENT_NEUTRAL, ///&lt; Creature doesn't fight for either side.
++                ALIGNMENT_ENEMY    ///&lt; Creature fights against the player.
++            };
++
+             /// Beschreibt die art des zugefuegten Schadens
+             enum DamageTag
+             {
+@@ -749,6 +758,9 @@
+             **/
+             void setTaktischeBewegung(int type);
+ 
++            void setAlignment(Alignment);
++            Alignment getAlignment() const;
++
+         protected:
+            /**
+              *  Berechnet den Basiswert von der @ref abbdea &quot;Astralenergie&quot;.
+@@ -855,6 +867,8 @@
+ 
+             Property mBehaviours;
+ 
++            Alignment mAlignment;
++
+             /**
+              *  Sets a the status \a statusVariable. It uses a reference counting
+              *  System to do this, so if for example severeal effects put the creature
+
+Modified: rl/trunk/engine/rules/src/Creature.cpp
+===================================================================
+--- rl/trunk/engine/rules/src/Creature.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/rules/src/Creature.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -75,7 +75,8 @@
+         mKampftechniken(),
+         mSonderfertigkeiten(),
+         mErschoepfung(0),
+-        mMovementType(0)
++        mMovementType(0),
++        mAlignment(ALIGNMENT_NEUTRAL)
+     {
+         mEffectManager = new EffectManager();
+         mQueryFlags |= QUERYFLAG_CREATURE;
+@@ -955,6 +956,16 @@
+ 		mEffectManager-&gt;checkEffects();
+ 	}
+ 
++    void Creature::setAlignment(Creature::Alignment alignment)
++    {
++        mAlignment = alignment;
++    }
++
++    Creature::Alignment Creature::getAlignment() const
++    {
++        return mAlignment;
++    }
++
+     void Creature::setProperty(const Ogre::String &amp;key, const rl::Property &amp;value)
+     {
+         if (key == Creature::PROPERTY_BEHAVIOURS)
+
+Modified: rl/trunk/engine/script/swig/RlRules.swig
+===================================================================
+--- rl/trunk/engine/script/swig/RlRules.swig	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/script/swig/RlRules.swig	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -385,6 +385,8 @@
+         
+         rl::GameObjectState getState() const;
+         void setState(rl::GameObjectState state);
++        
++        unsigned long getQueryFlags() const;
+     };
+     
+     %feature(&quot;director&quot;) Item;
+@@ -592,6 +594,14 @@
+     const std::string ALL_EIGENSCHAFTEN = &quot;alle Eigenschaften&quot;;
+     const std::string ALL_TALENTE = &quot;alle Talente&quot;;
+ 
++        enum Alignment
++        {
++            ALIGNMENT_ALLY,    ///&lt; Creature fights with the player.
++            ALIGNMENT_NEUTRAL, ///&lt; Creature doesn't fight for either side.
++            ALIGNMENT_ENEMY    ///&lt; Creature fights against the player.
++        };
++        
++
+     static const Wert WERT_MOD_AE = &quot;ModAE&quot;;
+     static const Wert WERT_MOD_LE = &quot;ModLE&quot;;
+     static const Wert WERT_MOD_AU = &quot;ModAU&quot;;
+@@ -649,6 +659,9 @@
+ 
+         virtual const rl::Property getProperty(const Ogre::String&amp; key) const;
+         virtual void setProperty(const Ogre::String&amp; key, const rl::Property&amp; value);
++
++        void setAlignment(Alignment);
++        Alignment getAlignment() const;
+    };
+    
+    %feature(&quot;director&quot;) Person;
+
+Modified: rl/trunk/engine/ui/RlUI2005.vcproj
+===================================================================
+--- rl/trunk/engine/ui/RlUI2005.vcproj	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/RlUI2005.vcproj	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -346,6 +346,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\CombatCharacterController.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\CommandMapper.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -543,6 +547,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\CombatCharacterController.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\CommandMapper.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Modified: rl/trunk/engine/ui/include/CutsceneCharacterController.h
+===================================================================
+--- rl/trunk/engine/ui/include/CutsceneCharacterController.h	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/include/CutsceneCharacterController.h	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -24,9 +24,6 @@
+ 
+ 	class Actor;
+ 
+-	/** Diese Klasse 
+-	  *  
+-	  */
+ 	class _RlUiExport CutsceneCharacterController : public CharacterController
+ 	{
+ 	public:
+
+Modified: rl/trunk/engine/ui/include/Selector.h
+===================================================================
+--- rl/trunk/engine/ui/include/Selector.h	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/include/Selector.h	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -104,9 +104,6 @@
+ 
+         virtual void doCreatePrimitive();
+     };
+-
+-    typedef std::vector&lt;GameObject*&gt; GameObjectVector;
+-
+ }
+ #endif
+ 
+
+Modified: rl/trunk/engine/ui/src/MovementCharacterController.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/src/MovementCharacterController.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -46,6 +46,7 @@
+ #include &quot;LineSetPrimitive.h&quot;
+ #include &quot;WindowFactory.h&quot;
+ #include &quot;AnimationManager.h&quot;
++#include &quot;UiSubsystem.h&quot;
+ 
+ #include &lt;numeric&gt;
+ 
+@@ -104,7 +105,8 @@
+         mRaycast(new PhysicsMaterialRaycast()),
+         mGravitation(),
+         mSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager()),
+-        mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager())
++        mCombatSelector(CoreSubsystem::getSingleton().getWorld()-&gt;getSceneManager(),
++            QUERYFLAG_CREATURE)
+     {
+         DebugWindow::getSingleton().registerPage(msDebugWindowPageName);
+ 
+@@ -247,6 +249,11 @@
+         }
+ 
+         mCharacterState.mLastMovementState = mCharacterState.mCurrentMovementState;
++
++        if (isEnemyNear())
++        {
++            UiSubsystem::getSingleton().requestCharacterControllerSwitch(CTRL_COMBAT);
++        }
+     }
+ 
+     //------------------------------------------------------------------------
+@@ -1630,8 +1637,15 @@
+         mCombatSelector.setRadius(10.0);
+         mCombatSelector.updateSelection();
+ 
+-        // TODO implement
+-        GameObject* go = mCombatSelector.getFirstSelectedObject();
++        const Selector::GameObjectVector&amp; gov = mCombatSelector.getAllSelectedObjects();
++        for (size_t i = 0, end = gov.size(); i &lt; end; ++i)
++        {
++            Creature* creature = dynamic_cast&lt;Creature*&gt;(gov.at(i));
++            if (creature &amp;&amp; creature-&gt;getAlignment() == Creature::ALIGNMENT_ENEMY)
++            {
++                return true;
++            }
++        }
+ 
+         return false;
+     }
+
+Modified: rl/trunk/engine/ui/src/Selector.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/Selector.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/src/Selector.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -42,7 +42,7 @@
+         return mSelection.empty() ? NULL : mSelection[0];
+     }
+ 
+-    const GameObjectVector&amp; Selector::getAllSelectedObjects() const
++    const Selector::GameObjectVector&amp; Selector::getAllSelectedObjects() const
+     {
+         return mSelection;
+     }
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-04-11 19:38:40 UTC (rev 3255)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-04-11 19:59:08 UTC (rev 3256)
+@@ -28,6 +28,7 @@
+ #include &quot;ConfigurationManager.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;Creature.h&quot;
++#include &quot;CombatCharacterController.h&quot;
+ #include &quot;CutsceneCharacterController.h&quot;
+ #include &quot;DialogCharacterController.h&quot;
+ #include &quot;DsaManager.h&quot;
+@@ -199,14 +200,12 @@
+             if (person == NULL)
+             {
+                 mCharacter = NULL;
+-                world-&gt;setActiveActor( ActorManager::getSingleton().getActor(&quot;DefaultCamera&quot;) );
+             }
+             else
+             {
+                 ScriptWrapper::getSingleton().owned( person );
+                 mCharacter = person;
+ 
+-                world-&gt;setActiveActor(person-&gt;getActor());
+                 mWindowFactory-&gt;setActiveCharacter(person);
+ 
+                 mCharacter-&gt;getActor()-&gt;attach(SoundManager::getSingleton().getListenerActor());
+@@ -260,22 +259,27 @@
+         else if (type == CharacterController::CTRL_FREEFLIGHT)
+         {
+             mCharacterController = new FreeFlightCharacterController(camera,
+-                CoreSubsystem::getSingleton().getWorld()-&gt;getActiveActor());
++                mCharacter ? mCharacter-&gt;getActor() : NULL);
+         }
+         else if (type == CharacterController::CTRL_DIALOG)
+         {
+             mCharacterController = new DialogCharacterController(camera,
+-                CoreSubsystem::getSingleton().getWorld()-&gt;getActiveActor());
++                mCharacter ? mCharacter-&gt;getActor() : NULL);
+         }
+         else if (type == CharacterController::CTRL_VANITY_MODE)
+         {
+             mCharacterController = new VanityModeCharacterController(camera,
+-                CoreSubsystem::getSingleton().getWorld()-&gt;getActiveActor());
++                mCharacter ? mCharacter-&gt;getActor() : NULL);
+         }
+         else if (type == CharacterController::CTRL_CUTSCENE)
+         {
+             mCharacterController = new CutsceneCharacterController(camera);
+         }
++        else if (type == CharacterController::CTRL_COMBAT)
++        {
++            mCharacterController = new CombatCharacterController(camera,
++                mCharacter ? mCharacter-&gt;getActor() : NULL);
++        }
+         else
+         {
+             Throw(IllegalArgumentException, &quot;Unknown CharacterControllerType.&quot;);
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000326.html">[Dsa-hl-svn] r3255 - rl/trunk/engine/rules/include
+</A></li>
+	<LI>Next message: <A HREF="000328.html">[Dsa-hl-svn] r3257 - in rl/trunk/engine/ui: include src
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#327">[ date ]</a>
+              <a href="thread.html#327">[ thread ]</a>
+              <a href="subject.html#327">[ subject ]</a>
+              <a href="author.html#327">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

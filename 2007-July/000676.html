@@ -1,0 +1,1423 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3605 - in rl/trunk/engine: ai/include ai/src	common/include core core/include core/src ui/include ui/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-July/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3605%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/include%20core%20core/include%20core/src%20ui/include%20ui/src&In-Reply-To=%3C200707171442.l6HEgUU0002683%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000675.html">
+   <LINK REL="Next"  HREF="000677.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3605 - in rl/trunk/engine: ai/include ai/src	common/include core core/include core/src ui/include ui/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3605%20-%20in%20rl/trunk/engine%3A%20ai/include%20ai/src%0A%09common/include%20core%20core/include%20core/src%20ui/include%20ui/src&In-Reply-To=%3C200707171442.l6HEgUU0002683%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3605 - in rl/trunk/engine: ai/include ai/src	common/include core core/include core/src ui/include ui/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Tue Jul 17 16:42:30 CEST 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000675.html">[Dsa-hl-svn] r3604 - in modules: common/materials	common/materials/programs common/models ruchin/maps	ruchin/materials ruchin/materials/textures ruchin/models	ruchin/scripts/maps
+</A></li>
+        <LI>Next message: <A HREF="000677.html">[Dsa-hl-svn] r3606 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#676">[ date ]</a>
+              <a href="thread.html#676">[ thread ]</a>
+              <a href="subject.html#676">[ subject ]</a>
+              <a href="author.html#676">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-07-17 16:41:51 +0200 (Tue, 17 Jul 2007)
+New Revision: 3605
+
+Added:
+   rl/trunk/engine/core/include/CoreMessages.h
+   rl/trunk/engine/core/include/MessageObject.h
+   rl/trunk/engine/core/include/MessagePump.h
+   rl/trunk/engine/core/include/MessageType.h
+   rl/trunk/engine/core/src/MessagePump.cpp
+Modified:
+   rl/trunk/engine/ai/include/AiSubsystem.h
+   rl/trunk/engine/ai/src/AiSubsystem.cpp
+   rl/trunk/engine/common/include/FixRubyHeaders.h
+   rl/trunk/engine/core/RlCore2005.vcproj
+   rl/trunk/engine/core/include/CoreSubsystem.h
+   rl/trunk/engine/core/include/World.h
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+   rl/trunk/engine/core/src/Makefile.am
+   rl/trunk/engine/core/src/World.cpp
+   rl/trunk/engine/ui/include/UiSubsystem.h
+   rl/trunk/engine/ui/src/UiSubsystem.cpp
+Log:
+New shiny MessagePump for internal message handling. Will eventually replace all listener interfaces. SceneChangeListener is replaced now.
+
+Modified: rl/trunk/engine/ai/include/AiSubsystem.h
+===================================================================
+--- rl/trunk/engine/ai/include/AiSubsystem.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/ai/include/AiSubsystem.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -17,7 +17,10 @@
+ #define __AiSubsystem_H__
+ 
+ #include &lt;OgreSingleton.h&gt;
++
+ #include &quot;AiPrerequisites.h&quot;
++
++#include &quot;MessagePump.h&quot;
+ #include &quot;World.h&quot;
+ 
+ namespace rl
+@@ -33,9 +36,7 @@
+ 	/** Central core of AI
+ 	 * Handles creation of all AI related object Managers.
+ 	 */
+-	class _RlAiExport AiSubsystem 
+-		: public Ogre::Singleton&lt;AiSubsystem&gt;,
+-		  public SceneChangeListener
++	class _RlAiExport AiSubsystem : public Ogre::Singleton&lt;AiSubsystem&gt;
+ 	{
+ 	public:
+ 		//! default constructor
+@@ -53,11 +54,11 @@
+ 
+ 		/** Trigger function triggered after scene load.
+ 		 */
+-		virtual void onAfterSceneLoaded();
++		virtual bool onAfterSceneLoaded();
+ 
+ 		/** Trigger function triggered before scene load.
+ 		 */
+-        virtual void onBeforeClearScene();
++        virtual bool onBeforeClearScene();
+ 
+ 		/** Creates an named LandmarkPath.
+ 		 * @param name the path's name
+@@ -101,6 +102,9 @@
+ 
+ 		std::map&lt;Ogre::String, LandmarkPath*&gt; mLandmarkPaths;
+ 		std::map&lt;Ogre::String, Landmark*&gt; mLandmarks;
++
++	    MessagePump::ScopedConnection mSceneLoadedConnection;
++	    MessagePump::ScopedConnection mSceneClearingConnection;
+ 	};
+ 
+ 	inline AiWorld* AiSubsystem::getWorld()
+
+Modified: rl/trunk/engine/ai/src/AiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/ai/src/AiSubsystem.cpp	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -19,6 +19,7 @@
+ 
+ #include &quot;AiWorld.h&quot;
+ #include &quot;AgentManager.h&quot;
++#include &quot;CoreMessages.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;Landmark.h&quot;
+@@ -46,7 +47,6 @@
+ 
+ AiSubsystem::~AiSubsystem(void)
+ {
+-    CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;removeSceneChangeListener(this);
+ 	GameLoop::getSingleton().removeTask(AgentManager::getSingletonPtr());
+     AgentManager::getSingleton().removeAllAgents();
+     mWorld-&gt;removeAllObstacles();
+@@ -63,43 +63,34 @@
+ 	mWayPointGraphManager = new WayPointGraphManager();
+     mWorld = new AiWorld();
+ 
+-    CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;addSceneChangeListener(this);
++    mSceneLoadedConnection =
++        MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneLoaded&gt;(
++		    boost::bind(&amp;AiSubsystem::onAfterSceneLoaded, this));
++    mSceneClearingConnection =
++        MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneClearing&gt;(
++		    boost::bind(&amp;AiSubsystem::onBeforeClearScene, this));
++
+     GameLoop::getSingleton().addTask(AgentManager::getSingletonPtr(), GameLoop::TG_LOGIC);
+ }
+ 
+-void AiSubsystem::onBeforeClearScene()
++bool AiSubsystem::onBeforeClearScene()
+ {
+     AgentManager::getSingleton().removeAllAgents();
+     mWorld-&gt;removeAllObstacles();
++
++    return true;
+ }
+ 
+ 
+ 
+-void AiSubsystem::onAfterSceneLoaded()
++bool AiSubsystem::onAfterSceneLoaded()
+ {
+     // newton world hinzuf&#252;gen
+     Obstacle *newtonWorld = new NewtonWorldAsObstacle;
+     newtonWorld-&gt;setSeenFrom(AbstractObstacle::both);
+     mWorld-&gt;addObstacle(newtonWorld);
+ 
+-    // &#228;u&#223;ere grenzen einf&#252;gen
+-    //PhysicsManager
+-/*
+-//  create an obstacle as bounding box of the walkarea for npcs
+-//  this should be accessable through scripting, the Obstacles should have names
+-//  for easier access
+-    BoxObstacle* o = new BoxObstacle(25,50,25);
+-    o-&gt;setSeenFrom(AbstractObstacle::inside);
+-    o-&gt;setPosition(Vec3(-40.0f,-10.0f, 0.0f));
+-    o-&gt;setForward(0,0,-1);
+-    addObstacle(o);
+-
+-    o = new BoxObstacle(2,50,2);
+-    o-&gt;setSeenFrom(AbstractObstacle::outside);
+-    o-&gt;setPosition(Vec3(-31.5f,-10.0f, -3.5f));
+-    o-&gt;setForward(0,0,-1);
+-    addObstacle(o);
+-*/
++    return true;
+ }
+ 
+ Landmark* AiSubsystem::createLandmark(const Ogre::String&amp; name, const Ogre::Vector3&amp; position)
+
+Modified: rl/trunk/engine/common/include/FixRubyHeaders.h
+===================================================================
+--- rl/trunk/engine/common/include/FixRubyHeaders.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/common/include/FixRubyHeaders.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -20,8 +20,9 @@
+  * Diese Datei muss nach einem Ruby-Header inkludiert werden, m&#246;glicherweise auch
+  * noch davor, um vorherige Makros zu l&#246;schen.
+  */
++#undef accept
++#undef bind
+ #undef close
+-#undef bind
+ #undef select
+ #undef shutdown
+ #undef snprintf
+
+Modified: rl/trunk/engine/core/RlCore2005.vcproj
+===================================================================
+--- rl/trunk/engine/core/RlCore2005.vcproj	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/RlCore2005.vcproj	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -400,6 +400,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\CoreMessages.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\CorePrerequisites.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -496,6 +500,18 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\include\MessageObject.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\MessagePump.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
++				RelativePath=&quot;.\include\MessageType.h&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\include\MovableText.h&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+@@ -765,6 +781,10 @@
+ 				&gt;
+ 			&lt;/File&gt;
+ 			&lt;File
++				RelativePath=&quot;.\src\MessagePump.cpp&quot;
++				&gt;
++			&lt;/File&gt;
++			&lt;File
+ 				RelativePath=&quot;.\src\MovableText.cpp&quot;
+ 				&gt;
+ 			&lt;/File&gt;
+
+Added: rl/trunk/engine/core/include/CoreMessages.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreMessages.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/CoreMessages.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -0,0 +1,37 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_CoreMessages_H__
++#define __Rl_CoreMessages_H__
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;MessageType.h&quot;
++
++namespace rl
++{
++    enum CoreMessageTypeIds
++    {
++        RLMSG_SCENE_LOADED = 0x01000001,
++        RLMSG_SCENE_CLEARING = 0x01000002
++    };
++
++    /// Message sent right after a scene has been loaded.
++    typedef MessageType&lt;RLMSG_SCENE_LOADED&gt; MessageType_SceneLoaded;
++
++    /// Message sent just before a scene will be cleared.
++    typedef MessageType&lt;RLMSG_SCENE_CLEARING&gt; MessageType_SceneClearing;
++}
++#endif
+
+Modified: rl/trunk/engine/core/include/CoreSubsystem.h
+===================================================================
+--- rl/trunk/engine/core/include/CoreSubsystem.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/CoreSubsystem.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -1,169 +1,171 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+- * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the Clarified Artistic License.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  Clarified Artistic License for more details.
+- *
+- *  You should have received a copy of the Clarified Artistic License
+- *  along with this program; if not you can get it here
+- *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+- */
+-
+-#ifndef __CoreSubsystem_H__
+-#define __CoreSubsystem_H__
+-
+-
+-#include &lt;OgreSingleton.h&gt;
+-#include &lt;OgreString.h&gt;
+-#include &lt;OgreRoot.h&gt;
+-#include &lt;OgreTimer.h&gt;
+-#include &lt;map&gt;
+-
+-#include &quot;EventSource.h&quot;
+-#include &quot;EventCaster.h&quot;
+-#include &quot;CorePrerequisites.h&quot;
+-
+-namespace rl {
+-
+-class RubyInterpreter;
+-class World;
+-class CoreEvent;
+-class CoreEventListener;
+-class Actor;
+-class ContentModule;
+-class ScriptWrapper;
+-class PhysicsManager;
+-class GameLoop;
+-class AnimationManager;
+-class ActorManager;
+-class GameEventManager;
+-class XmlResourceManager;
+-class SoundManager;
+-class DebugVisualsManager;
+-class JobScheduler;
+-class ZoneManager;
+-
+-typedef _RlCoreExport std::map&lt;Ogre::String, ContentModule*&gt; ModuleMap;
+-
+-/** CoreSubsystem.
+-    @remarks
+-        It follows the Singleton Pattern,
+-        and initialises the game context.
+-*/
+-class _RlCoreExport CoreSubsystem : public Ogre::Singleton&lt;CoreSubsystem&gt;, public virtual EventSource
+-{
+-public:
+-    /** Default Constructor */
+-    CoreSubsystem();
+-    /** Default Deconstructor */
+-    virtual ~CoreSubsystem();
+-
+-    /** Starts the Game */
+-    void startCore();
+-
+-    /** Renders one frame (for internal use) */
+-    void renderOneFrame();
+-
+-    World* getWorld();
+-    void loadMap(const Ogre::String type, const Ogre::String filename,
+-        const Ogre::String module);
+-
+-    RubyInterpreter* getRubyInterpreter();
+-
+-    ContentModule* getActiveAdventureModule() const;
+-    ContentModule* getModule(const Ogre::String&amp; moduleId) const;
+-    const ModuleMap&amp; getAllModules() const;
+-    void startAdventureModule(ContentModule* module);
+-    void setDefaultActiveModule(const Ogre::String&amp; moduleId);
+-    const Ogre::String&amp; getDefaultActiveModule() const;
+-    void registerModule(ContentModule* module);
+-
+-    void setDeveloperMode(bool developerMode);
+-    bool getDeveloperMode() const;
+-
+-    /// Returns time since game started in Milliseconds.
+-    /// Uses GameLoop::getClock internally, function is here to allow access from ruby.
+-    unsigned long getClock();
+-
+-    /** Saves a timestamped png Screenshot
+-        @param sName The filename (extended with the timestamp)
+-    */
+-    void makeScreenshot(const Ogre::String&amp; sName);
+-
+-    void addCoreEventListener(CoreEventListener* listener);
+-    void removeCoreEventListener(CoreEventListener* listener);
+-
+-    void setScheme(const Ogre::String&amp; schemeName);
+-
+-    bool isInitialized() const;
+-
+-    Ogre::String getEngineVersionString() const;
+-    Ogre::String getEngineVersionName() const;
+-    long         getEngineBuildNumber() const;
+-
+-    /**
+-     * Retrieves a pointer to the current render window.
+-     *
+-     * @return pointer to render window
+-     */
+-    Ogre::RenderWindow* getRenderWindow();
+-
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++
++#ifndef __CoreSubsystem_H__
++#define __CoreSubsystem_H__
++
++
++#include &lt;OgreSingleton.h&gt;
++#include &lt;OgreString.h&gt;
++#include &lt;OgreRoot.h&gt;
++#include &lt;OgreTimer.h&gt;
++#include &lt;map&gt;
++
++#include &quot;EventSource.h&quot;
++#include &quot;EventCaster.h&quot;
++#include &quot;CorePrerequisites.h&quot;
++
++namespace rl {
++
++class RubyInterpreter;
++class World;
++class CoreEvent;
++class CoreEventListener;
++class Actor;
++class ContentModule;
++class ScriptWrapper;
++class PhysicsManager;
++class MessagePump;
++class GameLoop;
++class AnimationManager;
++class ActorManager;
++class GameEventManager;
++class XmlResourceManager;
++class SoundManager;
++class DebugVisualsManager;
++class JobScheduler;
++class ZoneManager;
++
++typedef _RlCoreExport std::map&lt;Ogre::String, ContentModule*&gt; ModuleMap;
++
++/** CoreSubsystem.
++    @remarks
++        It follows the Singleton Pattern,
++        and initialises the game context.
++*/
++class _RlCoreExport CoreSubsystem : public Ogre::Singleton&lt;CoreSubsystem&gt;, public virtual EventSource
++{
++public:
++    /** Default Constructor */
++    CoreSubsystem();
++    /** Default Deconstructor */
++    virtual ~CoreSubsystem();
++
++    /** Starts the Game */
++    void startCore();
++
++    /** Renders one frame (for internal use) */
++    void renderOneFrame();
++
++    World* getWorld();
++    void loadMap(const Ogre::String type, const Ogre::String filename,
++        const Ogre::String module);
++
++    RubyInterpreter* getRubyInterpreter();
++
++    ContentModule* getActiveAdventureModule() const;
++    ContentModule* getModule(const Ogre::String&amp; moduleId) const;
++    const ModuleMap&amp; getAllModules() const;
++    void startAdventureModule(ContentModule* module);
++    void setDefaultActiveModule(const Ogre::String&amp; moduleId);
++    const Ogre::String&amp; getDefaultActiveModule() const;
++    void registerModule(ContentModule* module);
++
++    void setDeveloperMode(bool developerMode);
++    bool getDeveloperMode() const;
++
++    /// Returns time since game started in Milliseconds.
++    /// Uses GameLoop::getClock internally, function is here to allow access from ruby.
++    unsigned long getClock();
++
++    /** Saves a timestamped png Screenshot
++        @param sName The filename (extended with the timestamp)
++    */
++    void makeScreenshot(const Ogre::String&amp; sName);
++
++    void addCoreEventListener(CoreEventListener* listener);
++    void removeCoreEventListener(CoreEventListener* listener);
++
++    void setScheme(const Ogre::String&amp; schemeName);
++
++    bool isInitialized() const;
++
++    Ogre::String getEngineVersionString() const;
++    Ogre::String getEngineVersionName() const;
++    long         getEngineBuildNumber() const;
++
++    /**
++     * Retrieves a pointer to the current render window.
++     *
++     * @return pointer to render window
++     */
++    Ogre::RenderWindow* getRenderWindow();
++
+ 	/// Sets the pause state of the game
+ 	/// @param paused &lt;code&gt;true&lt;/code&gt; if the game should be paused, &lt;code&gt;false&lt;/code&gt; if it should be continued
+ 	void setPaused(bool paused);
+-
+-private:
+-    World* mWorld;
+-    RubyInterpreter* mRubyInterpreter;
+-    ModuleMap mModules;
+-    ContentModule* mActiveAdventureModule;
+-    Ogre::String mDefaultActiveModule;
+-    Ogre::RenderWindow* mRenderWindow;            //!&lt; Render window for OGRE
+-
+-    RL_LONGLONG mClockStartTime;
+-
+-    bool mDeveloperMode;
+-    bool mInitialized;
+-    EventCaster&lt;CoreEvent&gt; mCoreEventCaster;
+-    std::vector&lt;Ogre::Technique*&gt; mDefaultTechniques;
+-
+-    // The singletons of this subsystem
+-    Ogre::Root* mOgreRoot;
+-    ScriptWrapper* mScriptWrapper;
+-    XmlResourceManager* mXmlResourceManager;
+-    PhysicsManager* mPhysicsManager;
+-    GameLoop* mGameLoop;
+-    AnimationManager* mAnimationManager;
+-    ActorManager* mActorManager;
+-    GameEventManager* mGameEventManager;
+-    SoundManager* mSoundManager;
+-    DebugVisualsManager* mDebugVisualsManager;
+-    JobScheduler* mJobScheduler;
+-	ZoneManager* mZoneManager;
+-
+-    /** Runs the setup methods  */
+-    bool initializeCoreSubsystem();
+-
+-    /** Loads all needed ressources */
+-    void initializeResources();
+-
+-    void loadPlugins();
+-    void unloadPlugins();
+-
+-    /**
+-     * Sammelt alle Default-Techniques, um sie sp&#228;ter bei jedem aktivierten Scheme
+-     * benutzen zu k&#246;nnen
+-     */
+-    void updateDefaultScheme();
+-
+-    void loadModule(ContentModule* module);
+-};
+-
+-}
+-#endif
+-
++
++private:
++    World* mWorld;
++    RubyInterpreter* mRubyInterpreter;
++    ModuleMap mModules;
++    ContentModule* mActiveAdventureModule;
++    Ogre::String mDefaultActiveModule;
++    Ogre::RenderWindow* mRenderWindow;            //!&lt; Render window for OGRE
++
++    RL_LONGLONG mClockStartTime;
++
++    bool mDeveloperMode;
++    bool mInitialized;
++    EventCaster&lt;CoreEvent&gt; mCoreEventCaster;
++    std::vector&lt;Ogre::Technique*&gt; mDefaultTechniques;
++
++    // The singletons of this subsystem
++    Ogre::Root* mOgreRoot;
++    ScriptWrapper* mScriptWrapper;
++    XmlResourceManager* mXmlResourceManager;
++    PhysicsManager* mPhysicsManager;
++    MessagePump* mMessagePump;
++    GameLoop* mGameLoop;
++    AnimationManager* mAnimationManager;
++    ActorManager* mActorManager;
++    GameEventManager* mGameEventManager;
++    SoundManager* mSoundManager;
++    DebugVisualsManager* mDebugVisualsManager;
++    JobScheduler* mJobScheduler;
++	ZoneManager* mZoneManager;
++
++    /** Runs the setup methods  */
++    bool initializeCoreSubsystem();
++
++    /** Loads all needed ressources */
++    void initializeResources();
++
++    void loadPlugins();
++    void unloadPlugins();
++
++    /**
++     * Sammelt alle Default-Techniques, um sie sp&#228;ter bei jedem aktivierten Scheme
++     * benutzen zu k&#246;nnen
++     */
++    void updateDefaultScheme();
++
++    void loadModule(ContentModule* module);
++};
++
++}
++#endif
++
+
+Added: rl/trunk/engine/core/include/MessageObject.h
+===================================================================
+--- rl/trunk/engine/core/include/MessageObject.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/MessageObject.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -0,0 +1,157 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_MessageObject_H__
++#define __Rl_MessageObject_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++#include &lt;boost/function.hpp&gt;
++#include &lt;boost/bind.hpp&gt;
++#include &lt;boost/bind/placeholders.hpp&gt;
++
++namespace rl
++{
++
++    //This class is a dummy that indicated that a parameter is not used
++    class MessageObject_EmptyParam 
++    {};
++
++    template&lt;int MessageTypeId,
++        typename Param1 = MessageObject_EmptyParam,
++        typename Param2 = MessageObject_EmptyParam&gt;
++    class MessageType;
++
++    class MessageObjectBase
++    {
++    public:
++        virtual ~MessageObjectBase() {}
++        virtual int getMessageTypeId() = 0;
++    };
++
++    //MessageObject with 0 parameters
++    class MessageObject_0 : public MessageObjectBase
++    {
++    public:
++        typedef boost::function&lt; bool () &gt; HandlerType;
++
++        template&lt;typename Handler&gt;
++        bool Invoke(const Handler&amp; handler)
++        {
++            return handler();
++        }
++    };
++
++    //MessageObject with 1 parameters
++    template&lt;typename _Param1&gt;
++    class MessageObject_1 : public MessageObjectBase
++    {
++    public:
++        typedef _Param1 Param1;
++        Param1 param1;
++
++        typedef boost::function&lt; bool (const Param1&amp; p1) &gt; HandlerType;
++
++        template&lt;typename Handler&gt;
++        bool Invoke(const Handler&amp; handler)
++        {
++            return handler(param1);
++        }
++    };
++
++    //MessageObject with 2 parameters
++    template&lt;typename _Param1, typename _Param2&gt;
++    class MessageObject_2 : public MessageObjectBase
++    {
++    public:
++        typedef _Param1 Param1;
++        typedef _Param2 Param2;
++
++        Param1 param1;
++        Param2 param2;
++
++        typedef boost::function&lt; bool (const Param1&amp; p1, const Param2&amp; p2) &gt; HandlerType;
++
++        template&lt;typename Handler&gt;
++        bool Invoke(const Handler&amp; handler)
++        {
++            return handler(param1, param2);
++        }
++    };
++
++    //forward declaration of MessageObject_x
++    //It is implemented in several specializations, 
++    //each derives from another MessageObject base 
++    //to select the correct parameter count
++    template&lt;int _MessageTypeId, typename Param1, typename Param2&gt;
++    class MessageObject_x;
++
++    template&lt;int _MessageTypeId&gt;
++    class MessageObject_x&lt;_MessageTypeId, MessageObject_EmptyParam, MessageObject_EmptyParam&gt;
++        : public MessageObject_0
++    {
++    public:
++        static MessageObject_x* Build()
++        {
++            MessageObject_x* msgObj = new MessageObject&lt;_MessageTypeId&gt;();
++            return msgObj;
++        }
++    };
++
++    template&lt;int _MessageTypeId, typename Param1&gt;
++    class MessageObject_x&lt;_MessageTypeId, Param1, MessageObject_EmptyParam&gt;
++        : public MessageObject_1&lt;Param1&gt;
++    {
++    public:
++        static MessageObject_x* Build(const Param1&amp; p1)
++        {
++            MessageObject_x* msgObj = new MessageObject&lt;_MessageTypeId, Param1&gt;();
++            msgObj-&gt;param1 = p1;
++            return msgObj;
++        }
++    };
++
++    template&lt;int _MessageTypeId, typename Param1, typename Param2&gt;
++    class MessageObject_x : public MessageObject_2&lt;Param1, Param2&gt;
++    {
++    public:
++        static MessageObject_x* Build(const Param1&amp; p1, const Param2&amp; p2)
++        {
++            MessageObject_x* msgObj = new MessageObject&lt;_MessageTypeId, Param1, Param2&gt;();
++            msgObj-&gt;param1 = p1;
++            msgObj-&gt;param2 = p2;
++            return msgObj;
++        }
++    };
++
++    /////////////////////////////////////////////////////
++
++    //The final MessageObject. The real implementation is chosen through the given template parameters
++    template&lt;int _MessageTypeId,
++        typename Param1 = MessageObject_EmptyParam,
++        typename Param2 = MessageObject_EmptyParam&gt;
++    class MessageObject : public MessageObject_x&lt;_MessageTypeId, Param1, Param2&gt;
++    {
++    public:
++        virtual int getMessageTypeId()
++        {
++            return _MessageTypeId;
++        }
++    };
++
++}
++
++#endif
+
+Added: rl/trunk/engine/core/include/MessagePump.h
+===================================================================
+--- rl/trunk/engine/core/include/MessagePump.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/MessagePump.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -0,0 +1,269 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_MessagePump_H__
++#define __Rl_MessagePump_H__
++
++#include &quot;CorePrerequisites.h&quot;
++
++#include &quot;MessageType.h&quot;
++#include &quot;GameTask.h&quot;
++
++#include &lt;OgreSingleton.h&gt;
++
++#include &lt;map&gt;
++#include &lt;queue&gt;
++
++#include &lt;boost/noncopyable.hpp&gt;
++
++namespace rl
++{
++
++    class MessageHandlerWrapperBase
++    {
++    public:
++        virtual ~MessageHandlerWrapperBase() {}
++        virtual bool Invoke(MessageObjectBase* obj) = 0;
++    };
++
++    template&lt;class _MessageType&gt;
++    class MessageHandlerWrapper : public MessageHandlerWrapperBase
++    {
++    public:
++        typedef typename _MessageType::MessageObjectType MessageObjectType;
++        typedef typename _MessageType::HandlerType HandlerType;
++
++        MessageHandlerWrapper(const HandlerType&amp; handler)
++            : mHandler(handler)
++        {
++        }
++
++        virtual bool Invoke(MessageObjectBase* obj)
++        {
++            MessageObjectType* obj2 = (MessageObjectType*)obj;
++            return obj2-&gt;Invoke(mHandler);
++        }
++
++    private:
++        HandlerType mHandler;
++    };
++
++    class _RlCoreExport MessagePump : public GameTask, public Ogre::Singleton&lt;MessagePump&gt;
++    {
++    public:
++        class Connection
++        {
++            friend class MessagePump;
++        public:
++            Connection()
++                : connectionId(-1), pump(NULL)
++            {}
++            void disconnect()
++            {
++                if(pump &amp;&amp; connectionId != -1)
++                    pump-&gt;disconnectHandler(connectionId);
++            }
++        private:
++            MessagePump* pump;
++            int connectionId;
++        };
++
++        class ScopedConnection : boost::noncopyable
++        {
++        public:
++            ScopedConnection()
++            {}
++            ScopedConnection(const Connection&amp; conn)
++                : mConnection(conn)
++            {}
++            ScopedConnection&amp; operator =(const Connection&amp; conn)
++            {
++                mConnection.disconnect();
++                mConnection = conn;
++                return *this;
++            }
++            ~ScopedConnection()
++            {
++                mConnection.disconnect();
++            }
++        private:
++            Connection mConnection;
++        };
++
++    private:
++        struct MessageHandlerMapEntry
++        {
++            int connectionId;
++            MessageHandlerWrapperBase* handlerWrapper;
++        };
++
++        typedef std::vector&lt;MessageHandlerMapEntry&gt; MessageHandlerMapEntries;
++        typedef std::map&lt;int, MessageHandlerMapEntries*&gt; MessageHandlerMap;
++        typedef std::queue&lt;MessageObjectBase*&gt; MessageQueue;
++
++    public:
++        MessagePump() : mNextConnectionId(0) {}
++
++        template&lt;typename _MessageType&gt;
++        Connection addMessageHandler( const typename _MessageType::HandlerType&amp; handler )
++        {
++            MessageHandlerWrapper&lt;_MessageType&gt;* wrapper =
++                new MessageHandlerWrapper&lt;_MessageType&gt;(handler);
++
++            MessageHandlerMapEntries* entries = getOrCreateMapEntries(_MessageType::MessageTypeId);
++            MessageHandlerMapEntry entry = {mNextConnectionId++, wrapper};
++            entries-&gt;push_back(entry);
++
++            Connection con;
++            con.pump = this;
++            con.connectionId = entry.connectionId;
++            return con;
++        }
++
++        /*
++        * sendMessage and postMessage is implemented for all possible parameter counts
++        * Thanks to the idea of SFINAE, the compiler will choose 
++        * the correct implementation for all MessageTypes at compile time
++        *
++        * sendMessage processes the message immediatly, while postMessage delays the 
++        * processing to a later frame
++        */
++        template&lt;typename _MessageType&gt;
++        bool sendMessage()
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            return doSend(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1);
++            return doSend(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        bool sendMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build(p1, p2);
++            return doSend(obj);
++        }
++
++        ////////////////////////////////
++
++        template&lt;typename _MessageType&gt;
++        void postMessage()
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            doPost(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            doPost(obj);
++        }
++
++        template&lt;typename _MessageType&gt;
++        void postMessage(const typename _MessageType::MessageObjectType::Param1&amp; p1,
++            const typename _MessageType::MessageObjectType::Param2&amp; p2)
++        {
++            MessageObjectBase* obj = _MessageType::MessageObjectType::Build();
++            doPost(obj);
++        }
++
++        void sendPending()
++        {
++            while(!mMessageQueue.empty())
++            {
++                doSend(mMessageQueue.front());
++                mMessageQueue.pop();
++            }
++        }
++
++        // overloads from GameTask
++
++		virtual void run(Ogre::Real elapsedTime);
++
++        virtual const Ogre::String&amp; getName() const;
++
++    private:
++        MessageHandlerMapEntries* getOrCreateMapEntries(int id) 
++        {
++            MessageHandlerMap::iterator it = mMessageHandlerMap.find(id);
++            if(it == mMessageHandlerMap.end())
++            {
++                MessageHandlerMapEntries* entries = new MessageHandlerMapEntries();
++                mMessageHandlerMap[id] = entries;
++                return entries;
++            }
++            return it-&gt;second;
++        }
++
++        bool doSend(MessageObjectBase* msg)
++        {
++            bool msgHandled = false;
++            MessageHandlerMapEntries* entries = getOrCreateMapEntries(msg-&gt;getMessageTypeId());
++            for(MessageHandlerMapEntries::iterator it = entries-&gt;begin(); it != entries-&gt;end(); ++it)
++            {
++                if((*it).handlerWrapper-&gt;Invoke(msg))
++                {
++                    msgHandled = true;
++                }
++            }
++            delete msg;
++            return msgHandled;;
++        }
++
++        void doPost(MessageObjectBase* msg)
++        {
++            mMessageQueue.push(msg);
++        }
++
++        friend class Connection;
++        void disconnectHandler(int connectionId)
++        {
++            //not very performant...definitely needs improvement
++            for (MessageHandlerMap::iterator it = mMessageHandlerMap.begin();
++                it != mMessageHandlerMap.end(); ++it)
++            {
++                MessageHandlerMapEntries* en = it-&gt;second;
++                for (MessageHandlerMapEntries::iterator jt = en-&gt;begin(); jt != en-&gt;end(); ++jt)
++                {
++                    if (jt-&gt;connectionId == connectionId)
++                    {
++                        delete jt-&gt;handlerWrapper;
++                        en-&gt;erase(jt);
++                        if (en-&gt;empty())
++                        {
++                            delete en;
++                            mMessageHandlerMap.erase(it);
++                        }
++                        return;
++                    }
++                }
++            }
++        }
++
++    private:
++        int mNextConnectionId;
++        MessageHandlerMap mMessageHandlerMap;
++        MessageQueue mMessageQueue;
++    };
++}
++#endif
+
+Added: rl/trunk/engine/core/include/MessageType.h
+===================================================================
+--- rl/trunk/engine/core/include/MessageType.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/MessageType.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -0,0 +1,35 @@
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++* 
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++
++#ifndef __Rl_MessageType_H__
++#define __Rl_MessageType_H__
++
++#include &quot;CorePrerequisites.h&quot;
++#include &quot;MessageObject.h&quot;
++
++namespace rl
++{
++    template&lt;int _MessageTypeId, typename Param1, typename Param2&gt;
++    class MessageType
++    {
++    public:
++        static const int MessageTypeId = _MessageTypeId;
++
++        typedef MessageObject&lt;_MessageTypeId, Param1, Param2&gt; MessageObjectType;
++        typedef typename MessageObjectType::HandlerType HandlerType;
++    };
++}
++#endif
+
+Modified: rl/trunk/engine/core/include/World.h
+===================================================================
+--- rl/trunk/engine/core/include/World.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/include/World.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -26,13 +26,6 @@
+ 
+     class Actor;
+ 
+-    class _RlCoreExport SceneChangeListener
+-    {
+-    public:
+-        virtual void onAfterSceneLoaded() {};
+-        virtual void onBeforeClearScene() {};
+-    };
+-
+     class _RlCoreExport World
+     {
+     public:
+@@ -93,9 +86,6 @@
+ 
+         void setShowBoundingBoxes(bool dis);
+ 
+-        void addSceneChangeListener(SceneChangeListener*);
+-        void removeSceneChangeListener(SceneChangeListener*);
+-
+         /// Returns a name not yet used for an Ogre object.
+         Ogre::String getUniqueName();
+ 
+@@ -109,9 +99,6 @@
+ 
+         Actor* mActiveActor;
+ 
+-        typedef std::set&lt;SceneChangeListener*&gt; SceneChangeListenerSet;
+-        SceneChangeListenerSet mSceneChangeListeners;
+-
+         World(Ogre::SceneType sceneType);
+         
+         void fireAfterSceneLoaded();
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -34,6 +34,7 @@
+ #include &quot;DotSceneOctreeWorld.h&quot;
+ #include &quot;Exception.h&quot;
+ #include &quot;GameEventManager.h&quot;
++#include &quot;MessagePump.h&quot;
+ #include &quot;GameLoop.h&quot;
+ #include &quot;ZoneManager.h&quot;
+ #include &quot;Logger.h&quot;
+@@ -68,6 +69,7 @@
+         mScriptWrapper(NULL),
+         mXmlResourceManager(NULL),
+         mPhysicsManager(NULL),
++        mMessagePump(NULL),
+         mGameLoop(NULL),
+         mAnimationManager(NULL),
+         mActorManager(NULL),
+@@ -90,6 +92,7 @@
+         delete mGameEventManager;
+ 		delete mWorld;
+         delete mGameLoop;
++        delete mMessagePump;
+         delete mJobScheduler;
+         delete mAnimationManager;
+         delete mActorManager;
+@@ -264,6 +267,10 @@
+         mWorld = new DotSceneOctreeWorld();
+         mActorManager-&gt;setWorld(mWorld);
+ 
++        mMessagePump = new MessagePump();
++        GameLoop::getSingleton().addTask(mMessagePump, GameLoop::TG_LOGIC);
++        LOG_MESSAGE(Logger::CORE,&quot;MessagePump erzeugt&quot;);
++
+         mPhysicsManager = new PhysicsManager();
+         GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+         LOG_MESSAGE(Logger::CORE,&quot;PhysicsManager erzeugt&quot;);
+
+Modified: rl/trunk/engine/core/src/Makefile.am
+===================================================================
+--- rl/trunk/engine/core/src/Makefile.am	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/src/Makefile.am	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -40,6 +40,7 @@
+ 	MergeableMeshObject.cpp \
+ 	MeshAnimation.cpp \
+ 	MeshObject.cpp \
++	MessagePump.cpp \
+ 	MovableText.cpp \
+ 	ParticleSystemObject.cpp \
+ 	PhysicsContactListener.cpp \
+
+Added: rl/trunk/engine/core/src/MessagePump.cpp
+===================================================================
+--- rl/trunk/engine/core/src/MessagePump.cpp	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/src/MessagePump.cpp	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -0,0 +1,35 @@
++/* This source file is part of Rastullahs Lockenpracht.
++ * Copyright (C) 2003-2007 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++ * 
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the Clarified Artistic License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  Clarified Artistic License for more details.
++ *
++ *  You should have received a copy of the Clarified Artistic License
++ *  along with this program; if not you can get it here
++ *  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++ */
++#include &quot;stdinc.h&quot;
++
++#include &quot;MessagePump.h&quot;
++
++template&lt;&gt; rl::MessagePump* Ogre::Singleton&lt;rl::MessagePump&gt;::ms_Singleton = 0;
++
++namespace rl
++{
++
++    void MessagePump::run(Ogre::Real elapsedTime)
++    {
++    }
++
++    const Ogre::String&amp; MessagePump::getName() const
++    {
++        static Ogre::String name = &quot;MessagePump&quot;;
++        return name;
++    }
++
++}
+
+Modified: rl/trunk/engine/core/src/World.cpp
+===================================================================
+--- rl/trunk/engine/core/src/World.cpp	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/core/src/World.cpp	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -17,10 +17,13 @@
+ 
+ #include &quot;World.h&quot;
+ 
++#include &quot;Exception.h&quot;
++#include &quot;CoreMessages.h&quot;
++#include &quot;MessagePump.h&quot;
++
+ #include &lt;OgreRoot.h&gt;
+ #include &lt;OgreSceneManager.h&gt;
+ 
+-#include &quot;Exception.h&quot;
+ 
+ using namespace Ogre;
+ 
+@@ -129,39 +132,13 @@
+         return &quot;__RL_WORLD_UNIQUE_NAME__&quot; + StringConverter::toString(++mUniqueNameSeed);
+     }
+ 
+-    void World::addSceneChangeListener(SceneChangeListener* listener)
+-    {
+-        SceneChangeListenerSet::iterator it = mSceneChangeListeners.find(listener);
+-        if (it == mSceneChangeListeners.end())
+-            mSceneChangeListeners.insert(listener);
+-        else
+-            Throw(IllegalArgumentException, &quot;Listener is already registered.&quot;);
+-    }
+-
+-    void World::removeSceneChangeListener(SceneChangeListener* listener)
+-    {
+-        SceneChangeListenerSet::iterator it = mSceneChangeListeners.find(listener);
+-        if (it != mSceneChangeListeners.end())
+-            mSceneChangeListeners.erase(listener);
+-        else
+-            Throw(IllegalArgumentException, &quot;Listener is not registered.&quot;);
+-    }
+-
+     void World::fireAfterSceneLoaded()
+     {
+-        for (SceneChangeListenerSet::iterator it = mSceneChangeListeners.begin();
+-            it != mSceneChangeListeners.end(); ++it)
+-        {
+-            (*it)-&gt;onAfterSceneLoaded();
+-        }
++        MessagePump::getSingleton().sendMessage&lt;MessageType_SceneLoaded&gt;();
+     }
+ 
+     void World::fireBeforeClearScene()
+     {
+-        for (SceneChangeListenerSet::iterator it = mSceneChangeListeners.begin();
+-            it != mSceneChangeListeners.end(); ++it)
+-        {
+-            (*it)-&gt;onBeforeClearScene();
+-        }
++        MessagePump::getSingleton().sendMessage&lt;MessageType_SceneClearing&gt;();
+     }
+ }
+
+Modified: rl/trunk/engine/ui/include/UiSubsystem.h
+===================================================================
+--- rl/trunk/engine/ui/include/UiSubsystem.h	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/ui/include/UiSubsystem.h	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -23,6 +23,7 @@
+ #include &lt;OgreSingleton.h&gt;
+ 
+ #include &quot;ControlState.h&quot;
++#include &quot;MessagePump.h&quot;
+ 
+ // Gar nicht sch&#246;n, aber ansonsten gibt es unn&#246;tige Abh&#228;ngigkeiten,
+ // wenn man die Header hier inkludiert.
+@@ -44,8 +45,7 @@
+     class WindowFactory;
+     class WindowManager;
+ 
+-    class _RlUiExport UiSubsystem : public SceneChangeListener,
+-        public Ogre::Singleton&lt;UiSubsystem&gt;
++    class _RlUiExport UiSubsystem : public Ogre::Singleton&lt;UiSubsystem&gt;
+     {
+     public:
+         static const char* CEGUI_ROOT;
+@@ -60,14 +60,15 @@
+         ///@todo function feels misplaced here,
+         void setActiveCharacter(Person* person);
+ 
+-        /// from SceneChangeListener
+-        virtual void onBeforeClearScene();
++        virtual bool onBeforeClearScene();
+ 
+         void initializeSubsystem();
+ 
+     private:
+         Person* mCharacter;
+ 
++	    MessagePump::ScopedConnection mSceneClearingConnection;
++
+         // Singletons
+         InputManager* mInputManager;
+         WindowFactory* mWindowFactory;
+
+Modified: rl/trunk/engine/ui/src/UiSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-07-17 08:46:25 UTC (rev 3604)
++++ rl/trunk/engine/ui/src/UiSubsystem.cpp	2007-07-17 14:41:51 UTC (rev 3605)
+@@ -27,6 +27,7 @@
+ #include &quot;Actor.h&quot;
+ #include &quot;ActorManager.h&quot;
+ #include &quot;ConfigurationManager.h&quot;
++#include &quot;CoreMessages.h&quot;
+ #include &quot;CoreSubsystem.h&quot;
+ #include &quot;Creature.h&quot;
+ #include &quot;CombatControlState.h&quot;
+@@ -65,14 +66,14 @@
+         mGuiResourceProvider(NULL),
+         mGuiSystem(NULL)
+     {
+-        CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;addSceneChangeListener(this);
++        mSceneClearingConnection =
++            MessagePump::getSingleton().addMessageHandler&lt;MessageType_SceneClearing&gt;(
++			    boost::bind(&amp;UiSubsystem::onBeforeClearScene, this));
+         mWindowFactory = new WindowFactory();
+     }
+ 
+     UiSubsystem::~UiSubsystem()
+     {
+-        CoreSubsystem::getSingletonPtr()-&gt;getWorld()-&gt;removeSceneChangeListener(this);
+-
+         delete mWindowFactory;
+         delete mWindowManager;
+ 
+@@ -188,11 +189,13 @@
+         }
+     }
+ 
+-    void UiSubsystem::onBeforeClearScene()
++    bool UiSubsystem::onBeforeClearScene()
+     {
+         setActiveCharacter(NULL);
+         // Remove control states here too, in case that there has not yet been a
+         // person set active.
+         mInputManager-&gt;clearControlStates();
++
++        return true;
+     }
+ }
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000675.html">[Dsa-hl-svn] r3604 - in modules: common/materials	common/materials/programs common/models ruchin/maps	ruchin/materials ruchin/materials/textures ruchin/models	ruchin/scripts/maps
+</A></li>
+	<LI>Next message: <A HREF="000677.html">[Dsa-hl-svn] r3606 - rl/trunk/engine/core/include
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#676">[ date ]</a>
+              <a href="thread.html#676">[ thread ]</a>
+              <a href="subject.html#676">[ subject ]</a>
+              <a href="author.html#676">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

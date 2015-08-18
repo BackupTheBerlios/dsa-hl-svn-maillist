@@ -1,0 +1,225 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3136 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	plugins/fmod4driver/include
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3136%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/include/nulldriver%20engine/core/src%0A%09plugins/fmod4driver/include&In-Reply-To=%3C200703062346.l26NkttN023325%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000206.html">
+   <LINK REL="Next"  HREF="000208.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3136 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	plugins/fmod4driver/include</H1>
+    <B>josch at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3136%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/include/nulldriver%20engine/core/src%0A%09plugins/fmod4driver/include&In-Reply-To=%3C200703062346.l26NkttN023325%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3136 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	plugins/fmod4driver/include">josch at mail.berlios.de
+       </A><BR>
+    <I>Wed Mar  7 00:46:55 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000206.html">[Dsa-hl-svn] r3135 - in rl/trunk/engine: ai/include script/swig
+</A></li>
+        <LI>Next message: <A HREF="000208.html">[Dsa-hl-svn] r3137 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#207">[ date ]</a>
+              <a href="thread.html#207">[ thread ]</a>
+              <a href="subject.html#207">[ subject ]</a>
+              <a href="author.html#207">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: josch
+Date: 2007-03-07 00:46:43 +0100 (Wed, 07 Mar 2007)
+New Revision: 3136
+
+Modified:
+   rl/trunk/engine/core/include/SoundDriver.h
+   rl/trunk/engine/core/include/nulldriver/NullDriver.h
+   rl/trunk/engine/core/src/SoundManager.cpp
+   rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+Log:
+Fixed bug that occurred at application shutdown.
+
+Modified: rl/trunk/engine/core/include/SoundDriver.h
+===================================================================
+--- rl/trunk/engine/core/include/SoundDriver.h	2007-03-06 22:20:18 UTC (rev 3135)
++++ rl/trunk/engine/core/include/SoundDriver.h	2007-03-06 23:46:43 UTC (rev 3136)
+@@ -83,6 +83,12 @@
+         const Ogre::Real getMasterVolume() const;
+ 
+         /**
++         * If this driver is a Ogre plugin, it returns TRUE.
++         * @return bool TRUE if Ogre plugin, FALSE otherwise.
++         */
++        virtual bool isDriverPlugin() = 0;
++
++        /**
+          * Returns the current sound driver settings as a key-value list
+          *
+          * @return key-value list of sound options
+
+Modified: rl/trunk/engine/core/include/nulldriver/NullDriver.h
+===================================================================
+--- rl/trunk/engine/core/include/nulldriver/NullDriver.h	2007-03-06 22:20:18 UTC (rev 3135)
++++ rl/trunk/engine/core/include/nulldriver/NullDriver.h	2007-03-06 23:46:43 UTC (rev 3136)
+@@ -44,6 +44,8 @@
+     virtual Ogre::String getName() const;
+     /// Update-Aufgaben erledigen
+     virtual void update();
++    /// Ist kein Ogre plugin
++    virtual bool isDriverPlugin() { return false; }
+     /// Einen Soundlistener erzeugen
+     virtual ListenerMovable *createListener(const Ogre::String &amp;name);
+     /// Set volume attenuation factor f in 1/(f*distance)
+
+Modified: rl/trunk/engine/core/src/SoundManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SoundManager.cpp	2007-03-06 22:20:18 UTC (rev 3135)
++++ rl/trunk/engine/core/src/SoundManager.cpp	2007-03-06 23:46:43 UTC (rev 3136)
+@@ -72,7 +72,7 @@
+       mListenerActor(NULL),
+       mActiveListener(NULL)
+     {
+-        LOG_MESSAGE(Logger::CORE, &quot;Erzeuge Soundmanager...&quot;);
++        LOG_MESSAGE(Logger::MULTIMEDIA, &quot;Erzeuge Soundmanager...&quot;);
+         NullDriver* nullDriver = new NullDriver(this);
+         registerDriver(nullDriver);
+         setActiveDriver(nullDriver);
+@@ -136,14 +136,14 @@
+ 
+     if (mActiveDriver == driver)
+     {
+-        LOG_DEBUG(Logger::CORE,
++        LOG_DEBUG(Logger::MULTIMEDIA,
+             &quot;No need to change Sound Driver, &quot;
+             + mActiveDriver-&gt;getName()
+             + &quot; is already active.&quot;);
+         return;
+     }
+ 
+-    LOG_MESSAGE(Logger::CORE,
++    LOG_MESSAGE(Logger::MULTIMEDIA,
+         &quot;Changing Sound Driver to &quot;
+          + driver-&gt;getName());
+ 
+@@ -160,7 +160,7 @@
+     else
+     {
+         LOG_ERROR(
+-            Logger::CORE,
++            Logger::MULTIMEDIA,
+             &quot;Sound driver &quot;
+             + driver-&gt;getName()
+             + &quot; had an error while initializing, keeping old driver.&quot;);
+@@ -274,14 +274,14 @@
+         }
+         catch(Ogre::Exception &amp;e)
+         {
+-            LOG_MESSAGE(Logger::CORE,
++            LOG_MESSAGE(Logger::MULTIMEDIA,
+                 CeGuiString(&quot;Soundtreiber kann nicht geladen werden: &quot;)
+                     + drivername + &quot;\n&quot;
+                     + e.getFullDescription());
+         }
+         catch(...)
+         {
+-            LOG_MESSAGE(Logger::CORE,
++            LOG_MESSAGE(Logger::MULTIMEDIA,
+                  CeGuiString(&quot;Soundtreiber kann nicht geladen werden: &quot;)
+                     + drivername);
+         }
+@@ -300,20 +300,11 @@
+ 
+ void SoundManager::unloadAllDrivers()
+ {
+-       if (mActiveDriver != NULL)
+-    {
+-        mActiveDriver-&gt;shutdown();
+-        mActiveDriver = NULL;
+-    }
+-
+     /**
+      * @ToDo: This is a hack to avoid the problem with the Null driver.
+      *        Don't know yet, why this happens.
+      */
+-    DriverList::iterator it = mDriverList.begin();
+-    if (!mDriverList.empty()) ++it;
+-    /** Hack End **/
+-    for(/*DriverList::iterator it = mDriverList.begin()*/; it != mDriverList.end(); it++)
++    for(DriverList::iterator it = mDriverList.begin(); it != mDriverList.end(); it++)
+     {
+ #       if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+         Ogre::String driverPlugin = (*it)-&gt;getName();
+@@ -321,13 +312,23 @@
+         Ogre::String driverPlugin = &quot;lib&quot; + (*it)-&gt;getName();
+ #       endif
+ 
+-        LOG_MESSAGE(Logger::CORE,
++        LOG_MESSAGE(Logger::MULTIMEDIA,
+             &quot;Unloading sound driver DLL &quot;
+             + driverPlugin);
+ 
+-        Ogre::Root::getSingleton().unloadPlugin(driverPlugin);
++        bool isDriverPlugin = (*it)-&gt;isDriverPlugin();
++        if (mActiveDriver != NULL &amp;&amp; mActiveDriver == *it)
++        {
++            mActiveDriver-&gt;shutdown();
++            delete mActiveDriver;
++            mActiveDriver = NULL;
++        }
++        if (isDriverPlugin)
++        {
++            Ogre::Root::getSingleton().unloadPlugin(driverPlugin);
++        }
+ 
+-        LOG_MESSAGE(Logger::CORE,
++        LOG_MESSAGE(Logger::MULTIMEDIA,
+             &quot;Sound driver DLL &quot;
+             + driverPlugin
+             + &quot; successfully unloaded.&quot;);
+
+Modified: rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+===================================================================
+--- rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-03-06 22:20:18 UTC (rev 3135)
++++ rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-03-06 23:46:43 UTC (rev 3136)
+@@ -67,6 +67,8 @@
+         virtual void shutdown();
+         /// Der Name des Treibers
+         virtual Ogre::String getName() const;
++        /// Ist ein Ogre plugin
++        virtual bool isDriverPlugin() { return true; }
+         /// Update-Aufgaben erledigen
+         virtual void update();
+         /// Einen Soundlistener erzeugen
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000206.html">[Dsa-hl-svn] r3135 - in rl/trunk/engine: ai/include script/swig
+</A></li>
+	<LI>Next message: <A HREF="000208.html">[Dsa-hl-svn] r3137 - in rl/trunk/engine: ai/include ai/src	script/swig
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#207">[ date ]</a>
+              <a href="thread.html#207">[ thread ]</a>
+              <a href="subject.html#207">[ subject ]</a>
+              <a href="author.html#207">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

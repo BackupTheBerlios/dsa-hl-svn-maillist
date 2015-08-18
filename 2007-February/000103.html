@@ -1,0 +1,404 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r3032 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2007-February/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3032%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/include/nulldriver%20engine/core/src%0A%09engine/core/src/nulldriver%20plugins/fmod4driver/include%0A%09plugins/fmod4driver/src%20plugins/openaldriver/include%0A%09plugins/openaldriver/src&In-Reply-To=%3C200702082122.l18LMwre002841%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000102.html">
+   <LINK REL="Next"  HREF="000104.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r3032 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src</H1>
+    <B>tanis at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r3032%20-%20in%20rl/trunk%3A%20engine/core/include%0A%09engine/core/include/nulldriver%20engine/core/src%0A%09engine/core/src/nulldriver%20plugins/fmod4driver/include%0A%09plugins/fmod4driver/src%20plugins/openaldriver/include%0A%09plugins/openaldriver/src&In-Reply-To=%3C200702082122.l18LMwre002841%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r3032 - in rl/trunk: engine/core/include	engine/core/include/nulldriver engine/core/src	engine/core/src/nulldriver plugins/fmod4driver/include	plugins/fmod4driver/src plugins/openaldriver/include	plugins/openaldriver/src">tanis at mail.berlios.de
+       </A><BR>
+    <I>Thu Feb  8 22:22:58 CET 2007</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000102.html">[Dsa-hl-svn] r3031 - in rl/trunk/engine/core: include src
+</A></li>
+        <LI>Next message: <A HREF="000104.html">[Dsa-hl-svn] r3033 -	dependencies/opensteer/macosx/OpenSteer.xcodeproj
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#103">[ date ]</a>
+              <a href="thread.html#103">[ thread ]</a>
+              <a href="subject.html#103">[ subject ]</a>
+              <a href="author.html#103">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: tanis
+Date: 2007-02-08 22:22:41 +0100 (Thu, 08 Feb 2007)
+New Revision: 3032
+
+Modified:
+   rl/trunk/engine/core/include/SoundDriver.h
+   rl/trunk/engine/core/include/nulldriver/NullDriver.h
+   rl/trunk/engine/core/src/SoundDriver.cpp
+   rl/trunk/engine/core/src/SoundObject.cpp
+   rl/trunk/engine/core/src/nulldriver/NullDriver.cpp
+   rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+   rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+   rl/trunk/plugins/openaldriver/include/OpenALDriver.h
+   rl/trunk/plugins/openaldriver/src/OpenALDriver.cpp
+Log:
+Sounds are managed by the drivers. First step to this goal.
+
+Modified: rl/trunk/engine/core/include/SoundDriver.h
+===================================================================
+--- rl/trunk/engine/core/include/SoundDriver.h	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/engine/core/include/SoundDriver.h	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -52,9 +52,13 @@
+         /// Update-Aufgaben erledigen
+         virtual void update() = 0;
+         /// Einen Sound-Stream mit Resource erzeugen
+-        virtual Sound *createStream(const SoundResourcePtr &amp;res) = 0;
++        virtual Sound* createStream(const SoundResourcePtr &amp;res);
+         /// Einen Sound-Sample mit Resource erzeugen
+-        virtual Sound *createSample(const SoundResourcePtr &amp;res) = 0;
++        virtual Sound* createSample(const SoundResourcePtr &amp;res);
++
++        /// Destroy a sound created by this driver. Do not call the Sound destructor yourself!
++        virtual void destroySound(Sound*);
++
+         /// Einen Soundlistener erzeugen
+         virtual ListenerMovable *createListener(const Ogre::String &amp;name) = 0;
+ 
+@@ -74,8 +78,6 @@
+         virtual void setMasterVolume(const Ogre::Real&amp; vol);
+         /// Die Standardlautst&#239;&#191;&#189;rke f&#239;&#191;&#189;r Musik zur&#239;&#191;&#189;ckgeben.
+         const Ogre::Real getMasterVolume() const;
+-        /// Einen Sound aus den Listen entfernen
+-        void remove(Sound *sound);
+ 
+         /**
+          * Returns the current sound driver settings as a key-value list
+@@ -93,17 +95,18 @@
+         virtual void applySettings(const Ogre::NameValuePairList&amp; settings);
+ 
+     protected:
+-        /// Liste der Musikst&#239;&#191;&#189;cke
+-        SoundSet mMusicSet;
+-        /// Liste der Sounds
+-        SoundSet mSoundSet;
++        static Ogre::ResourceManager* sSoundResourceManager;
++
++        SoundSet mStreamSet;
++        SoundSet mSampleSet;
++
+         Ogre::Real mDefaultMusicVolume;  ///!&lt; Music volume
+         Ogre::Real mDefaultSoundVolume;  ///!&lt; Sound effect volume
+         Ogre::Real mMasterVolume;        ///!&lt; Master volume
+ 
+-        static Ogre::ResourceManager* sSoundResourceManager;
++        virtual Sound* createStreamImpl(const SoundResourcePtr &amp;res) = 0;
++        virtual Sound* createSampleImpl(const SoundResourcePtr &amp;res) = 0;
+     };
+-
+ }
+ 
+ #endif /*SOUNDDRIVER_H_*/
+
+Modified: rl/trunk/engine/core/include/nulldriver/NullDriver.h
+===================================================================
+--- rl/trunk/engine/core/include/nulldriver/NullDriver.h	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/engine/core/include/nulldriver/NullDriver.h	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -44,15 +44,15 @@
+     virtual Ogre::String getName() const;
+     /// Update-Aufgaben erledigen
+     virtual void update();
+-    /// Einen Sound-Stream mit Resource erzeugen
+-    virtual Sound *createStream(const SoundResourcePtr &amp;res);
+-    /// Einen Sound-Sample mit Resource erzeugen
+-    virtual Sound *createSample(const SoundResourcePtr &amp;res);
+     /// Einen Soundlistener erzeugen
+     virtual ListenerMovable *createListener(const Ogre::String &amp;name);
+-    /// Setzt den Faktor f, mit der die Lautst&#239;&#191;&#189;rke nach der Formel 1/(f*Entfernung) abnimmt
++    /// Set volume attenuation factor f in 1/(f*distance)
+     virtual void setRolloffFactor(const Ogre::Real&amp;);
+     virtual const Ogre::Real getRolloffFactor();
++
++protected:
++    virtual Sound *createStreamImpl(const SoundResourcePtr &amp;res);
++    virtual Sound *createSampleImpl(const SoundResourcePtr &amp;res);
+ };
+ 
+ }
+
+Modified: rl/trunk/engine/core/src/SoundDriver.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SoundDriver.cpp	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/engine/core/src/SoundDriver.cpp	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -25,8 +25,8 @@
+ Ogre::ResourceManager* SoundDriver::sSoundResourceManager = NULL;
+ 
+ SoundDriver::SoundDriver(ResourceManager* soundResourceManager)
+- :  mMusicSet(),
+-    mSoundSet(),
++ :  mStreamSet(),
++    mSampleSet(),
+     mDefaultMusicVolume(40),
+     mDefaultSoundVolume(100),
+     mMasterVolume(100)
+@@ -36,6 +36,17 @@
+ 
+ SoundDriver::~SoundDriver()
+ {
++    SoundSet sounds;
++    sounds.insert(mSampleSet.begin(), mSampleSet.end());
++    sounds.insert(mSampleSet.begin(), mSampleSet.end());
++    for (SoundSet::iterator it = sounds.begin(); it != sounds.end(); ++it)
++    {
++        if ((*it)-&gt;isPlaying())
++        {
++            (*it)-&gt;stop();
++        }
++        delete *it;
++    }
+ }
+ 
+ /// Die Standardlautst&#228;rke f&#252;r Musik einstellen
+@@ -43,7 +54,7 @@
+ {
+     mDefaultMusicVolume = vol;
+     SoundSet::iterator it;
+-    for(it = mMusicSet.begin(); it != mMusicSet.end(); it++)
++    for(it = mStreamSet.begin(); it != mStreamSet.end(); it++)
+     {
+         (*it)-&gt;setVolume(vol);
+     }
+@@ -60,7 +71,7 @@
+ {
+     mDefaultSoundVolume = vol;
+     SoundSet::iterator it;
+-    for(it = mSoundSet.begin(); it != mSoundSet.end(); it++)
++    for(it = mSampleSet.begin(); it != mSampleSet.end(); it++)
+     {
+         (*it)-&gt;setVolume(vol);
+     }
+@@ -82,13 +93,6 @@
+     return mMasterVolume;
+ }
+ 
+-/// Aus einer Liste entfernen.
+-void SoundDriver::remove(Sound *sound)
+-{
+-    mMusicSet.erase(sound);
+-    mSoundSet.erase(sound);
+-}
+-
+     Ogre::NameValuePairList SoundDriver::getSettings() const
+     {
+         Ogre::NameValuePairList SoundSettings;
+@@ -138,4 +142,35 @@
+             setDefaultSoundVolume(Ogre::StringConverter::parseReal(it-&gt;second));
+         }
+     }
++
++    Sound* SoundDriver::createStream(const SoundResourcePtr &amp;res)
++    {
++        Sound* sound = createStreamImpl(res);
++        if (sound != NULL)
++        {
++            mStreamSet.insert(sound);
++        }
++        return sound;
++    }
++
++    Sound* SoundDriver::createSample(const SoundResourcePtr &amp;res)
++    {
++        Sound* sound = createSampleImpl(res);
++        if (sound != NULL)
++        {
++            mSampleSet.insert(sound);
++        }
++        return sound;
++    }
++
++    void SoundDriver::destroySound(Sound* sound)
++    {
++        if (sound-&gt;isPlaying())
++        {
++            sound-&gt;stop();
++        }
++        mStreamSet.erase(sound);
++        mSampleSet.erase(sound);
++        delete sound;
++    }
+ }
+
+Modified: rl/trunk/engine/core/src/SoundObject.cpp
+===================================================================
+--- rl/trunk/engine/core/src/SoundObject.cpp	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/engine/core/src/SoundObject.cpp	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -53,13 +53,8 @@
+ {
+     if (mMovableObject != NULL)
+     {
+-        if (getSound()-&gt;isPlaying())
+-        {
+-            getSound()-&gt;stop();
+-        }
+         getSound()-&gt;removeEventListener(this);
+-		SoundManager::getSingleton().getActiveDriver()-&gt;remove(getSound());
+-        delete mMovableObject;
++		SoundManager::getSingleton().getActiveDriver()-&gt;destroySound(getSound());
+         mMovableObject = NULL;
+     }
+ }
+
+Modified: rl/trunk/engine/core/src/nulldriver/NullDriver.cpp
+===================================================================
+--- rl/trunk/engine/core/src/nulldriver/NullDriver.cpp	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/engine/core/src/nulldriver/NullDriver.cpp	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -99,7 +99,7 @@
+   * @author JoSch
+   * @date 03-06-2006
+   */
+-Sound *NullDriver::createStream(const SoundResourcePtr &amp;res)
++Sound *NullDriver::createStreamImpl(const SoundResourcePtr &amp;res)
+ {
+      Sound *sound = new NullSound(res);
+      return sound;
+@@ -112,7 +112,7 @@
+  * @author JoSch
+  * @date 03-06-2006
+  */
+-Sound *NullDriver::createSample(const SoundResourcePtr &amp;res)
++Sound *NullDriver::createSampleImpl(const SoundResourcePtr &amp;res)
+ {
+      Sound *sound = new NullSound(res);
+      return sound;
+
+Modified: rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h
+===================================================================
+--- rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/plugins/fmod4driver/include/Fmod4Driver.h	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -67,10 +67,6 @@
+         virtual Ogre::String getName() const;
+         /// Update-Aufgaben erledigen
+         virtual void update();
+-        /// Einen Sound-Stream mit Resource erzeugen
+-        virtual Sound *createStream(const SoundResourcePtr &amp;res);
+-        /// Einen Sound-Sample mit Resource erzeugen
+-        virtual Sound *createSample(const SoundResourcePtr &amp;res);
+         /// Einen Soundlistener erzeugen
+         virtual ListenerMovable *createListener(const Ogre::String &amp;name);
+ 
+@@ -100,6 +96,10 @@
+ 
+         FMOD::System* _getFmodSystem();
+ 
++    protected:
++        virtual Sound* createStreamImpl(const SoundResourcePtr &amp;res);
++        virtual Sound* createSampleImpl(const SoundResourcePtr &amp;res);
++
+     private:
+         /// Informationen &#239;&#191;&#189;ber den Treiber ausgeben
+         virtual void printData() const;
+
+Modified: rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp
+===================================================================
+--- rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/plugins/fmod4driver/src/Fmod4Driver.cpp	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -105,7 +105,7 @@
+       * @author JoSch
+       * @date 03-06-2006
+       */
+-    Sound *Fmod4Driver::createStream(const SoundResourcePtr &amp;res)
++    Sound *Fmod4Driver::createStreamImpl(const SoundResourcePtr &amp;res)
+     {
+          Sound *sound = new Fmod4Sound(this, res, Fmod4Sound::STREAM);
+          return sound;
+@@ -117,7 +117,7 @@
+      * @author JoSch
+      * @date 03-06-2006
+      */
+-    Sound *Fmod4Driver::createSample(const SoundResourcePtr &amp;res)
++    Sound *Fmod4Driver::createSampleImpl(const SoundResourcePtr &amp;res)
+     {
+         Sound *sound = new Fmod4Sound(this, res, Fmod4Sound::SAMPLE);
+          return sound;
+
+Modified: rl/trunk/plugins/openaldriver/include/OpenALDriver.h
+===================================================================
+--- rl/trunk/plugins/openaldriver/include/OpenALDriver.h	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/plugins/openaldriver/include/OpenALDriver.h	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -44,10 +44,6 @@
+         virtual Ogre::String getName() const;
+         /// Update-Aufgaben erledigen
+         virtual void update();
+-        /// Einen Sound-Stream mit Resource erzeugen
+-        virtual Sound *createStream(const SoundResourcePtr &amp;res);
+-        /// Einen Sound-Sample mit Resource erzeugen
+-        virtual Sound *createSample(const SoundResourcePtr &amp;res);
+         /// Einen Soundlistener erzeugen
+         virtual ListenerMovable *createListener(const Ogre::String &amp;name);
+ 
+@@ -55,6 +51,10 @@
+         virtual void setRolloffFactor(const Ogre::Real&amp; f);
+         virtual const Ogre::Real getRolloffFactor();
+ 
++    protected:
++        virtual Sound* createStreamImpl(const SoundResourcePtr &amp;res);
++        virtual Sound* createSampleImpl(const SoundResourcePtr &amp;res);
++
+     private:
+         /// Informationen &#252;ber den Treiber ausgeben
+         virtual void printData() const;
+
+Modified: rl/trunk/plugins/openaldriver/src/OpenALDriver.cpp
+===================================================================
+--- rl/trunk/plugins/openaldriver/src/OpenALDriver.cpp	2007-02-08 20:49:20 UTC (rev 3031)
++++ rl/trunk/plugins/openaldriver/src/OpenALDriver.cpp	2007-02-08 21:22:41 UTC (rev 3032)
+@@ -140,7 +140,7 @@
+       * @author JoSch
+       * @date 03-06-2006
+       */
+-    Sound *OpenALDriver::createStream(const SoundResourcePtr &amp;res)
++    Sound* OpenALDriver::createStreamImpl(const SoundResourcePtr &amp;res)
+     {
+          Sound *sound = new OpenALSoundStream(this, res);
+          return sound;
+@@ -152,7 +152,7 @@
+      * @author JoSch
+      * @date 03-06-2006
+      */
+-    Sound *OpenALDriver::createSample(const SoundResourcePtr &amp;res)
++    Sound* OpenALDriver::createSampleImpl(const SoundResourcePtr &amp;res)
+     {
+          Sound *sound = new OpenALSoundSample(this, res);
+          return sound;
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000102.html">[Dsa-hl-svn] r3031 - in rl/trunk/engine/core: include src
+</A></li>
+	<LI>Next message: <A HREF="000104.html">[Dsa-hl-svn] r3033 -	dependencies/opensteer/macosx/OpenSteer.xcodeproj
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#103">[ date ]</a>
+              <a href="thread.html#103">[ thread ]</a>
+              <a href="subject.html#103">[ subject ]</a>
+              <a href="author.html#103">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

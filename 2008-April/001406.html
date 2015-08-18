@@ -1,0 +1,1271 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4335 - in rl/trunk/engine/core: include src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2008-April/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4335%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200804162050.m3GKovne023115%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001405.html">
+   <LINK REL="Next"  HREF="001407.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4335 - in rl/trunk/engine/core: include src</H1>
+    <B>blakharaz at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4335%20-%20in%20rl/trunk/engine/core%3A%20include%20src&In-Reply-To=%3C200804162050.m3GKovne023115%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4335 - in rl/trunk/engine/core: include src">blakharaz at mail.berlios.de
+       </A><BR>
+    <I>Wed Apr 16 22:50:57 CEST 2008</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001405.html">[Dsa-hl-svn] r4334 - in rl/trunk/engine/rules: include src
+</A></li>
+        <LI>Next message: <A HREF="001407.html">[Dsa-hl-svn] r4336 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1406">[ date ]</a>
+              <a href="thread.html#1406">[ thread ]</a>
+              <a href="subject.html#1406">[ subject ]</a>
+              <a href="author.html#1406">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: blakharaz
+Date: 2008-04-16 22:50:54 +0200 (Wed, 16 Apr 2008)
+New Revision: 4335
+
+Modified:
+   rl/trunk/engine/core/include/ConfigurationManager.h
+   rl/trunk/engine/core/src/ConfigurationManager.cpp
+   rl/trunk/engine/core/src/CoreSubsystem.cpp
+Log:
+added method for video settings
+
+Modified: rl/trunk/engine/core/include/ConfigurationManager.h
+===================================================================
+--- rl/trunk/engine/core/include/ConfigurationManager.h	2008-04-16 20:50:04 UTC (rev 4334)
++++ rl/trunk/engine/core/include/ConfigurationManager.h	2008-04-16 20:50:54 UTC (rev 4335)
+@@ -170,6 +170,12 @@
+             Ogre::NameValuePairList getSettings(const Ogre::String&amp; section) const;
+ 
+             /**
++             * Returns a pointer to the video settings
++             * @return key-value list of graphic settings
++             */
++            Ogre::NameValuePairList* getVideoSettings() const;
++
++            /**
+              * Returns a list of Ogre plugins specific to the OS
+              *
+              * @return vector of plugin names
+
+Modified: rl/trunk/engine/core/src/ConfigurationManager.cpp
+===================================================================
+--- rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-04-16 20:50:04 UTC (rev 4334)
++++ rl/trunk/engine/core/src/ConfigurationManager.cpp	2008-04-16 20:50:54 UTC (rev 4335)
+@@ -156,6 +156,11 @@
+         return mRastullahLogDirectory;
+     }
+ 
++    Ogre::NameValuePairList* ConfigurationManager::getVideoSettings() const
++    {
++        return new Ogre::NameValuePairList(getSettings(&quot;Video&quot;));
++    }
++
+     Ogre::NameValuePairList ConfigurationManager::getSettings(const Ogre::String&amp; section) const
+     {
+         SectionMap::const_iterator it = mSettings.find(section);
+
+Modified: rl/trunk/engine/core/src/CoreSubsystem.cpp
+===================================================================
+--- rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-04-16 20:50:04 UTC (rev 4334)
++++ rl/trunk/engine/core/src/CoreSubsystem.cpp	2008-04-16 20:50:54 UTC (rev 4335)
+@@ -1,579 +1,579 @@
+-/* This source file is part of Rastullahs Lockenpracht.
+-* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
+-*
+-*  This program is free software; you can redistribute it and/or modify
+-*  it under the terms of the Clarified Artistic License.
+-*
+-*  This program is distributed in the hope that it will be useful,
+-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-*  Clarified Artistic License for more details.
+-*
+-*  You should have received a copy of the Clarified Artistic License
+-*  along with this program; if not you can get it here
+-*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
+-*/
+-#include &quot;stdinc.h&quot; //precompiled header
+-
+-#include &quot;XmlResourceManager.h&quot;
+-
+-#include &quot;CoreSubsystem.h&quot;
+-
+-#include &lt;OgreEnvironment.h&gt;
+-
+-#include &quot;ActorManager.h&quot;
+-#include &quot;AnimationManager.h&quot;
+-#include &quot;ContentModule.h&quot;
+-#include &quot;ConfigurationManager.h&quot;
+-#include &quot;DebugVisualsManager.h&quot;
+-#include &quot;DotSceneOctreeWorld.h&quot;
+-#include &quot;Exception.h&quot;
+-#include &quot;GameEventManager.h&quot;
+-#include &quot;GameLoop.h&quot;
+-#include &quot;JobScheduler.h&quot;
+-#include &quot;Logger.h&quot;
+-#include &quot;MessagePump.h&quot;
+-#include &quot;PhysicsManager.h&quot;
+-#include &quot;RubyInterpreter.h&quot;
+-#include &quot;SaveGameManager.h&quot;
+-#include &quot;ScriptWrapper.h&quot;
+-#include &quot;SoundManager.h&quot;
+-#include &quot;TimeSource.h&quot;
+-#include &quot;ZoneManager.h&quot;
+-
+-#include &lt;ctime&gt;
+-
+-using namespace Ogre;
+-
+-template&lt;&gt; rl::CoreSubsystem* Singleton&lt;rl::CoreSubsystem&gt;::ms_Singleton = 0;
+-
+-namespace rl
+-{
+-    CoreSubsystem::CoreSubsystem()
+-        : Singleton&lt;CoreSubsystem&gt;(),
+-        mWorld(NULL),
+-        mRubyInterpreter(NULL),
+-        mModules(),
+-        mActiveAdventureModule(NULL),
+-        mDefaultActiveModule(&quot;&quot;),
+-        mClockStartTime(),
+-        mDeveloperMode(false),
+-        mInitialized(false),
+-        mDefaultTechniques(),
+-        mOgreRoot(NULL),
+-        mScriptWrapper(NULL),
+-        mXmlResourceManager(NULL),
+-        mPhysicsManager(NULL),
+-        mMessagePump(NULL),
+-        mGameLoop(NULL),
+-        mAnimationManager(NULL),
+-        mActorManager(NULL),
+-        mGameEventManager(NULL),
+-        mSoundManager(NULL),
+-        mDebugVisualsManager(NULL),
+-        mJobScheduler(NULL),
+-        mRenderWindow(NULL),
+-		mZoneManager(NULL)
+-    {
+-        initializeCoreSubsystem();
+-    }
+-
+-    CoreSubsystem::~CoreSubsystem()
+-    {
+-		delete meshmagick::OgreEnvironment::getSingletonPtr();
+-		delete mWorld;
+-        delete mZoneManager;
+-        delete mGameEventManager;
+-        delete mGameLoop;
+-        delete mMessagePump;
+-        delete mJobScheduler;
+-        delete mAnimationManager;
+-        delete mActorManager;
+-        delete mPhysicsManager;
+-//        delete mXmlResourceManager;
+-        delete mScriptWrapper;
+-        delete mDebugVisualsManager;
+-		delete ConfigurationManager::getSingletonPtr();
+-        delete mSoundManager;
+-        delete mOgreRoot;
+-        delete mRubyInterpreter;
+-        delete mTimeSourceManager;
+-		delete mSaveGameManager;
+-    }
+-
+-    void CoreSubsystem::startCore()
+-    {
+-        loadPlugins();
+-
+-        mInitialized = true;
+-
+-        if (mDefaultActiveModule == &quot;&quot;)
+-        {
+-            mDefaultActiveModule = &quot;intro&quot;; ///@fixme replace by last active
+-        }
+-
+-
+-        ContentModule* mod = getModule(mDefaultActiveModule);
+-        if (mod == NULL)
+-        {
+-            Throw(rl::RuntimeException, &quot;Module &quot;+mDefaultActiveModule+&quot; not found&quot;);
+-        }
+-        else
+-        {
+-            startAdventureModule(mod);
+-        }
+-
+-        mGameLoop-&gt;loop();
+-
+-        mWorld-&gt;clearScene();
+-        unloadPlugins();
+-
+-        //mRubyInterpreter-&gt;finalizeInterpreter();
+-    }
+-
+-    void CoreSubsystem::renderOneFrame()
+-    {
+-        mGameLoop-&gt;_executeOneRenderLoop();
+-    }
+-
+-    void CoreSubsystem::setDeveloperMode(bool developerMode)
+-    {
+-        mDeveloperMode = developerMode;
+-    }
+-
+-    bool CoreSubsystem::getDeveloperMode() const
+-    {
+-        return mDeveloperMode;
+-    }
+-
+-    bool CoreSubsystem::isInitialized() const
+-    {
+-        return mInitialized;
+-    }
+-
+-    Ogre::RenderWindow* CoreSubsystem::getRenderWindow() const
+-    {
+-        return mRenderWindow;
+-    }
+-
+-	void CoreSubsystem::setPaused(bool paused)
+-	{
+-       // mAnimationManager-&gt;setPaused(paused);
+-       // mPhysicsManager-&gt;setPaused(paused);
+-        mTimeSourceManager-&gt;setPaused(paused);
+-        mGameLoop-&gt;setPaused(paused);
+-	}
+-
+-    void CoreSubsystem::setTimeFactor(const Ogre::Real &amp;factor)
+-    {
+-        mTimeSourceManager-&gt;setTimeFactor(factor);
+-        mPhysicsManager-&gt;setTimeFactor(factor);
+-        mGameLoop-&gt;setTimeFactor(factor);
+-    }
+-
+-    bool CoreSubsystem::initializeCoreSubsystem()
+-    {
+-        // set default queryflags to zero
+-        Ogre::MovableObject::setDefaultQueryFlags(0);
+-        // By not specifying the first two parameters, OGRE will not try
+-        // to load plugins.cfg and ogre.cfg
+-        mOgreRoot = new Root(&quot;&quot;, &quot;&quot;, ConfigurationManager::getSingleton().getOgreLogFile());
+-
+-        // Load Ogre plugins
+-        Ogre::StringVector pluginList = ConfigurationManager::getSingleton().getPluginList();
+-        for (Ogre::StringVector::const_iterator it = pluginList.begin(); it &lt; pluginList.end(); it++)
+-        {
+-            mOgreRoot-&gt;loadPlugin(*it);
+-        }
+-
+-        // Find out, what Renderer plugins are available
+-        RenderSystemList* rsl = mOgreRoot-&gt;getAvailableRenderers();
+-        RenderSystemList::iterator it;
+-
+-        for (it = rsl-&gt;begin(); it &lt; rsl-&gt;end(); it++)
+-        {
+-            if ((*it)-&gt;getName() == ConfigurationManager::getSingleton().getStringSetting(
+-                &quot;Video&quot;, &quot;Render System&quot;))
+-            {
+-                // Select and initialise the render system
+-                mOgreRoot-&gt;setRenderSystem(*it);
+-                mOgreRoot-&gt;initialise(false, &quot;&quot;);
+-            }
+-        }
+-
+-        //Root::getSingleton().setFrameSmoothingPeriod(0.5f);
+-
+-        // Muss vor dem Laden der Ressourcen geschehen,
+-        // weil es sonst sofort angewandt wird.
+-        MeshManager::getSingleton().setBoundsPaddingFactor(0.0);
+-
+-        // EDIT:
+-        LOG_MESSAGE(Logger::CORE,&quot;init&quot;);
+-
+-        std::stringstream name;
+-        name &lt;&lt; &quot;Rastullahs Lockenpracht - &quot;;
+-        name &lt;&lt; getEngineVersionString() &lt;&lt; &quot; &quot;;
+-        name &lt;&lt; getEngineVersionName() &lt;&lt; &quot; [&quot;;
+-        name &lt;&lt; getEngineBuildNumber() &lt;&lt; &quot;]&quot;;
+-
+-        // Get width and height of the RenderWindow from the &quot;Video Mode&quot; setting
+-        Ogre::String VideoMode = ConfigurationManager::getSingleton().getStringSetting(
+-            &quot;Video&quot;, &quot;Video Mode&quot;);
+-        int temp = VideoMode.find(&quot;x&quot;);
+-        int width = Ogre::StringConverter::parseInt(VideoMode.substr(0, temp));
+-        int height = Ogre::StringConverter::parseInt(VideoMode.substr(temp + 1, VideoMode.size()));
+-
+-        mRenderWindow = mOgreRoot-&gt;createRenderWindow(
+-            name.str(), width, height,
+-            ConfigurationManager::getSingleton().getBoolSetting(
+-                &quot;Video&quot;, &quot;Fullscreen&quot;),
+-            &amp;ConfigurationManager::getSingleton().getSettings(&quot;Video&quot;));
+-
+-        if (!mRenderWindow)
+-            return false;
+-
+-        mGameLoop = new GameLoop();
+-        LOG_MESSAGE(Logger::CORE,&quot;GameLoopmanager erzeugt&quot;);
+-
+-        mSaveGameManager = new SaveGameManager();
+-        LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
+-		
+-		mTimeSourceManager = new TimeSourceManager();
+-        mTimeSourceManager-&gt;registerTimeSource(new RealTimeContinuous());
+-        mTimeSourceManager-&gt;registerTimeSource(new RealTimeInterruptable());
+-        LOG_MESSAGE(Logger::CORE,&quot;Time sources (realtime) created&quot;);
+-
+-        mScriptWrapper = new ScriptWrapper();
+-        LOG_MESSAGE(Logger::CORE,&quot;Skriptwrapper erzeugt&quot;);
+-        ///@todo: muss loeschbar werden.
+-        mRubyInterpreter = new RubyInterpreter();
+-        LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter erzeugt&quot;);
+-        mRubyInterpreter-&gt;initializeInterpreter();
+-        LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter initialisiert&quot;);
+-
+-        mMessagePump = new MessagePump();
+-        GameLoop::getSingleton().addTask(mMessagePump, GameLoop::TG_LOGIC);
+-        LOG_MESSAGE(Logger::CORE,&quot;MessagePump erzeugt&quot;);
+-
+-        mActorManager = new ActorManager();
+-        LOG_MESSAGE(Logger::CORE,&quot;Aktormanager erzeugt&quot;);
+-
+-        mSoundManager = new SoundManager();
+-        GameLoop::getSingleton().addTask(mSoundManager, GameLoop::TG_SOUND);
+-        LOG_MESSAGE(Logger::CORE,&quot;SoundManager erzeugt&quot;);
+-
+-        initializeResources();
+-
+-        // Set default mipmap level (NB some APIs ignore this)
+-        ///@todo: In Config-Datei verlagern
+-        TextureManager::getSingleton().setDefaultNumMipmaps(5);
+-        MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_TRILINEAR);
+-        MaterialManager::getSingleton().setDefaultAnisotropy(
+-            ConfigurationManager::getSingleton().getIntSetting(
+-                &quot;Video&quot;, &quot;Max Anisotropy&quot;));
+-
+-
+-        mWorld = new DotSceneOctreeWorld();
+-        mActorManager-&gt;setWorld(mWorld);
+-
+-        mPhysicsManager = new PhysicsManager();
+-        GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
+-        LOG_MESSAGE(Logger::CORE,&quot;PhysicsManager erzeugt&quot;);
+-
+-        mAnimationManager = new AnimationManager();
+-        GameLoop::getSingleton().addTask(mAnimationManager, GameLoop::TG_GRAPHICS);
+-        LOG_MESSAGE(Logger::CORE,&quot;AnimationManager erzeugt&quot;);
+-
+-        mGameEventManager = new GameEventManager();
+-        GameLoop::getSingleton().addTask(mGameEventManager, GameLoop::TG_LOGIC);
+-        LOG_MESSAGE(Logger::CORE,&quot;GameEventManager erzeugt&quot;);
+-
+-        mDebugVisualsManager = new DebugVisualsManager();
+-        GameLoop::getSingleton().addTask(mDebugVisualsManager, GameLoop::TG_GRAPHICS);
+-        LOG_MESSAGE(Logger::CORE,&quot;DebugVisualsManager erzeugt&quot;);
+-
+-        mJobScheduler = new JobScheduler();
+-        GameLoop::getSingleton().addTask(mJobScheduler, GameLoop::TG_GRAPHICS);
+-        LOG_MESSAGE(Logger::CORE,&quot;JobScheduler erzeugt&quot;);
+-
+-		mZoneManager = new ZoneManager();
+-        GameLoop::getSingleton().addTask(mZoneManager, GameLoop::TG_LOGIC);
+-        LOG_MESSAGE(Logger::CORE,&quot;ZoneManager erzeugt&quot;);
+-
+-		new meshmagick::OgreEnvironment();
+-		meshmagick::OgreEnvironment::getSingleton().initialize(false, Logger::getSingleton()._getLog());
+-
+-        return true;
+-    }
+-
+-    void CoreSubsystem::initializeResources()
+-    {
+-        mXmlResourceManager = new XmlResourceManager();
+-
+-        // Fuer Configs die keinem Typ zugeordnet sind,
+-        // und die per kompletten Verezeichnis erfragt werden
+-        ResourceGroupManager::getSingleton().addResourceLocation(
+-            ConfigurationManager::getSingleton().
+-                getModulesRootDirectory(),
+-            &quot;FileSystem&quot;,
+-            ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+-
+-
+-        // Initialise the modules
+-        Ogre::StringVector modulesList = ConfigurationManager::getSingleton().getModuleList();
+-
+-        for (size_t i = 0; i &lt; modulesList.size(); i++)
+-        {
+-            mRubyInterpreter-&gt;executeFile(ContentModule::getInitFile(modulesList[i]));
+-
+-            ContentModule* module = getModule(modulesList[i]);
+-
+-            if (module == NULL)
+-            {
+-                Throw(rl::RuntimeException,
+-                      ContentModule::getInitFile(modulesList[i]) + &quot; did not register module '&quot; + modulesList[i] + &quot;'&quot;);
+-            }
+-            //else
+-            //{
+-            //    if (module-&gt;isCommon())
+-            //    {
+-            //        module-&gt;initializeTextures();
+-            //        module-&gt;initialize();
+-            //    }
+-            //}
+-        }
+-    }
+-
+-    ContentModule* CoreSubsystem::getModule(const Ogre::String&amp; moduleId) const
+-    {
+-        ModuleMap::const_iterator moduleIt = mModules.find(moduleId);
+-
+-        if (moduleIt != mModules.end())
+-        {
+-            return (*moduleIt).second;
+-        }
+-        else
+-        {
+-            return NULL;
+-        }
+-    }
+-
+-    void CoreSubsystem::registerModule(ContentModule* module)
+-    {
+-        mModules[module-&gt;getId()] = module;
+-    }
+-
+-    void CoreSubsystem::updateDefaultScheme()
+-    {
+-        int numTu = mOgreRoot-&gt;getRenderSystem()-&gt;getCapabilities()-&gt;getNumTextureUnits();
+-
+-        Ogre::String tuScheme;
+-
+-        if (numTu &gt;= 6)
+-            tuScheme = &quot;tu6&quot;;
+-        else if (numTu &gt;= 2)
+-            tuScheme = &quot;tu2&quot;;
+-        else
+-            tuScheme = &quot;tu1&quot;;
+-
+-        LOG_MESSAGE(Logger::CORE,
+-            &quot;Found &quot; + Ogre::StringConverter::toString(numTu) + &quot; Texture Units, using &quot;+
+-            &quot;alphablending scheme &quot; + tuScheme);
+-
+-        for (ResourceManager::ResourceMapIterator itMat =
+-            MaterialManager::getSingleton().getResourceIterator();
+-            itMat.hasMoreElements();)
+-        {
+-            MaterialPtr mat = itMat.getNext();
+-            for (Material::TechniqueIterator itTech =
+-                mat-&gt;getTechniqueIterator();
+-                itTech.hasMoreElements();)
+-            {
+-                Technique* tech = itTech.getNext();
+-                if (tech-&gt;getSchemeName() == tuScheme)
+-                {
+-                    tech-&gt;setSchemeName(MaterialManager::DEFAULT_SCHEME_NAME);
+-                    mDefaultTechniques.push_back(tech);
+-                }
+-                else if (tech-&gt;getSchemeName() == MaterialManager::DEFAULT_SCHEME_NAME)
+-                {
+-                    mDefaultTechniques.push_back(tech);
+-                }
+-            }
+-        }
+-    }
+-
+-    void CoreSubsystem::setScheme(const Ogre::String&amp; schemeName)
+-    {
+-        if (schemeName != MaterialManager::getSingleton().getActiveScheme())
+-        {
+-            /*for (std::vector&lt;Technique*&gt;::iterator iter = mDefaultTechniques.begin();
+-                iter != mDefaultTechniques.end(); ++iter)
+-            {
+-                Technique* cur = *iter;
+-                cur-&gt;setSchemeName(schemeName);
+-            }*/
+-
+-            MaterialManager::getSingleton().setActiveScheme(schemeName);
+-        }
+-    }
+-
+-    void CoreSubsystem::startAdventureModule(ContentModule* module)
+-    {
+-        if (mActiveAdventureModule != NULL)
+-        {
+-            mActiveAdventureModule-&gt;unload();
+-        }
+-
+-        //mCoreEventCaster.dispatchEvent(new DataLoadedEvent(0.0));
+-
+-        updateDefaultScheme();
+-        loadModule(module);
+-        mActiveAdventureModule = module;
+-
+-        //mCoreEventCaster.dispatchEvent(new DataLoadedEvent(100.0));
+-        
+-        module-&gt;start();
+-    }
+-
+-    void CoreSubsystem::loadModule(ContentModule* module)
+-    {
+-        if (module-&gt;getMinimumEngineVersion() &gt; getEngineBuildNumber())
+-        {
+-            Throw(
+-                rl::RuntimeException,
+-                &quot;Module &quot;
+-                + Ogre::String(module-&gt;getName().c_str())
+-                + &quot; needs engine &gt;=&quot;
+-                + StringConverter::toString(module-&gt;getMinimumEngineVersion())
+-                + &quot; but engine is &quot;
+-                + StringConverter::toString(getEngineBuildNumber()));
+-        }
+-
+-        StringVector deps = module-&gt;getDependencies();
+-        for (StringVector::const_iterator depsIt = deps.begin(); depsIt != deps.end(); depsIt++)
+-        {
+-            Ogre::String depName = *depsIt;
+-            ModuleMap::iterator modIt = mModules.find(depName);
+-            if (modIt == mModules.end())
+-            {
+-                Throw(
+-                    rl::RuntimeException,
+-                    &quot;Depedency Module &quot; + depName
+-                    + &quot; needed by &quot; + Ogre::String(module-&gt;getName().c_str())
+-                    + &quot; not found.&quot;);
+-            }
+-
+-            ContentModule* depMod = (*modIt).second;
+-
+-            if (!depMod-&gt;isLoaded())
+-            {
+-                loadModule(depMod);
+-            }
+-        }
+-
+-        LOG_MESSAGE(
+-            Logger::CORE,
+-            &quot;Start initializing module &quot; + module-&gt;getName());
+-        module-&gt;initializeTextures();
+-        module-&gt;initialize();
+-
+-        ResourceGroupManager::getSingleton().initialiseResourceGroup(module-&gt;getId());
+-        module-&gt;precreateMeshes();
+-
+-        if (module-&gt;isCommon())
+-        {
+-            module-&gt;start();
+-        }
+-
+-        LOG_MESSAGE(
+-            Logger::CORE,
+-            &quot;Module &quot; + module-&gt;getName() + &quot; initialized.&quot;);
+-    }
+-
+-    void CoreSubsystem::setDefaultActiveModule(const Ogre::String&amp; module)
+-    {
+-        mDefaultActiveModule = module;
+-    }
+-
+-    const Ogre::String&amp; CoreSubsystem::getDefaultActiveModule() const
+-    {
+-        return mDefaultActiveModule;
+-    }
+-
+-    World* CoreSubsystem::getWorld()
+-    {
+-        return mWorld;
+-    }
+-
+-    const Ogre::String CoreSubsystem::getEngineVersionString() const
+-    {
+-        static Ogre::String version = &quot;0.3.0&quot;;
+-        return version;
+-    }
+-
+-    const Ogre::String CoreSubsystem::getEngineVersionName() const
+-    {
+-        static Ogre::String version = &quot;Internal Build&quot;;
+-        return version;
+-    }
+-
+-    long CoreSubsystem::getEngineBuildNumber() const
+-    {
+-        static const Ogre::String sMonths[] =
+-        {&quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;, &quot;Jul&quot;, &quot;Aug&quot;,
+-         &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;};
+-
+-        Ogre::String dateStr = Ogre::String(__DATE__);
+-        Ogre::String monthStr = dateStr.substr(0,3);
+-        int day = Ogre::StringConverter::parseInt(dateStr.substr(4,2));
+-        int year = Ogre::StringConverter::parseInt(dateStr.substr(7,4));
+-        int month = 0;
+-
+-        while( month &lt; 12 &amp;&amp; monthStr.compare(sMonths[month]) != 0 )
+-            month++;
+-
+-        return /* Jahr */          year * 100000 +
+-               /* Monat */         (month+1) * 1000 +
+-               /* Tag */           day * 10 +
+-               /* Sub-Version */   0;
+-    }
+-
+-    RubyInterpreter* CoreSubsystem::getRubyInterpreter()
+-    {
+-        return mRubyInterpreter;
+-    }
+-
+-    void CoreSubsystem::makeScreenshot( const Ogre::String&amp; sName )
+-    {
+-        mRenderWindow-&gt;writeContentsToTimestampedFile(sName, &quot;.png&quot;);
+-    }
+-
+-    ContentModule* CoreSubsystem::getActiveAdventureModule() const
+-    {
+-        return mActiveAdventureModule;
+-    }
+-
+-    const ModuleMap&amp; CoreSubsystem::getAllModules() const
+-    {
+-        return mModules;
+-    }
+-
+-    void CoreSubsystem::loadMap(const Ogre::String type, const Ogre::String filename,
+-        const Ogre::String module)
+-    {
+-        mWorld-&gt;loadScene(filename, module);
+-    }
+-
+-    void CoreSubsystem::loadPlugins()
+-    {
+-        mSoundManager-&gt;applySettings(rl::ConfigurationManager::getSingleton().getSettings(&quot;Sound&quot;));
+-        LOG_MESSAGE(Logger::CORE, &quot;Soundeinstellungen geladen&quot;);
+-    }
+-
+-    void CoreSubsystem::unloadPlugins()
+-    {
+-        mSoundManager-&gt;unloadAllDrivers();
+-        LOG_MESSAGE(Logger::CORE, &quot;Soundtreiber entladen&quot;);
+-    }
+-}
++/* This source file is part of Rastullahs Lockenpracht.
++* Copyright (C) 2003-2008 Team Pantheon. <A HREF="http://www.team-pantheon.de">http://www.team-pantheon.de</A>
++*
++*  This program is free software; you can redistribute it and/or modify
++*  it under the terms of the Clarified Artistic License.
++*
++*  This program is distributed in the hope that it will be useful,
++*  but WITHOUT ANY WARRANTY; without even the implied warranty of
++*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++*  Clarified Artistic License for more details.
++*
++*  You should have received a copy of the Clarified Artistic License
++*  along with this program; if not you can get it here
++*  <A HREF="http://www.jpaulmorrison.com/fbp/artistic2.htm.">http://www.jpaulmorrison.com/fbp/artistic2.htm.</A>
++*/
++#include &quot;stdinc.h&quot; //precompiled header
++
++#include &quot;XmlResourceManager.h&quot;
++
++#include &quot;CoreSubsystem.h&quot;
++
++#include &lt;OgreEnvironment.h&gt;
++
++#include &quot;ActorManager.h&quot;
++#include &quot;AnimationManager.h&quot;
++#include &quot;ContentModule.h&quot;
++#include &quot;ConfigurationManager.h&quot;
++#include &quot;DebugVisualsManager.h&quot;
++#include &quot;DotSceneOctreeWorld.h&quot;
++#include &quot;Exception.h&quot;
++#include &quot;GameEventManager.h&quot;
++#include &quot;GameLoop.h&quot;
++#include &quot;JobScheduler.h&quot;
++#include &quot;Logger.h&quot;
++#include &quot;MessagePump.h&quot;
++#include &quot;PhysicsManager.h&quot;
++#include &quot;RubyInterpreter.h&quot;
++#include &quot;SaveGameManager.h&quot;
++#include &quot;ScriptWrapper.h&quot;
++#include &quot;SoundManager.h&quot;
++#include &quot;TimeSource.h&quot;
++#include &quot;ZoneManager.h&quot;
++
++#include &lt;ctime&gt;
++
++using namespace Ogre;
++
++template&lt;&gt; rl::CoreSubsystem* Singleton&lt;rl::CoreSubsystem&gt;::ms_Singleton = 0;
++
++namespace rl
++{
++    CoreSubsystem::CoreSubsystem()
++        : Singleton&lt;CoreSubsystem&gt;(),
++        mWorld(NULL),
++        mRubyInterpreter(NULL),
++        mModules(),
++        mActiveAdventureModule(NULL),
++        mDefaultActiveModule(&quot;&quot;),
++        mClockStartTime(),
++        mDeveloperMode(false),
++        mInitialized(false),
++        mDefaultTechniques(),
++        mOgreRoot(NULL),
++        mScriptWrapper(NULL),
++        mXmlResourceManager(NULL),
++        mPhysicsManager(NULL),
++        mMessagePump(NULL),
++        mGameLoop(NULL),
++        mAnimationManager(NULL),
++        mActorManager(NULL),
++        mGameEventManager(NULL),
++        mSoundManager(NULL),
++        mDebugVisualsManager(NULL),
++        mJobScheduler(NULL),
++        mRenderWindow(NULL),
++		mZoneManager(NULL)
++    {
++        initializeCoreSubsystem();
++    }
++
++    CoreSubsystem::~CoreSubsystem()
++    {
++		delete meshmagick::OgreEnvironment::getSingletonPtr();
++		delete mWorld;
++        delete mZoneManager;
++        delete mGameEventManager;
++        delete mGameLoop;
++        delete mMessagePump;
++        delete mJobScheduler;
++        delete mAnimationManager;
++        delete mActorManager;
++        delete mPhysicsManager;
++//        delete mXmlResourceManager;
++        delete mScriptWrapper;
++        delete mDebugVisualsManager;
++		delete ConfigurationManager::getSingletonPtr();
++        delete mSoundManager;
++        delete mOgreRoot;
++        delete mRubyInterpreter;
++        delete mTimeSourceManager;
++		delete mSaveGameManager;
++    }
++
++    void CoreSubsystem::startCore()
++    {
++        loadPlugins();
++
++        mInitialized = true;
++
++        if (mDefaultActiveModule == &quot;&quot;)
++        {
++            mDefaultActiveModule = &quot;intro&quot;; ///@fixme replace by last active
++        }
++
++
++        ContentModule* mod = getModule(mDefaultActiveModule);
++        if (mod == NULL)
++        {
++            Throw(rl::RuntimeException, &quot;Module &quot;+mDefaultActiveModule+&quot; not found&quot;);
++        }
++        else
++        {
++            startAdventureModule(mod);
++        }
++
++        mGameLoop-&gt;loop();
++
++        mWorld-&gt;clearScene();
++        unloadPlugins();
++
++        //mRubyInterpreter-&gt;finalizeInterpreter();
++    }
++
++    void CoreSubsystem::renderOneFrame()
++    {
++        mGameLoop-&gt;_executeOneRenderLoop();
++    }
++
++    void CoreSubsystem::setDeveloperMode(bool developerMode)
++    {
++        mDeveloperMode = developerMode;
++    }
++
++    bool CoreSubsystem::getDeveloperMode() const
++    {
++        return mDeveloperMode;
++    }
++
++    bool CoreSubsystem::isInitialized() const
++    {
++        return mInitialized;
++    }
++
++    Ogre::RenderWindow* CoreSubsystem::getRenderWindow() const
++    {
++        return mRenderWindow;
++    }
++
++	void CoreSubsystem::setPaused(bool paused)
++	{
++       // mAnimationManager-&gt;setPaused(paused);
++       // mPhysicsManager-&gt;setPaused(paused);
++        mTimeSourceManager-&gt;setPaused(paused);
++        mGameLoop-&gt;setPaused(paused);
++	}
++
++    void CoreSubsystem::setTimeFactor(const Ogre::Real &amp;factor)
++    {
++        mTimeSourceManager-&gt;setTimeFactor(factor);
++        mPhysicsManager-&gt;setTimeFactor(factor);
++        mGameLoop-&gt;setTimeFactor(factor);
++    }
++
++    bool CoreSubsystem::initializeCoreSubsystem()
++    {
++        // set default queryflags to zero
++        Ogre::MovableObject::setDefaultQueryFlags(0);
++        // By not specifying the first two parameters, OGRE will not try
++        // to load plugins.cfg and ogre.cfg
++        mOgreRoot = new Root(&quot;&quot;, &quot;&quot;, ConfigurationManager::getSingleton().getOgreLogFile());
++
++        // Load Ogre plugins
++        Ogre::StringVector pluginList = ConfigurationManager::getSingleton().getPluginList();
++        for (Ogre::StringVector::const_iterator it = pluginList.begin(); it &lt; pluginList.end(); it++)
++        {
++            mOgreRoot-&gt;loadPlugin(*it);
++        }
++
++        // Find out, what Renderer plugins are available
++        RenderSystemList* rsl = mOgreRoot-&gt;getAvailableRenderers();
++        RenderSystemList::iterator it;
++
++        for (it = rsl-&gt;begin(); it &lt; rsl-&gt;end(); it++)
++        {
++            if ((*it)-&gt;getName() == ConfigurationManager::getSingleton().getStringSetting(
++                &quot;Video&quot;, &quot;Render System&quot;))
++            {
++                // Select and initialise the render system
++                mOgreRoot-&gt;setRenderSystem(*it);
++                mOgreRoot-&gt;initialise(false, &quot;&quot;);
++            }
++        }
++
++        //Root::getSingleton().setFrameSmoothingPeriod(0.5f);
++
++        // Muss vor dem Laden der Ressourcen geschehen,
++        // weil es sonst sofort angewandt wird.
++        MeshManager::getSingleton().setBoundsPaddingFactor(0.0);
++
++        // EDIT:
++        LOG_MESSAGE(Logger::CORE,&quot;init&quot;);
++
++        std::stringstream name;
++        name &lt;&lt; &quot;Rastullahs Lockenpracht - &quot;;
++        name &lt;&lt; getEngineVersionString() &lt;&lt; &quot; &quot;;
++        name &lt;&lt; getEngineVersionName() &lt;&lt; &quot; [&quot;;
++        name &lt;&lt; getEngineBuildNumber() &lt;&lt; &quot;]&quot;;
++
++        // Get width and height of the RenderWindow from the &quot;Video Mode&quot; setting
++        Ogre::String VideoMode = ConfigurationManager::getSingleton().getStringSetting(
++            &quot;Video&quot;, &quot;Video Mode&quot;);
++        int temp = VideoMode.find(&quot;x&quot;);
++        int width = Ogre::StringConverter::parseInt(VideoMode.substr(0, temp));
++        int height = Ogre::StringConverter::parseInt(VideoMode.substr(temp + 1, VideoMode.size()));
++
++        mRenderWindow = mOgreRoot-&gt;createRenderWindow(
++            name.str(), width, height,
++            ConfigurationManager::getSingleton().getBoolSetting(
++                &quot;Video&quot;, &quot;Fullscreen&quot;),
++            ConfigurationManager::getSingleton().getVideoSettings());
++
++        if (!mRenderWindow)
++            return false;
++
++        mGameLoop = new GameLoop();
++        LOG_MESSAGE(Logger::CORE,&quot;GameLoopmanager erzeugt&quot;);
++
++        mSaveGameManager = new SaveGameManager();
++        LOG_MESSAGE(Logger::RULES, &quot;SaveGameManager erzeugt&quot;);
++		
++		mTimeSourceManager = new TimeSourceManager();
++        mTimeSourceManager-&gt;registerTimeSource(new RealTimeContinuous());
++        mTimeSourceManager-&gt;registerTimeSource(new RealTimeInterruptable());
++        LOG_MESSAGE(Logger::CORE,&quot;Time sources (realtime) created&quot;);
++
++        mScriptWrapper = new ScriptWrapper();
++        LOG_MESSAGE(Logger::CORE,&quot;Skriptwrapper erzeugt&quot;);
++        ///@todo: muss loeschbar werden.
++        mRubyInterpreter = new RubyInterpreter();
++        LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter erzeugt&quot;);
++        mRubyInterpreter-&gt;initializeInterpreter();
++        LOG_MESSAGE(Logger::CORE,&quot;RubyInterpreter initialisiert&quot;);
++
++        mMessagePump = new MessagePump();
++        GameLoop::getSingleton().addTask(mMessagePump, GameLoop::TG_LOGIC);
++        LOG_MESSAGE(Logger::CORE,&quot;MessagePump erzeugt&quot;);
++
++        mActorManager = new ActorManager();
++        LOG_MESSAGE(Logger::CORE,&quot;Aktormanager erzeugt&quot;);
++
++        mSoundManager = new SoundManager();
++        GameLoop::getSingleton().addTask(mSoundManager, GameLoop::TG_SOUND);
++        LOG_MESSAGE(Logger::CORE,&quot;SoundManager erzeugt&quot;);
++
++        initializeResources();
++
++        // Set default mipmap level (NB some APIs ignore this)
++        ///@todo: In Config-Datei verlagern
++        TextureManager::getSingleton().setDefaultNumMipmaps(5);
++        MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_TRILINEAR);
++        MaterialManager::getSingleton().setDefaultAnisotropy(
++            ConfigurationManager::getSingleton().getIntSetting(
++                &quot;Video&quot;, &quot;Max Anisotropy&quot;));
++
++
++        mWorld = new DotSceneOctreeWorld();
++        mActorManager-&gt;setWorld(mWorld);
++
++        mPhysicsManager = new PhysicsManager();
++        GameLoop::getSingleton().addTask(mPhysicsManager, GameLoop::TG_PHYSICS);
++        LOG_MESSAGE(Logger::CORE,&quot;PhysicsManager erzeugt&quot;);
++
++        mAnimationManager = new AnimationManager();
++        GameLoop::getSingleton().addTask(mAnimationManager, GameLoop::TG_GRAPHICS);
++        LOG_MESSAGE(Logger::CORE,&quot;AnimationManager erzeugt&quot;);
++
++        mGameEventManager = new GameEventManager();
++        GameLoop::getSingleton().addTask(mGameEventManager, GameLoop::TG_LOGIC);
++        LOG_MESSAGE(Logger::CORE,&quot;GameEventManager erzeugt&quot;);
++
++        mDebugVisualsManager = new DebugVisualsManager();
++        GameLoop::getSingleton().addTask(mDebugVisualsManager, GameLoop::TG_GRAPHICS);
++        LOG_MESSAGE(Logger::CORE,&quot;DebugVisualsManager erzeugt&quot;);
++
++        mJobScheduler = new JobScheduler();
++        GameLoop::getSingleton().addTask(mJobScheduler, GameLoop::TG_GRAPHICS);
++        LOG_MESSAGE(Logger::CORE,&quot;JobScheduler erzeugt&quot;);
++
++		mZoneManager = new ZoneManager();
++        GameLoop::getSingleton().addTask(mZoneManager, GameLoop::TG_LOGIC);
++        LOG_MESSAGE(Logger::CORE,&quot;ZoneManager erzeugt&quot;);
++
++		new meshmagick::OgreEnvironment();
++		meshmagick::OgreEnvironment::getSingleton().initialize(false, Logger::getSingleton()._getLog());
++
++        return true;
++    }
++
++    void CoreSubsystem::initializeResources()
++    {
++        mXmlResourceManager = new XmlResourceManager();
++
++        // Fuer Configs die keinem Typ zugeordnet sind,
++        // und die per kompletten Verezeichnis erfragt werden
++        ResourceGroupManager::getSingleton().addResourceLocation(
++            ConfigurationManager::getSingleton().
++                getModulesRootDirectory(),
++            &quot;FileSystem&quot;,
++            ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
++
++
++        // Initialise the modules
++        Ogre::StringVector modulesList = ConfigurationManager::getSingleton().getModuleList();
++
++        for (size_t i = 0; i &lt; modulesList.size(); i++)
++        {
++            mRubyInterpreter-&gt;executeFile(ContentModule::getInitFile(modulesList[i]));
++
++            ContentModule* module = getModule(modulesList[i]);
++
++            if (module == NULL)
++            {
++                Throw(rl::RuntimeException,
++                      ContentModule::getInitFile(modulesList[i]) + &quot; did not register module '&quot; + modulesList[i] + &quot;'&quot;);
++            }
++            //else
++            //{
++            //    if (module-&gt;isCommon())
++            //    {
++            //        module-&gt;initializeTextures();
++            //        module-&gt;initialize();
++            //    }
++            //}
++        }
++    }
++
++    ContentModule* CoreSubsystem::getModule(const Ogre::String&amp; moduleId) const
++    {
++        ModuleMap::const_iterator moduleIt = mModules.find(moduleId);
++
++        if (moduleIt != mModules.end())
++        {
++            return (*moduleIt).second;
++        }
++        else
++        {
++            return NULL;
++        }
++    }
++
++    void CoreSubsystem::registerModule(ContentModule* module)
++    {
++        mModules[module-&gt;getId()] = module;
++    }
++
++    void CoreSubsystem::updateDefaultScheme()
++    {
++        int numTu = mOgreRoot-&gt;getRenderSystem()-&gt;getCapabilities()-&gt;getNumTextureUnits();
++
++        Ogre::String tuScheme;
++
++        if (numTu &gt;= 6)
++            tuScheme = &quot;tu6&quot;;
++        else if (numTu &gt;= 2)
++            tuScheme = &quot;tu2&quot;;
++        else
++            tuScheme = &quot;tu1&quot;;
++
++        LOG_MESSAGE(Logger::CORE,
++            &quot;Found &quot; + Ogre::StringConverter::toString(numTu) + &quot; Texture Units, using &quot;+
++            &quot;alphablending scheme &quot; + tuScheme);
++
++        for (ResourceManager::ResourceMapIterator itMat =
++            MaterialManager::getSingleton().getResourceIterator();
++            itMat.hasMoreElements();)
++        {
++            MaterialPtr mat = itMat.getNext();
++            for (Material::TechniqueIterator itTech =
++                mat-&gt;getTechniqueIterator();
++                itTech.hasMoreElements();)
++            {
++                Technique* tech = itTech.getNext();
++                if (tech-&gt;getSchemeName() == tuScheme)
++                {
++                    tech-&gt;setSchemeName(MaterialManager::DEFAULT_SCHEME_NAME);
++                    mDefaultTechniques.push_back(tech);
++                }
++                else if (tech-&gt;getSchemeName() == MaterialManager::DEFAULT_SCHEME_NAME)
++                {
++                    mDefaultTechniques.push_back(tech);
++                }
++            }
++        }
++    }
++
++    void CoreSubsystem::setScheme(const Ogre::String&amp; schemeName)
++    {
++        if (schemeName != MaterialManager::getSingleton().getActiveScheme())
++        {
++            /*for (std::vector&lt;Technique*&gt;::iterator iter = mDefaultTechniques.begin();
++                iter != mDefaultTechniques.end(); ++iter)
++            {
++                Technique* cur = *iter;
++                cur-&gt;setSchemeName(schemeName);
++            }*/
++
++            MaterialManager::getSingleton().setActiveScheme(schemeName);
++        }
++    }
++
++    void CoreSubsystem::startAdventureModule(ContentModule* module)
++    {
++        if (mActiveAdventureModule != NULL)
++        {
++            mActiveAdventureModule-&gt;unload();
++        }
++
++        //mCoreEventCaster.dispatchEvent(new DataLoadedEvent(0.0));
++
++        updateDefaultScheme();
++        loadModule(module);
++        mActiveAdventureModule = module;
++
++        //mCoreEventCaster.dispatchEvent(new DataLoadedEvent(100.0));
++        
++        module-&gt;start();
++    }
++
++    void CoreSubsystem::loadModule(ContentModule* module)
++    {
++        if (module-&gt;getMinimumEngineVersion() &gt; getEngineBuildNumber())
++        {
++            Throw(
++                rl::RuntimeException,
++                &quot;Module &quot;
++                + Ogre::String(module-&gt;getName().c_str())
++                + &quot; needs engine &gt;=&quot;
++                + StringConverter::toString(module-&gt;getMinimumEngineVersion())
++                + &quot; but engine is &quot;
++                + StringConverter::toString(getEngineBuildNumber()));
++        }
++
++        StringVector deps = module-&gt;getDependencies();
++        for (StringVector::const_iterator depsIt = deps.begin(); depsIt != deps.end(); depsIt++)
++        {
++            Ogre::String depName = *depsIt;
++            ModuleMap::iterator modIt = mModules.find(depName);
++            if (modIt == mModules.end())
++            {
++                Throw(
++                    rl::RuntimeException,
++                    &quot;Depedency Module &quot; + depName
++                    + &quot; needed by &quot; + Ogre::String(module-&gt;getName().c_str())
++                    + &quot; not found.&quot;);
++            }
++
++            ContentModule* depMod = (*modIt).second;
++
++            if (!depMod-&gt;isLoaded())
++            {
++                loadModule(depMod);
++            }
++        }
++
++        LOG_MESSAGE(
++            Logger::CORE,
++            &quot;Start initializing module &quot; + module-&gt;getName());
++        module-&gt;initializeTextures();
++        module-&gt;initialize();
++
++        ResourceGroupManager::getSingleton().initialiseResourceGroup(module-&gt;getId());
++        module-&gt;precreateMeshes();
++
++        if (module-&gt;isCommon())
++        {
++            module-&gt;start();
++        }
++
++        LOG_MESSAGE(
++            Logger::CORE,
++            &quot;Module &quot; + module-&gt;getName() + &quot; initialized.&quot;);
++    }
++
++    void CoreSubsystem::setDefaultActiveModule(const Ogre::String&amp; module)
++    {
++        mDefaultActiveModule = module;
++    }
++
++    const Ogre::String&amp; CoreSubsystem::getDefaultActiveModule() const
++    {
++        return mDefaultActiveModule;
++    }
++
++    World* CoreSubsystem::getWorld()
++    {
++        return mWorld;
++    }
++
++    const Ogre::String CoreSubsystem::getEngineVersionString() const
++    {
++        static Ogre::String version = &quot;0.3.0&quot;;
++        return version;
++    }
++
++    const Ogre::String CoreSubsystem::getEngineVersionName() const
++    {
++        static Ogre::String version = &quot;Internal Build&quot;;
++        return version;
++    }
++
++    long CoreSubsystem::getEngineBuildNumber() const
++    {
++        static const Ogre::String sMonths[] =
++        {&quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;, &quot;Jul&quot;, &quot;Aug&quot;,
++         &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;};
++
++        Ogre::String dateStr = Ogre::String(__DATE__);
++        Ogre::String monthStr = dateStr.substr(0,3);
++        int day = Ogre::StringConverter::parseInt(dateStr.substr(4,2));
++        int year = Ogre::StringConverter::parseInt(dateStr.substr(7,4));
++        int month = 0;
++
++        while( month &lt; 12 &amp;&amp; monthStr.compare(sMonths[month]) != 0 )
++            month++;
++
++        return /* Jahr */          year * 100000 +
++               /* Monat */         (month+1) * 1000 +
++               /* Tag */           day * 10 +
++               /* Sub-Version */   0;
++    }
++
++    RubyInterpreter* CoreSubsystem::getRubyInterpreter()
++    {
++        return mRubyInterpreter;
++    }
++
++    void CoreSubsystem::makeScreenshot( const Ogre::String&amp; sName )
++    {
++        mRenderWindow-&gt;writeContentsToTimestampedFile(sName, &quot;.png&quot;);
++    }
++
++    ContentModule* CoreSubsystem::getActiveAdventureModule() const
++    {
++        return mActiveAdventureModule;
++    }
++
++    const ModuleMap&amp; CoreSubsystem::getAllModules() const
++    {
++        return mModules;
++    }
++
++    void CoreSubsystem::loadMap(const Ogre::String type, const Ogre::String filename,
++        const Ogre::String module)
++    {
++        mWorld-&gt;loadScene(filename, module);
++    }
++
++    void CoreSubsystem::loadPlugins()
++    {
++        mSoundManager-&gt;applySettings(rl::ConfigurationManager::getSingleton().getSettings(&quot;Sound&quot;));
++        LOG_MESSAGE(Logger::CORE, &quot;Soundeinstellungen geladen&quot;);
++    }
++
++    void CoreSubsystem::unloadPlugins()
++    {
++        mSoundManager-&gt;unloadAllDrivers();
++        LOG_MESSAGE(Logger::CORE, &quot;Soundtreiber entladen&quot;);
++    }
++}
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001405.html">[Dsa-hl-svn] r4334 - in rl/trunk/engine/rules: include src
+</A></li>
+	<LI>Next message: <A HREF="001407.html">[Dsa-hl-svn] r4336 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1406">[ date ]</a>
+              <a href="thread.html#1406">[ thread ]</a>
+              <a href="subject.html#1406">[ subject ]</a>
+              <a href="author.html#1406">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,396 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Dsa-hl-svn] r4826 - rl/trunk/editors/Lockenwickler/src
+   </TITLE>
+   <LINK REL="Index" HREF="http://lists.berlios.de/pipermail/dsa-hl-svn/2009-March/index.html" >
+   <LINK REL="made" HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4826%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903102117.n2ALHVFl017184%40sheep.berlios.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001882.html">
+   <LINK REL="Next"  HREF="001884.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Dsa-hl-svn] r4826 - rl/trunk/editors/Lockenwickler/src</H1>
+    <B>fusion2 at mail.berlios.de</B> 
+    <A HREF="mailto:dsa-hl-svn%40lists.berlios.de?Subject=Re%3A%20%5BDsa-hl-svn%5D%20r4826%20-%20rl/trunk/editors/Lockenwickler/src&In-Reply-To=%3C200903102117.n2ALHVFl017184%40sheep.berlios.de%3E"
+       TITLE="[Dsa-hl-svn] r4826 - rl/trunk/editors/Lockenwickler/src">fusion2 at mail.berlios.de
+       </A><BR>
+    <I>Tue Mar 10 22:17:31 CET 2009</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001882.html">[Dsa-hl-svn] r4825 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+        <LI>Next message: <A HREF="001884.html">[Dsa-hl-svn] r4827 - dependencies/OgreNewt
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1883">[ date ]</a>
+              <a href="thread.html#1883">[ thread ]</a>
+              <a href="subject.html#1883">[ subject ]</a>
+              <a href="author.html#1883">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Author: fusion2
+Date: 2009-03-10 22:17:25 +0100 (Tue, 10 Mar 2009)
+New Revision: 4826
+
+Modified:
+   rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+   rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+Log:
+- lights and entities are now loaded and saved with all properties
+
+Modified: rl/trunk/editors/Lockenwickler/src/ModuleManager.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-10 20:42:07 UTC (rev 4825)
++++ rl/trunk/editors/Lockenwickler/src/ModuleManager.py	2009-03-10 21:17:25 UTC (rev 4826)
+@@ -91,6 +91,21 @@
+     return n
+         
+         
++class EntityCustomOptions(og.UserDefinedObject):
++    def __init__(self, receivesShadow = True, staticgeometrygroup = 0, physicsproxytype = &quot;none&quot;, renderingdistance = &quot;20000&quot;):
++        og.UserDefinedObject.__init__(self)
++        self.receivesShadow = receivesShadow
++        self.staticgeometrygroup = staticgeometrygroup
++        self.physicsproxytype = physicsproxytype
++        self.renderingdistance = renderingdistance
++        
++        ModuleManager.entityCustomOptionsDict.append(self)
++        
++    def copy(self):
++            return EntityCustomOptions(self.receivesShadow, self.staticgeometrygroup, self.physicsproxytype, self.renderingdistance)
++        
++    def getType(self):
++            return &quot;EntityCustomOptions&quot;
+ 
+ class Map():
+     def __init__(self, pathToFile, sceneManager, ogreRoot, gocManager, emptyMap = False):
+@@ -147,6 +162,27 @@
+                     ModuleManager.dropCount = num + 1
+                     
+             meshFile = nodes.attrib[&quot;meshfile&quot;]
++            
++            eco = EntityCustomOptions()
++            
++            try:
++                eco.receivesShadow = bool(nodes.attrib[&quot;receivesShadow&quot;])
++            except:
++                pass
++            try:
++                eco.staticgeometrygroup = int(nodes.attrib[&quot;staticgeometrygroup&quot;])
++            except:
++                pass
++            try:
++                eco.physicsproxy = nodes.attrib[&quot;physicsproxy&quot;]
++            except:
++                pass
++            try:
++                eco.renderingdistance = float(nodes.attrib[&quot;renderingdistance&quot;])
++            except:
++                pass
++            
++            
+             nodePosition = None
+             nodeScale = None
+             qw = qx = qy = qz = None
+@@ -173,8 +209,10 @@
+                 e = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager,  entityName), meshFile)
+             except:
+                 print &quot;Warning: Meshfile &quot; + meshFile + &quot; could not be found.&quot;
+-                continue
++                return
++            
+ 
++            e.setUserObject(eco)
+             n = self.mapNode.createChild(&quot;entity_&quot; + entityName + &quot;_node&quot;)
+             n.attachObject(e)
+             n.setPosition(nodePosition)
+@@ -188,13 +226,19 @@
+             lightVisible = bool(l.attrib[&quot;visible&quot;])
+             castShadows = bool(l.attrib[&quot;castShadows&quot;])
+             lightPosition = None
++            lightDirection = None
+             colourDiffuse = None
+             colourSpecular = None
+             lightAttenuationRange = None
+             lightAttenuationConstant= None
+             lightAttenuationLinear = None
+             lightAttenuationQuadratic = None
++            spotlightinner = None
++            spotlightouter = None
++            falloff = None 
++            
+ 
++                
+             transformations = l.getiterator()
+             for t in transformations:
+                 if t.tag == &quot;position&quot;:
+@@ -217,23 +261,36 @@
+                     lightAttenuationConstant= float(t.attrib[&quot;constant&quot;])
+                     lightAttenuationLinear = float(t.attrib[&quot;linear&quot;])
+                     lightAttenuationQuadratic = float(t.attrib[&quot;quadratic&quot;])
+-            
+-
++                elif t.tag == &quot;spotlightrange&quot;:
++                    spotlightinner = float(t.attrib[&quot;spotlightinner&quot;])
++                    spotlightouter = float(t.attrib[&quot;spotlightouter&quot;])
++                    falloff = float(t.attrib[&quot;falloff&quot;])
++                    
+             light = self.sceneManager.createLight(lightName)
+             light.setVisible(lightVisible)
+             light.setCastShadows(castShadows)
+-            light.setAttenuation(lightAttenuationRange, lightAttenuationConstant, lightAttenuationLinear, lightAttenuationQuadratic)
+-            light.setDiffuseColour(colourDiffuse)
+-            light.setSpecularColour(colourSpecular)
++            if lightAttenuationConstant and lightAttenuationLinear and lightAttenuationQuadratic:
++                light.setAttenuation(lightAttenuationRange, lightAttenuationConstant, lightAttenuationLinear, lightAttenuationQuadratic)
++            if colourDiffuse:
++                light.setDiffuseColour(colourDiffuse)
++            if colourSpecular:
++                light.setSpecularColour(colourSpecular)
++            if spotlightinner and spotlightouter and spotlightouter: 
++                light.setSpotlightRange(spotlightinner, spotlightouter, falloff)
+             
+             if lightType == &quot;point&quot;:
+-                light.setType(og.Light.LT_POINT)
+-            
++                light.setType(og.Light.LT_POINT)            
++            elif lightType == &quot;spot&quot;:
++                light.setType(og.Light.LT_SPOT)
++            elif lightType == &quot;directional&quot;:
++                light.setType(og.Light.LT_DIRECTIONAL)
++                
+             e = self.sceneManager.createEntity(lightName + &quot;_ent&quot;, &quot;lightbulp.mesh&quot;)
+             n = self.mapNode.createChild(&quot;light_&quot; + lightName + &quot;_node&quot;)
+             n.attachObject(e)
+             n.attachObject(light)
+-            n.setPosition(lightPosition)
++            if lightPosition:
++                n.setPosition(lightPosition)
+ 
+             
+     def createSound(self, soundNodes):
+@@ -313,6 +370,11 @@
+                     entElem = xml.SubElement(nodesElem, &quot;entity&quot;)
+                     entElem.attrib[&quot;name&quot;] = n.getAttachedObject(0).getName()
+                     entElem.attrib[&quot;meshfile&quot;] = n.getAttachedObject(0).getMesh().getName()
++   
++                    entElem.attrib[&quot;receivesShadow&quot;] = str(n.getAttachedObject(0).getUserObject().receivesShadow).lower()
++                    entElem.attrib[&quot;staticgeometrygroup&quot;] = str(n.getAttachedObject(0).getUserObject().staticgeometrygroup)
++                    entElem.attrib[&quot;physicsproxytype&quot;] = str(n.getAttachedObject(0).getUserObject().physicsproxytype)
++                    entElem.attrib[&quot;renderingdistance&quot;] = str(n.getAttachedObject(0).getUserObject().renderingdistance)
+                     
+                     posElem = xml.SubElement(entElem, &quot;position&quot;)
+                     posElem.attrib[&quot;x&quot;] = str(n.getPosition().x)
+@@ -330,7 +392,7 @@
+                     scaleElem.attrib[&quot;y&quot;] = str(n.getScale().y)
+                     scaleElem.attrib[&quot;z&quot;] = str(n.getScale().z)
+                     
+-                if n.name.startswith(&quot;gameobject_&quot;):
++                elif n.name.startswith(&quot;gameobject_&quot;):
+                     goElem = xml.SubElement(nodesElem, &quot;gameobject&quot;)
+                     mname = n.name
+ 
+@@ -354,6 +416,66 @@
+                     scaleElem.attrib[&quot;y&quot;] = str(n.getScale().y)
+                     scaleElem.attrib[&quot;z&quot;] = str(n.getScale().z)
+                     
++                elif n.name.startswith(&quot;light_&quot;):
++                    light = n.getAttachedObject(0)
++                    lightName = light.getName()
++                    lightType = light.getType()
++                    isVisible = &quot;true&quot;
++                    if not light.isVisible():
++                        isVisible = &quot;false&quot;
++                    
++                    castShadows = &quot;false&quot;
++                    if light.getCastShadows():
++                        castShadows = &quot;true&quot;
++                    
++                    if lightType == og.Light.LT_POINT:
++                        lightType = &quot;point&quot;
++                    elif lightType == og.Light.LT_SPOT:
++                        lightType = &quot;spot&quot;
++                    elif lightType == og.Light.LT_SPOT:
++                        lightType = &quot;directional&quot;
++                    
++                    
++                    lightElem = xml.SubElement(nodesElem, &quot;light&quot;)
++                    lightElem.attrib[&quot;name&quot;] = lightName
++                    lightElem.attrib[&quot;type&quot;] = lightType
++                    lightElem.attrib[&quot;visible&quot;] = isVisible
++                    lightElem.attrib[&quot;castShadows&quot;] = castShadows
++                    
++                    if lightType == &quot;point&quot; or lightType == &quot;spot&quot;:
++                        posElem = xml.SubElement(lightElem, &quot;position&quot;)
++                        posElem.attrib[&quot;x&quot;] = str(light.getPosition().x)
++                        posElem.attrib[&quot;y&quot;] = str(light.getPosition().y)
++                        posElem.attrib[&quot;z&quot;] = str(light.getPosition().z)
++                    
++                    colDiffuseElem = xml.SubElement(lightElem, &quot;colourDiffuse&quot;)
++                    colDiffuseElem.attrib[&quot;r&quot;] = str(light.getDiffuseColour().r)
++                    colDiffuseElem.attrib[&quot;g&quot;] = str(light.getDiffuseColour().g)
++                    colDiffuseElem.attrib[&quot;b&quot;] = str(light.getDiffuseColour().b)
++
++                    colSpecularElem = xml.SubElement(lightElem, &quot;colourSpecular&quot;)
++                    colSpecularElem.attrib[&quot;r&quot;] = str(light.getSpecularColour().r)
++                    colSpecularElem.attrib[&quot;g&quot;] = str(light.getSpecularColour().g)
++                    colSpecularElem.attrib[&quot;b&quot;] = str(light.getSpecularColour().b)
++                    
++                    lightAttenuationElem = xml.SubElement(lightElem, &quot;lightAttenuation&quot;)
++                    lightAttenuationElem.attrib[&quot;range&quot;] = str(light.getAttenuationRange())
++                    lightAttenuationElem.attrib[&quot;constant&quot;] = str(light.getAttenuationConstant())
++                    lightAttenuationElem.attrib[&quot;linear&quot;] = str(light.getAttenuationLinear())
++                    lightAttenuationElem.attrib[&quot;quadratic&quot;] = str(light.getAttenuationQuadratic())
++                    
++                    if lightType == &quot;spot&quot;:
++                        spotligthRangeElem = xml.SubElement(lightElem, &quot;spotlightrange&quot;)
++                        spotligthRangeElem.attrib[&quot;inner&quot;] = str(light.getSpotlightInnerAngle())
++                        spotligthRangeElem.attrib[&quot;outer&quot;] = str(light.getSpotlightOuterAngle())
++                        spotligthRangeElem.attrib[&quot;falloff&quot;] = str(light.getSpotlightFalloff())
++                        
++                    if lightType == &quot;spot&quot; or lightType == &quot;directional&quot;:
++                        directionElem = xml.SubElement(lightElem, &quot;direction&quot;)
++                        directionElem.attrib[&quot;x&quot;] = str(light.getDirection().x)
++                        directionElem.attrib[&quot;y&quot;] = str(light.getDirection().y)
++                        directionElem.attrib[&quot;z&quot;] = str(light.getDirection().z)
++                        
+             i = i+1
+             
+         indent(root)
+@@ -573,6 +695,7 @@
+                             
+ class ModuleManager():
+     dropCount = 0
++    entityCustomOptionsDict = []
+     
+     def __init__(self,  ogreRoot,  sceneManager):
+         self.sceneManager = sceneManager
+@@ -623,6 +746,8 @@
+         self.onContextMenuCallback = None
+     
+         self.playerStartGameObjectId = None
++        
++        self.entityCustomOptionsDict = []
+     
+     def resetParsedModuleConfig(self):
+         self.moduleConfigIsParsed = False
+@@ -846,13 +971,13 @@
+ 
+         for so in self.userSelectionList:
+             if so.entity.getUserObject() is not None:
+-                if so.entity.getUserObject().getType() == &quot;GAME_OBJECT_REPRESENTATION&quot;:
++                if str(so.entity.getParentNode().getName()).startswith(&quot;gameobject_&quot;):
+                     go = self.gocManager.getGameObjectWithClassId(so.entity.getUserObject().gocName)
+                     meshFile = go.getMeshFileName()
+ 
+                     if go is not None:
+                         newEntity = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), str(meshFile))
+-                        newNode = self.currentMap.mapNode.createChild(&quot;gameObject_dropNode&quot; + str(ModuleManager.dropCount))
++                        newNode = self.currentMap.mapNode.createChild(&quot;gameobject_dropNode&quot; + str(ModuleManager.dropCount))
+                         newNode.attachObject(newEntity)
+                         newNode.setPosition(so.entity.getParentNode().getPosition())
+ 
+@@ -865,23 +990,28 @@
+                         newSO.setSelected(True)
+                         newSelectionList.append(newSO)
+                         ModuleManager.dropCount += 1
+-            else:
+-                nodeName = &quot;entity_dropNode&quot; + str(ModuleManager.dropCount)
+-                newNode = self.currentMap.mapNode.createChild(nodeName)
++                elif str(so.entity.getParentNode().getName()).startswith(&quot;entity_&quot;):
++                    nodeName = &quot;entity_dropNode&quot; + str(ModuleManager.dropCount)
++                    newNode = self.currentMap.mapNode.createChild(nodeName)
+ 
+-                entityName = createUniqueEntityName(self.sceneManager)
+-                newEntity = self.sceneManager.createEntity(entityName, so.entity.getMesh().getName())
++                    entityName = createUniqueEntityName(self.sceneManager)
++                    newEntity = self.sceneManager.createEntity(entityName, so.entity.getMesh().getName())
+ 
+-                newNode.attachObject(newEntity)
+-                newNode.setPosition(so.entity.getParentNode().getPosition())
+-                newNode.setOrientation(so.entity.getParentNode().getOrientation())
+-                newNode.setScale(so.entity.getParentNode().getScale())
++                    eco = so.entity.getUserObject().copy()
++                    newEntity.setUserObject(eco)
+ 
+-                newSO = SelectionObject(newEntity)
+-                newSO.setSelected(True)
+-                newSelectionList.append(newSO)
+-                ModuleManager.dropCount += 1
++                    newNode.attachObject(newEntity)
++                    newNode.setPosition(so.entity.getParentNode().getPosition())
++                    newNode.setOrientation(so.entity.getParentNode().getOrientation())
++                    newNode.setScale(so.entity.getParentNode().getScale())
+ 
++                    newSO = SelectionObject(newEntity)
++                    newSO.setSelected(True)
++                    newSelectionList.append(newSO)
++                    ModuleManager.dropCount += 1
++                elif str(so.entity.getParentNode().getName()).startswith(&quot;light_&quot;):
++                    print &quot;Can't copy lights yet :)&quot;
++
+         self.resetSelection()
+         self.userSelectionList = newSelectionList
+ 
+@@ -990,6 +1120,11 @@
+             return
+             
+         self.dropEntity = self.sceneManager.createEntity(createUniqueEntityName(self.sceneManager), meshFile)
++        
++        eco = EntityCustomOptions()
++        self.dropEntity.setUserObject(eco)
++        #ModuleManager.entityCustomOptionsDict.append(eco)
++        
+         self.dropNode = self.currentMap.mapNode.createChild(&quot;entity_dropNode&quot; + str(ModuleManager.dropCount))
+         self.dropNode.attachObject(self.dropEntity)
+ 
+
+Modified: rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py
+===================================================================
+--- rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-10 20:42:07 UTC (rev 4825)
++++ rl/trunk/editors/Lockenwickler/src/SelectionBuffer.py	2009-03-10 21:17:25 UTC (rev 4826)
+@@ -12,11 +12,8 @@
+         self.entity = entity #the selected entity
+         self.isPivot = False
+ 
+-#        if self.entity.getUserObject() is not None:
+-#            self.isGameObject = True
+-#        else:
+-#            self.isGameObject = False
+ 
++
+     #if True this instance will show its bounding box else it will hide it
+     def setSelected(self,  selected):
+         if selected == True:
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001882.html">[Dsa-hl-svn] r4825 - rl/trunk/Mac/Rastullah.xcodeproj
+</A></li>
+	<LI>Next message: <A HREF="001884.html">[Dsa-hl-svn] r4827 - dependencies/OgreNewt
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1883">[ date ]</a>
+              <a href="thread.html#1883">[ thread ]</a>
+              <a href="subject.html#1883">[ subject ]</a>
+              <a href="author.html#1883">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="https://lists.berlios.de/mailman/listinfo/dsa-hl-svn">More information about the Dsa-hl-svn
+mailing list</a><br>
+</body></html>
